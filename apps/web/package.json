@@ -1,0 +1,31 @@
+{
+  "name": "@tdc/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@tdc/types": "workspace:*",
+    "nuxt": "catalog:vue",
+    "vue": "catalog:vue",
+    "vue-router": "catalog:vue"
+  },
+  "devDependencies": {
+    "@vueuse/nuxt": "catalog:vue",
+    "@vueuse/core": "catalog:vue",
+    "typescript": "catalog:tooling",
+    "vue-tsc": "catalog:tooling",
+    "eslint": "catalog:tooling",
+    "vitest": "catalog:testing"
+  }
+}

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,4 +141,54 @@ func waitForServing(t *testing.T, address string) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("server did not start listening")
+}
+
+// An allowed origin must be echoed back so a browser permits the response,
+// and a disallowed one must not be, so an arbitrary site cannot read
+// authenticated responses on a user's behalf.
+func TestCORSOnlyPermitsConfiguredOrigins(t *testing.T) {
+	server := New(Config{
+		Address:         "127.0.0.1:0",
+		ReadTimeout:     5 * time.Second,
+		WriteTimeout:    5 * time.Second,
+		IdleTimeout:     10 * time.Second,
+		ShutdownTimeout: 2 * time.Second,
+		ServerName:      "Test Server",
+		DefaultLanguage: "en",
+		AllowedOrigins:  []string{"http://localhost:3000"},
+	}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	t.Run("allowed origin is permitted", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/version", nil)
+		req.Header.Set("Origin", "http://localhost:3000")
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:3000" {
+			t.Errorf("Access-Control-Allow-Origin = %q, want the request origin", got)
+		}
+	})
+
+	t.Run("unlisted origin is refused", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/version", nil)
+		req.Header.Set("Origin", "https://attacker.example")
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+			t.Errorf("Access-Control-Allow-Origin = %q for an unlisted origin, want empty", got)
+		}
+	})
+
+	t.Run("responses vary on origin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/version", nil)
+		req.Header.Set("Origin", "http://localhost:3000")
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+
+		// Without this a cache could serve one origin's response to another.
+		if !strings.Contains(rec.Header().Get("Vary"), "Origin") {
+			t.Errorf("Vary = %q, want it to include Origin", rec.Header().Get("Vary"))
+		}
+	})
 }

@@ -1,0 +1,71 @@
+# A working TDC deployment: the server and its database.
+#
+# This runs unedited for local evaluation. Before using it in production,
+# change every value marked CHANGE ME below — the server also warns about
+# unsafe settings at startup.
+
+name: tdc
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TDC_SERVER_NAME: "TDC"
+      TDC_SERVER_DESCRIPTION: "A Tanzania Developers Community server"
+      # CHANGE ME: the address clients and federated peers use to reach this
+      # server. Without it the server cannot state a stable address.
+      TDC_SERVER_CANONICAL_ADDRESS: "localhost:8080"
+      TDC_SERVER_ADDRESS: ":8080"
+      # CHANGE ME: the password here must match the one set on the database.
+      # sslmode=disable is acceptable only because both run on this host.
+      TDC_DATABASE_URL: "postgres://tdc:tdc@database:5432/tdc?sslmode=disable"
+      # Browser origins allowed to call this API cross-origin. Empty in a
+      # normal deployment, where the web app is served from this same origin.
+      # Set here for local development, where the app runs on port 3000.
+      TDC_SERVER_ALLOWED_ORIGINS: "http://localhost:3000"
+      TDC_LOG_FORMAT: "json"
+      TDC_LOG_LEVEL: "info"
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  database:
+    # The Debian-based image rather than Alpine: it is the better-tested
+    # variant for production, and Alpine's musl libc has historically caused
+    # locale and collation differences that are painful to discover late.
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tdc
+      # CHANGE ME: this password is published in this file and is not a secret.
+      POSTGRES_PASSWORD: tdc
+      POSTGRES_DB: tdc
+    volumes:
+      # PostgreSQL 18 changed PGDATA to a version-specific directory
+      # (/var/lib/postgresql/18/docker) and moved the declared volume to
+      # /var/lib/postgresql. Mounting the parent is what allows a later
+      # major-version upgrade to use "pg_upgrade --link"; mounting the old
+      # .../data path leaves the container writing to an anonymous volume and
+      # failing to start.
+      - database:/var/lib/postgresql
+    healthcheck:
+      # The server refuses to start until the database accepts connections,
+      # so this gate is what makes an unedited "compose up" work first time.
+      test: ["CMD-SHELL", "pg_isready -U tdc -d tdc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  database:

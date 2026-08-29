@@ -43,6 +43,10 @@ type Config struct {
 	// DefaultLanguage is the interface language for users who have not chosen
 	// one.
 	DefaultLanguage string
+	// AllowedOrigins lists browser origins permitted to call this API from
+	// another origin. Empty is correct when the web app is served from the
+	// same origin as the API, which is the normal deployment.
+	AllowedOrigins []string
 }
 
 // Server owns the HTTP listener and the routes mounted on it.
@@ -74,6 +78,9 @@ func New(cfg Config, pool *db.Pool, log *slog.Logger) *Server {
 		config: cfg,
 	}
 
+	if len(cfg.AllowedOrigins) > 0 {
+		e.Use(cors(cfg.AllowedOrigins))
+	}
 	e.Use(requestLogger(log))
 	e.Use(recoverPanic(log))
 

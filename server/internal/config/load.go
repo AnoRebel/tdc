@@ -120,6 +120,23 @@ func (l *loader) int32Value(key string, fallback int32) int32 {
 	return int32(parsed)
 }
 
+// list reads a comma-separated setting, discarding empty entries so that
+// trailing commas and blank values are tolerated.
+func (l *loader) list(key string) []string {
+	value, ok := l.raw(key)
+	if !ok || strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	return items
+}
+
 func (l *loader) oneOf(key, fallback string, allowed ...string) string {
 	value := l.str(key, fallback)
 	for _, candidate := range allowed {
@@ -162,6 +179,7 @@ func Load(path string) (Config, error) {
 	cfg.Server.IdleTimeout = l.duration("server.idle_timeout", d.Server.IdleTimeout)
 	cfg.Server.ShutdownTimeout = l.duration("server.shutdown_timeout", d.Server.ShutdownTimeout)
 	cfg.Server.ExposeInternalErrors = l.boolean("server.expose_internal_errors", d.Server.ExposeInternalErrors)
+	cfg.Server.AllowedOrigins = l.list("server.allowed_origins")
 
 	cfg.Database.URL = l.str("database.url", d.Database.URL)
 	cfg.Database.MaxConnections = l.int32Value("database.max_connections", d.Database.MaxConnections)

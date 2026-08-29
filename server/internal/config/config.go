@@ -43,6 +43,13 @@ type ServerConfig struct {
 	// local development only: error text can disclose internals to an
 	// unauthenticated caller.
 	ExposeInternalErrors bool
+
+	// AllowedOrigins lists browser origins permitted to call this API from
+	// another origin, comma-separated in configuration. Empty is correct when
+	// the web app is served from the same origin, which is the normal
+	// deployment; it is set during development, when the app runs on a
+	// different port.
+	AllowedOrigins []string
 }
 
 // DatabaseConfig describes the connection to Postgres.

@@ -85,6 +85,7 @@ func run() error {
 		ServerDescription:    cfg.Server.Description,
 		CanonicalAddress:     cfg.Server.CanonicalAddress,
 		DefaultLanguage:      cfg.Server.DefaultLanguage,
+		AllowedOrigins:       cfg.Server.AllowedOrigins,
 	}, pool, log)
 
 	return server.Run(ctx)
