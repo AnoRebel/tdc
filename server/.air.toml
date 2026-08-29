@@ -1,0 +1,22 @@
+# Live reload for local development. Run with "bun run dev:server".
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/tdc-server ./cmd/tdc-server"
+  bin = "./tmp/tdc-server"
+  include_ext = ["go", "sql", "yaml"]
+  exclude_dir = ["tmp", "internal/db/dbgen"]
+  # Generated code changes only when sqlc runs, and rebuilding on it would
+  # loop; the trigger is the query and migration files instead.
+  exclude_regex = ["_test\\.go$"]
+  delay = 300
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = 2000
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true

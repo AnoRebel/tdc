@@ -16,13 +16,17 @@ import (
 
 func testServer(t *testing.T) *Server {
 	t.Helper()
+	// A nil pool is deliberate: these routes must work without a database, and
+	// health reports only the checks it can actually perform.
 	return New(Config{
 		Address:         "127.0.0.1:0",
 		ReadTimeout:     5 * time.Second,
 		WriteTimeout:    5 * time.Second,
 		IdleTimeout:     10 * time.Second,
 		ShutdownTimeout: 2 * time.Second,
-	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		ServerName:      "Test Server",
+		DefaultLanguage: "en",
+	}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
 func TestHealthReportsOK(t *testing.T) {
@@ -67,7 +71,7 @@ func TestVersionMatchesBuild(t *testing.T) {
 // Health and version must not require credentials: a client needs the version
 // before it can sign in, and an uptime check holds no credential.
 func TestPublicEndpointsNeedNoCredentials(t *testing.T) {
-	for _, path := range []string{"/api/health", "/api/version"} {
+	for _, path := range []string{"/api/health", "/api/version", "/api/server"} {
 		rec := httptest.NewRecorder()
 		testServer(t).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK {
@@ -103,7 +107,9 @@ func TestRunShutsDownOnContextCancel(t *testing.T) {
 		WriteTimeout:    5 * time.Second,
 		IdleTimeout:     10 * time.Second,
 		ShutdownTimeout: 2 * time.Second,
-	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		ServerName:      "Test Server",
+		DefaultLanguage: "en",
+	}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)

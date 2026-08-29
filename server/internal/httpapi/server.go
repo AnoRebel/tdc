@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
+	"github.com/AnoRebel/tdc/server/internal/db"
 )
 
 // Config describes how the HTTP server should listen.
@@ -31,6 +32,17 @@ type Config struct {
 	// exists for local development and must stay off in production, where
 	// error text can disclose internals to an unauthenticated caller.
 	ExposeInternalErrors bool
+
+	// ServerName is the operator-chosen display name.
+	ServerName string
+	// ServerDescription says who this server is for.
+	ServerDescription string
+	// CanonicalAddress is how this server is known to clients and peers. It is
+	// never inferred from a request header, so it stays correct behind a proxy.
+	CanonicalAddress string
+	// DefaultLanguage is the interface language for users who have not chosen
+	// one.
+	DefaultLanguage string
 }
 
 // Server owns the HTTP listener and the routes mounted on it.
@@ -38,12 +50,17 @@ type Server struct {
 	echo   *echo.Echo
 	http   *http.Server
 	log    *slog.Logger
+	db     *db.Pool
 	config Config
 }
 
 // New builds a server with the health and version routes mounted. It does not
 // listen until Run is called.
-func New(cfg Config, log *slog.Logger) *Server {
+//
+// The database pool may be nil, which health reporting accounts for; that
+// keeps the server testable without a database for routes that do not need
+// one.
+func New(cfg Config, pool *db.Pool, log *slog.Logger) *Server {
 	e := echo.New()
 	e.Logger = log
 	// Echo v5 takes a factory here, and the parameter order of the handler it
@@ -53,6 +70,7 @@ func New(cfg Config, log *slog.Logger) *Server {
 	s := &Server{
 		echo:   e,
 		log:    log,
+		db:     pool,
 		config: cfg,
 	}
 
