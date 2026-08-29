@@ -1,0 +1,8 @@
+bun.lock
+node_modules/
+dist/
+.output/
+.nuxt/
+bin/
+openspec/
+LICENSE

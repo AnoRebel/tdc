@@ -1,0 +1,37 @@
+# Git hooks. Installed by "bun install" via the postinstall script.
+#
+# These run the cheap checks locally so that obvious problems are caught before
+# they reach continuous integration. Anything slow belongs in CI, not here: a
+# hook that people are tempted to skip is worse than no hook.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format
+      glob: "*.{ts,tsx,vue,js,mjs,json,md,yml,yaml}"
+      run: bun run prettier --check {staged_files}
+
+    - name: gofmt
+      glob: "*.go"
+      run: |
+        unformatted=$(gofmt -l {staged_files})
+        if [ -n "$unformatted" ]; then
+          echo "Not gofmt'd:"; echo "$unformatted"; exit 1
+        fi
+
+    - name: go vet
+      glob: "*.go"
+      run: cd server && go vet ./...
+
+    - name: version consistency
+      glob: "{VERSION,**/package.json,**/config.yml,**/version.go}"
+      run: bun run version:check
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: go test
+      run: cd server && go test -race -timeout 120s ./...
+
+    - name: go build
+      run: cd server && go build ./...

@@ -1,0 +1,178 @@
+## Purpose
+
+Defines how clients receive messages and state changes as they happen — connection lifecycle, subscriptions, presence and status, delivery and read state, and recovery after disconnection — with the network and battery constraints of mobile users on metered data treated as first-class requirements.
+
+## ADDED Requirements
+
+### Requirement: Live delivery
+
+A connected client SHALL receive new messages and state changes for its subscriptions without polling, and delivery MUST be scoped so a client only receives events it is authorized to see.
+
+#### Scenario: Message reaches subscribers promptly
+
+- **WHEN** a message is posted to a channel
+- **THEN** connected members of that channel receive it without issuing a new request
+
+#### Scenario: Delivery respects authorization
+
+- **WHEN** an event occurs in a channel a connected user is not a member of
+- **THEN** that event is not delivered to that user's connection
+
+#### Scenario: Authorization change affects live delivery
+
+- **WHEN** a user's access to a channel is revoked while connected
+- **THEN** subsequent events for that channel are not delivered to them
+
+### Requirement: Subscriptions
+
+A client SHALL declare which conversations it wants live updates for, and MUST be able to change that set without tearing down its connection.
+
+The server MUST NOT require a client to subscribe to everything it is permitted to see.
+
+#### Scenario: Subscription set changes in place
+
+- **WHEN** a client subscribes to an additional channel
+- **THEN** it begins receiving that channel's events on the existing connection
+
+#### Scenario: Client subscribes selectively
+
+- **WHEN** a client is a member of many channels but subscribes to a few
+- **THEN** it receives events only for the subscribed channels
+- **AND** it can still be informed of activity elsewhere through lightweight notification rather than full event delivery
+
+### Requirement: Reconnection and gap recovery
+
+After a disconnection, a client SHALL be able to resume from its last known position and receive exactly the events it missed, without duplicates and without re-fetching entire histories.
+
+Where the gap is too large to replay, the server MUST tell the client to resynchronise rather than silently omitting events.
+
+#### Scenario: Missed events are replayed
+
+- **WHEN** a client reconnects after a brief disconnection
+- **THEN** it receives the events it missed, in order, with no duplicates
+
+#### Scenario: Oversized gap is signalled
+
+- **WHEN** a client reconnects after missing more events than the server retains for replay
+- **THEN** the server instructs the client to resynchronise rather than delivering a partial, gap-containing stream
+
+#### Scenario: Reconnection does not duplicate
+
+- **WHEN** a client reconnects and replays
+- **THEN** no event it already processed is delivered again
+
+### Requirement: Connection efficiency on constrained networks
+
+The transport SHALL be efficient enough for use on metered mobile data and intermittent connectivity. Payloads MUST be compact, and the client MUST NOT be required to maintain a continuously open connection to remain usable.
+
+Idle connections MUST NOT generate constant traffic; keepalive intervals MUST be configurable by the operator.
+
+#### Scenario: Idle connection is quiet
+
+- **WHEN** a client is connected with no activity in its subscriptions
+- **THEN** traffic is limited to infrequent keepalives at the operator-configured interval
+
+#### Scenario: Application remains usable when disconnected
+
+- **WHEN** a client loses connectivity
+- **THEN** previously loaded conversations remain readable
+- **AND** the client indicates it is disconnected and reconnects automatically when connectivity returns
+
+#### Scenario: Reconnection avoids thundering herd
+
+- **WHEN** many clients are disconnected simultaneously and the server returns
+- **THEN** clients reconnect with randomised backoff rather than simultaneously
+
+### Requirement: Presence
+
+The server SHALL track whether a user is currently connected and expose that to users permitted to see it.
+
+Presence MUST be derived from actual connection state, MUST expire if a connection is lost without a clean disconnect, and users MUST be able to appear offline regardless of actual connection state.
+
+#### Scenario: Presence reflects connection
+
+- **WHEN** a user connects
+- **THEN** users permitted to see their presence observe them as online
+
+#### Scenario: Ungraceful disconnect expires
+
+- **WHEN** a client's connection is lost without a clean disconnect
+- **THEN** the user's presence returns to offline within a bounded time rather than remaining online indefinitely
+
+#### Scenario: Invisibility is honoured
+
+- **WHEN** a user chooses to appear offline
+- **THEN** other users observe them as offline while they remain fully functional
+
+### Requirement: Status
+
+Users SHALL be able to set a status such as available, busy, or away, and operators MUST be able to configure the available statuses, including their labels and whether each suppresses notifications.
+
+A status MAY carry an expiry after which it reverts automatically.
+
+#### Scenario: Operator configures statuses
+
+- **WHEN** an operator defines the set of selectable statuses
+- **THEN** users may choose only from that set
+- **AND** each status behaves as configured with respect to notification suppression
+
+#### Scenario: Status expires
+
+- **WHEN** a user sets a status with an expiry and that time passes
+- **THEN** the status reverts automatically without user action
+
+#### Scenario: Busy suppresses notifications
+
+- **WHEN** a user holds a status configured to suppress notifications
+- **THEN** notifications are withheld or downgraded per that configuration
+
+### Requirement: Typing indication
+
+The server SHALL support indicating that a user is composing a message in a conversation. Indicators MUST expire automatically if not refreshed, and MUST be suppressible by the user.
+
+#### Scenario: Indicator expires without refresh
+
+- **WHEN** a client stops refreshing a typing indication
+- **THEN** the indication disappears for other participants within a bounded time
+
+#### Scenario: Indication can be disabled
+
+- **WHEN** a user disables sending typing indication
+- **THEN** no such indication is sent on their behalf
+
+### Requirement: Delivery and read state
+
+The server SHALL track each user's read position per conversation so unread state is consistent across that user's devices.
+
+Read state MUST converge when a user reads on one device while others are connected or offline.
+
+#### Scenario: Read state syncs across devices
+
+- **WHEN** a user reads a conversation on one device
+- **THEN** their other devices reflect the updated read position
+
+#### Scenario: Unread counts are accurate
+
+- **WHEN** a user has unread messages across several conversations
+- **THEN** the reported unread counts match the messages after their read position, excluding their own messages
+
+#### Scenario: Offline device converges on reconnect
+
+- **WHEN** a device that was offline reconnects
+- **THEN** it converges on the read position established elsewhere rather than resurfacing already-read messages
+
+### Requirement: Multi-node operation
+
+The delivery mechanism SHALL support running more than one server process behind a load balancer, with an event reaching subscribers regardless of which process they are connected to.
+
+A single-process deployment MUST NOT require any additional infrastructure to achieve this.
+
+#### Scenario: Cross-process delivery
+
+- **WHEN** two clients are connected to different server processes and one posts to a shared channel
+- **THEN** the other receives the message
+
+#### Scenario: Single node needs nothing extra
+
+- **WHEN** an operator runs a single server process
+- **THEN** real-time delivery works with only the server and its database, with no broker or additional service required

@@ -1,0 +1,11 @@
+/**
+ * Shared type definitions for the TDC platform.
+ *
+ * This package is transport-agnostic and framework-agnostic: it describes the
+ * shapes exchanged between clients and a server, and nothing about how they
+ * travel. Both the web and desktop clients depend on it, as does any third
+ * party writing an integration.
+ */
+
+export * from "./server";
+export * from "./errors";

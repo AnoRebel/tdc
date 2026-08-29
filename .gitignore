@@ -1,0 +1,51 @@
+# AI tooling
+.claude
+.opencode
+.pi
+.serena
+.Claude
+.mcp.json
+
+# Dependencies
+node_modules/
+
+# Build output
+bin/
+dist/
+.output/
+.nuxt/
+.nitro/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Wails
+apps/desktop/build/bin/
+apps/desktop/frontend/bindings/
+
+# Test and coverage
+coverage/
+*.out
+*.test
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!**/testdata/**/*.key
+
+# Editor and OS
+.DS_Store
+.idea/
+*.swp
+
+# Local data
+tmp/
+data/
+
+# Agent instruction files (empty placeholders)
+CLAUDE.md
+AGENTS.md
