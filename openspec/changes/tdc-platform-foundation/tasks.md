@@ -12,8 +12,8 @@ Goal: a server that starts, connects to Postgres, reports its version, and a web
 - [x] 1.3 Create the directory structure — `server/` (`internal/`+`pkg/`+`cmd/`), `packages/ui/`, `packages/types/`, `apps/web/`, `apps/desktop/`; verify each builds an empty artifact
 - [x] 1.4 Set up the Echo v5 server with structured logging, graceful shutdown, and health endpoints; verify it starts, serves health, and shuts down cleanly on signal
 - [ ] 1.5 Implement configuration loading from file with environment override, startup validation reporting every problem, and secret redaction; verify two invalid values are both reported and startup is refused (`platform/foundation`, `platform/server-config`)
-- [ ] 1.6 Set up Postgres connectivity with `pgx` plus GORM per the design's split; verify both paths connect and a round-trip test passes
-- [ ] 1.7 Implement the migration runner applying migrations transactionally on start and refusing a newer schema than the binary; verify a skipped-release upgrade applies all pending migrations in order (`platform/foundation`)
+- [x] 1.6 Set up Postgres connectivity with `pgx` and configure `sqlc` to generate typed Go from hand-written SQL; verify the pool connects, a generated query round-trips, and `sqlc vet` runs in CI
+- [x] 1.7 Implement the migration runner applying migrations transactionally on start and refusing a newer schema than the binary; verify a skipped-release upgrade applies all pending migrations in order (`platform/foundation`)
 - [x] 1.8 Implement the version endpoint reporting release and protocol version unauthenticated; verify it matches the built artifact (`platform/foundation`)
 - [ ] 1.9 Scaffold the Nuxt 4 web app with `ssr: false` and `compatibilityVersion: 5`; verify it builds and renders a page
 - [ ] 1.10 Write the server Dockerfile and a Compose definition bringing up server and Postgres unedited; verify `docker compose up` yields a reachable server (`platform/foundation`)

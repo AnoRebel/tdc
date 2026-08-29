@@ -80,11 +80,20 @@ The cost is honest and stated in the spec: a room is unavailable to remote parti
 
 The data is aggressively relational (messages→threads→channels→servers, reactions as many-to-many, issues with assignees, labels, parents and cross-project relations). Denormalising into documents means a username change fans out across every message the user ever posted, unprotected by a transaction. JSONB covers the genuine flexibility need without giving up foreign keys or multi-table ACID.
 
-### ORM: GORM for CRUD, raw SQL for the hot path
+### Data access: pgx with sqlc, and no ORM
 
-**Decision.** GORM for users, roles, projects, settings and other ordinary CRUD; hand-written SQL through `pgx` for message insertion, timeline reads and unread counts.
+**Decision.** `pgx` as the driver, `sqlc` to generate typed Go from hand-written SQL, and `golang-migrate` for schema migrations. No ORM anywhere.
 
-This keeps the requested ORM where it earns its keep and bypasses it on the paths where a message-heavy system will feel it. Congrator already demonstrates the no-ORM end of this (`sqlx` with hand-written SQL) and AnoPOS the GORM end; TDC splits by workload rather than picking one globally.
+This reverses the project's initial stack choice of GORM. The reasoning is long-term maintainability with outside contributors, which is the situation TDC is actually in:
+
+- **GORM's failure modes are invisible in review.** A contributor unfamiliar with the schema can easily produce an N+1 query, an accidental full-table scan, or a silent zero-value update, and none of those fail a test or a code review — they fail in production on a small VPS. With generated SQL the query is on the page in the pull request, so a reviewer sees exactly what will execute.
+- **`sqlc` catches mistakes at build time.** A wrong column name or a type mismatch fails compilation rather than at runtime. That safety net helps an unfamiliar contributor most, and is the main reason to prefer `sqlc` over `sqlx`, which still lets a typo reach production.
+- **A hybrid is worse than either option alone.** The earlier plan split GORM for CRUD from raw SQL for the message hot path. In practice that obliges every contributor to learn both, plus an unwritten rule about which applies where — a boundary that would be re-argued in review and would drift. One mental model is worth more than local convenience.
+- **It suits the memory target.** Predictable, inspectable queries are far easier to reason about than a reflection-heavy runtime when chasing memory use on a 1 GB budget.
+
+**The precedent is unambiguous.** Mattermost — a Go chat server, self-hosted, with a mature open-source contributor base, and the closest analogue to this project — uses `sqlx` with `squirrel` and no ORM, having had every opportunity to adopt one. Congrator likewise uses hand-written SQL through `sqlx`.
+
+**The honest cost.** Migrations become hand-written SQL rather than generated from struct definitions. That is more work up front, but auto-migration would have to be abandoned before production regardless: it cannot express a safe column rename or a backfill, and this product must support operators upgrading across skipped releases, which requires deterministic ordered migrations. `golang-migrate` provides those, and the migration runner already specified in `platform/foundation` assumes them.
 
 ### Real-time transport: server-authoritative WebSocket pub/sub
 
