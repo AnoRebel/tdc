@@ -69,7 +69,7 @@ The cost is honest and stated in the spec: a room is unavailable to remote parti
 
 ### Datastore: Postgres only
 
-**Decision.** PostgreSQL 17+ as the sole datastore. Normalised tables for messages, channels, memberships, issues and relations; JSONB with GIN indexes for message content blocks, custom fields and integration payloads; `tsvector` + GIN for search; `pg_trgm` for fuzzy matching.
+**Decision.** PostgreSQL 17 or later as the sole datastore, developed and tested against 18. Normalised tables for messages, channels, memberships, issues and relations; JSONB with GIN indexes for message content blocks, custom fields and integration payloads; `tsvector` + GIN for search; `pg_trgm` for fuzzy matching.
 
 **Why not FerretDB or the DocumentDB extension.** Both were evaluated seriously. The DocumentDB Postgres extension is MIT-licensed and Linux Foundation–governed with real multi-vendor backing (Microsoft, AWS, Google), and FerretDB is Apache-2.0 — so licensing was not the objection. The objections are:
 
@@ -94,6 +94,13 @@ This reverses the project's initial stack choice of GORM. The reasoning is long-
 **The precedent is unambiguous.** Mattermost — a Go chat server, self-hosted, with a mature open-source contributor base, and the closest analogue to this project — uses `sqlx` with `squirrel` and no ORM, having had every opportunity to adopt one. Congrator likewise uses hand-written SQL through `sqlx`.
 
 **The honest cost.** Migrations become hand-written SQL rather than generated from struct definitions. That is more work up front, but auto-migration would have to be abandoned before production regardless: it cannot express a safe column rename or a backfill, and this product must support operators upgrading across skipped releases, which requires deterministic ordered migrations. `golang-migrate` provides those, and the migration runner already specified in `platform/foundation` assumes them.
+
+**Implementation notes**, recorded because each cost time to discover:
+
+- `sqlc` reads its schema from the **migration directory**, not a separate schema file, so the migrations are the single description of the database. A query naming a column no migration creates fails to generate rather than failing at runtime.
+- `sqlc` singularises table names to derive struct names, and its guesses are poor for names that are already singular (`schema_meta` became `SchemaMetum`). Its `rename` option maps field names, not table-to-struct names, so the fix is to name tables in the plural.
+- `golang-migrate`'s pgx driver registers itself under the scheme **`pgx5`**, not `postgres`. Operators write an ordinary `postgres://` URL and the runner translates it, rather than leaking an unusual scheme into configuration and documentation.
+- Timestamps are overridden to `time.Time` rather than `pgtype` wrappers, and nullable columns to pointers, so no code outside the generated package imports `pgtype`.
 
 ### Real-time transport: server-authoritative WebSocket pub/sub
 
