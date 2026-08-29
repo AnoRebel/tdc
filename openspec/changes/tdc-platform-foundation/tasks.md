@@ -9,12 +9,12 @@ Goal: a server that starts, connects to Postgres, reports its version, and a web
 - [x] 1.1 Initialise the monorepo on Bun 1.4 with Go modules and `go.work`, following Congrator's working workspace arrangement rather than a fresh one; verify a clean-clone `bun install` resolves every workspace and a sibling package's `exports` map is honoured when imported across the workspace
 - [ ] 1.1a Set up `air` for Go live reload and pin development tool versions in the repository; verify `air` rebuilds and restarts the server on a source change
 - [x] 1.2 Add the Apache-2.0 `LICENSE` and `NOTICE` at the root; verify the licence is detected correctly by the repository host
-- [ ] 1.3 Create the directory structure — `server/` (`internal/`+`pkg/`+`cmd/`), `packages/ui/`, `packages/types/`, `apps/web/`, `apps/desktop/`; verify each builds an empty artifact
-- [ ] 1.4 Set up the Echo v5 server with structured logging, graceful shutdown, and health endpoints; verify it starts, serves health, and shuts down cleanly on signal
+- [x] 1.3 Create the directory structure — `server/` (`internal/`+`pkg/`+`cmd/`), `packages/ui/`, `packages/types/`, `apps/web/`, `apps/desktop/`; verify each builds an empty artifact
+- [x] 1.4 Set up the Echo v5 server with structured logging, graceful shutdown, and health endpoints; verify it starts, serves health, and shuts down cleanly on signal
 - [ ] 1.5 Implement configuration loading from file with environment override, startup validation reporting every problem, and secret redaction; verify two invalid values are both reported and startup is refused (`platform/foundation`, `platform/server-config`)
 - [ ] 1.6 Set up Postgres connectivity with `pgx` plus GORM per the design's split; verify both paths connect and a round-trip test passes
 - [ ] 1.7 Implement the migration runner applying migrations transactionally on start and refusing a newer schema than the binary; verify a skipped-release upgrade applies all pending migrations in order (`platform/foundation`)
-- [ ] 1.8 Implement the version endpoint reporting release and protocol version unauthenticated; verify it matches the built artifact (`platform/foundation`)
+- [x] 1.8 Implement the version endpoint reporting release and protocol version unauthenticated; verify it matches the built artifact (`platform/foundation`)
 - [ ] 1.9 Scaffold the Nuxt 4 web app with `ssr: false` and `compatibilityVersion: 5`; verify it builds and renders a page
 - [ ] 1.10 Write the server Dockerfile and a Compose definition bringing up server and Postgres unedited; verify `docker compose up` yields a reachable server (`platform/foundation`)
 - [ ] **MILESTONE 1** — Demonstrate: `docker compose up` starts the stack, the web app loads in a browser, and it displays the server's version fetched from the live API. Tag `v0.1.0-dev`.
