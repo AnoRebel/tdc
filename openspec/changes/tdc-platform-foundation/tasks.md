@@ -38,7 +38,7 @@ Goal: real accounts, real sessions, enforced permissions — the system is usabl
 
 Goal: the core product. Channels, messages, and live delivery between real clients.
 
-- [ ] 3.1 Define the event schema with content-derived identifiers and implement Ed25519 signing and verification with rotatable keys; verify identifiers change when any signed field changes and retired keys still verify history (`platform/event-log`)
+- [x] 3.1 Define the event schema with content-derived identifiers and implement Ed25519 signing and verification with rotatable keys; verify identifiers change when any signed field changes and retired keys still verify history (`platform/event-log`)
 - [ ] 3.2 Implement the append-only event store with per-room total ordering; verify two readers observe identical order for the same range (`platform/event-log`)
 - [ ] 3.3 Implement idempotent submission keyed on a client token; verify an identical retry yields one event and returns the same identifier (`platform/event-log`)
 - [ ] 3.4 Implement `user@server` and `room@server` addressing throughout; verify API responses always name the home server (`platform/event-log`, `messaging/channels`)
