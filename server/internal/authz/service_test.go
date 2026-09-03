@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"os"
 	"testing"
 	"time"
 
@@ -14,15 +13,13 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/dbtest"
 )
 
 func newTestService(t *testing.T) (*authz.Service, *dbgen.Queries) {
 	t.Helper()
 
-	url := os.Getenv("TDC_TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("set TDC_TEST_DATABASE_URL to run authorization tests")
-	}
+	url := dbtest.URL(t, "authz")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

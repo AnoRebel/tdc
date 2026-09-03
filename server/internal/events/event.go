@@ -8,6 +8,7 @@
 package events
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -68,6 +69,16 @@ type Event struct {
 	// Content is the type-specific payload.
 	Content json.RawMessage `json:"content"`
 
+	// Nonce distinguishes events that are otherwise identical.
+	//
+	// Without it, two events with the same sender, room, type, content and
+	// millisecond timestamp derive the same identifier — which a person
+	// double-clicking send, or an integration posting a repeated status line,
+	// produces in ordinary use. It is part of the signed form, so it cannot be
+	// altered after the fact, and it is what makes identity unique by
+	// construction rather than by hoping the inputs differ.
+	Nonce string `json:"nonce"`
+
 	// Signature over the canonical form, produced by the origin server.
 	Signature string `json:"signature,omitempty"`
 	// KeyID names which of the origin's keys signed this, so a key can be
@@ -98,6 +109,7 @@ func (e Event) canonical() ([]byte, error) {
 		Origin    string          `json:"origin"`
 		Type      Type            `json:"type"`
 		CreatedAt int64           `json:"createdAt"`
+		Nonce     string          `json:"nonce"`
 		Content   json.RawMessage `json:"content"`
 	}{
 		Room:      e.Room,
@@ -105,6 +117,7 @@ func (e Event) canonical() ([]byte, error) {
 		Origin:    e.Origin,
 		Type:      e.Type,
 		CreatedAt: e.CreatedAt,
+		Nonce:     e.Nonce,
 		Content:   e.Content,
 	}
 
@@ -147,6 +160,8 @@ func (e Event) Validate() error {
 		return fmt.Errorf("%w: createdAt is required", ErrMalformed)
 	case len(e.Content) == 0:
 		return fmt.Errorf("%w: content is required", ErrMalformed)
+	case e.Nonce == "":
+		return fmt.Errorf("%w: nonce is required", ErrMalformed)
 	}
 
 	if !json.Valid(e.Content) {
@@ -154,6 +169,15 @@ func (e Event) Validate() error {
 	}
 
 	return nil
+}
+
+// NewNonce returns a fresh nonce.
+func NewNonce() (string, error) {
+	buffer := make([]byte, 12)
+	if _, err := rand.Read(buffer); err != nil {
+		return "", fmt.Errorf("generate event nonce: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(buffer), nil
 }
 
 // Now returns the current time in the representation events use.

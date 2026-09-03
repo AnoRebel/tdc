@@ -37,6 +37,31 @@ type Credential struct {
 	LastUsedAt *time.Time
 }
 
+type Event struct {
+	ID            string
+	RoomID        uuid.UUID
+	Sequence      int64
+	SenderID      *uuid.UUID
+	SenderAddress string
+	RoomAddress   string
+	OriginServer  string
+	Type          string
+	Content       []byte
+	CreatedAt     int64
+	Signature     string
+	KeyID         string
+	RedactedAt    *time.Time
+	RedactedBy    *uuid.UUID
+	Nonce         string
+}
+
+type EventIdempotency struct {
+	SenderID    uuid.UUID
+	ClientToken string
+	EventID     string
+	CreatedAt   time.Time
+}
+
 type Role struct {
 	ID          uuid.UUID
 	Name        string
@@ -51,6 +76,36 @@ type RolePermission struct {
 	Permission string
 	ScopeID    *uuid.UUID
 	Granted    bool
+}
+
+type Room struct {
+	ID                uuid.UUID
+	Slug              string
+	SlugFolded        string
+	Name              string
+	Topic             string
+	Kind              string
+	Visibility        string
+	HomeServer        string
+	CreatedBy         *uuid.UUID
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	ArchivedAt        *time.Time
+	ArchivedBy        *uuid.UUID
+	MessageTtlSeconds *int32
+}
+
+type RoomMember struct {
+	RoomID       uuid.UUID
+	UserID       uuid.UUID
+	JoinedAt     time.Time
+	InvitedBy    *uuid.UUID
+	ReadSequence *int64
+}
+
+type RoomSequence struct {
+	RoomID  uuid.UUID
+	NextSeq int64
 }
 
 type SchemaVersion struct {

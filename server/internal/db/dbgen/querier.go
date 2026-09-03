@@ -12,9 +12,15 @@ import (
 )
 
 type Querier interface {
+	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) error
 	AppendAuditEntry(ctx context.Context, arg AppendAuditEntryParams) (AuditEntry, error)
+	AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error)
+	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
+	// How far behind a client is, so the server can decide between replaying the
+	// gap and telling the client to resynchronise.
+	CountEventsSince(ctx context.Context, arg CountEventsSinceParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	// How many people hold a permission at server scope without an explicit
 	// denial. The administrator floor uses this to refuse a change that would
@@ -22,23 +28,31 @@ type Querier interface {
 	CountUsersWithPermission(ctx context.Context, permission string) (int64, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
+	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
+	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteRole(ctx context.Context, id uuid.UUID) error
 	DeleteServerConfigValue(ctx context.Context, key string) error
+	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
+	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetRoleByName(ctx context.Context, name string) (Role, error)
+	GetRoomByID(ctx context.Context, id uuid.UUID) (Room, error)
+	GetRoomBySlug(ctx context.Context, slugFolded string) (Room, error)
 	GetSchemaVersion(ctx context.Context) (GetSchemaVersionRow, error)
 	GetServerConfigValue(ctx context.Context, key string) (ServerConfig, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error)
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
+	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
+	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
 	// Filters are optional: a NULL argument matches everything, so one query
 	// serves the whole administrative view rather than one per filter combination.
@@ -47,18 +61,43 @@ type Querier interface {
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	// The most recent events, for opening a room.
+	ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEventsParams) ([]Event, error)
 	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]RolePermission, error)
 	ListRoles(ctx context.Context) ([]Role, error)
 	ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]Role, error)
+	// A page of a room's timeline, oldest first within the page.
+	ListRoomEvents(ctx context.Context, arg ListRoomEventsParams) ([]Event, error)
+	// Just the identifiers, for deciding who a live event should reach.
+	ListRoomMemberIDs(ctx context.Context, roomID uuid.UUID) ([]uuid.UUID, error)
+	ListRoomMembers(ctx context.Context, roomID uuid.UUID) ([]ListRoomMembersRow, error)
+	// Rooms the user is a member of, plus public rooms they could join. A private
+	// room they are not in never appears, which is what keeps its existence
+	// undisclosed.
+	ListRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
+	ListRoomsUserIsIn(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	ListServerConfig(ctx context.Context) ([]ServerConfig, error)
 	ListSessionsForUser(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	// Allocates the next position in a room's total order.
+	//
+	// The UPDATE takes a row lock, so two concurrent writers serialise here rather
+	// than both reading the same maximum and colliding.
+	NextRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
+	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
+	// Removes content while leaving the event in place, so ordering and the
+	// surrounding events stay verifiable.
+	RedactEvent(ctx context.Context, arg RedactEventParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	RemoveRolePermission(ctx context.Context, arg RemoveRolePermissionParams) error
+	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) error
+	RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
+	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.
 	SetRolePermission(ctx context.Context, arg SetRolePermissionParams) error

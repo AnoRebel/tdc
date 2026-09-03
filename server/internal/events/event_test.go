@@ -16,6 +16,7 @@ func newEvent() events.Event {
 		Origin:    "tdc.example",
 		Type:      events.TypeMessageSent,
 		CreatedAt: events.Now(),
+		Nonce:     "test-nonce-fixed",
 		Content:   json.RawMessage(`{"body":"hello"}`),
 	}
 }
@@ -60,6 +61,7 @@ func TestIdentifierChangesWithEverySignedField(t *testing.T) {
 		"type":      func(e *events.Event) { e.Type = events.TypeMessageEdited },
 		"createdAt": func(e *events.Event) { e.CreatedAt = base.CreatedAt + 1 },
 		"content":   func(e *events.Event) { e.Content = json.RawMessage(`{"body":"different"}`) },
+		"nonce":     func(e *events.Event) { e.Nonce = "a-different-nonce" },
 	}
 
 	for field, mutate := range variations {
@@ -287,6 +289,7 @@ func TestMalformedEventsAreRejected(t *testing.T) {
 		"no type":      func(e *events.Event) { e.Type = "" },
 		"no timestamp": func(e *events.Event) { e.CreatedAt = 0 },
 		"no content":   func(e *events.Event) { e.Content = nil },
+		"no nonce":     func(e *events.Event) { e.Nonce = "" },
 	}
 
 	for name, mutate := range cases {
@@ -315,5 +318,49 @@ func TestIdentifierIsSafeInUrlsAndHeaders(t *testing.T) {
 		if strings.Contains(id, unsafe) {
 			t.Errorf("identifier %q contains %q, which needs escaping", id, unsafe)
 		}
+	}
+}
+
+// Two events identical in every other field must still differ.
+//
+// Without a nonce they would not: a person double-clicking send, or an
+// integration posting a repeated status line, produces the same sender, room,
+// type, content and millisecond timestamp, and so the same identifier.
+func TestIdenticalMessagesInTheSameMillisecondDiffer(t *testing.T) {
+	first := newEvent()
+	second := newEvent()
+	second.CreatedAt = first.CreatedAt // the same millisecond
+
+	nonce, err := events.NewNonce()
+	if err != nil {
+		t.Fatalf("NewNonce: %v", err)
+	}
+	second.Nonce = nonce
+
+	firstID, err := first.DeriveID()
+	if err != nil {
+		t.Fatalf("DeriveID: %v", err)
+	}
+	secondID, err := second.DeriveID()
+	if err != nil {
+		t.Fatalf("DeriveID: %v", err)
+	}
+
+	if firstID == secondID {
+		t.Error("two otherwise-identical events share an identifier")
+	}
+}
+
+func TestNoncesAreDistinct(t *testing.T) {
+	seen := map[string]bool{}
+	for range 1000 {
+		nonce, err := events.NewNonce()
+		if err != nil {
+			t.Fatalf("NewNonce: %v", err)
+		}
+		if seen[nonce] {
+			t.Fatalf("NewNonce repeated %q", nonce)
+		}
+		seen[nonce] = true
 	}
 }

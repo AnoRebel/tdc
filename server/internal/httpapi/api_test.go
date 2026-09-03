@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/dbtest"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 )
@@ -28,10 +28,7 @@ const testPassword = "correct horse battery staple"
 func newTestAPI(t *testing.T) http.Handler {
 	t.Helper()
 
-	url := os.Getenv("TDC_TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("set TDC_TEST_DATABASE_URL to run API tests")
-	}
+	url := dbtest.URL(t, "httpapi")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

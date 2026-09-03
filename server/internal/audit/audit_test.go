@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"net/netip"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -16,15 +15,13 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/dbtest"
 )
 
 func newTestRecorder(t *testing.T) (*audit.Recorder, *dbgen.Queries) {
 	t.Helper()
 
-	url := os.Getenv("TDC_TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("set TDC_TEST_DATABASE_URL to run audit tests")
-	}
+	url := dbtest.URL(t, "audit")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
