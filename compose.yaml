@@ -46,6 +46,11 @@ services:
     # locale and collation differences that are painful to discover late.
     image: postgres:18
     restart: unless-stopped
+    ports:
+      # Exposed for local development and tests. A production deployment
+      # should remove this: the server reaches the database over the compose
+      # network, and nothing outside the host needs to.
+      - "127.0.0.1:55433:5432"
     environment:
       POSTGRES_USER: tdc
       # CHANGE ME: this password is published in this file and is not a secret.

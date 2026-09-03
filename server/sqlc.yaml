@@ -22,6 +22,21 @@ sql:
         # Postgres timestamps map to time.Time rather than pgtype wrappers,
         # so that code outside this package never has to import pgtype.
         overrides:
+          # UUIDs map to google/uuid rather than pgtype.UUID, so that no code
+          # outside the generated package has to import pgtype to pass an
+          # identifier.
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              package: "uuid"
+              type: "UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/google/uuid"
+              package: "uuid"
+              type: "UUID"
+              pointer: true
           - db_type: "timestamptz"
             go_type: "time.Time"
           - db_type: "timestamptz"

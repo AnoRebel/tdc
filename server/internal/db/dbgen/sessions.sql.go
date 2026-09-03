@@ -10,7 +10,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	uuid "github.com/google/uuid"
 )
 
 const createSession = `-- name: CreateSession :one
@@ -20,8 +20,8 @@ RETURNING id, user_id, token_hash, user_agent, ip_address, created_at, last_seen
 `
 
 type CreateSessionParams struct {
-	ID        pgtype.UUID
-	UserID    pgtype.UUID
+	ID        uuid.UUID
+	UserID    uuid.UUID
 	TokenHash []byte
 	UserAgent string
 	IpAddress *netip.Addr
@@ -112,7 +112,7 @@ WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
 ORDER BY last_seen_at DESC
 `
 
-func (q *Queries) ListSessionsForUser(ctx context.Context, userID pgtype.UUID) ([]Session, error) {
+func (q *Queries) ListSessionsForUser(ctx context.Context, userID uuid.UUID) ([]Session, error) {
 	rows, err := q.db.Query(ctx, listSessionsForUser, userID)
 	if err != nil {
 		return nil, err
@@ -147,7 +147,7 @@ UPDATE sessions SET revoked_at = NOW()
 WHERE user_id = $1 AND revoked_at IS NULL
 `
 
-func (q *Queries) RevokeAllSessionsForUser(ctx context.Context, userID pgtype.UUID) error {
+func (q *Queries) RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, revokeAllSessionsForUser, userID)
 	return err
 }
@@ -158,8 +158,8 @@ WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL
 `
 
 type RevokeOtherSessionsForUserParams struct {
-	UserID pgtype.UUID
-	ID     pgtype.UUID
+	UserID uuid.UUID
+	ID     uuid.UUID
 }
 
 func (q *Queries) RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error {
@@ -173,8 +173,8 @@ WHERE id = $1 AND user_id = $2 AND revoked_at IS NULL
 `
 
 type RevokeSessionParams struct {
-	ID     pgtype.UUID
-	UserID pgtype.UUID
+	ID     uuid.UUID
+	UserID uuid.UUID
 }
 
 func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) error {
@@ -186,7 +186,7 @@ const touchSession = `-- name: TouchSession :exec
 UPDATE sessions SET last_seen_at = NOW() WHERE id = $1
 `
 
-func (q *Queries) TouchSession(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) TouchSession(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, touchSession, id)
 	return err
 }

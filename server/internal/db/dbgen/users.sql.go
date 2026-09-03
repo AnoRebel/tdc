@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	uuid "github.com/google/uuid"
 )
 
 const countUsers = `-- name: CountUsers :one
@@ -30,7 +30,7 @@ RETURNING id, username, username_folded, display_name, email, email_folded, emai
 `
 
 type CreateUserParams struct {
-	ID             pgtype.UUID
+	ID             uuid.UUID
 	Username       string
 	UsernameFolded string
 	DisplayName    string
@@ -97,7 +97,7 @@ const getUserByID = `-- name: GetUserByID :one
 SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at FROM users WHERE id = $1
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error) {
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i User
 	err := row.Scan(
@@ -153,7 +153,7 @@ SET suspended_at    = NULL,
 WHERE id = $1
 `
 
-func (q *Queries) LiftUserSuspension(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) LiftUserSuspension(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, liftUserSuspension, id)
 	return err
 }
@@ -214,9 +214,9 @@ WHERE id = $1
 `
 
 type SuspendUserParams struct {
-	ID             pgtype.UUID
+	ID             uuid.UUID
 	SuspendedUntil *time.Time
-	SuspendedBy    pgtype.UUID
+	SuspendedBy    *uuid.UUID
 	SuspensionNote *string
 }
 
@@ -239,7 +239,7 @@ RETURNING id, username, username_folded, display_name, email, email_folded, emai
 `
 
 type UpdateUserProfileParams struct {
-	ID          pgtype.UUID
+	ID          uuid.UUID
 	DisplayName string
 }
 

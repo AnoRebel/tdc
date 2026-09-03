@@ -23,7 +23,7 @@ Goal: a server that starts, connects to Postgres, reports its version, and a web
 
 Goal: real accounts, real sessions, enforced permissions — the system is usable by more than one identity.
 
-- [ ] 2.1 Implement the user model, registration, and first-run administrator setup that closes after the first administrator exists; verify the setup path becomes unavailable and no default credential exists (`identity/authentication`)
+- [x] 2.1 Implement the user model, registration, and first-run administrator setup that closes after the first administrator exists; verify the setup path becomes unavailable and no default credential exists (`identity/authentication`)
 - [ ] 2.2 Implement password authentication with argon2id, weak/compromised rejection, and account-existence-neutral failures; verify failure responses are indistinguishable for existing and non-existing accounts (`identity/authentication`)
 - [ ] 2.3 Implement sessions with expiry, per-device listing, and individual and bulk revocation; verify a password change invalidates all other sessions (`identity/authentication`)
 - [ ] 2.4 Implement per-account and per-source rate limiting with identifier normalisation; verify case-varied identifiers share one limit (`identity/authentication`)

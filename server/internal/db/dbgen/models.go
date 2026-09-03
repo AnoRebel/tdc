@@ -8,13 +8,13 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	uuid "github.com/google/uuid"
 )
 
 type AuditEntry struct {
 	ID         int64
 	OccurredAt time.Time
-	ActorID    pgtype.UUID
+	ActorID    *uuid.UUID
 	ActorLabel string
 	Action     string
 	TargetKind string
@@ -25,8 +25,8 @@ type AuditEntry struct {
 }
 
 type Credential struct {
-	ID         pgtype.UUID
-	UserID     pgtype.UUID
+	ID         uuid.UUID
+	UserID     uuid.UUID
 	Kind       string
 	Label      string
 	Secret     []byte
@@ -38,7 +38,7 @@ type Credential struct {
 }
 
 type Role struct {
-	ID          pgtype.UUID
+	ID          uuid.UUID
 	Name        string
 	Description string
 	BuiltIn     bool
@@ -47,9 +47,9 @@ type Role struct {
 }
 
 type RolePermission struct {
-	RoleID     pgtype.UUID
+	RoleID     uuid.UUID
 	Permission string
-	ScopeID    pgtype.UUID
+	ScopeID    uuid.UUID
 	Granted    bool
 }
 
@@ -69,8 +69,8 @@ type ServerConfig struct {
 }
 
 type Session struct {
-	ID         pgtype.UUID
-	UserID     pgtype.UUID
+	ID         uuid.UUID
+	UserID     uuid.UUID
 	TokenHash  []byte
 	UserAgent  string
 	IpAddress  *netip.Addr
@@ -81,7 +81,7 @@ type Session struct {
 }
 
 type User struct {
-	ID             pgtype.UUID
+	ID             uuid.UUID
 	Username       string
 	UsernameFolded string
 	DisplayName    string
@@ -90,15 +90,15 @@ type User struct {
 	EmailVerified  bool
 	SuspendedAt    *time.Time
 	SuspendedUntil *time.Time
-	SuspendedBy    pgtype.UUID
+	SuspendedBy    *uuid.UUID
 	SuspensionNote *string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
 
 type UserRole struct {
-	UserID    pgtype.UUID
-	RoleID    pgtype.UUID
+	UserID    uuid.UUID
+	RoleID    uuid.UUID
 	GrantedAt time.Time
-	GrantedBy pgtype.UUID
+	GrantedBy *uuid.UUID
 }

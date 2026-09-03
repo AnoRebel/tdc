@@ -101,6 +101,7 @@ This reverses the project's initial stack choice of GORM. The reasoning is long-
 - `sqlc` singularises table names to derive struct names, and its guesses are poor for names that are already singular (`schema_meta` became `SchemaMetum`). Its `rename` option maps field names, not table-to-struct names, so the fix is to name tables in the plural.
 - `golang-migrate`'s pgx driver registers itself under the scheme **`pgx5`**, not `postgres`. Operators write an ordinary `postgres://` URL and the runner translates it, rather than leaking an unusual scheme into configuration and documentation.
 - Timestamps are overridden to `time.Time` rather than `pgtype` wrappers, and nullable columns to pointers, so no code outside the generated package imports `pgtype`.
+- UUIDs are likewise overridden to `github.com/google/uuid`. Both the plain and the nullable override must use the **explicit `import`/`package`/`type` form**: the shorthand `go_type: "github.com/google/uuid.UUID"` emits the full path as a literal type name for the pointer case (producing invalid Go), and mixing the two forms makes sqlc emit the import twice.
 
 ### Real-time transport: server-authoritative WebSocket pub/sub
 

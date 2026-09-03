@@ -8,14 +8,14 @@ package dbgen
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
+	uuid "github.com/google/uuid"
 )
 
 const countCredentialsForUser = `-- name: CountCredentialsForUser :one
 SELECT COUNT(*) FROM credentials WHERE user_id = $1
 `
 
-func (q *Queries) CountCredentialsForUser(ctx context.Context, userID pgtype.UUID) (int64, error) {
+func (q *Queries) CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countCredentialsForUser, userID)
 	var count int64
 	err := row.Scan(&count)
@@ -29,8 +29,8 @@ RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, c
 `
 
 type CreateCredentialParams struct {
-	ID         pgtype.UUID
-	UserID     pgtype.UUID
+	ID         uuid.UUID
+	UserID     uuid.UUID
 	Kind       string
 	Label      string
 	Secret     []byte
@@ -71,8 +71,8 @@ DELETE FROM credentials WHERE id = $1 AND user_id = $2
 `
 
 type DeleteCredentialParams struct {
-	ID     pgtype.UUID
-	UserID pgtype.UUID
+	ID     uuid.UUID
+	UserID uuid.UUID
 }
 
 func (q *Queries) DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error {
@@ -114,7 +114,7 @@ SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, crea
 WHERE user_id = $1 AND kind = 'password'
 `
 
-func (q *Queries) GetPasswordCredential(ctx context.Context, userID pgtype.UUID) (Credential, error) {
+func (q *Queries) GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error) {
 	row := q.db.QueryRow(ctx, getPasswordCredential, userID)
 	var i Credential
 	err := row.Scan(
@@ -138,7 +138,7 @@ WHERE user_id = $1
 ORDER BY created_at
 `
 
-func (q *Queries) ListCredentialsForUser(ctx context.Context, userID pgtype.UUID) ([]Credential, error) {
+func (q *Queries) ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error) {
 	rows, err := q.db.Query(ctx, listCredentialsForUser, userID)
 	if err != nil {
 		return nil, err
@@ -178,8 +178,8 @@ RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, c
 `
 
 type ReplacePasswordCredentialParams struct {
-	ID     pgtype.UUID
-	UserID pgtype.UUID
+	ID     uuid.UUID
+	UserID uuid.UUID
 	Secret []byte
 }
 
@@ -208,7 +208,7 @@ WHERE id = $1
 `
 
 type TouchCredentialParams struct {
-	ID        pgtype.UUID
+	ID        uuid.UUID
 	SignCount int64
 }
 
