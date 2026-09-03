@@ -6,14 +6,41 @@ package dbgen
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	CountCredentialsForUser(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountUsers(ctx context.Context) (int64, error)
+	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
+	DeleteExpiredSessions(ctx context.Context) error
 	DeleteServerConfigValue(ctx context.Context, key string) error
+	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
+	GetPasswordCredential(ctx context.Context, userID pgtype.UUID) (Credential, error)
 	GetSchemaVersion(ctx context.Context) (GetSchemaVersionRow, error)
 	GetServerConfigValue(ctx context.Context, key string) (ServerConfig, error)
+	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error)
+	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
+	GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
+	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
+	LiftUserSuspension(ctx context.Context, id pgtype.UUID) error
+	ListCredentialsForUser(ctx context.Context, userID pgtype.UUID) ([]Credential, error)
 	ListServerConfig(ctx context.Context) ([]ServerConfig, error)
+	ListSessionsForUser(ctx context.Context, userID pgtype.UUID) ([]Session, error)
+	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
+	RevokeAllSessionsForUser(ctx context.Context, userID pgtype.UUID) error
+	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
+	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
+	SuspendUser(ctx context.Context, arg SuspendUserParams) error
+	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
+	TouchSession(ctx context.Context, id pgtype.UUID) error
+	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
 }
 

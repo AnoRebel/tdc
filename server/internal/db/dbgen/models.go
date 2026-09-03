@@ -5,8 +5,53 @@
 package dbgen
 
 import (
+	"net/netip"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type AuditEntry struct {
+	ID         int64
+	OccurredAt time.Time
+	ActorID    pgtype.UUID
+	ActorLabel string
+	Action     string
+	TargetKind string
+	TargetID   string
+	SourceIp   *netip.Addr
+	UserAgent  string
+	Detail     []byte
+}
+
+type Credential struct {
+	ID         pgtype.UUID
+	UserID     pgtype.UUID
+	Kind       string
+	Label      string
+	Secret     []byte
+	ExternalID *string
+	Provider   *string
+	SignCount  int64
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
+}
+
+type Role struct {
+	ID          pgtype.UUID
+	Name        string
+	Description string
+	BuiltIn     bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type RolePermission struct {
+	RoleID     pgtype.UUID
+	Permission string
+	ScopeID    pgtype.UUID
+	Granted    bool
+}
 
 type SchemaVersion struct {
 	ID            bool
@@ -21,4 +66,39 @@ type ServerConfig struct {
 	IsSecret  bool
 	UpdatedAt time.Time
 	UpdatedBy *string
+}
+
+type Session struct {
+	ID         pgtype.UUID
+	UserID     pgtype.UUID
+	TokenHash  []byte
+	UserAgent  string
+	IpAddress  *netip.Addr
+	CreatedAt  time.Time
+	LastSeenAt time.Time
+	ExpiresAt  time.Time
+	RevokedAt  *time.Time
+}
+
+type User struct {
+	ID             pgtype.UUID
+	Username       string
+	UsernameFolded string
+	DisplayName    string
+	Email          *string
+	EmailFolded    *string
+	EmailVerified  bool
+	SuspendedAt    *time.Time
+	SuspendedUntil *time.Time
+	SuspendedBy    pgtype.UUID
+	SuspensionNote *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type UserRole struct {
+	UserID    pgtype.UUID
+	RoleID    pgtype.UUID
+	GrantedAt time.Time
+	GrantedBy pgtype.UUID
 }
