@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineNuxtConfig({
   compatibilityDate: "2026-08-29",
@@ -18,7 +19,7 @@ export default defineNuxtConfig({
 
   modules: ["@vueuse/nuxt"],
 
-  css: [],
+  css: ["~/assets/css/main.css"],
 
   runtimeConfig: {
     public: {
@@ -40,6 +41,7 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    plugins: [tailwindcss()],
     server: {
       // Wails expects a predictable port; sharing the convention here keeps
       // the two apps consistent.

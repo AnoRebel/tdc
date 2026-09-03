@@ -1,32 +1,60 @@
 <script setup lang="ts">
-import type { Session } from "@tdc/types";
+import type { Room, Session } from "@tdc/types";
 import { isApiError } from "@tdc/types";
+import { Separator } from "~/components/ui/separator";
 
 definePageMeta({ middleware: "auth" });
 
-const { user, permissions, can, signOut, listSessions, revokeSession } = useAuth();
+const { user, can, signOut, listSessions, revokeSession } = useAuth();
+const roomsApi = useRooms();
 const router = useRouter();
 
+const rooms = ref<Room[]>([]);
 const sessions = ref<Session[]>([]);
 const error = ref<string | null>(null);
+const creating = ref(false);
+const newSlug = ref("");
 const busy = ref<string | null>(null);
 
-async function loadSessions() {
+/** Rooms the person has joined, shown first because they are the ones in use. */
+const joined = computed(() => rooms.value.filter((room) => room.member));
+/** Public rooms they could join but have not. */
+const available = computed(() => rooms.value.filter((room) => !room.member));
+
+async function load() {
   try {
+    rooms.value = await roomsApi.list();
     sessions.value = await listSessions();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not load your sessions.";
+    error.value = isApiError(cause) ? cause.message : "Could not load your rooms.";
   }
 }
 
-await loadSessions();
+await load();
+
+async function createRoom() {
+  const slug = newSlug.value.trim();
+  if (!slug) return;
+
+  creating.value = true;
+  error.value = null;
+
+  try {
+    const room = await roomsApi.create({ slug, name: slug });
+    newSlug.value = "";
+    await router.push(`/rooms/${room.id}`);
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : "Could not create that room.";
+  } finally {
+    creating.value = false;
+  }
+}
 
 async function endSession(id: string) {
-  error.value = null;
   busy.value = id;
   try {
     await revokeSession(id);
-    await loadSessions();
+    sessions.value = await listSessions();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not end that session.";
   } finally {
@@ -39,221 +67,137 @@ async function leave() {
   await router.push("/signin");
 }
 
-/** Formats a timestamp for display in the reader's own locale. */
 function when(value: string): string {
   return new Date(value).toLocaleString();
 }
 </script>
 
 <template>
-  <div class="page">
-    <header class="bar">
+  <div class="mx-auto max-w-3xl px-4 py-6">
+    <header class="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
       <div>
-        <strong>{{ user?.displayName }}</strong>
-        <span class="address">{{ user?.address }}</span>
+        <p class="font-semibold">{{ user?.displayName }}</p>
+        <p class="text-sm text-muted-foreground">{{ user?.address }}</p>
       </div>
-      <button class="secondary" type="button" @click="leave">Sign out</button>
+      <button
+        type="button"
+        class="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+        @click="leave"
+      >
+        Sign out
+      </button>
     </header>
 
-    <main class="content">
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p
+      v-if="error"
+      class="mt-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+      role="alert"
+    >
+      {{ error }}
+    </p>
 
-      <section class="panel">
-        <h2>Your account</h2>
-        <dl>
-          <dt>Username</dt>
-          <dd>{{ user?.username }}</dd>
-          <dt>Display name</dt>
-          <dd>{{ user?.displayName }}</dd>
-          <dt>Address</dt>
-          <dd>{{ user?.address }}</dd>
-        </dl>
-      </section>
+    <section class="mt-6">
+      <h2 class="text-lg font-semibold">Your rooms</h2>
 
-      <section class="panel">
-        <h2>Signed-in devices</h2>
-        <p class="lead">
-          Ending a session signs that device out immediately. Your current session is marked.
-        </p>
+      <ul v-if="joined.length" class="mt-3 grid gap-2">
+        <li v-for="room in joined" :key="room.id">
+          <NuxtLink
+            :to="`/rooms/${room.id}`"
+            class="flex items-center justify-between rounded-lg border p-3 hover:bg-accent"
+          >
+            <span>
+              <span class="font-medium">{{ room.name }}</span>
+              <span v-if="room.topic" class="ml-2 text-sm text-muted-foreground">{{
+                room.topic
+              }}</span>
+              <span class="block text-xs text-muted-foreground">{{ room.address }}</span>
+            </span>
+            <span v-if="room.archived" class="text-xs text-muted-foreground">Archived</span>
+          </NuxtLink>
+        </li>
+      </ul>
 
-        <ul class="sessions">
-          <li v-for="session in sessions" :key="session.id">
-            <div>
-              <span class="agent">{{ session.userAgent || "Unknown client" }}</span>
-              <span v-if="session.current" class="badge">This device</span>
-              <span class="detail">
-                {{ session.ipAddress ? `${session.ipAddress} · ` : "" }}last active
-                {{ when(session.lastSeenAt) }}
-              </span>
-            </div>
-            <button
-              v-if="!session.current"
-              class="danger"
-              type="button"
-              :disabled="busy === session.id"
-              @click="endSession(session.id)"
+      <p v-else class="mt-3 text-sm text-muted-foreground">You are not in any rooms yet.</p>
+    </section>
+
+    <section v-if="available.length" class="mt-6">
+      <h2 class="text-lg font-semibold">Rooms you can join</h2>
+      <ul class="mt-3 grid gap-2">
+        <li v-for="room in available" :key="room.id">
+          <NuxtLink
+            :to="`/rooms/${room.id}`"
+            class="flex items-center justify-between rounded-lg border border-dashed p-3 hover:bg-accent"
+          >
+            <span>
+              <span class="font-medium">{{ room.name }}</span>
+              <span class="block text-xs text-muted-foreground">{{ room.address }}</span>
+            </span>
+            <span class="text-xs text-muted-foreground">Join</span>
+          </NuxtLink>
+        </li>
+      </ul>
+    </section>
+
+    <section v-if="can('channel.create')" class="mt-6">
+      <h2 class="text-lg font-semibold">Create a room</h2>
+      <form class="mt-3 flex gap-2" @submit.prevent="createRoom">
+        <input
+          v-model="newSlug"
+          placeholder="general"
+          class="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <button
+          type="submit"
+          :disabled="creating || !newSlug.trim()"
+          class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
+          Create
+        </button>
+      </form>
+      <p class="mt-2 text-xs text-muted-foreground">
+        Letters, digits, underscore, dot and hyphen. This becomes the room's address.
+      </p>
+    </section>
+
+    <Separator class="mt-8" label="Your account" />
+
+    <section class="mt-2">
+      <h2 class="text-lg font-semibold">Signed-in devices</h2>
+      <ul class="mt-3 grid gap-2">
+        <li
+          v-for="session in sessions"
+          :key="session.id"
+          class="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+        >
+          <span class="text-sm">
+            <span class="font-medium">{{ session.userAgent || "Unknown client" }}</span>
+            <span
+              v-if="session.current"
+              class="ml-2 rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-600 dark:text-green-400"
             >
-              {{ busy === session.id ? "Ending…" : "End session" }}
-            </button>
-          </li>
-        </ul>
-      </section>
+              This device
+            </span>
+            <span class="block text-xs text-muted-foreground">
+              last active {{ when(session.lastSeenAt) }}
+            </span>
+          </span>
+          <button
+            v-if="!session.current"
+            type="button"
+            :disabled="busy === session.id"
+            class="rounded-md border border-destructive px-3 py-1.5 text-xs text-destructive disabled:opacity-50"
+            @click="endSession(session.id)"
+          >
+            {{ busy === session.id ? "Ending…" : "End session" }}
+          </button>
+        </li>
+      </ul>
+    </section>
 
-      <section class="panel">
-        <h2>What you can do here</h2>
-        <p class="lead">
-          These are the permissions your roles grant. The server checks every action against them
-          independently.
-        </p>
-        <ul class="permissions">
-          <li v-for="permission in permissions" :key="permission">
-            <code>{{ permission }}</code>
-          </li>
-        </ul>
-        <p v-if="permissions.length === 0" class="lead">
-          You hold no special permissions on this server.
-        </p>
-      </section>
-
-      <section v-if="can('server.audit.read')" class="panel">
-        <h2>Administration</h2>
-        <p class="lead">You hold administrative permissions on this server.</p>
-        <NuxtLink class="link-button" to="/audit">View the audit log</NuxtLink>
-      </section>
-    </main>
+    <section v-if="can('server.audit.read')" class="mt-6">
+      <NuxtLink to="/audit" class="text-sm underline underline-offset-4"
+        >View the audit log</NuxtLink
+      >
+    </section>
   </div>
 </template>
-
-<style scoped>
-.page {
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: 1rem;
-}
-
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-
-.bar div {
-  display: grid;
-}
-
-.address {
-  color: var(--text-muted);
-  font-size: 0.875rem;
-}
-
-.content {
-  display: grid;
-  gap: 1.5rem;
-  padding: 1.5rem 0;
-}
-
-.panel {
-  padding: 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.panel h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.125rem;
-}
-
-.lead {
-  margin: 0 0 1rem;
-  color: var(--text-muted);
-  font-size: 0.9375rem;
-}
-
-dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.35rem 1rem;
-  margin: 0;
-}
-
-dt {
-  font-weight: 600;
-}
-
-dd {
-  margin: 0;
-}
-
-.sessions {
-  display: grid;
-  gap: 0.75rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.sessions li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  flex-wrap: wrap;
-}
-
-.agent {
-  display: block;
-  font-weight: 600;
-  font-size: 0.9375rem;
-}
-
-.detail {
-  display: block;
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-}
-
-.badge {
-  display: inline-block;
-  margin-left: 0.5rem;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--success) 18%, transparent);
-  color: var(--success);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.permissions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.permissions code {
-  padding: 0.15rem 0.45rem;
-  border-radius: var(--radius);
-  background: var(--surface-sunken);
-  font-size: 0.8125rem;
-}
-
-.link-button {
-  display: inline-block;
-  padding: 0.6rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  text-decoration: none;
-  font-weight: 600;
-}
-</style>

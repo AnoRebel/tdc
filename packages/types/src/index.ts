@@ -9,4 +9,5 @@
 
 export * from "./server";
 export * from "./auth";
+export * from "./rooms";
 export * from "./errors";

@@ -49,9 +49,9 @@ Goal: the core product. Channels, messages, and live delivery between real clien
 - [x] 3.9 Implement the WebSocket connection lifecycle with authentication, operator-configured keepalive, and graceful close; verify an idle connection generates only keepalives (`messaging/realtime`)
 - [x] 3.10 Implement topic subscription changes without reconnecting, and authorization-scoped fanout; verify an event for a non-member channel is never delivered, including when access is revoked mid-connection (`messaging/realtime`)
 - [x] 3.11 Implement per-room sequence numbers, gap detection, and replay on reconnect, plus the oversized-gap resynchronise path; verify a reconnecting client receives exactly the missed events with no duplicates (`messaging/realtime`)
-- [ ] 3.12 Implement client reconnection with randomised backoff; verify many simultaneously disconnected clients do not reconnect in lockstep (`messaging/realtime`)
-- [ ] 3.13 Build the web chat interface — channel list, timeline, composer — using shadcn-vue's chat components (bubbles, separator, keyboard keys, preview) rather than hand-rolling them; verify the full send/receive/edit/delete cycle works against a live server
-- [ ] **MILESTONE 3** — Demonstrate: two people in different browsers exchange messages in a shared channel in real time, one edits and deletes a message, one disconnects and reconnects and sees exactly the messages missed. This is the first genuinely usable version. Tag `v0.3.0-dev`.
+- [x] 3.12 Implement client reconnection with randomised backoff; verify many simultaneously disconnected clients do not reconnect in lockstep (`messaging/realtime`)
+- [x] 3.13 Build the web chat interface — channel list, timeline, composer — using shadcn-vue's chat components (bubbles, separator, keyboard keys, preview) rather than hand-rolling them; verify the full send/receive/edit/delete cycle works against a live server
+- [x] **MILESTONE 3** — Demonstrate: two people in different browsers exchange messages in a shared channel in real time, one edits and deletes a message, one disconnects and reconnects and sees exactly the messages missed. This is the first genuinely usable version. Tag `v0.3.0-dev`.
 
 ## 4. Phase 4 — Conversations get structure
 
