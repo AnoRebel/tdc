@@ -44,10 +44,10 @@ Goal: the core product. Channels, messages, and live delivery between real clien
 - [x] 3.4 Implement `user@server` and `room@server` addressing throughout; verify API responses always name the home server (`platform/event-log`, `messaging/channels`)
 - [x] 3.5 Implement channel creation, rename, archive, and restore; verify archiving preserves history and refuses posts, and restoring resumes posting (`messaging/channels`)
 - [x] 3.6 Implement public and private visibility with non-disclosure; verify a non-member cannot distinguish "forbidden" from "does not exist" (`messaging/channels`)
-- [ ] 3.7 Implement channel membership with immediate effect on live connections; verify a removed member stops receiving events without reconnecting (`messaging/channels`, `messaging/realtime`)
+- [x] 3.7 Implement channel membership with immediate effect on live connections; verify a removed member stops receiving events without reconnecting (`messaging/channels`, `messaging/realtime`)
 - [x] 3.8 Implement posting, editing, and deleting messages with edit markers and deletion placeholders; verify a deleted message leaves evidence rather than vanishing (`messaging/channels`)
-- [ ] 3.9 Implement the WebSocket connection lifecycle with authentication, operator-configured keepalive, and graceful close; verify an idle connection generates only keepalives (`messaging/realtime`)
-- [ ] 3.10 Implement topic subscription changes without reconnecting, and authorization-scoped fanout; verify an event for a non-member channel is never delivered, including when access is revoked mid-connection (`messaging/realtime`)
+- [x] 3.9 Implement the WebSocket connection lifecycle with authentication, operator-configured keepalive, and graceful close; verify an idle connection generates only keepalives (`messaging/realtime`)
+- [x] 3.10 Implement topic subscription changes without reconnecting, and authorization-scoped fanout; verify an event for a non-member channel is never delivered, including when access is revoked mid-connection (`messaging/realtime`)
 - [ ] 3.11 Implement per-room sequence numbers, gap detection, and replay on reconnect, plus the oversized-gap resynchronise path; verify a reconnecting client receives exactly the missed events with no duplicates (`messaging/realtime`)
 - [ ] 3.12 Implement client reconnection with randomised backoff; verify many simultaneously disconnected clients do not reconnect in lockstep (`messaging/realtime`)
 - [ ] 3.13 Build the web chat interface — channel list, timeline, composer — using shadcn-vue's chat components (bubbles, separator, keyboard keys, preview) rather than hand-rolling them; verify the full send/receive/edit/delete cycle works against a live server

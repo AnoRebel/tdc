@@ -107,7 +107,13 @@ This reverses the project's initial stack choice of GORM. The reasoning is long-
 
 **Decision.** A WebSocket carrier with topic-based subscription, server-authoritative fanout, sequence numbers per room for gap detection, and replay from the event log on reconnect. Single-node needs nothing but Postgres; multi-node fanout uses Postgres `LISTEN`/`NOTIFY` first, with a broker interface allowing NATS or Redis later.
 
-**Conduit is deliberately not the chat transport.** The author's own `~/Code/conduit` (MIT, on JSR) is a PeerJS-style WebRTC signaling library. Its protocol enum has no room, topic, subscribe, or presence message types, and its relay handler is strictly 1:1 unicast — channel fanout, presence sets and replay would all have to be built on top, and the Go client is signaling-only. It is the wrong shape for one-to-many topic delivery.
+**Conduit is deliberately not the chat transport**, though not for the reason first recorded here. An earlier assessment said its protocol had no room or topic concept; it has since merged rooms, topics, multicast and cluster distribution, with a real `SUBSCRIBE`/`PUBLISH`/`ROOM_BROADCAST` protocol. That capability gap no longer exists.
+
+The reasons it is still not used for chat are structural:
+
+- **Its server is TypeScript; this server is Go.** The room and topic logic lives in the Node server, so adopting it means either running a second process — contradicting the single-binary deployment and the memory budget — or reimplementing its protocol in Go, which is more work than the hub it would replace.
+- **The Go client is signaling-only**, by its own documentation. It is not a room or topic client.
+- **Authorization has to be server-side and live.** This hub reads membership from the database at delivery time, which is what makes a removal take effect on an open connection. Conduit's rooms are membership-by-request, so TDC would have to check authorization before publishing regardless — leaving Conduit performing only the fan-out, which is the straightforward part.
 
 This is not a theoretical conclusion: **`~/Code/card_games` already made this call**, using Nitro-native WebSockets (crossws) topic pub/sub as its carrier and gating Conduit behind `NUXT_CONDUIT_ENABLED=true` as an optional WebRTC enhancement. Its `server/utils/roomHub.ts` — per-recipient state redaction, connection grace timers with reconnect windows, room reaping, per-peer token bucket (20 burst / 10 per second, 16 KB max message) — is the design reference for TDC's Go hub.
 
