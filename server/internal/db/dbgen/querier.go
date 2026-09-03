@@ -6,11 +6,13 @@ package dbgen
 
 import (
 	"context"
+	"time"
 
 	uuid "github.com/google/uuid"
 )
 
 type Querier interface {
+	AppendAuditEntry(ctx context.Context, arg AppendAuditEntryParams) (AuditEntry, error)
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
@@ -22,6 +24,7 @@ type Querier interface {
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteRole(ctx context.Context, id uuid.UUID) error
@@ -37,6 +40,9 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
+	// Filters are optional: a NULL argument matches everything, so one query
+	// serves the whole administrative view rather than one per filter combination.
+	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
