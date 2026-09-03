@@ -27,7 +27,7 @@ func testServer(t *testing.T) *Server {
 		ShutdownTimeout: 2 * time.Second,
 		ServerName:      "Test Server",
 		DefaultLanguage: "en",
-	}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}, nil, Services{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
 func TestHealthReportsOK(t *testing.T) {
@@ -110,7 +110,7 @@ func TestRunShutsDownOnContextCancel(t *testing.T) {
 		ShutdownTimeout: 2 * time.Second,
 		ServerName:      "Test Server",
 		DefaultLanguage: "en",
-	}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}, nil, Services{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -156,7 +156,7 @@ func TestCORSOnlyPermitsConfiguredOrigins(t *testing.T) {
 		ServerName:      "Test Server",
 		DefaultLanguage: "en",
 		AllowedOrigins:  []string{"http://localhost:3000"},
-	}, nil, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	}, nil, Services{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	t.Run("allowed origin is permitted", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/version", nil)

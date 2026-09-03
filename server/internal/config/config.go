@@ -50,6 +50,13 @@ type ServerConfig struct {
 	// deployment; it is set during development, when the app runs on a
 	// different port.
 	AllowedOrigins []string
+
+	// SecureCookies marks session cookies Secure, so a browser sends them only
+	// over TLS. It defaults to on: a deployment served over plain HTTP has to
+	// say so explicitly rather than silently weakening its cookies.
+	SecureCookies bool
+	// SessionLifetime is how long a session lasts without being renewed.
+	SessionLifetime time.Duration
 }
 
 // DatabaseConfig describes the connection to Postgres.
@@ -94,6 +101,8 @@ func Default() Config {
 			IdleTimeout:          120 * time.Second,
 			ShutdownTimeout:      20 * time.Second,
 			ExposeInternalErrors: false,
+			SecureCookies:        true,
+			SessionLifetime:      30 * 24 * time.Hour,
 		},
 		Database: DatabaseConfig{
 			URL:             "",

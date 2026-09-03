@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
 )
 
@@ -14,9 +15,37 @@ import (
 // identity and version before it can sign in, and an operator's uptime check
 // holds no credential.
 func (s *Server) routes() {
+	// Public: a client needs these before it can sign in, and an uptime check
+	// holds no credential.
 	s.echo.GET("/api/health", s.handleHealth)
 	s.echo.GET("/api/version", s.handleVersion)
 	s.echo.GET("/api/server", s.handleServerInfo)
+
+	// First-run setup. Available only while the server has no accounts; the
+	// handler refuses once one exists, which is what closes the path.
+	s.echo.GET("/api/setup", s.handleSetupStatus)
+	s.echo.POST("/api/setup", s.handleCompleteSetup)
+
+	// Authentication.
+	s.echo.POST("/api/auth/register", s.handleRegister)
+	s.echo.POST("/api/auth/signin", s.handleSignIn)
+	s.echo.POST("/api/auth/signout", s.handleSignOut, requireAuthentication)
+
+	// The signed-in user's own account and sessions.
+	me := s.echo.Group("/api/me", requireAuthentication)
+	me.GET("", s.handleCurrentUser)
+	me.GET("/permissions", s.handleCurrentPermissions)
+	me.GET("/sessions", s.handleListSessions)
+	me.DELETE("/sessions/:id", s.handleRevokeSession)
+
+	// Administration. Each route names the permission that governs it, so
+	// authority is visible at the routing table rather than buried in a
+	// handler.
+	admin := s.echo.Group("/api/admin", requireAuthentication)
+	admin.GET("/permissions", s.handlePermissionCatalogue,
+		requirePermission(authz.PermRoleManage))
+	admin.GET("/audit", s.handleReadAudit,
+		requirePermission(authz.PermServerViewAudit))
 }
 
 // healthResponse reports whether the server can serve requests.

@@ -10,10 +10,15 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/AnoRebel/tdc/server/internal/audit"
+	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
+	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/config"
 	"github.com/AnoRebel/tdc/server/internal/db"
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 )
 
 func main() {
@@ -74,6 +79,21 @@ func run() error {
 	}
 	defer pool.Close()
 
+	queries := dbgen.New(pool)
+
+	// The in-process cache is the default, so a single-server deployment needs
+	// no cache service. An operator running several processes configures a
+	// shared implementation instead.
+	memoryCache := cache.NewMemory()
+	defer func() { _ = memoryCache.Close() }()
+
+	services := httpapi.Services{
+		Identity: identity.NewService(queries, log),
+		Authz:    authz.NewService(queries),
+		Audit:    audit.NewRecorder(queries, log),
+		Limiter:  cache.NewLimiter(memoryCache),
+	}
+
 	server := httpapi.New(httpapi.Config{
 		Address:              cfg.Server.Address,
 		ReadTimeout:          cfg.Server.ReadTimeout,
@@ -86,7 +106,9 @@ func run() error {
 		CanonicalAddress:     cfg.Server.CanonicalAddress,
 		DefaultLanguage:      cfg.Server.DefaultLanguage,
 		AllowedOrigins:       cfg.Server.AllowedOrigins,
-	}, pool, log)
+		SecureCookies:        cfg.Server.SecureCookies,
+		SessionLifetime:      cfg.Server.SessionLifetime,
+	}, pool, services, log)
 
 	return server.Run(ctx)
 }

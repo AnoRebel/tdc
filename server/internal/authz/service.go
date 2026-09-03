@@ -240,3 +240,42 @@ func (s *Service) administratorCount(ctx context.Context) (int64, error) {
 	}
 	return count, nil
 }
+
+// EnsureRole returns a role by name, creating it with the given permissions if
+// it does not exist.
+//
+// Used for the built-in roles a server needs to function, most importantly the
+// administrator role created during first-run setup.
+func (s *Service) EnsureRole(
+	ctx context.Context,
+	name, description string,
+	permissions ...Permission,
+) (dbgen.Role, error) {
+	existing, err := s.store.GetRoleByName(ctx, name)
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return dbgen.Role{}, fmt.Errorf("look up role: %w", err)
+	}
+
+	role, err := s.store.CreateRole(ctx, dbgen.CreateRoleParams{
+		ID:          uuid.New(),
+		Name:        name,
+		Description: description,
+		// Built-in roles cannot be deleted, so a server always retains a
+		// coherent permission model.
+		BuiltIn: true,
+	})
+	if err != nil {
+		return dbgen.Role{}, fmt.Errorf("create role: %w", err)
+	}
+
+	for _, permission := range permissions {
+		if err := s.SetRolePermission(ctx, role.ID, permission, nil, true); err != nil {
+			return dbgen.Role{}, err
+		}
+	}
+
+	return role, nil
+}

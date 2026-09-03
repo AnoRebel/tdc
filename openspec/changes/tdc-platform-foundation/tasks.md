@@ -26,11 +26,11 @@ Goal: real accounts, real sessions, enforced permissions — the system is usabl
 - [x] 2.1 Implement the user model, registration, and first-run administrator setup that closes after the first administrator exists; verify the setup path becomes unavailable and no default credential exists (`identity/authentication`)
 - [x] 2.2 Implement password authentication with argon2id, weak/compromised rejection, and account-existence-neutral failures; verify failure responses are indistinguishable for existing and non-existing accounts (`identity/authentication`)
 - [x] 2.3 Implement sessions with expiry, per-device listing, and individual and bulk revocation; verify a password change invalidates all other sessions (`identity/authentication`)
-- [ ] 2.4 Implement per-account and per-source rate limiting with identifier normalisation; verify case-varied identifiers share one limit (`identity/authentication`)
+- [x] 2.4 Implement per-account and per-source rate limiting with identifier normalisation; verify case-varied identifiers share one limit (`identity/authentication`)
 - [x] 2.5 Implement the permission catalogue, roles, multi-role union with explicit denials, and the administrator floor; verify a channel-scope denial overrides a server-scope grant and the last administrator cannot be demoted (`identity/authorization`)
-- [ ] 2.6 Implement server-side authorization enforcement on every endpoint; verify a request bypassing the UI is denied and names the required permission (`identity/authorization`)
+- [x] 2.6 Implement server-side authorization enforcement on every endpoint; verify a request bypassing the UI is denied and names the required permission (`identity/authorization`)
 - [x] 2.7 Implement the `Cache` interface with the in-process default, bounded with eviction, applied to permission and session lookups; verify no unbounded growth under sustained load and that a revocation invalidates immediately rather than expiring (`design.md` — Caching)
-- [ ] 2.8 Implement audit recording for authentication and authorization changes with the separate audit-read permission, tamper-evidence, and fail-closed behaviour; verify an unrecordable privileged action is refused while ordinary requests are unaffected (`platform/audit-log`)
+- [x] 2.8 Implement audit recording for authentication and authorization changes with the separate audit-read permission, tamper-evidence, and fail-closed behaviour; verify an unrecordable privileged action is refused while ordinary requests are unaffected (`platform/audit-log`)
 - [ ] 2.9 Build the web sign-in, registration, and session-management screens; verify a user can register, sign in, view sessions, and revoke one
 - [ ] **MILESTONE 2** — Demonstrate: two people register on a running server, sign in from different browsers, see their own sessions, and an administrator's permission change visibly takes effect on the other user. Tag `v0.2.0-dev`.
 

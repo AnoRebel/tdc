@@ -11,8 +11,12 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/audit"
+	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
+	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 )
 
 // Config describes how the HTTP server should listen.
@@ -47,15 +51,36 @@ type Config struct {
 	// another origin. Empty is correct when the web app is served from the
 	// same origin as the API, which is the normal deployment.
 	AllowedOrigins []string
+
+	// SecureCookies marks session cookies Secure, so a browser sends them
+	// only over TLS. Off only for local development over plain HTTP.
+	SecureCookies bool
+	// SessionLifetime is how long a session lasts without being renewed.
+	SessionLifetime time.Duration
 }
 
 // Server owns the HTTP listener and the routes mounted on it.
 type Server struct {
-	echo   *echo.Echo
-	http   *http.Server
-	log    *slog.Logger
-	db     *db.Pool
-	config Config
+	echo     *echo.Echo
+	http     *http.Server
+	log      *slog.Logger
+	db       *db.Pool
+	identity *identity.Service
+	authz    *authz.Service
+	audit    *audit.Recorder
+	limiter  *cache.Limiter
+	config   Config
+}
+
+// Services are the collaborators the HTTP layer needs.
+//
+// Grouped into one parameter rather than a growing argument list, so adding a
+// dependency does not change every call site.
+type Services struct {
+	Identity *identity.Service
+	Authz    *authz.Service
+	Audit    *audit.Recorder
+	Limiter  *cache.Limiter
 }
 
 // New builds a server with the health and version routes mounted. It does not
@@ -64,7 +89,7 @@ type Server struct {
 // The database pool may be nil, which health reporting accounts for; that
 // keeps the server testable without a database for routes that do not need
 // one.
-func New(cfg Config, pool *db.Pool, log *slog.Logger) *Server {
+func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server {
 	e := echo.New()
 	e.Logger = log
 	// Echo v5 takes a factory here, and the parameter order of the handler it
@@ -72,10 +97,14 @@ func New(cfg Config, pool *db.Pool, log *slog.Logger) *Server {
 	e.HTTPErrorHandler = echo.DefaultHTTPErrorHandler(cfg.ExposeInternalErrors)
 
 	s := &Server{
-		echo:   e,
-		log:    log,
-		db:     pool,
-		config: cfg,
+		echo:     e,
+		log:      log,
+		db:       pool,
+		identity: services.Identity,
+		authz:    services.Authz,
+		audit:    services.Audit,
+		limiter:  services.Limiter,
+		config:   cfg,
 	}
 
 	if len(cfg.AllowedOrigins) > 0 {
@@ -83,6 +112,11 @@ func New(cfg Config, pool *db.Pool, log *slog.Logger) *Server {
 	}
 	e.Use(requestLogger(log))
 	e.Use(recoverPanic(log))
+	// Resolves the session if the request carries one. It does not refuse an
+	// unauthenticated request: some routes are public, and requiring
+	// authentication is the job of requireAuthentication on the routes that
+	// need it.
+	e.Use(s.authenticate)
 
 	s.routes()
 

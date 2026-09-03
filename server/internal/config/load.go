@@ -180,6 +180,8 @@ func Load(path string) (Config, error) {
 	cfg.Server.ShutdownTimeout = l.duration("server.shutdown_timeout", d.Server.ShutdownTimeout)
 	cfg.Server.ExposeInternalErrors = l.boolean("server.expose_internal_errors", d.Server.ExposeInternalErrors)
 	cfg.Server.AllowedOrigins = l.list("server.allowed_origins")
+	cfg.Server.SecureCookies = l.boolean("server.secure_cookies", d.Server.SecureCookies)
+	cfg.Server.SessionLifetime = l.duration("server.session_lifetime", d.Server.SessionLifetime)
 
 	cfg.Database.URL = l.str("database.url", d.Database.URL)
 	cfg.Database.MaxConnections = l.int32Value("database.max_connections", d.Database.MaxConnections)
