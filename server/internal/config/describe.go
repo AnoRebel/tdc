@@ -122,6 +122,10 @@ func (c Config) Warnings() []string {
 		warnings = append(warnings,
 			"server.canonical_address is not set: the server cannot state a stable address for clients or federated peers.")
 	}
+	if !c.Server.SecureCookies {
+		warnings = append(warnings,
+			"server.secure_cookies is off: session cookies are sent over plain HTTP and can be read in transit. Acceptable only for local development.")
+	}
 	if strings.Contains(c.Database.URL, "sslmode=disable") {
 		warnings = append(warnings,
 			"database.url disables TLS: traffic to the database is unencrypted. Acceptable only when the database is on the same host.")

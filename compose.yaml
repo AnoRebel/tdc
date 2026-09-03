@@ -28,6 +28,11 @@ services:
       # normal deployment, where the web app is served from this same origin.
       # Set here for local development, where the app runs on port 3000.
       TDC_SERVER_ALLOWED_ORIGINS: "http://localhost:3000"
+      # CHANGE ME: session cookies are marked Secure by default, so a browser
+      # sends them only over TLS. This local stack is served over plain HTTP,
+      # where a Secure cookie would be set and then never sent back. Remove
+      # this line for any deployment served over HTTPS.
+      TDC_SERVER_SECURE_COOKIES: "false"
       TDC_LOG_FORMAT: "json"
       TDC_LOG_LEVEL: "info"
     depends_on:

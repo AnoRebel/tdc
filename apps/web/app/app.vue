@@ -1,118 +1,141 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import type { ServerInfo } from "@tdc/types";
-
-/**
- * The first screen: prove the client can reach a TDC server and report what it
- * found. Everything else in the application builds on this connection.
- */
-
-const serverInfo = ref<ServerInfo | null>(null);
-const error = ref<string | null>(null);
-const loading = ref(true);
-
-const apiBase = useRuntimeConfig().public.apiBase;
-
-const status = computed(() => {
-  if (loading.value) return "connecting";
-  return error.value ? "unreachable" : "connected";
-});
-
-async function loadServerInfo() {
-  loading.value = true;
-  error.value = null;
-
-  try {
-    serverInfo.value = await $fetch<ServerInfo>(`${apiBase}/api/server`);
-  } catch (cause) {
-    // The message is for a developer running this locally; the production
-    // client will present connection failures far more gently.
-    error.value = cause instanceof Error ? cause.message : String(cause);
-    serverInfo.value = null;
-  } finally {
-    loading.value = false;
-  }
-}
-
-onMounted(loadServerInfo);
+// The session is resolved by the auth middleware on protected routes, so that
+// it happens before a page decides whether to render or redirect. Public pages
+// do not need it resolved first.
 </script>
 
 <template>
-  <main class="page">
-    <h1>TDC</h1>
-
-    <p class="status" :data-status="status">
-      {{ status }}
-    </p>
-
-    <dl v-if="serverInfo" class="details">
-      <dt>Server</dt>
-      <dd>{{ serverInfo.name }}</dd>
-
-      <dt>Description</dt>
-      <dd>{{ serverInfo.description }}</dd>
-
-      <dt>Version</dt>
-      <dd>{{ serverInfo.version }}</dd>
-
-      <dt>Address</dt>
-      <dd>{{ serverInfo.canonicalAddress || "not set" }}</dd>
-
-      <dt>Language</dt>
-      <dd>{{ serverInfo.defaultLanguage }}</dd>
-    </dl>
-
-    <p v-else-if="error" class="error">Could not reach a TDC server: {{ error }}</p>
-
-    <button type="button" @click="loadServerInfo">Retry</button>
-  </main>
+  <div class="app">
+    <NuxtPage />
+  </div>
 </template>
 
 <style>
 :root {
   color-scheme: light dark;
-  font-family: system-ui, sans-serif;
+
+  --surface: #ffffff;
+  --surface-sunken: #f4f4f5;
+  --border: #d4d4d8;
+  --text: #18181b;
+  --text-muted: #52525b;
+  --accent: #1d4ed8;
+  --accent-text: #ffffff;
+  --danger: #b91c1c;
+  --success: #15803d;
+  --radius: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #18181b;
+    --surface-sunken: #27272a;
+    --border: #3f3f46;
+    --text: #f4f4f5;
+    --text-muted: #a1a1aa;
+    --accent: #60a5fa;
+    --accent-text: #0b1120;
+    --danger: #f87171;
+    --success: #4ade80;
+  }
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  line-height: 1.5;
 }
 
-.page {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 2rem 1rem;
+.app {
+  min-height: 100vh;
 }
 
-.status {
-  font-variant: small-caps;
-  letter-spacing: 0.05em;
+.loading {
+  padding: 2rem;
+  color: var(--text-muted);
 }
 
-.status[data-status="connected"] {
-  color: green;
-}
-
-.status[data-status="unreachable"] {
-  color: crimson;
-}
-
-.details {
+/* Shared form and control styles, kept here while the application is small
+   enough that a design system would be premature. */
+.field {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.25rem 1rem;
-  margin: 1.5rem 0;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
 }
 
-.details dt {
+.field label {
   font-weight: 600;
+  font-size: 0.875rem;
 }
 
-.details dd {
-  margin: 0;
+.field input {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  width: 100%;
+}
+
+.field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.field .hint {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+button {
+  padding: 0.6rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+button.danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .error {
-  color: crimson;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 0.9375rem;
 }
 </style>
