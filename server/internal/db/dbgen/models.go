@@ -49,7 +49,7 @@ type Role struct {
 type RolePermission struct {
 	RoleID     uuid.UUID
 	Permission string
-	ScopeID    uuid.UUID
+	ScopeID    *uuid.UUID
 	Granted    bool
 }
 

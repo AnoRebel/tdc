@@ -11,16 +11,25 @@ import (
 )
 
 type Querier interface {
+	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	// How many people hold a permission at server scope without an explicit
+	// denial. The administrator floor uses this to refuse a change that would
+	// leave nobody able to administer the server.
+	CountUsersWithPermission(ctx context.Context, permission string) (int64, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
+	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
 	DeleteExpiredSessions(ctx context.Context) error
+	DeleteRole(ctx context.Context, id uuid.UUID) error
 	DeleteServerConfigValue(ctx context.Context, key string) error
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
+	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
+	GetRoleByName(ctx context.Context, name string) (Role, error)
 	GetSchemaVersion(ctx context.Context) (GetSchemaVersionRow, error)
 	GetServerConfigValue(ctx context.Context, key string) (ServerConfig, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error)
@@ -29,13 +38,24 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
+	// Every grant a user holds, across all their roles. One query rather than one
+	// per role: a request resolves permissions once and consults them many times.
+	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]RolePermission, error)
+	ListRoles(ctx context.Context) ([]Role, error)
+	ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]Role, error)
 	ListServerConfig(ctx context.Context) ([]ServerConfig, error)
 	ListSessionsForUser(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
+	RemoveRolePermission(ctx context.Context, arg RemoveRolePermissionParams) error
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	// The conflict target matches the unique index, which COALESCEs a NULL scope
+	// so that two server-scope grants of one permission collide as intended.
+	SetRolePermission(ctx context.Context, arg SetRolePermissionParams) error
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
 	SuspendUser(ctx context.Context, arg SuspendUserParams) error
 	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
