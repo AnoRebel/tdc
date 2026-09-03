@@ -3,12 +3,16 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -17,8 +21,10 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/config"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
 func main() {
@@ -87,11 +93,21 @@ func run() error {
 	memoryCache := cache.NewMemory()
 	defer func() { _ = memoryCache.Close() }()
 
+	// The signing key identifies this server. It is loaded from storage rather
+	// than generated per start: a server that made a new key each time would
+	// invalidate every signature it had ever produced.
+	signingKey, err := loadOrCreateSigningKey(ctx, queries)
+	if err != nil {
+		return err
+	}
+
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
 		Audit:    audit.NewRecorder(queries, log),
 		Limiter:  cache.NewLimiter(memoryCache),
+		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
+			serverName(cfg), log),
 	}
 
 	server := httpapi.New(httpapi.Config{
@@ -108,6 +124,7 @@ func run() error {
 		AllowedOrigins:       cfg.Server.AllowedOrigins,
 		SecureCookies:        cfg.Server.SecureCookies,
 		SessionLifetime:      cfg.Server.SessionLifetime,
+		Keepalive:            cfg.Server.Keepalive,
 	}, pool, services, log)
 
 	return server.Run(ctx)
@@ -139,4 +156,58 @@ func parseLevel(level string) slog.Level {
 	default:
 		return slog.LevelInfo
 	}
+}
+
+// serverName is the name this server publishes in addresses.
+//
+// The canonical address when the operator has set one, since that is what
+// clients and peers use to reach this server; otherwise a local default, which
+// is adequate until the server federates.
+func serverName(cfg config.Config) string {
+	if cfg.Server.CanonicalAddress != "" {
+		return cfg.Server.CanonicalAddress
+	}
+	return "localhost"
+}
+
+// signingKeyConfigKey is where the server's signing seed is stored.
+const signingKeyConfigKey = "server.signing_key_seed"
+
+// loadOrCreateSigningKey returns this server's signing key, generating one on
+// first start.
+//
+// Stored in the database rather than a file so that the key travels with the
+// data it signs: a server restored from a backup keeps the identity its events
+// were signed with, and history stays verifiable.
+func loadOrCreateSigningKey(ctx context.Context, queries *dbgen.Queries) (*events.KeyPair, error) {
+	stored, err := queries.GetServerConfigValue(ctx, signingKeyConfigKey)
+	if err == nil {
+		seed, decodeErr := base64.RawURLEncoding.DecodeString(stored.Value)
+		if decodeErr != nil {
+			return nil, fmt.Errorf("stored signing key is not valid: %w", decodeErr)
+		}
+		return events.KeyPairFromSeed("key-1", seed)
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("read signing key: %w", err)
+	}
+
+	key, err := events.NewKeyPair("key-1")
+	if err != nil {
+		return nil, err
+	}
+
+	actor := "system"
+	if err := queries.SetServerConfigValue(ctx, dbgen.SetServerConfigValueParams{
+		Key:   signingKeyConfigKey,
+		Value: base64.RawURLEncoding.EncodeToString(key.Seed()),
+		// Anything holding this can sign as this server, so it is redacted
+		// wherever configuration is displayed.
+		IsSecret:  true,
+		UpdatedBy: &actor,
+	}); err != nil {
+		return nil, fmt.Errorf("store signing key: %w", err)
+	}
+
+	return key, nil
 }

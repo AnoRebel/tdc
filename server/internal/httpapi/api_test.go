@@ -18,8 +18,10 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/dbtest"
+	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
 const testPassword = "correct horse battery staple"
@@ -46,7 +48,7 @@ func newTestAPI(t *testing.T) http.Handler {
 		cleanCtx, cleanCancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cleanCancel()
 		for _, statement := range []string{
-			"DELETE FROM audit_entries", "DELETE FROM users", "DELETE FROM roles",
+			"DELETE FROM audit_entries", "DELETE FROM rooms", "DELETE FROM users", "DELETE FROM roles",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)
@@ -57,6 +59,11 @@ func newTestAPI(t *testing.T) http.Handler {
 
 	memory := cache.NewMemory()
 	queries := dbgen.New(pool)
+
+	signingKey, err := events.NewKeyPair("test-key")
+	if err != nil {
+		t.Fatalf("NewKeyPair: %v", err)
+	}
 
 	server := httpapi.New(httpapi.Config{
 		Address:         "127.0.0.1:0",
@@ -75,6 +82,7 @@ func newTestAPI(t *testing.T) http.Handler {
 		Authz:    authz.NewService(queries),
 		Audit:    audit.NewRecorder(queries, logger),
 		Limiter:  cache.NewLimiter(memory),
+		Rooms:    rooms.NewService(queries, events.NewKeyring(signingKey), "tdc.test", logger),
 	}, logger)
 
 	t.Cleanup(func() {
@@ -455,4 +463,23 @@ func TestSessionCookieIsHttpOnly(t *testing.T) {
 	if session.SameSite != http.SameSiteLaxMode {
 		t.Error("the session cookie has no SameSite protection")
 	}
+}
+
+// mustCall issues a request and fails the test unless the status matches.
+func mustCall(
+	t *testing.T,
+	handler http.Handler,
+	method, path string,
+	body any,
+	token string,
+	wantStatus int,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	recorder := call(t, handler, method, path, body, token)
+	if recorder.Code != wantStatus {
+		t.Fatalf("%s %s: status %d, want %d, body %s",
+			method, path, recorder.Code, wantStatus, recorder.Body.String())
+	}
+	return recorder
 }

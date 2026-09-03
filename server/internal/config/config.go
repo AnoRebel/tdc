@@ -57,6 +57,10 @@ type ServerConfig struct {
 	SecureCookies bool
 	// SessionLifetime is how long a session lasts without being renewed.
 	SessionLifetime time.Duration
+	// Keepalive is how often an idle live connection is pinged. Configurable
+	// because the right interval depends on what sits between client and
+	// server, and because a phone on metered data pays for every one.
+	Keepalive time.Duration
 }
 
 // DatabaseConfig describes the connection to Postgres.
@@ -103,6 +107,7 @@ func Default() Config {
 			ExposeInternalErrors: false,
 			SecureCookies:        true,
 			SessionLifetime:      30 * 24 * time.Hour,
+			Keepalive:            45 * time.Second,
 		},
 		Database: DatabaseConfig{
 			URL:             "",

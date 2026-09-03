@@ -17,6 +17,8 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/realtime"
+	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
 // Config describes how the HTTP server should listen.
@@ -57,6 +59,10 @@ type Config struct {
 	SecureCookies bool
 	// SessionLifetime is how long a session lasts without being renewed.
 	SessionLifetime time.Duration
+	// Keepalive is how often an idle live connection is pinged. Configurable
+	// because the right interval depends on what sits between the client and
+	// the server, and because a phone on metered data pays for each one.
+	Keepalive time.Duration
 }
 
 // Server owns the HTTP listener and the routes mounted on it.
@@ -69,6 +75,9 @@ type Server struct {
 	authz    *authz.Service
 	audit    *audit.Recorder
 	limiter  *cache.Limiter
+	rooms    *rooms.Service
+	hub      *realtime.Hub
+	realtime *realtime.Server
 	config   Config
 }
 
@@ -81,6 +90,7 @@ type Services struct {
 	Authz    *authz.Service
 	Audit    *audit.Recorder
 	Limiter  *cache.Limiter
+	Rooms    *rooms.Service
 }
 
 // New builds a server with the health and version routes mounted. It does not
@@ -104,7 +114,15 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		authz:    services.Authz,
 		audit:    services.Audit,
 		limiter:  services.Limiter,
+		rooms:    services.Rooms,
 		config:   cfg,
+	}
+
+	// The hub reads membership from the rooms service at delivery time, which
+	// is what makes a removal take effect on a connection that stays open.
+	if services.Rooms != nil {
+		s.hub = realtime.NewHub(services.Rooms, log)
+		s.realtime = realtime.NewServer(s.hub, roomReplayer{rooms: services.Rooms}, cfg.Keepalive, log)
 	}
 
 	if len(cfg.AllowedOrigins) > 0 {
@@ -164,6 +182,12 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	s.log.Info("shutting down", slog.Duration("timeout", s.config.ShutdownTimeout))
+
+	// Live connections are long-lived by design, so they would otherwise hold
+	// the drain open for its full timeout.
+	if s.hub != nil {
+		s.hub.CloseAll()
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.config.ShutdownTimeout)
 	defer cancel()

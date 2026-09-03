@@ -329,3 +329,13 @@ func (s *Service) MemberIDs(ctx context.Context, roomID uuid.UUID) ([]uuid.UUID,
 	}
 	return ids, nil
 }
+
+// RoomsUserIsIn returns only the rooms the user has joined, as distinct from
+// those they can merely discover.
+func (s *Service) RoomsUserIsIn(ctx context.Context, userID uuid.UUID) ([]dbgen.Room, error) {
+	joined, err := s.store.ListRoomsUserIsIn(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list joined rooms: %w", err)
+	}
+	return joined, nil
+}

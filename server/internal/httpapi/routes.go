@@ -38,6 +38,23 @@ func (s *Server) routes() {
 	me.GET("/sessions", s.handleListSessions)
 	me.DELETE("/sessions/:id", s.handleRevokeSession)
 
+	// Rooms and messages.
+	rooms := s.echo.Group("/api/rooms", requireAuthentication)
+	rooms.GET("", s.handleListRooms)
+	rooms.POST("", s.handleCreateRoom, requirePermission(authz.PermChannelCreate))
+	rooms.GET("/:id", s.handleGetRoom)
+	rooms.POST("/:id/join", s.handleJoinRoom)
+	rooms.POST("/:id/leave", s.handleLeaveRoom)
+	rooms.GET("/:id/members", s.handleRoomMembers)
+	rooms.GET("/:id/timeline", s.handleRoomTimeline)
+	rooms.POST("/:id/messages", s.handleSendMessage)
+	rooms.PATCH("/:id/messages/:eventId", s.handleEditMessage)
+	rooms.DELETE("/:id/messages/:eventId", s.handleDeleteMessage)
+
+	// The live connection. Authenticated like any other route; a connection is
+	// never established for an unauthenticated caller.
+	s.echo.GET("/api/live", s.handleWebSocket, requireAuthentication)
+
 	// Administration. Each route names the permission that governs it, so
 	// authority is visible at the routing table rather than buried in a
 	// handler.
