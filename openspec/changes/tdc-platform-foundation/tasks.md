@@ -88,7 +88,7 @@ Goal: attachments with previews and safe link unfurling.
 - [x] 5.11c Build context menus for messages, attachments and conversations, opened by right-click and by long press, keyboard-navigable and dismissable, offering only permitted actions; verify every action remains reachable without the menu (`clients/web`)
 - [x] 5.11d Require confirmation before destructive actions, naming what is lost and never defaulting focus to the destructive choice; verify a reversible action is not interrupted and a reflexive keypress cannot destroy (`clients/web`)
 - [x] 5.11e Make every hover-revealed action reachable by touch, size targets to the documented minimum, and add swipe shortcuts that are discoverable another way; verify on a touch viewport that no capability is pointer-only (`clients/web`)
-- [ ] **MILESTONE 5** — Demonstrate: a user uploads an image and sees a thumbnail, another user downloads it, a non-member is refused, a posted link renders a preview, and a link to a private network address produces no preview. Tag `v0.5.0-dev`.
+- [x] **MILESTONE 5** — Demonstrate: a user uploads an image and sees a thumbnail, another user downloads it, a non-member is refused, a posted link renders a preview, and a link to a private network address produces no preview. Tag `v0.5.0-dev`.
 
 ## 6. Phase 6 — People find out what happened
 
