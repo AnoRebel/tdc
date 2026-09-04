@@ -74,14 +74,21 @@ func (r roomReplayer) EventsSince(
 
 // eventFrame renders a stored event as a frame for the wire.
 func eventFrame(event dbgen.Event) (realtime.Frame, error) {
-	payload, err := json.Marshal(map[string]any{
+	body := map[string]any{
 		"id":        event.ID,
 		"type":      event.Type,
 		"sender":    event.SenderAddress,
 		"content":   json.RawMessage(event.Content),
 		"createdAt": event.CreatedAt,
 		"redacted":  event.RedactedAt != nil,
-	})
+	}
+	// A reply names the thread it belongs to, so a client can keep it out of
+	// the channel timeline rather than showing it in both places.
+	if event.ThreadRootID != nil {
+		body["threadRoot"] = *event.ThreadRootID
+	}
+
+	payload, err := json.Marshal(body)
 	if err != nil {
 		return realtime.Frame{}, fmt.Errorf("encode event frame: %w", err)
 	}

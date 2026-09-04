@@ -89,4 +89,9 @@ export interface LiveEventPayload {
   content: MessageContent;
   createdAt: number;
   redacted: boolean;
+  /**
+   * Set when the event is a reply. The channel view uses it to keep replies
+   * out of the main timeline, where they belong to their thread instead.
+   */
+  threadRoot?: string;
 }

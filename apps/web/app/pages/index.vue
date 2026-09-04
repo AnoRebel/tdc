@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Room, Session } from "@tdc/types";
+import type { Room, Session, UnreadCounts } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { Separator } from "~/components/ui/separator";
 
@@ -10,6 +10,8 @@ const roomsApi = useRooms();
 const router = useRouter();
 
 const rooms = ref<Room[]>([]);
+const direct = ref<Room[]>([]);
+const unread = ref<UnreadCounts>({});
 const sessions = ref<Session[]>([]);
 const error = ref<string | null>(null);
 const creating = ref(false);
@@ -24,6 +26,8 @@ const available = computed(() => rooms.value.filter((room) => !room.member));
 async function load() {
   try {
     rooms.value = await roomsApi.list();
+    direct.value = await roomsApi.listDirect();
+    unread.value = await roomsApi.unread();
     sessions.value = await listSessions();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not load your rooms.";
@@ -112,12 +116,40 @@ function when(value: string): string {
               }}</span>
               <span class="block text-xs text-muted-foreground">{{ room.address }}</span>
             </span>
-            <span v-if="room.archived" class="text-xs text-muted-foreground">Archived</span>
+            <span class="flex items-center gap-2">
+              <span
+                v-if="unread[room.id]"
+                class="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground"
+              >
+                {{ unread[room.id] }}
+              </span>
+              <span v-if="room.archived" class="text-xs text-muted-foreground">Archived</span>
+            </span>
           </NuxtLink>
         </li>
       </ul>
 
       <p v-else class="mt-3 text-sm text-muted-foreground">You are not in any rooms yet.</p>
+    </section>
+
+    <section v-if="direct.length" class="mt-6">
+      <h2 class="text-lg font-semibold">Direct messages</h2>
+      <ul class="mt-3 grid gap-2">
+        <li v-for="conversation in direct" :key="conversation.id">
+          <NuxtLink
+            :to="`/rooms/${conversation.id}`"
+            class="flex items-center justify-between rounded-lg border p-3 hover:bg-accent"
+          >
+            <span class="font-medium">{{ conversation.name }}</span>
+            <span
+              v-if="unread[conversation.id]"
+              class="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground"
+            >
+              {{ unread[conversation.id] }}
+            </span>
+          </NuxtLink>
+        </li>
+      </ul>
     </section>
 
     <section v-if="available.length" class="mt-6">

@@ -1,4 +1,12 @@
-import type { Message, Room, RoomMember } from "@tdc/types";
+import type {
+  Message,
+  Presence,
+  Room,
+  RoomMember,
+  Thread,
+  TypingPerson,
+  UnreadCounts,
+} from "@tdc/types";
 
 /** Reading and writing rooms and their messages. */
 export function useRooms() {
@@ -56,5 +64,73 @@ export function useRooms() {
     return api.delete<Message>(`/api/rooms/${roomId}/messages/${messageId}`);
   }
 
-  return { list, get, create, join, leave, timeline, members, send, edit, remove };
+  /** A thread's root message and its replies. */
+  function thread(roomId: string, rootId: string): Promise<Thread> {
+    return api.get<Thread>(`/api/rooms/${roomId}/threads/${rootId}`);
+  }
+
+  function reply(
+    roomId: string,
+    rootId: string,
+    body: string,
+    clientToken: string,
+  ): Promise<Message> {
+    return api.post<Message>(`/api/rooms/${roomId}/threads/${rootId}/replies`, {
+      body,
+      clientToken,
+    });
+  }
+
+  /** Opens the conversation with these people, or returns the existing one. */
+  function openDirect(userIds: string[]): Promise<Room> {
+    return api.post<Room>("/api/direct", { userIds });
+  }
+
+  function listDirect(): Promise<Room[]> {
+    return api.get<Room[]>("/api/direct");
+  }
+
+  /** Records how far the person has read, so unread counts clear. */
+  function markRead(roomId: string, sequence: number): Promise<void> {
+    return api.post(`/api/rooms/${roomId}/read`, { sequence });
+  }
+
+  function unread(): Promise<UnreadCounts> {
+    return api.get<UnreadCounts>("/api/me/unread");
+  }
+
+  function presence(roomId: string): Promise<Presence[]> {
+    return api.get<Presence[]>(`/api/rooms/${roomId}/presence`);
+  }
+
+  function typing(roomId: string): Promise<TypingPerson[]> {
+    return api.get<TypingPerson[]>(`/api/rooms/${roomId}/typing`);
+  }
+
+  /** Announces that the person is composing. The server expires it on its own. */
+  function startTyping(roomId: string): Promise<void> {
+    return api.post(`/api/rooms/${roomId}/typing`);
+  }
+
+  return {
+    list,
+    get,
+    create,
+    join,
+    leave,
+    timeline,
+    members,
+    send,
+    edit,
+    remove,
+    thread,
+    reply,
+    openDirect,
+    listDirect,
+    markRead,
+    unread,
+    presence,
+    typing,
+    startTyping,
+  };
 }
