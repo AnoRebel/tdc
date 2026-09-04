@@ -56,10 +56,8 @@
    * keeps them from looking like a grey smudge over a tinted surface.
    */
   --shadow-xs: 0 1px 2px oklch(0.21 0.012 265 / 0.05);
-  --shadow-sm:
-    0 1px 3px oklch(0.21 0.012 265 / 0.07), 0 1px 2px oklch(0.21 0.012 265 / 0.04);
-  --shadow-md:
-    0 4px 12px oklch(0.21 0.012 265 / 0.08), 0 2px 4px oklch(0.21 0.012 265 / 0.04);
+  --shadow-sm: 0 1px 3px oklch(0.21 0.012 265 / 0.07), 0 1px 2px oklch(0.21 0.012 265 / 0.04);
+  --shadow-md: 0 4px 12px oklch(0.21 0.012 265 / 0.08), 0 2px 4px oklch(0.21 0.012 265 / 0.04);
   --shadow-lg: 0 12px 32px oklch(0.21 0.012 265 / 0.12);
 }
 
@@ -171,6 +169,43 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /*
+   * Anything you can act on says so under the pointer.
+   *
+   * Tailwind v4 no longer sets this on buttons, so without a rule here every
+   * control in the application would keep the text caret and read as inert.
+   * Stated once, as a property of being interactive, rather than repeated as
+   * a utility class on each of the places it is needed.
+   */
+  button:not(:disabled),
+  summary,
+  label[for],
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="option"],
+  [role="menuitem"],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="range"]:not(:disabled),
+  input[type="color"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* A link with no destination is not yet a link, so it keeps the default. */
+  a[href] {
+    cursor: pointer;
+  }
+
+  /* A control that cannot be used says that too, whichever element it is. */
+  :disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
   /* A visible focus ring is an accessibility requirement, not decoration. */
   :focus-visible {
     outline: 2px solid var(--ring);
@@ -233,9 +268,10 @@
     transform: translateY(1px);
   }
 
+  /* The cursor comes from the base rule for anything disabled; only the
+     dimming is particular to a button. */
   .btn:disabled {
     opacity: 0.5;
-    cursor: not-allowed;
   }
 
   .btn-primary {
