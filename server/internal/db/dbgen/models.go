@@ -92,6 +92,24 @@ type MessageSearch struct {
 	SearchVector  interface{}
 }
 
+type Notification struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	RoomID    uuid.UUID
+	EventID   string
+	Reason    string
+	ReadAt    *time.Time
+	CreatedAt time.Time
+}
+
+type NotificationPreference struct {
+	UserID    uuid.UUID
+	RoomID    *uuid.UUID
+	Level     string
+	Muted     bool
+	UpdatedAt time.Time
+}
+
 type Role struct {
 	ID          uuid.UUID
 	Name        string

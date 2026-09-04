@@ -52,6 +52,7 @@ type Querier interface {
 	// Messages after the member's read position, excluding their own: a person's
 	// own messages are not unread to them.
 	CountUnread(ctx context.Context, arg CountUnreadParams) (int64, error)
+	CountUnreadNotifications(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	// How many people hold a permission at server scope without an explicit
 	// denial. The administrator floor uses this to refuse a change that would
@@ -60,6 +61,11 @@ type Querier interface {
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
+	// Raises a notification, once.
+	//
+	// The conflict clause is what stops a redelivered or edited message notifying
+	// somebody twice.
+	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
@@ -77,6 +83,12 @@ type Querier interface {
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
+	// The preference that applies to one conversation.
+	//
+	// The room's own row when there is one, the person's global default
+	// otherwise. Ordered so the specific row wins, which is what "override"
+	// means: a channel setting beats the default rather than merging with it.
+	GetNotificationPreference(ctx context.Context, arg GetNotificationPreferenceParams) (GetNotificationPreferenceRow, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
@@ -103,6 +115,7 @@ type Querier interface {
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	ListNotificationPreferences(ctx context.Context, userID uuid.UUID) ([]ListNotificationPreferencesRow, error)
 	// Attachments that never became part of a message, oldest first.
 	ListOrphanedAttachments(ctx context.Context, arg ListOrphanedAttachmentsParams) ([]Attachment, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
@@ -135,7 +148,14 @@ type Querier interface {
 	// Unread counts for every room a person is in, in one query rather than one
 	// per room.
 	ListUnreadCounts(ctx context.Context, userID uuid.UUID) ([]ListUnreadCountsRow, error)
+	ListUnreadNotifications(ctx context.Context, arg ListUnreadNotificationsParams) ([]ListUnreadNotificationsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
+	// Withdraws notifications for messages read elsewhere.
+	//
+	// Reading a conversation on a phone must clear what a laptop is showing, which
+	// is why this is keyed on the room rather than on individual notifications.
+	MarkRoomNotificationsRead(ctx context.Context, arg MarkRoomNotificationsReadParams) error
 	// Allocates the next position in a room's total order.
 	//
 	// The UPDATE takes a row lock, so two concurrent writers serialise here rather
@@ -171,12 +191,14 @@ type Querier interface {
 	// websearch_to_tsquery cannot match a prefix, so "mkut" finds nothing there.
 	// Trigram similarity finds it, and tolerates a typo at the same time.
 	SearchMessagesFuzzy(ctx context.Context, arg SearchMessagesFuzzyParams) ([]SearchMessagesFuzzyRow, error)
+	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.
 	SetRolePermission(ctx context.Context, arg SetRolePermissionParams) error
+	SetRoomNotificationPreference(ctx context.Context, arg SetRoomNotificationPreferenceParams) error
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
 	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
 	SetTypingPreference(ctx context.Context, arg SetTypingPreferenceParams) error

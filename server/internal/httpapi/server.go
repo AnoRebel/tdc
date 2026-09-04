@@ -19,6 +19,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
@@ -84,6 +85,7 @@ type Server struct {
 	attachments *attachments.Service
 	unfurl      *unfurl.Service
 	search      *search.Service
+	notify      *notify.Service
 	queries     *dbgen.Queries
 	presence    *presence.Service
 	hub         *realtime.Hub
@@ -104,6 +106,7 @@ type Services struct {
 	Attachments *attachments.Service
 	Unfurl      *unfurl.Service
 	Search      *search.Service
+	Notify      *notify.Service
 	Presence    *presence.Service
 }
 
@@ -132,6 +135,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		attachments: services.Attachments,
 		unfurl:      services.Unfurl,
 		search:      services.Search,
+		notify:      services.Notify,
 		queries:     dbgen.New(pool),
 		presence:    services.Presence,
 		config:      cfg,

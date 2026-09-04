@@ -64,6 +64,12 @@ func (s *Server) routes() {
 	s.echo.GET("/api/attachments/:id", s.handleDownloadAttachment, requireAuthentication)
 	s.echo.GET("/api/attachments/:id/preview", s.handleAttachmentPreview, requireAuthentication)
 
+	// Notifications, and what a person wants to be told about.
+	me.GET("/notifications", s.handleListNotifications)
+	me.GET("/notifications/count", s.handleNotificationCount)
+	me.POST("/notifications/:id/read", s.handleMarkNotificationRead)
+	me.PUT("/preferences/notifications", s.handleSetNotificationPreference)
+
 	// Search. A GET, so a search is shareable and bookmarkable: the term is
 	// the caller's own words about their own conversations.
 	s.echo.GET("/api/search", s.handleSearch, requireAuthentication)

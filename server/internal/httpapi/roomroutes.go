@@ -277,6 +277,7 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 	}
 
 	s.indexForSearch(ctx, event, request.Body)
+	s.notifyRecipients(ctx, event, request.Body, roomID)
 
 	// Delivered after it is stored, so a client that misses the live frame
 	// still finds the message on reconnection.
@@ -419,4 +420,40 @@ func (s *Server) indexForSearch(ctx context.Context, event dbgen.Event, body str
 	if err := s.search.Index(ctx, event, body); err != nil {
 		s.log.Error("cannot index a message for search", "eventId", event.ID, "error", err)
 	}
+}
+
+// notifyRecipients tells the room's members about a message.
+//
+// After the message is stored and outside its transaction, so a notification
+// that cannot be written costs a notification rather than the message. Somebody
+// whose message failed to send because a badge could not be updated has lost
+// something real.
+func (s *Server) notifyRecipients(
+	ctx context.Context,
+	event dbgen.Event,
+	body string,
+	roomID uuid.UUID,
+) {
+	if s.notify == nil {
+		return
+	}
+
+	members, err := s.queries.ListRoomMembers(ctx, roomID)
+	if err != nil {
+		s.log.Error("cannot read a room's members to notify them",
+			"roomId", roomID, "error", err)
+		return
+	}
+
+	room, err := s.queries.GetRoomByID(ctx, roomID)
+	if err != nil {
+		s.log.Error("cannot read a room to notify its members",
+			"roomId", roomID, "error", err)
+		return
+	}
+
+	// A direct conversation notifies whoever is in it regardless of their
+	// level: somebody set to "mentions" should still hear from a person
+	// speaking to them privately.
+	s.notify.ForMessage(ctx, event, body, members, room.Kind == "direct")
 }

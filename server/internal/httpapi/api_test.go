@@ -22,6 +22,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
@@ -121,6 +122,7 @@ func newTestAPIConfigured(
 			adjust,
 		),
 		Search:   search.NewService(pool),
+		Notify:   notify.NewService(pool, logger),
 		Presence: presence.NewService(queries),
 	}, logger)
 
