@@ -4,6 +4,7 @@ import { isApiError } from "@tdc/types";
 import {
   Check,
   Hash,
+  Paperclip,
   Lock,
   MessageSquareText,
   Pencil,
@@ -38,6 +39,14 @@ const editDraft = ref("");
 
 const timelineElement = ref<HTMLElement | null>(null);
 const composer = ref<HTMLTextAreaElement | null>(null);
+const filePicker = ref<HTMLInputElement | null>(null);
+
+// Uploads are held here until the message that carries them is sent, so a
+// refusal costs only the transfer and a failed send does not lose the file.
+const uploads = useUploads();
+
+/** Files picked but not yet sent, kept so a retry needs no second selection. */
+const pending = new Map<string, File>();
 
 const openThreadId = ref<string | null>(null);
 const threadCounts = ref<Record<string, number>>({});
@@ -86,6 +95,7 @@ const visible = computed(() => {
     .sort((a, b) => a.sequence - b.sequence)
     .map((message) => ({
       ...message,
+      attachments: message.attachments ?? [],
       body: replaced.get(message.id) ?? message.content.body ?? "",
       edited: replaced.has(message.id),
       removed: redacted.has(message.id) || message.redacted,
@@ -171,6 +181,7 @@ const live = useLiveConnection({
       sender: payload.sender,
       sequence,
       content: payload.content,
+      attachments: payload.attachments,
       sentAt: new Date(payload.createdAt).toISOString(),
       redacted: payload.redacted,
     });
@@ -265,9 +276,32 @@ function fitComposer() {
   element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
 }
 
+/** Starts uploading whatever was picked, without blocking the conversation. */
+async function pickFiles(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = [...(input.files ?? [])];
+  // Cleared so picking the same file twice in a row still fires a change.
+  input.value = "";
+
+  for (const file of files) {
+    const started = uploads.upload(roomId.value, file);
+    void started.then((upload) => pending.set(upload.id, file));
+    pending.set(file.name, file);
+  }
+}
+
+function retryUpload(id: string) {
+  const file = pending.get(id);
+  if (file) void uploads.retry(roomId.value, id, file);
+}
+
 async function send() {
   const body = draft.value.trim();
-  if (!body || sending.value) return;
+  const ready = uploads.completed.value;
+
+  // A message may be nothing but its attachments, so an empty body is only a
+  // reason to refuse when there is nothing to attach either.
+  if ((!body && ready.length === 0) || sending.value) return;
 
   sending.value = true;
   error.value = null;
@@ -281,7 +315,14 @@ async function send() {
   fitComposer();
 
   try {
-    const sent = await roomsApi.send(roomId.value, body, clientToken);
+    const sent = await roomsApi.send(
+      roomId.value,
+      body,
+      clientToken,
+      ready.map((attachment) => attachment.id),
+    );
+    uploads.clearFinished();
+    pending.clear();
     if (!messages.value.some((message) => message.id === sent.id)) {
       messages.value.push(sent);
       scrollToLatest();
@@ -501,33 +542,44 @@ watch(roomId, load, { immediate: true });
                   </button>
                 </div>
 
-                <Bubble
-                  :variant="message.removed ? 'redacted' : group.mine ? 'mine' : 'default'"
-                  :align="group.mine ? 'end' : 'start'"
-                  :continued="position > 0"
+                <div
+                  class="flex min-w-0 flex-1 flex-col gap-1"
+                  :class="group.mine ? 'items-end' : 'items-start'"
                 >
-                  <form v-if="editing === message.id" @submit.prevent="saveEdit(message.id)">
-                    <input
-                      v-model="editDraft"
-                      class="input h-8"
-                      @keydown.esc="editing = null"
-                      autofocus
-                    />
-                    <p class="mt-1 text-[0.6875rem] opacity-70">
-                      <Kbd>Enter</Kbd> to save, <Kbd>Esc</Kbd> to cancel
-                    </p>
-                  </form>
+                  <Bubble
+                    v-if="message.body || message.removed"
+                    :variant="message.removed ? 'redacted' : group.mine ? 'mine' : 'default'"
+                    :align="group.mine ? 'end' : 'start'"
+                    :continued="position > 0"
+                  >
+                    <form v-if="editing === message.id" @submit.prevent="saveEdit(message.id)">
+                      <input
+                        v-model="editDraft"
+                        class="input h-8"
+                        @keydown.esc="editing = null"
+                        autofocus
+                      />
+                      <p class="mt-1 text-[0.6875rem] opacity-70">
+                        <Kbd>Enter</Kbd> to save, <Kbd>Esc</Kbd> to cancel
+                      </p>
+                    </form>
 
-                  <template v-else>
-                    {{ message.removed ? "This message was removed" : message.body }}
-                    <span
-                      v-if="message.edited && !message.removed"
-                      class="ml-1 align-baseline text-[0.6875rem] opacity-60"
-                    >
-                      edited
-                    </span>
-                  </template>
-                </Bubble>
+                    <template v-else>
+                      {{ message.removed ? "This message was removed" : message.body }}
+                      <span
+                        v-if="message.edited && !message.removed"
+                        class="ml-1 align-baseline text-[0.6875rem] opacity-60"
+                      >
+                        edited
+                      </span>
+                    </template>
+                  </Bubble>
+
+                  <AttachmentList
+                    v-if="!message.removed && message.attachments.length"
+                    :attachments="message.attachments"
+                  />
+                </div>
               </MessageRow>
 
               <button
@@ -552,11 +604,29 @@ watch(roomId, load, { immediate: true });
           {{ typingLabel ? `${typingLabel}…` : "" }}
         </p>
 
+        <UploadTray
+          v-if="room?.member"
+          :uploads="uploads.uploads.value"
+          @cancel="uploads.cancel"
+          @retry="retryUpload"
+          @dismiss="uploads.remove"
+        />
+
         <form
           v-if="room?.member"
           class="flex items-end gap-2 rounded-xl border bg-surface p-1.5 shadow-xs transition focus-within:border-ring focus-within:shadow-sm"
           @submit.prevent="send"
         >
+          <input ref="filePicker" type="file" multiple class="sr-only" @change="pickFiles" />
+          <button
+            type="button"
+            class="btn btn-ghost size-8 shrink-0 px-0"
+            :disabled="room.archived"
+            title="Attach a file"
+            @click="filePicker?.click()"
+          >
+            <Paperclip class="size-4" />
+          </button>
           <textarea
             ref="composer"
             v-model="draft"
@@ -573,7 +643,9 @@ watch(roomId, load, { immediate: true });
           <button
             type="submit"
             class="btn btn-primary size-8 shrink-0 px-0"
-            :disabled="sending || room.archived || !draft.trim()"
+            :disabled="
+              sending || room.archived || (!draft.trim() && uploads.completed.value.length === 0)
+            "
             title="Send"
           >
             <Spinner v-if="sending" size="sm" />

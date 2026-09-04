@@ -313,3 +313,25 @@ func (s *Server) handleAttachmentPreview(c *echo.Context) error {
 
 	return c.Stream(http.StatusOK, attachment.PreviewType, reader)
 }
+
+// parseAttachmentIDs turns the identifiers a client sent into UUIDs.
+//
+// A malformed identifier is refused rather than skipped: silently dropping one
+// would post a message missing a file the sender believed they had attached.
+func parseAttachmentIDs(raw []string) ([]uuid.UUID, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	ids := make([]uuid.UUID, 0, len(raw))
+	for _, value := range raw {
+		id, err := uuid.Parse(value)
+		if err != nil {
+			return nil, echo.NewHTTPError(http.StatusBadRequest,
+				"an attachment identifier could not be read")
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, nil
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
@@ -27,7 +28,8 @@ const maxReplayEvents = 500
 // It exists so the realtime package depends on an interface it defines rather
 // than on the rooms package, keeping the transport independent of the domain.
 type roomReplayer struct {
-	rooms *rooms.Service
+	rooms       *rooms.Service
+	attachments *attachments.Service
 }
 
 // CanSubscribe reports whether a user may receive a room's events.
@@ -62,7 +64,7 @@ func (r roomReplayer) EventsSince(
 
 	frames := make([]realtime.Frame, 0, len(missed))
 	for _, event := range missed {
-		frame, err := eventFrame(event)
+		frame, err := eventFrame(event, r.attachmentsFor(ctx, event.ID))
 		if err != nil {
 			return nil, false, err
 		}
@@ -73,7 +75,12 @@ func (r roomReplayer) EventsSince(
 }
 
 // eventFrame renders a stored event as a frame for the wire.
-func eventFrame(event dbgen.Event) (realtime.Frame, error) {
+//
+// Attachments are passed in rather than looked up here, so that the two callers
+// — live delivery and replay after a reconnection — decide for themselves how
+// to fetch them. A frame without them would show a message arriving with its
+// files missing until the page was reloaded.
+func eventFrame(event dbgen.Event, files []attachmentResponse) (realtime.Frame, error) {
 	body := map[string]any{
 		"id":        event.ID,
 		"type":      event.Type,
@@ -81,6 +88,9 @@ func eventFrame(event dbgen.Event) (realtime.Frame, error) {
 		"content":   json.RawMessage(event.Content),
 		"createdAt": event.CreatedAt,
 		"redacted":  event.RedactedAt != nil,
+	}
+	if len(files) > 0 {
+		body["attachments"] = files
 	}
 	// A reply names the thread it belongs to, so a client can keep it out of
 	// the channel timeline rather than showing it in both places.
@@ -126,11 +136,29 @@ func (s *Server) handleWebSocket(c *echo.Context) error {
 // in the log, so a client that misses it will receive it on reconnection. The
 // send must not fail because a fanout did.
 func (s *Server) publishEvent(ctx context.Context, event dbgen.Event) {
-	frame, err := eventFrame(event)
+	frame, err := eventFrame(event, roomReplayer{attachments: s.attachments}.attachmentsFor(ctx, event.ID))
 	if err != nil {
 		s.log.Error("cannot render event for delivery",
 			"eventId", event.ID, "error", err)
 		return
 	}
 	s.hub.Publish(ctx, event.RoomID, frame)
+}
+
+// attachmentsFor collects a message's attachments for a live frame.
+//
+// A failure returns nothing rather than propagating: the message itself is what
+// matters most, and withholding it because a file could not be listed would be
+// the worse outcome. The attachments appear on the next timeline fetch.
+func (r roomReplayer) attachmentsFor(ctx context.Context, eventID string) []attachmentResponse {
+	files, err := r.attachments.ForEvent(ctx, eventID)
+	if err != nil || len(files) == 0 {
+		return nil
+	}
+
+	response := make([]attachmentResponse, 0, len(files))
+	for _, file := range files {
+		response = append(response, attachmentResponseOf(file))
+	}
+	return response
 }

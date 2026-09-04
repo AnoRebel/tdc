@@ -38,6 +38,8 @@ export interface Message {
   /** Position in the room's total order, used to detect a gap. */
   sequence: number;
   content: MessageContent;
+  /** Files carried by this message. Absent when it carries none, which is most. */
+  attachments?: Attachment[];
   sentAt: string;
   /**
    * True when the content has been removed. The event stays in the timeline
@@ -94,4 +96,74 @@ export interface LiveEventPayload {
    * out of the main timeline, where they belong to their thread instead.
    */
   threadRoot?: string;
+  /**
+   * Files carried by the message. Sent with the frame rather than fetched
+   * afterwards, so a message never appears with its attachments missing until
+   * the next reload.
+   */
+  attachments?: Attachment[];
+}
+
+/**
+ * A file attached to a message.
+ *
+ * The content type is what the server detected from the bytes, never what the
+ * uploader declared: a client that decides how to display a file should use
+ * this rather than the filename's extension.
+ */
+export interface Attachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  /** Size in bytes. */
+  size: number;
+  /** Where to fetch the file itself. */
+  url: string;
+  /** Whether a client can be expected to display this inline. */
+  renderable: boolean;
+  /**
+   * A reduced version, where one exists. Absent for anything that is not an
+   * image, and a client then shows the name, size and type instead of a broken
+   * image.
+   */
+  previewUrl?: string;
+  /**
+   * The original's dimensions, where known. Used to reserve the right space
+   * before the image arrives, so a conversation does not jump as it loads.
+   */
+  width?: number;
+  height?: number;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+/** What an operator permits to be uploaded. */
+export interface AttachmentLimits {
+  maxFileSize: number;
+  maxMessageSize: number;
+  maxPerMessage: number;
+  /** Empty means every type not explicitly blocked is permitted. */
+  allowedTypes: string[];
+  blockedTypes: string[];
+}
+
+/**
+ * An upload in flight.
+ *
+ * Progress is reported from the transfer itself rather than simulated, which is
+ * why this carries bytes rather than only a percentage: a stalled upload is
+ * visible as a number that stops moving.
+ */
+export interface UploadProgress {
+  /** A client-side identifier, so a queued upload can be addressed before the
+   * server has given it one. */
+  id: string;
+  filename: string;
+  size: number;
+  transferred: number;
+  status: "waiting" | "uploading" | "done" | "failed" | "cancelled";
+  /** Set when the status is "failed", stating what went wrong. */
+  error?: string;
+  /** Set once the upload completes. */
+  attachment?: Attachment;
 }

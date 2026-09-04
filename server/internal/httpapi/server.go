@@ -134,7 +134,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		if services.Presence != nil {
 			lifecycle = services.Presence
 		}
-		s.realtime = realtime.NewServer(s.hub, roomReplayer{rooms: services.Rooms},
+		s.realtime = realtime.NewServer(s.hub, roomReplayer{rooms: services.Rooms, attachments: services.Attachments},
 			lifecycle, cfg.Keepalive, log)
 	}
 

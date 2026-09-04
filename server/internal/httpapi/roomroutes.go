@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -56,8 +57,11 @@ type messageResponse struct {
 	Sender   string          `json:"sender"`
 	Sequence int64           `json:"sequence"`
 	Content  json.RawMessage `json:"content"`
-	SentAt   time.Time       `json:"sentAt"`
-	Redacted bool            `json:"redacted"`
+	// Attachments is absent when a message carries no files, which is most of
+	// them.
+	Attachments []attachmentResponse `json:"attachments,omitempty"`
+	SentAt      time.Time            `json:"sentAt"`
+	Redacted    bool                 `json:"redacted"`
 }
 
 func messageResponseOf(event dbgen.Event) messageResponse {
@@ -70,6 +74,26 @@ func messageResponseOf(event dbgen.Event) messageResponse {
 		SentAt:   time.UnixMilli(event.CreatedAt),
 		Redacted: event.RedactedAt != nil,
 	}
+}
+
+// withAttachments fills in a message's attachments.
+//
+// Looked up per message rather than joined into the timeline query: most
+// messages carry none, and the common case should not pay for the rare one.
+func (s *Server) withAttachments(ctx context.Context, message messageResponse) messageResponse {
+	files, err := s.attachments.ForEvent(ctx, message.ID)
+	if err != nil || len(files) == 0 {
+		// A message whose attachments cannot be read is still a message. The
+		// text is what matters most, and hiding it because a file is missing
+		// would be the worse failure.
+		return message
+	}
+
+	message.Attachments = make([]attachmentResponse, 0, len(files))
+	for _, file := range files {
+		message.Attachments = append(message.Attachments, attachmentResponseOf(file))
+	}
+	return message
 }
 
 type createRoomRequest struct {
@@ -198,13 +222,16 @@ func (s *Server) handleRoomTimeline(c *echo.Context) error {
 
 	response := make([]messageResponse, 0, len(timeline))
 	for _, event := range timeline {
-		response = append(response, messageResponseOf(event))
+		response = append(response, s.withAttachments(ctx, messageResponseOf(event)))
 	}
 	return c.JSON(http.StatusOK, response)
 }
 
 type sendMessageRequest struct {
-	Body string `json:"body"`
+	// AttachmentIDs are uploads to bind to this message. They were uploaded
+	// beforehand, so a refusal here costs only the binding, not the transfer.
+	AttachmentIDs []string `json:"attachmentIds,omitempty"`
+	Body          string   `json:"body"`
 	// ClientToken makes a retry safe: resending with the same token returns
 	// the original message rather than posting twice.
 	ClientToken string `json:"clientToken"`
@@ -224,16 +251,36 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
+	// Checked before the message is accepted, so a refusal does not leave a
+	// message posted with its files missing.
+	attachmentIDs, err := parseAttachmentIDs(request.AttachmentIDs)
+	if err != nil {
+		return err
+	}
+	if len(attachmentIDs) > 0 {
+		if err := s.attachments.CheckBatch(ctx, attachmentIDs); err != nil {
+			return attachmentError(err)
+		}
+	}
+
 	event, err := s.rooms.SendMessage(ctx, roomID, user.ID, request.Body, request.ClientToken)
 	if err != nil {
 		return roomError(err)
+	}
+
+	// Bound after the event exists, since the binding names it. Scoped to this
+	// uploader and room, so one person cannot attach another's upload.
+	if len(attachmentIDs) > 0 {
+		if _, err := s.attachments.Bind(ctx, event.ID, roomID, user.ID, attachmentIDs); err != nil {
+			return attachmentError(err)
+		}
 	}
 
 	// Delivered after it is stored, so a client that misses the live frame
 	// still finds the message on reconnection.
 	s.publishEvent(ctx, event)
 
-	return c.JSON(http.StatusCreated, messageResponseOf(event))
+	return c.JSON(http.StatusCreated, s.withAttachments(ctx, messageResponseOf(event)))
 }
 
 type editMessageRequest struct {

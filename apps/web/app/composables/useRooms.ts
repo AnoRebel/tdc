@@ -52,8 +52,17 @@ export function useRooms() {
    * again with the same token returns the original message rather than
    * posting twice.
    */
-  function send(roomId: string, body: string, clientToken: string): Promise<Message> {
-    return api.post<Message>(`/api/rooms/${roomId}/messages`, { body, clientToken });
+  function send(
+    roomId: string,
+    body: string,
+    clientToken: string,
+    attachmentIds: string[] = [],
+  ): Promise<Message> {
+    return api.post<Message>(`/api/rooms/${roomId}/messages`, {
+      body,
+      clientToken,
+      attachmentIds,
+    });
   }
 
   function edit(roomId: string, messageId: string, body: string): Promise<Message> {
