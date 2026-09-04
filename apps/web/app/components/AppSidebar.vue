@@ -2,6 +2,7 @@
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import { Globe, Hash, Lock, Plus, Search, Server, Settings } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
+import { Kbd } from "~/components/ui/kbd";
 
 /**
  * The persistent navigation.
@@ -26,34 +27,23 @@ const props = defineProps<{
   servers: ConnectedServer[];
 }>();
 
-const emit = defineEmits<{ create: [] }>();
+const emit = defineEmits<{ create: []; search: [] }>();
 
 const { user } = useAuth();
 const route = useRoute();
 
-const filter = ref("");
+const joined = computed(() => props.rooms);
+const conversations = computed(() => props.direct);
+const joinable = computed(() => props.available);
+const peers = computed(() => props.servers);
 
-/** Filters by name, so a long list stays usable without a separate search. */
-function matching(rooms: Room[]): Room[] {
-  const term = filter.value.trim().toLowerCase();
-  if (!term) return rooms;
-  return rooms.filter(
-    (room) =>
-      room.name.toLowerCase().includes(term) || (room.slug ?? "").toLowerCase().includes(term),
-  );
-}
-
-const joined = computed(() => matching(props.rooms));
-const conversations = computed(() => matching(props.direct));
-const joinable = computed(() => matching(props.available));
-
-/** Filters connected servers by the same search term. */
-const peers = computed(() => {
-  const term = filter.value.trim().toLowerCase();
-  if (!term) return props.servers;
-  return props.servers.filter(
-    (peer) => peer.name.toLowerCase().includes(term) || peer.domain.toLowerCase().includes(term),
-  );
+/**
+ * The modifier this platform actually uses, so the hint is not a lie on one of
+ * them. Guarded for the server render, where there is no navigator.
+ */
+const shortcut = computed(() => {
+  const mac = import.meta.client && /Mac|iP(hone|ad|od)/.test(navigator.platform);
+  return mac ? "⌘K" : "Ctrl K";
 });
 
 function isCurrent(roomId: string): boolean {
@@ -83,18 +73,19 @@ function conversationName(room: Room): string {
     </header>
 
     <div class="p-2">
-      <div class="relative">
-        <Search
-          class="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
-          v-model="filter"
-          type="search"
-          placeholder="Search rooms"
-          class="input h-8 pl-7 text-xs"
-          aria-label="Search rooms"
-        />
-      </div>
+      <!-- A button, not a field. It used to filter the rooms already loaded
+           here, which answered a different question from the real search and
+           found nothing in messages or people — two searches disagreeing is
+           worse than one that works. -->
+      <button
+        type="button"
+        class="flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/40 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted"
+        @click="emit('search')"
+      >
+        <Search class="size-3.5 shrink-0" />
+        <span>Search</span>
+        <Kbd class="ml-auto">{{ shortcut }}</Kbd>
+      </button>
     </div>
 
     <nav class="flex-1 space-y-4 overflow-y-auto px-2 pb-3">
@@ -215,7 +206,7 @@ function conversationName(room: Room): string {
         v-if="!joined.length && !conversations.length && !joinable.length && !peers.length"
         class="px-2 py-6 text-center text-xs text-muted-foreground"
       >
-        {{ filter ? "Nothing matches that." : "No rooms yet." }}
+        No rooms yet.
       </p>
     </nav>
 

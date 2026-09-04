@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { UploadProgress } from "@tdc/types";
 import { AlertCircle, Check, RotateCw, X } from "lucide-vue-next";
+import { Spinner } from "~/components/ui/spinner";
 
 /**
  * Uploads in flight, shown above the composer.

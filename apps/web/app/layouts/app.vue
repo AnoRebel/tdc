@@ -99,8 +99,32 @@ async function createRoom() {
   }
 }
 
+const searching = ref(false);
+
+/**
+ * Opens search on the platform's own shortcut.
+ *
+ * Command on a Mac, Control elsewhere, which is what every application these
+ * people already use binds it to. Slash is not bound: this application has a
+ * message box on most screens, and stealing a printable character from it
+ * would be worse than having one shortcut.
+ */
+function onShortcut(event: KeyboardEvent) {
+  if (event.key !== "k" || !(event.metaKey || event.ctrlKey)) return;
+  event.preventDefault();
+  searching.value = !searching.value;
+}
+
+onMounted(() => window.addEventListener("keydown", onShortcut));
+onBeforeUnmount(() => window.removeEventListener("keydown", onShortcut));
+
 // Available to pages that change room state, so the sidebar stays current.
 provide("refreshRooms", refresh);
+// Lets the sidebar's search box open the palette rather than owning a second,
+// weaker search of its own.
+provide("openSearch", () => {
+  searching.value = true;
+});
 </script>
 
 <template>
@@ -113,11 +137,14 @@ provide("refreshRooms", refresh);
       :can-create="can('channel.create')"
       :servers="servers"
       @create="creating = true"
+      @search="searching = true"
     />
 
     <main class="flex min-w-0 flex-1 flex-col">
       <slot />
     </main>
+
+    <SearchPalette v-model="searching" />
 
     <!-- Creating a channel is a small, focused task, so it is a slide-over
          rather than a modal that dims the whole application. -->

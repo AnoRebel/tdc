@@ -236,15 +236,35 @@ async function load() {
     // Subscribing from the last sequence means a reconnection replays exactly
     // what was missed rather than repeating what is already shown.
     live.subscribe(roomId.value, messages.value.at(-1)?.sequence);
-    await nextTick();
-    scrollToLatest();
     void refreshThreadCounts();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not open this room.";
   } finally {
     loading.value = false;
+
+    // A search result names the message it wants; anything else opens at the
+    // bottom, where a conversation is normally resumed.
+    if (typeof route.query.at === "string") {
+      jumpTo(route.query.at);
+    } else {
+      scrollToLatest();
+    }
   }
 }
+
+/*
+ * Jumping to a message must also work when the room is already open.
+ *
+ * Searching from inside a conversation changes only the query, so the page is
+ * never remounted and load() does not run again. The jump counter makes each
+ * jump a distinct location, so asking for the same message twice still moves.
+ */
+watch(
+  () => [route.query.at, route.query.jump],
+  ([eventId]) => {
+    if (typeof eventId === "string" && eventId) jumpTo(eventId);
+  },
+);
 
 async function loadPresence() {
   try {
@@ -280,10 +300,83 @@ function markCaughtUp() {
   }
 }
 
-function scrollToLatest() {
-  nextTick(() => {
+/*
+ * Runs an action once the timeline is showing the messages it will show.
+ *
+ * Three separate things can be missing, and each of them broke this on its
+ * own. The first load is started by a watcher with immediate: true, so it runs
+ * before the template has ever rendered and the ref holds null. The skeleton
+ * occupies the timeline while loading is true, so a height read then belongs
+ * to placeholder content. And nextTick returns before the browser has laid
+ * anything out, so even the right element has the wrong height.
+ *
+ * Waiting on all three is what makes a room open at its newest message rather
+ * than at the top. Bounded rather than a bare retry, so an empty room or a
+ * reader who has navigated away does not leave a callback running every frame.
+ */
+function onTimeline(action: (timeline: HTMLElement) => void) {
+  let attempts = 0;
+
+  const attempt = () => {
     const element = timelineElement.value;
-    if (element) element.scrollTop = element.scrollHeight;
+
+    // document.contains matters as much as the null check. A room that was
+    // already open leaves the ref pointing at the previous render's element,
+    // which is detached: scrolling it succeeds silently and moves nothing on
+    // screen, which is why rooms kept opening at the top.
+    const ready =
+      element &&
+      document.contains(element) &&
+      !loading.value &&
+      element.querySelector('[id^="message-"]');
+
+    if (ready) {
+      // setTimeout rather than requestAnimationFrame: rAF is suspended in a
+      // background or unfocused tab, so a room restored into one would open at
+      // the top and stay there. A zero timeout still lands after the browser
+      // has laid the timeline out, and it runs whether or not anything is
+      // painting.
+      setTimeout(() => action(element), 0);
+      return;
+    }
+
+    // About a second in total: far longer than a mount and a render take, and
+    // still finite when there is nothing to scroll to.
+    if (++attempts > 60) return;
+    setTimeout(attempt, 16);
+  };
+
+  void nextTick(attempt);
+}
+
+/**
+ * Scrolls to one message and marks it.
+ *
+ * The highlight matters as much as the scroll: landing in the middle of a
+ * conversation with no sign of which message was meant leaves the reader to
+ * work it out from search terms they have already stopped looking at. It fades
+ * rather than persisting, because it describes how you arrived rather than
+ * anything about the message.
+ */
+function jumpTo(eventId: string) {
+  onTimeline((timeline) => {
+    const element = timeline.querySelector<HTMLElement>(`[id="message-${CSS.escape(eventId)}"]`);
+    if (!element) {
+      // The message is real but outside the loaded window — history is not
+      // paged in yet. The bottom is a better answer than an unmoved view.
+      scrollToLatest();
+      return;
+    }
+
+    element.scrollIntoView({ block: "center" });
+    element.classList.add("just-found");
+    setTimeout(() => element.classList.remove("just-found"), 2000);
+  });
+}
+
+function scrollToLatest() {
+  onTimeline((timeline) => {
+    timeline.scrollTop = timeline.scrollHeight;
   });
 }
 
@@ -457,9 +550,16 @@ async function join() {
   }
 }
 
-/** Opens a thread beside the channel. */
+/*
+ * Opens a thread beside the channel, and brings its root into view.
+ *
+ * The panel shows the message it is about, but the channel behind it stays
+ * where it was — so a reply opened from a count near the top left the
+ * conversation showing an unrelated part of itself.
+ */
 function openThread(messageId: string) {
   openThreadId.value = messageId;
+  jumpTo(messageId);
 }
 
 /** Refreshes reply counts after posting in a thread. */
@@ -585,6 +685,7 @@ watch(roomId, load, { immediate: true });
 
               <MessageRow
                 v-for="(message, position) in group.items"
+                :id="`message-${message.id}`"
                 :key="message.id"
                 :mine="group.mine"
                 v-bind="contextMenu.handlers(() => menuFor(message, group.mine))"
@@ -822,3 +923,38 @@ watch(roomId, load, { immediate: true });
     />
   </div>
 </template>
+
+<style scoped>
+@reference "~/assets/css/main.css";
+
+/*
+ * Marks the message a search or a thread jumped to.
+ *
+ * :deep, because the class is set on a child component's root element rather
+ * than on markup this file owns. It runs once and leaves nothing behind: it
+ * says how the reader got here, not something about the message.
+ */
+:deep(.just-found) {
+  animation: found 2s ease-out;
+  border-radius: var(--radius-lg);
+}
+
+@keyframes found {
+  0%,
+  40% {
+    background-color: color-mix(in oklab, var(--color-primary) 22%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Somebody who prefers less motion still needs to see which message it is, so
+   the mark is shown and simply does not animate. */
+@media (prefers-reduced-motion: reduce) {
+  :deep(.just-found) {
+    animation: none;
+    background-color: color-mix(in oklab, var(--color-primary) 22%, transparent);
+  }
+}
+</style>

@@ -12,3 +12,4 @@ export * from "./auth";
 export * from "./rooms";
 export * from "./presence";
 export * from "./errors";
+export * from "./search";
