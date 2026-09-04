@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { LiveEventPayload, Message, Presence, Room, TypingPerson } from "@tdc/types";
 import { isApiError } from "@tdc/types";
+import type { MenuItem } from "~/components/ContextMenu.vue";
 import {
   Check,
+  Copy,
   Hash,
+  MoreVertical,
   Paperclip,
   Lock,
   MessageSquareText,
@@ -47,6 +50,14 @@ const uploads = useUploads();
 
 /** Files picked but not yet sent, kept so a retry needs no second selection. */
 const pending = new Map<string, File>();
+
+// Actions are reachable three ways: hover controls with a pointer, a context
+// menu by right-click or long press, and the keyboard. A touch screen has no
+// hover, so without the menu those actions would be unreachable on a phone.
+const contextMenu = useContextMenu();
+
+/** The message awaiting confirmation, if any. Deleting cannot be undone. */
+const pendingDelete = ref<{ id: string; body: string } | null>(null);
 
 // Photographs are reduced before they leave the device. A phone camera produces
 // several megabytes, and on metered mobile data sending the original to be
@@ -367,7 +378,57 @@ async function saveEdit(messageId: string) {
   }
 }
 
+/**
+ * Builds the menu for a message.
+ *
+ * Only what this person may actually do: offering an action that will be
+ * refused is worse than not offering it, because the refusal arrives after
+ * they have already decided.
+ */
+function menuFor(
+  message: { id: string; body: string; removed: boolean },
+  mine: boolean,
+): MenuItem[] {
+  const items: MenuItem[] = [];
+
+  if (!message.removed) {
+    items.push({
+      label: "Copy text",
+      icon: Copy,
+      action: () => navigator.clipboard?.writeText(message.body),
+    });
+  }
+
+  if (room.value?.member && !message.removed) {
+    items.push({
+      label: "Reply in thread",
+      icon: MessageSquareText,
+      action: () => openThread(message.id),
+    });
+  }
+
+  if (mine && !message.removed) {
+    items.push(
+      { label: "Edit", icon: Pencil, action: () => startEditing(message) },
+      {
+        label: "Delete",
+        icon: Trash2,
+        destructive: true,
+        action: () => confirmDelete(message),
+      },
+    );
+  }
+
+  return items;
+}
+
+/** Asks before deleting, since a deleted message cannot be brought back. */
+function confirmDelete(message: { id: string; body: string }) {
+  pendingDelete.value = { id: message.id, body: message.body };
+}
+
 async function remove(messageId: string) {
+  pendingDelete.value = null;
   try {
     const deletion = await roomsApi.remove(roomId.value, messageId);
     messages.value.push(deletion);
@@ -515,14 +576,33 @@ watch(roomId, load, { immediate: true });
                 v-for="(message, position) in group.items"
                 :key="message.id"
                 :mine="group.mine"
+                v-bind="contextMenu.handlers(() => menuFor(message, group.mine))"
               >
                 <!-- Actions sit outside the bubble, on the side away from the
                      edge, and appear only on the row being pointed at. -->
                 <div
                   v-if="!message.removed && editing !== message.id"
-                  class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100"
+                  class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 max-md:opacity-100"
                   :class="group.mine ? 'order-first' : 'order-last'"
                 >
+                  <!-- A touch screen has no hover, so the controls stay visible
+                       there and this opens the same menu a long press would.
+                       Without it, editing and deleting would be unreachable on
+                       a phone. -->
+                  <button
+                    type="button"
+                    class="btn btn-ghost size-8 px-0 md:hidden"
+                    aria-label="Message actions"
+                    @click.stop="
+                      contextMenu.show(
+                        ($event.currentTarget as HTMLElement).getBoundingClientRect().left,
+                        ($event.currentTarget as HTMLElement).getBoundingClientRect().bottom,
+                        menuFor(message, group.mine),
+                      )
+                    "
+                  >
+                    <MoreVertical class="size-4" />
+                  </button>
                   <button
                     v-if="room?.member"
                     type="button"
@@ -546,7 +626,7 @@ watch(roomId, load, { immediate: true });
                     type="button"
                     class="btn btn-danger size-6 px-0"
                     title="Delete"
-                    @click="remove(message.id)"
+                    @click="confirmDelete(message)"
                   >
                     <Trash2 class="size-3.5" />
                   </button>
@@ -675,6 +755,23 @@ watch(roomId, load, { immediate: true });
         </div>
       </footer>
     </section>
+
+    <ContextMenu
+      v-if="contextMenu.open.value"
+      :items="contextMenu.items.value"
+      :x="contextMenu.position.value.x"
+      :y="contextMenu.position.value.y"
+      @close="contextMenu.close"
+    />
+
+    <ConfirmDialog
+      v-if="pendingDelete"
+      title="Delete this message?"
+      :detail="pendingDelete.body"
+      confirm-label="Delete"
+      @cancel="pendingDelete = null"
+      @confirm="remove(pendingDelete.id)"
+    />
 
     <ThreadPanel
       v-if="openThreadId && user"
