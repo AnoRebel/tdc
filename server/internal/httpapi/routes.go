@@ -50,6 +50,23 @@ func (s *Server) routes() {
 	rooms.POST("/:id/messages", s.handleSendMessage)
 	rooms.PATCH("/:id/messages/:eventId", s.handleEditMessage)
 	rooms.DELETE("/:id/messages/:eventId", s.handleDeleteMessage)
+	rooms.GET("/:id/threads/:eventId", s.handleThread)
+	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread)
+	rooms.POST("/:id/read", s.handleMarkRead)
+	rooms.GET("/:id/presence", s.handleRoomPresence)
+	rooms.POST("/:id/typing", s.handleStartTyping)
+	rooms.GET("/:id/typing", s.handleListTyping)
+
+	// Direct conversations, which are found by their participants rather than
+	// by name.
+	direct := s.echo.Group("/api/direct", requireAuthentication)
+	direct.GET("", s.handleListDirect)
+	direct.POST("", s.handleOpenDirect)
+
+	// Presence and unread state for the signed-in person.
+	me.GET("/unread", s.handleUnreadCounts)
+	me.PUT("/status", s.handleSetStatus)
+	s.echo.GET("/api/statuses", s.handleListStatuses, requireAuthentication)
 
 	// The live connection. Authenticated like any other route; a connection is
 	// never established for an unauthenticated caller.

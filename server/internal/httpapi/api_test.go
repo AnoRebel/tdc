@@ -21,6 +21,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
@@ -83,6 +84,7 @@ func newTestAPI(t *testing.T) http.Handler {
 		Audit:    audit.NewRecorder(queries, logger),
 		Limiter:  cache.NewLimiter(memory),
 		Rooms:    rooms.NewService(queries, events.NewKeyring(signingKey), "tdc.test", logger),
+		Presence: presence.NewService(queries),
 	}, logger)
 
 	t.Cleanup(func() {

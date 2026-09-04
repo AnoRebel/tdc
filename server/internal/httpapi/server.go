@@ -17,6 +17,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
@@ -76,6 +77,7 @@ type Server struct {
 	audit    *audit.Recorder
 	limiter  *cache.Limiter
 	rooms    *rooms.Service
+	presence *presence.Service
 	hub      *realtime.Hub
 	realtime *realtime.Server
 	config   Config
@@ -91,6 +93,7 @@ type Services struct {
 	Audit    *audit.Recorder
 	Limiter  *cache.Limiter
 	Rooms    *rooms.Service
+	Presence *presence.Service
 }
 
 // New builds a server with the health and version routes mounted. It does not
@@ -115,6 +118,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		audit:    services.Audit,
 		limiter:  services.Limiter,
 		rooms:    services.Rooms,
+		presence: services.Presence,
 		config:   cfg,
 	}
 
@@ -122,7 +126,12 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 	// is what makes a removal take effect on a connection that stays open.
 	if services.Rooms != nil {
 		s.hub = realtime.NewHub(services.Rooms, log)
-		s.realtime = realtime.NewServer(s.hub, roomReplayer{rooms: services.Rooms}, cfg.Keepalive, log)
+		var lifecycle realtime.Lifecycle
+		if services.Presence != nil {
+			lifecycle = services.Presence
+		}
+		s.realtime = realtime.NewServer(s.hub, roomReplayer{rooms: services.Rooms},
+			lifecycle, cfg.Keepalive, log)
 	}
 
 	if len(cfg.AllowedOrigins) > 0 {

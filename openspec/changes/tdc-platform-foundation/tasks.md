@@ -63,7 +63,7 @@ Goal: threads, direct messages, presence, and read state — enough that it comp
 - [x] 4.4 Implement operator-configurable statuses with expiry and notification suppression; verify a status reverts automatically at its expiry (`messaging/realtime`)
 - [x] 4.5 Implement typing indication with automatic expiry and a user opt-out; verify the indicator disappears when not refreshed (`messaging/realtime`)
 - [x] 4.6 Implement per-conversation read state converging across a user's devices, cached per the design; verify reading on one device updates the others and an offline device converges on reconnect (`messaging/realtime`)
-- [ ] 4.7 Implement channel discovery and search respecting visibility; verify search never returns a channel the user cannot discover (`messaging/channels`)
+- [x] 4.7 Implement channel discovery and search respecting visibility; verify search never returns a channel the user cannot discover (`messaging/channels`)
 - [ ] 4.8 Build the web interface for threads, direct messages, presence, and unread indicators; verify each is usable end to end
 - [ ] **MILESTONE 4** — Demonstrate: a threaded conversation, a private direct message, live presence and typing indicators between two clients, and unread counts that clear correctly across two devices signed in as the same user. Tag `v0.4.0-dev`.
 

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
@@ -101,6 +103,14 @@ func run() error {
 		return err
 	}
 
+	presenceService := presence.NewService(queries)
+
+	// Presence and typing state lapse rather than being deleted on an event,
+	// so a client that goes away without a clean close does not leave someone
+	// permanently present or permanently typing. The sweep is what makes that
+	// lapse take effect.
+	go sweepPeriodically(ctx, presenceService, log)
+
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
@@ -108,6 +118,7 @@ func run() error {
 		Limiter:  cache.NewLimiter(memoryCache),
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
+		Presence: presenceService,
 	}
 
 	server := httpapi.New(httpapi.Config{
@@ -210,4 +221,31 @@ func loadOrCreateSigningKey(ctx context.Context, queries *dbgen.Queries) (*event
 	}
 
 	return key, nil
+}
+
+// sweepInterval is how often lapsed presence, statuses and typing indications
+// are cleared.
+//
+// Frequent enough that a stale indicator does not linger noticeably, rare
+// enough to be negligible work.
+const sweepInterval = 30 * time.Second
+
+// sweepPeriodically clears state that has lapsed, until the context ends.
+func sweepPeriodically(ctx context.Context, service *presence.Service, log *slog.Logger) {
+	ticker := time.NewTicker(sweepInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := service.Sweep(ctx); err != nil && ctx.Err() == nil {
+				// Logged rather than fatal: a failed sweep means a stale
+				// indicator lingers until the next one, not that the server
+				// cannot serve.
+				log.Error("presence sweep failed", slog.String("error", err.Error()))
+			}
+		}
+	}
 }

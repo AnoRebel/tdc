@@ -45,20 +45,46 @@ type Replayer interface {
 	CanSubscribe(ctx context.Context, roomID, userID uuid.UUID) (bool, error)
 }
 
+// Lifecycle is told when a person's connections open and close.
+//
+// An interface so the transport does not depend on the presence package, and
+// so a server that does not track presence can pass nothing.
+type Lifecycle interface {
+	Connected(ctx context.Context, userID uuid.UUID) error
+	Disconnected(ctx context.Context, userID uuid.UUID) error
+	Touch(ctx context.Context, userID uuid.UUID) error
+}
+
 // Server upgrades HTTP connections and runs them.
 type Server struct {
 	hub       *Hub
 	replayer  Replayer
+	lifecycle Lifecycle
 	keepalive time.Duration
 	log       *slog.Logger
 }
 
 // NewServer builds the WebSocket server.
-func NewServer(hub *Hub, replayer Replayer, keepalive time.Duration, log *slog.Logger) *Server {
+//
+// lifecycle may be nil, in which case connection state is not reported
+// anywhere.
+func NewServer(
+	hub *Hub,
+	replayer Replayer,
+	lifecycle Lifecycle,
+	keepalive time.Duration,
+	log *slog.Logger,
+) *Server {
 	if keepalive <= 0 {
 		keepalive = DefaultKeepalive
 	}
-	return &Server{hub: hub, replayer: replayer, keepalive: keepalive, log: log}
+	return &Server{
+		hub:       hub,
+		replayer:  replayer,
+		lifecycle: lifecycle,
+		keepalive: keepalive,
+		log:       log,
+	}
 }
 
 // Handle upgrades a request and serves the connection until it closes.
@@ -87,8 +113,25 @@ func (s *Server) Handle(w http.ResponseWriter, r *http.Request, userID uuid.UUID
 	conn := NewConnection(userID)
 	s.hub.Add(conn)
 
+	// Presence follows the connection: opening one makes the person present,
+	// and closing the last one ends it.
+	if s.lifecycle != nil {
+		if err := s.lifecycle.Connected(r.Context(), userID); err != nil {
+			s.log.Error("cannot record connection", slog.String("error", err.Error()))
+		}
+	}
+
 	defer func() {
 		s.hub.Remove(conn)
+		if s.lifecycle != nil {
+			// A fresh context: the request's is already cancelled by the time
+			// this runs, and the disconnection still has to be recorded.
+			closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := s.lifecycle.Disconnected(closeCtx, userID); err != nil {
+				s.log.Error("cannot record disconnection", slog.String("error", err.Error()))
+			}
+		}
 		_ = socket.CloseNow()
 	}()
 
@@ -247,6 +290,13 @@ func (s *Server) writeLoop(ctx context.Context, cancel context.CancelFunc, socke
 			// what keeps a phone on metered data cheap to leave connected.
 			pingCtx, pingCancel := context.WithTimeout(ctx, 10*time.Second)
 			err := socket.Ping(pingCtx)
+			if err == nil && s.lifecycle != nil {
+				// The same ping refreshes presence, so a live connection is
+				// not swept as stale.
+				if touchErr := s.lifecycle.Touch(pingCtx, conn.UserID); touchErr != nil {
+					s.log.Debug("cannot refresh presence", slog.String("error", touchErr.Error()))
+				}
+			}
 			pingCancel()
 			if err != nil {
 				conn.Close()
