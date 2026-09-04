@@ -99,10 +99,10 @@ Goal: notifications and search, so the product works when you are not looking at
 - [ ] 6.3 Implement suppression while actively viewing, withdrawal when read elsewhere, and status interaction with priority override; verify no notification is raised for the conversation in view (`platform/notifications`)
 - [ ] 6.4 Implement batching and optional periodic summaries; verify a burst produces one batched notification rather than one per message (`platform/notifications`)
 - [ ] 6.5 Make notification delivery non-blocking and failure-tolerant; verify an unreachable push service does not delay message delivery or lose unread state (`platform/notifications`)
-- [ ] 6.6 Implement the `Searcher` interface with a Postgres implementation using a separate search table, a stored generated `tsvector` column, and a GIN index; verify reindexing does not touch the messages table
-- [ ] 6.7 Implement query parsing with `websearch_to_tsquery`, recency ordering, and `ts_headline` highlighting; verify hostile input never raises a syntax error and results are ordered by recency
-- [ ] 6.8 Implement `pg_trgm` fuzzy and prefix matching for autocomplete; verify prefix queries return results `websearch_to_tsquery` alone cannot
-- [ ] 6.9 Enforce authorization on all search results; verify search never returns messages from channels the user cannot read
+- [x] 6.6 Implement the `Searcher` interface with a Postgres implementation using a separate search table, a stored generated `tsvector` column, and a GIN index; verify reindexing does not touch the messages table
+- [x] 6.7 Implement query parsing with `websearch_to_tsquery`, recency ordering, and `ts_headline` highlighting; verify hostile input never raises a syntax error and results are ordered by recency
+- [x] 6.8 Implement `pg_trgm` fuzzy and prefix matching for autocomplete; verify prefix queries return results `websearch_to_tsquery` alone cannot
+- [x] 6.9 Enforce authorization on all search results; verify search never returns messages from channels the user cannot read
 - [ ] 6.10 Build the web notification and search interface; verify both are usable end to end
 - [ ] **MILESTONE 6** — Demonstrate: a mention raises an in-app notification, muting silences it while unread state still updates, and searching returns matching messages ranked by recency with results from private channels correctly excluded. Tag `v0.6.0-dev`.
 
