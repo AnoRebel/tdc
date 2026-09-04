@@ -147,6 +147,37 @@ Unfurling MUST NOT be usable to reach hosts the server can access but an outside
 - **WHEN** a link is posted in a private channel
 - **THEN** the fetch does not disclose the channel, its members, or the message content to the target host beyond the request itself
 
+### Requirement: Original media is retrievable
+
+Where the client reduces a file before uploading it, the person sending it SHALL be able to send the original instead, and MUST be told which they are sending.
+
+A reduced copy is the default because most sharing is of photographs to be looked at, and on metered mobile data the original costs the sender money for detail nobody sees. Sending the original is a deliberate choice, not a hidden one.
+
+An operator MAY set a size above which the original is refused, and that refusal MUST name the limit as any other refusal does.
+
+Where a person wants to transfer a file the server will not store — because it exceeds the limits, or because they would rather it did not rest on a server at all — the client MAY offer a direct transfer between the two devices. Such a transfer MUST be offered as an alternative and never as the only route, MUST require the recipient to accept it, and MUST NOT be presented as more private than it is: the participants' addresses are visible to each other and to whatever relays the connection.
+
+#### Scenario: The reduced copy is the default
+
+- **WHEN** a person attaches a photograph
+- **THEN** a reduced copy is sent unless they choose otherwise
+
+#### Scenario: Sending the original is offered
+
+- **WHEN** a person chooses to send the original
+- **THEN** the file is uploaded unreduced
+- **AND** the interface says which was sent
+
+#### Scenario: An oversized original names the limit
+
+- **WHEN** an original exceeds what the operator permits
+- **THEN** the refusal states the limit it exceeded
+
+#### Scenario: A direct transfer is accepted before it begins
+
+- **WHEN** a direct transfer is offered
+- **THEN** nothing is sent until the recipient accepts
+
 ### Requirement: Deletion
 
 Deleting a message SHALL make its attachments unretrievable, and storage occupied by attachments with no remaining references MUST be reclaimable.

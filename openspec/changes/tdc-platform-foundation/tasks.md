@@ -84,6 +84,7 @@ Goal: attachments with previews and safe link unfurling.
 - [ ] 5.11 Build the web upload, preview, and link-preview interface with the user-controlled automatic-media setting; verify disabling it prevents media fetches until requested (`messaging/attachments`, `clients/web`)
 - [x] 5.11a Build the attachment viewer for images, animated images, video, audio and PDF, opening over the conversation with keyboard dismissal and navigation between one message's attachments; verify an unrenderable type still shows name, size and type with a download, and that rendered content cannot reach the application's session or storage (`clients/web`)
 - [x] 5.11b Build upload feedback with real transfer progress, cancellation, and a retry that does not re-select the file; verify progress comes from the transfer rather than a simulation, a refusal names the limit it broke, and the conversation stays usable while a file is in flight (`clients/web`)
+- [ ] 5.11f Offer sending the original rather than the reduced copy, stating which is being sent and naming the limit when an original is refused; verify the reduced copy remains the default (`messaging/attachments`, `clients/web`)
 - [ ] 5.11c Build context menus for messages, attachments and conversations, opened by right-click and by long press, keyboard-navigable and dismissable, offering only permitted actions; verify every action remains reachable without the menu (`clients/web`)
 - [ ] 5.11d Require confirmation before destructive actions, naming what is lost and never defaulting focus to the destructive choice; verify a reversible action is not interrupted and a reflexive keypress cannot destroy (`clients/web`)
 - [ ] 5.11e Make every hover-revealed action reachable by touch, size targets to the documented minimum, and add swipe shortcuts that are discoverable another way; verify on a touch viewport that no capability is pointer-only (`clients/web`)
@@ -105,6 +106,8 @@ Goal: notifications and search, so the product works when you are not looking at
 - [ ] 6.10 Build the web notification and search interface; verify both are usable end to end
 - [ ] **MILESTONE 6** — Demonstrate: a mention raises an in-app notification, muting silences it while unread state still updates, and searching returns matching messages ranked by recency with results from private channels correctly excluded. Tag `v0.6.0-dev`.
 
+- [ ] 6.10a Implement per-person disclosure settings and a member list that omits withheld details server-side rather than sending them to be hidden; verify a non-member cannot enumerate a private channel's members and that moderator access to withheld details is audited (`messaging/channels`, `platform/audit-log`)
+
 ## 7. Phase 7 — Operators are in control
 
 Goal: a server an operator can actually run, configure, and moderate.
@@ -119,6 +122,8 @@ Goal: a server an operator can actually run, configure, and moderate.
 - [ ] 7.8 Implement sensitive-media marking and obscuring; verify marked media is obscured until revealed and user marking works without a classifier (`platform/moderation`)
 - [ ] 7.9 Implement reporting with reporter non-disclosure and rate limiting, and the moderation queue with context and recorded outcomes; verify the reported party never learns who reported them (`platform/moderation`)
 - [ ] 7.10 Implement moderator actions — message removal, channel removal, suspension, posting restriction — audited and reversible; verify suspension invalidates sessions and temporary restrictions expire automatically (`platform/moderation`)
+- [ ] 7.10a Implement channel-level bans, temporary and permanent, taking effect on open connections, expiring without intervention, confined to their channel, and audited with reason and duration; verify a banned person cannot rejoin and that other memberships are untouched (`platform/moderation`)
+- [ ] 7.10b Implement per-person direct-message availability — anyone, only those sharing a channel, or nobody — enforced server-side with a refusal that does not disclose which setting caused it; verify existing conversations survive a narrowing and that moderators can still make contact (`platform/moderation`)
 - [ ] 7.11 Implement retention policies globally and per channel with disclosure and audited shortening; verify content is removed at expiry (`platform/moderation`)
 - [ ] 7.12 Implement user blocking without disclosure, with moderators retaining full view; verify the blocked user is not informed (`platform/moderation`)
 - [ ] 7.13 Implement disposable chats with server-enforced expiry; verify expired content is not served to a client offline through the expiry (`messaging/channels`)

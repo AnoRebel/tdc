@@ -101,6 +101,74 @@ Every moderator action MUST be recorded in the audit log with the actor, target,
 - **WHEN** a moderator reverses a previous action
 - **THEN** the reversal is recorded in the audit log referencing the original action
 
+### Requirement: Channel-level bans
+
+A channel's moderators SHALL be able to ban a person from that channel, temporarily or permanently, independently of any server-level action.
+
+A ban MUST remove the person from the channel, refuse their attempts to rejoin, and take effect on their open connections without waiting for a reconnection.
+
+A temporary ban SHALL state when it ends, and MUST lift itself at that time without a moderator having to act again.
+
+A ban MUST be recorded in the audit log with its reason and its duration, and MUST be reversible by any moderator of that channel.
+
+Banning from one channel MUST NOT affect a person's membership of any other, so that a moderator of one space cannot reach beyond it.
+
+#### Scenario: A banned person is removed and cannot return
+
+- **WHEN** a moderator bans someone from a channel
+- **THEN** they are removed from it
+- **AND** an attempt to rejoin is refused
+
+#### Scenario: A ban takes effect immediately
+
+- **WHEN** someone is banned while connected
+- **THEN** they stop receiving that channel's events without reconnecting
+
+#### Scenario: A temporary ban expires on its own
+
+- **WHEN** a temporary ban's period elapses
+- **THEN** the person may rejoin without a moderator acting
+
+#### Scenario: A ban is confined to its channel
+
+- **WHEN** someone is banned from one channel
+- **THEN** their membership of every other channel is unaffected
+
+#### Scenario: A ban is recorded and reversible
+
+- **WHEN** a ban is applied or lifted
+- **THEN** the action, its reason and its duration are recorded in the audit log
+
+### Requirement: Direct message availability
+
+A person SHALL be able to say who may open a direct conversation with them: anyone on the server, only people sharing a channel with them, or nobody.
+
+The server MUST enforce that choice, refusing a conversation the recipient's setting does not permit, and MUST NOT disclose which setting caused a refusal — a refusal that distinguishes "closed to everyone" from "closed to you" tells a stranger something about the person refusing.
+
+Changing the setting MUST NOT close conversations that already exist, since a person who has already been spoken to has already been reachable.
+
+A moderator's ability to contact someone about a moderation matter MUST NOT be blocked by this setting.
+
+#### Scenario: A closed inbox refuses a stranger
+
+- **WHEN** someone opens a direct conversation with a person who accepts none
+- **THEN** it is refused
+
+#### Scenario: Sharing a channel is enough, when that is the setting
+
+- **WHEN** someone in a shared channel opens a conversation with a person set to allow that
+- **THEN** it is permitted
+
+#### Scenario: A refusal discloses nothing
+
+- **WHEN** a conversation is refused
+- **THEN** the response does not reveal whether the person is closed to everyone or only to this sender
+
+#### Scenario: Existing conversations survive a change
+
+- **WHEN** a person narrows who may contact them
+- **THEN** conversations already open remain usable
+
 ### Requirement: Moderation queue
 
 The server SHALL present flagged content and reports in a queue for moderators, showing enough surrounding context to judge, and recording the outcome of each item.

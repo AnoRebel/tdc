@@ -198,6 +198,36 @@ An expired message SHALL leave the same placeholder a deleted message leaves, so
 - **WHEN** a message carrying attachments expires
 - **THEN** those attachments are removed and no longer retrievable
 
+### Requirement: Member lists respect each person's privacy
+
+A channel's members SHALL be able to see who else is in it, and each person SHALL control which of their own details that list discloses.
+
+A person's display name and address are always shown, because they are how a message is attributed and a conversation is opened; everything beyond that — presence, status, the time they were last seen, their profile details — is theirs to withhold.
+
+The server MUST omit withheld details from the response rather than sending them for a client to hide, since a detail sent is a detail disclosed however the client behaves.
+
+A moderator viewing the list in a moderation context MAY see what is withheld, and that viewing MUST be recorded in the audit log.
+
+#### Scenario: A member list shows who is present
+
+- **WHEN** a member views a channel's member list
+- **THEN** the other members are listed with their names and addresses
+
+#### Scenario: Withheld details are not sent
+
+- **WHEN** a person has chosen not to show their presence
+- **THEN** the member list sent to others omits it entirely rather than marking it hidden
+
+#### Scenario: A non-member cannot enumerate members
+
+- **WHEN** someone who is not in a private channel requests its member list
+- **THEN** the request is refused without revealing whether the channel exists
+
+#### Scenario: Moderator access is recorded
+
+- **WHEN** a moderator views details a person has withheld
+- **THEN** the access is recorded in the audit log
+
 ### Requirement: Discovery
 
 Users SHALL be able to browse and search the channels they are permitted to see, and search MUST never return a channel the requesting user is not permitted to discover.

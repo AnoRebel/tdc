@@ -117,7 +117,11 @@ The reasons it is still not used for chat are structural:
 
 This is not a theoretical conclusion: **`~/Code/card_games` already made this call**, using Nitro-native WebSockets (crossws) topic pub/sub as its carrier and gating Conduit behind `NUXT_CONDUIT_ENABLED=true` as an optional WebRTC enhancement. Its `server/utils/roomHub.ts` — per-recipient state redaction, connection grace timers with reconnect windows, room reaping, per-peer token bucket (20 burst / 10 per second, 16 KB max message) — is the design reference for TDC's Go hub.
 
-**Where Conduit does belong: voice/video.** For the optional calling capability it is exactly right — P2P media with WebSocket relay fallback, MIT-licensed, already written, with a Go signaling client to pair with `pion/webrtc`.
+**Where Conduit does belong: voice/video, and direct file transfer with it.** For the optional calling capability it is exactly right — P2P media with WebSocket relay fallback, MIT-licensed, already written, with a Go signaling client to pair with `pion/webrtc`.
+
+The same signaling carries direct file transfer, which is why that capability is specified as optional rather than as a second upload path. Once WebRTC is established for calls, a data channel between two participants costs almost nothing extra; building it before then would mean standing up signaling, NAT traversal and a relay fallback for the sake of moving a file that the ordinary upload already moves.
+
+Direct transfer is not offered as the private option, and the specification says so explicitly. Two people connected directly can see each other's addresses, and where a relay is needed — which is most of the time, behind carrier-grade NAT — the relay sees the traffic. Presenting it as more confidential than a server upload would be a promise the transport cannot keep. Its real merits are different and worth having: a file too large for the operator's limits, and bytes that never rest on a server at all.
 
 ### Calls: mesh by default, SFU behind a provider interface
 
