@@ -34,6 +34,16 @@ type AttachmentsConfig struct {
 	// choosing otherwise should be a decision rather than an accident.
 	ScannerFailOpen bool
 
+	// MediaSidecarAddress sends preview generation to another container.
+	//
+	// Empty — the default — does the work in this process, which is safe
+	// because decoding is pure Go and there is no image library in C to be
+	// exploited. An operator who would rather a decoder failure took down
+	// something disposable can point this at a sidecar.
+	MediaSidecarAddress string
+	// MediaSidecarTimeout bounds a request to it.
+	MediaSidecarTimeout time.Duration
+
 	// LinkPreviews lets this server fetch a summary of links people post.
 	//
 	// On by default because a preview is genuinely useful, but an operator who
@@ -182,10 +192,12 @@ func Default() Config {
 			},
 		},
 		Attachments: AttachmentsConfig{
-			ScannerAddress:  "",
-			ScannerTimeout:  30 * time.Second,
-			ScannerFailOpen: false,
-			LinkPreviews:    true,
+			ScannerAddress:      "",
+			ScannerTimeout:      30 * time.Second,
+			ScannerFailOpen:     false,
+			LinkPreviews:        true,
+			MediaSidecarAddress: "",
+			MediaSidecarTimeout: 30 * time.Second,
 		},
 		Log: LogConfig{
 			Level:  "info",

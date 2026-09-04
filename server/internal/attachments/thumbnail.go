@@ -248,3 +248,26 @@ func resize(source image.Image, width, height int) image.Image {
 
 	return destination
 }
+
+// GenerateThumbnailBoundsCheck confirms bytes really are a decodable image.
+//
+// Used on what a media sidecar returns. Trusting another process's declared
+// type is the same mistake as trusting a client's: the result is served to
+// browsers, so it has to be what it claims. Only the header is read, which is
+// enough to know the format and cheap enough to do on every preview.
+func GenerateThumbnailBoundsCheck(r io.Reader) (image.Config, error) {
+	config, _, err := image.DecodeConfig(io.LimitReader(r, detectionWindow*4))
+	if err != nil {
+		return image.Config{}, fmt.Errorf("attachments: not a decodable image: %w", err)
+	}
+
+	if config.Width <= 0 || config.Height <= 0 {
+		return image.Config{}, fmt.Errorf("attachments: image declares %dx%d",
+			config.Width, config.Height)
+	}
+	if int64(config.Width)*int64(config.Height) > maxSourcePixels {
+		return image.Config{}, ErrSourceTooLarge
+	}
+
+	return config, nil
+}

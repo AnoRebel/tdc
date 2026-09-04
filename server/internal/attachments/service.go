@@ -68,6 +68,11 @@ type Service struct {
 	// uses the operating system's temporary directory.
 	spoolDir string
 
+	// processor makes previews. Defaults to doing the work in this process,
+	// which is safe because decoding is pure Go; an operator who wants the
+	// isolation can point it at a sidecar instead.
+	processor Processor
+
 	// scanner is nil when the operator has configured none, which is the
 	// default and an ordinary way to run.
 	scanner Scanner
@@ -81,12 +86,23 @@ type Service struct {
 // NewService wires the parts an attachment needs.
 func NewService(pool *db.Pool, store storage.Store, limits Limits, log *slog.Logger) *Service {
 	return &Service{
-		pool:    pool,
-		queries: dbgen.New(pool),
-		store:   store,
-		limits:  limits,
-		log:     log,
+		pool:      pool,
+		queries:   dbgen.New(pool),
+		store:     store,
+		limits:    limits,
+		log:       log,
+		processor: LocalProcessor{},
 	}
+}
+
+// WithProcessor sends preview generation elsewhere.
+//
+// Separate from the constructor for the same reason as the scanner: doing the
+// work in this process is the default, and threading a processor through every
+// call site would suggest otherwise.
+func (s *Service) WithProcessor(processor Processor) *Service {
+	s.processor = processor
+	return s
 }
 
 // WithScanner attaches a malware scanner and its failure policy.
@@ -456,8 +472,19 @@ func (s *Service) makePreview(ctx context.Context, spooled *os.File, contentType
 		return result
 	}
 
-	thumbnail, err := GenerateThumbnail(spooled, contentType)
+	// Bounded, so a sidecar that stops answering cannot hold an upload open.
+	// The upload itself is already stored by this point either way: a preview
+	// is a convenience, and losing one must never lose the file.
+	processCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	thumbnail, err := s.processor.Process(processCtx, spooled, contentType)
 	if err != nil {
+		if !errors.Is(err, ErrNotThumbnailable) {
+			// A configured sidecar that is unreachable is worth an operator
+			// seeing, where an ordinary PDF having no preview is not.
+			s.log.Debug("cannot generate a preview", "error", err)
+		}
 		return result
 	}
 

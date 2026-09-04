@@ -41,8 +41,17 @@ services:
       # rebuilt or the container recreated.
       TDC_STORAGE_BACKEND: "local"
       TDC_STORAGE_DIRECTORY: "/var/lib/tdc/attachments"
+      # Uncomment, and start the media profile, to generate previews in a
+      # separate container instead of in this process. Optional: with this
+      # unset the server does the work itself, which is safe because image
+      # decoding is pure Go.
+      # TDC_ATTACHMENTS_MEDIA_SIDECAR_ADDRESS: "http://media:8081"
     volumes:
       - attachments:/var/lib/tdc
+    networks:
+      # default carries the database; media carries the optional sidecar.
+      default: {}
+      media: {}
     depends_on:
       database:
         condition: service_healthy
@@ -52,6 +61,48 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
+
+  # Optional. Previews are generated inside the server unless this is running
+  # and the server is pointed at it, which is what TDC_ATTACHMENTS_MEDIA_SIDECAR
+  # ADDRESS below does. Start it with:
+  #
+  #   docker compose --profile media up -d
+  #
+  # Worth it for a large or public deployment, where a decoder failure taking
+  # down a disposable container rather than the server is worth a second
+  # image. Unnecessary for a community server: image decoding is pure Go, so
+  # there is no library in C to be exploited.
+  media:
+    profiles: ["media"]
+    build:
+      context: .
+      dockerfile: server/Dockerfile.media
+    restart: unless-stopped
+    # No published ports: the server reaches it over the compose network, and
+    # nothing outside the host has any business talking to it.
+    expose:
+      - "8081"
+    # It makes no outbound connections of its own — it is handed bytes and
+    # returns a smaller picture — so it needs no name resolution and no route
+    # off this network.
+    networks:
+      media: {}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # A decompression bomb is refused from its header before a pixel is
+    # allocated, so these are the second bound rather than the first. They are
+    # what turns "this container was killed" into the failure mode instead of
+    # "the host ran out of memory".
+    mem_limit: 512m
+    cpus: 1.0
+    # No health check: a scratch image has no shell and no wget to run one
+    # with, and adding a userland purely to be able to curl itself would give
+    # up the isolation this container exists for. The server treats an
+    # unreachable sidecar as "no preview" rather than as a failure, so an
+    # unhealthy one degrades rather than breaks.
 
   database:
     # The Debian-based image rather than Alpine: it is the better-tested
@@ -84,6 +135,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+networks:
+  # The media processor sits on a network of its own with no gateway, so it
+  # cannot reach the internet, the database, or anything else the operator
+  # runs — only the server can reach it.
+  media:
+    internal: true
 
 volumes:
   database:

@@ -289,6 +289,15 @@ func newAttachmentService(
 ) *attachments.Service {
 	service := attachments.NewService(pool, store, attachments.DefaultLimits(), log)
 
+	// Preview generation is done in this process unless an operator has asked
+	// for the isolation of a separate container.
+	if address := cfg.Attachments.MediaSidecarAddress; address != "" {
+		log.Info("using a media sidecar for previews", "address", address)
+		service = service.WithProcessor(
+			attachments.NewSidecarProcessor(address, cfg.Attachments.MediaSidecarTimeout),
+		)
+	}
+
 	if address := cfg.Attachments.ScannerAddress; address != "" {
 		log.Info("malware scanning is enabled",
 			"address", address, "failOpen", cfg.Attachments.ScannerFailOpen)

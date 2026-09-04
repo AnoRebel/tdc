@@ -1,6 +1,7 @@
 package attachments_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -38,16 +39,23 @@ func fakeClamd(t *testing.T, reply string) string {
 			go func(c net.Conn) {
 				defer c.Close()
 
-				// Drain until the zero-length terminator, as clamd does.
+				// Drained until the zero-length terminator, as real clamd
+				// does. An earlier version replied as soon as anything
+				// arrived, which raced the writer: on a payload large enough
+				// to need more than one frame the reply landed before the
+				// write finished, and the scan failed intermittently. Reading
+				// to the end is both what clamd does and what makes this
+				// deterministic.
 				buffer := make([]byte, 4096)
 				for {
-					if _, err := c.Read(buffer); err != nil {
+					read, err := c.Read(buffer)
+					if err != nil {
 						break
 					}
-					// The reply is sent as soon as anything arrives; a real
-					// clamd waits for the terminator, and the difference does
-					// not matter for what is under test here.
-					break
+					// The terminator is four zero bytes at the end of a frame.
+					if read >= 4 && bytes.Equal(buffer[read-4:read], []byte{0, 0, 0, 0}) {
+						break
+					}
 				}
 
 				c.Write([]byte(reply))
