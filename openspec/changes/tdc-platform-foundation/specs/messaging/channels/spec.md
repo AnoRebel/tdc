@@ -198,6 +198,60 @@ An expired message SHALL leave the same placeholder a deleted message leaves, so
 - **WHEN** a message carrying attachments expires
 - **THEN** those attachments are removed and no longer retrievable
 
+### Requirement: Invitations
+
+A channel SHALL be able to require an invitation to join, and its moderators SHALL be able to issue invitations as a link, as a short code, or as both for the same invitation.
+
+An invitation MUST carry limits its issuer chooses: when it expires, how many times it may be used, and whether it admits anyone holding it or only a named person. An invitation with no remaining uses, or past its expiry, MUST be refused — and refusing MUST NOT disclose whether the invitation ever existed, so that guessing cannot be used to enumerate them.
+
+An invitation's secret MUST be long enough that guessing is impractical, and MUST be generated from a cryptographically secure source. A code short enough to be read aloud MUST compensate with a stricter rate limit on attempts, since it is necessarily easier to guess than a link.
+
+A moderator SHALL be able to revoke an invitation before it expires, taking effect immediately, and to see which invitations exist, who issued each, and how many times each has been used. Issuing, using and revoking MUST each be recorded in the audit log.
+
+Accepting an invitation MUST grant membership of that channel only, and MUST NOT confer any permission beyond it.
+
+Where the server itself is invitation-only, the same rules apply to invitations to the server, and accepting one MUST additionally permit registration.
+
+#### Scenario: An invitation admits its holder
+
+- **WHEN** someone opens a valid invitation link or enters its code
+- **THEN** they may join that channel
+
+#### Scenario: An expired invitation is refused
+
+- **WHEN** an invitation is used after its expiry
+- **THEN** it is refused
+
+#### Scenario: A used-up invitation is refused
+
+- **WHEN** an invitation that has reached its use limit is used again
+- **THEN** it is refused
+
+#### Scenario: A refusal discloses nothing
+
+- **WHEN** an invalid, expired, revoked or never-existent invitation is presented
+- **THEN** the refusals are indistinguishable from one another
+
+#### Scenario: Revocation is immediate
+
+- **WHEN** a moderator revokes an invitation
+- **THEN** it stops working at once, including for someone who already holds the link
+
+#### Scenario: An invitation grants nothing beyond the channel
+
+- **WHEN** someone joins through an invitation
+- **THEN** they hold ordinary membership of that channel and no other permission
+
+#### Scenario: Codes are rate limited
+
+- **WHEN** codes are guessed repeatedly against a channel
+- **THEN** attempts are refused after a documented threshold
+
+#### Scenario: Invitations are auditable
+
+- **WHEN** an invitation is issued, used or revoked
+- **THEN** the action, its issuer and its limits are recorded in the audit log
+
 ### Requirement: Member lists respect each person's privacy
 
 A channel's members SHALL be able to see who else is in it, and each person SHALL control which of their own details that list discloses.
