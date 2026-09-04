@@ -13,10 +13,26 @@ const EnvPrefix = "TDC_"
 
 // Config is the server's complete configuration.
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Storage  StorageConfig
-	Log      LogConfig
+	Server      ServerConfig
+	Database    DatabaseConfig
+	Storage     StorageConfig
+	Attachments AttachmentsConfig
+	Log         LogConfig
+}
+
+// AttachmentsConfig configures what happens to an uploaded file.
+type AttachmentsConfig struct {
+	// ScannerAddress is a clamd host and port. Empty — the default — disables
+	// scanning, which is how this server runs unless an operator asks
+	// otherwise: it must not require an external service.
+	ScannerAddress string
+	// ScannerTimeout bounds a scan, so a scanner that hangs does not hold an
+	// upload open.
+	ScannerTimeout time.Duration
+	// ScannerFailOpen accepts a file when the scanner cannot be reached. Off
+	// by default: a scanner that is down must not become a silent bypass, and
+	// choosing otherwise should be a decision rather than an accident.
+	ScannerFailOpen bool
 }
 
 // StorageConfig says where uploaded files are kept.
@@ -157,6 +173,11 @@ func Default() Config {
 				Region:    "us-east-1",
 				PathStyle: true,
 			},
+		},
+		Attachments: AttachmentsConfig{
+			ScannerAddress:  "",
+			ScannerTimeout:  30 * time.Second,
+			ScannerFailOpen: false,
 		},
 		Log: LogConfig{
 			Level:  "info",

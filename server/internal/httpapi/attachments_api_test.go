@@ -656,3 +656,165 @@ func TestCORSPermitsRangeRequests(t *testing.T) {
 		}
 	}
 }
+
+// TestDeletingAMessageRemovesItsAttachments checks that deleting a message
+// takes its files with it.
+//
+// Leaving them reachable would mean a deletion removed the words and kept the
+// photograph, which is not what anyone deleting a message expects.
+func TestDeletingAMessageRemovesItsAttachments(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	upload := uploadFile(t, handler, token, roomID, "siri.png", testPNG)
+	if upload.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d", upload.Code)
+	}
+
+	var uploaded struct {
+		ID  string `json:"id"`
+		URL string `json:"url"`
+	}
+	json.Unmarshal(upload.Body.Bytes(), &uploaded)
+
+	sent := call(t, handler, http.MethodPost, "/api/rooms/"+roomID+"/messages", map[string]any{
+		"body":          "Picha ya siri",
+		"clientToken":   "delete-test-1",
+		"attachmentIds": []string{uploaded.ID},
+	}, token)
+	if sent.Code != http.StatusCreated {
+		t.Fatalf("sending returned %d: %s", sent.Code, truncate(sent.Body.String()))
+	}
+
+	var message struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal(sent.Body.Bytes(), &message)
+
+	// Reachable while the message stands.
+	if before := call(t, handler, http.MethodGet, uploaded.URL, nil, token); before.Code != http.StatusOK {
+		t.Fatalf("the attachment is not reachable before deletion: %d", before.Code)
+	}
+
+	deleted := call(t, handler, http.MethodDelete,
+		"/api/rooms/"+roomID+"/messages/"+message.ID, nil, token)
+	if deleted.Code != http.StatusCreated {
+		t.Fatalf("deleting returned %d: %s", deleted.Code, truncate(deleted.Body.String()))
+	}
+
+	if after := call(t, handler, http.MethodGet, uploaded.URL, nil, token); after.Code == http.StatusOK {
+		t.Error("the attachment is still reachable after its message was deleted")
+	}
+}
+
+// TestSharedStorageSurvivesOneDeletion is the case content-addressed storage
+// makes subtle.
+//
+// Two people uploading the same file share one stored object, because the key
+// is derived from the content. Deleting one person's attachment must not remove
+// the bytes the other still points at — a reference count is what makes that
+// safe, and without it the second person's file would vanish silently.
+func TestSharedStorageSurvivesOneDeletion(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	// The same bytes, uploaded twice. Both land on one stored object.
+	first := uploadFile(t, handler, owner, roomID, "kwanza.png", testPNG)
+	second := uploadFile(t, handler, owner, roomID, "pili.png", testPNG)
+	if first.Code != http.StatusCreated || second.Code != http.StatusCreated {
+		t.Fatalf("uploads returned %d and %d", first.Code, second.Code)
+	}
+
+	var a, b struct {
+		ID  string `json:"id"`
+		URL string `json:"url"`
+	}
+	json.Unmarshal(first.Body.Bytes(), &a)
+	json.Unmarshal(second.Body.Bytes(), &b)
+
+	if a.ID == b.ID {
+		t.Fatal("the two uploads produced one attachment; they should be distinct records")
+	}
+
+	// Attach and delete the first, leaving the second unreferenced but present.
+	sent := call(t, handler, http.MethodPost, "/api/rooms/"+roomID+"/messages", map[string]any{
+		"body":          "Ya kwanza",
+		"clientToken":   "shared-storage-1",
+		"attachmentIds": []string{a.ID},
+	}, owner)
+	if sent.Code != http.StatusCreated {
+		t.Fatalf("sending returned %d", sent.Code)
+	}
+
+	var message struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal(sent.Body.Bytes(), &message)
+
+	if deleted := call(t, handler, http.MethodDelete,
+		"/api/rooms/"+roomID+"/messages/"+message.ID, nil, owner); deleted.Code != http.StatusCreated {
+		t.Fatalf("deleting returned %d", deleted.Code)
+	}
+
+	// The second attachment must still serve its bytes.
+	survivor := call(t, handler, http.MethodGet, b.URL, nil, owner)
+	if survivor.Code != http.StatusOK {
+		t.Fatalf("the other attachment sharing the same bytes returned %d; its storage was reclaimed",
+			survivor.Code)
+	}
+	if !bytes.Equal(survivor.Body.Bytes(), testPNG) {
+		t.Error("the surviving attachment's bytes are wrong")
+	}
+}
+
+// TestUnreachableScannerRefusesUploadByDefault is the requirement that matters
+// most about scanning.
+//
+// A scanner that is down must not become a silent bypass: the protection would
+// then disappear exactly when something is wrong, which is when it is most
+// likely to be needed. Accepting anyway is a legitimate choice for a small
+// community, but it has to be a choice.
+func TestUnreachableScannerRefusesUploadByDefault(t *testing.T) {
+	// A port nothing is listening on, which is what a stopped clamd looks like.
+	handler := newTestAPIWithScanner(t, "127.0.0.1:1", false)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "picha.png", testPNG)
+	if recorder.Code == http.StatusCreated {
+		t.Fatal("an upload was accepted while the scanner was unreachable")
+	}
+}
+
+// TestFailOpenAcceptsWhenConfigured checks that the operator's choice is
+// honoured, so a community that would rather stay usable can say so.
+func TestFailOpenAcceptsWhenConfigured(t *testing.T) {
+	handler := newTestAPIWithScanner(t, "127.0.0.1:1", true)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "picha.png", testPNG)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("fail-open was configured but the upload returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+}
+
+// TestNoScannerMeansNoRequirement checks the default: a server with no scanner
+// configured works without one, and needs no external service at all.
+func TestNoScannerMeansNoRequirement(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	if recorder := uploadFile(t, handler, token, roomID, "picha.png", testPNG); recorder.Code != http.StatusCreated {
+		t.Fatalf("an upload failed with no scanner configured: %d", recorder.Code)
+	}
+}

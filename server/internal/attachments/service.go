@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,16 +67,37 @@ type Service struct {
 	// spoolDir is where an upload is held while it is being measured. Empty
 	// uses the operating system's temporary directory.
 	spoolDir string
+
+	// scanner is nil when the operator has configured none, which is the
+	// default and an ordinary way to run.
+	scanner Scanner
+	// scannerFailOpen accepts a file the scanner could not decide on. Off by
+	// default: a scanner that is down must not become a silent bypass.
+	scannerFailOpen bool
+
+	log *slog.Logger
 }
 
 // NewService wires the parts an attachment needs.
-func NewService(pool *db.Pool, store storage.Store, limits Limits) *Service {
+func NewService(pool *db.Pool, store storage.Store, limits Limits, log *slog.Logger) *Service {
 	return &Service{
 		pool:    pool,
 		queries: dbgen.New(pool),
 		store:   store,
 		limits:  limits,
+		log:     log,
 	}
+}
+
+// WithScanner attaches a malware scanner and its failure policy.
+//
+// Separate from the constructor because scanning is optional: a server with
+// none configured is the default, and threading a nil through every call site
+// would suggest otherwise.
+func (s *Service) WithScanner(scanner Scanner, failOpen bool) *Service {
+	s.scanner = scanner
+	s.scannerFailOpen = failOpen
+	return s
 }
 
 // Limits returns the operator's configured restrictions, so a client can show
@@ -126,6 +148,13 @@ func (s *Service) Upload(
 	contentType := DetectType(head[:read])
 
 	if err := s.limits.CheckType(contentType); err != nil {
+		return nil, err
+	}
+
+	// Scanned before it is stored, so a rejected file never reaches the object
+	// store at all — cleaning one up afterwards would leave a window where it
+	// was present.
+	if err := s.scan(ctx, spooled, size); err != nil {
 		return nil, err
 	}
 
@@ -465,4 +494,107 @@ func (s *Service) OpenPreview(ctx context.Context, attachment *Attachment) (io.R
 	}
 
 	return reader, nil
+}
+
+// Delete removes an attachment and, when nothing else needs them, its bytes.
+//
+// The storage key is content-derived, so two people uploading the same file
+// share one stored object. Deleting one person's attachment must therefore not
+// remove the object another still points at — the reference count is what makes
+// that safe, and it is why this cannot simply delete the key.
+func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
+	attachment, err := s.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// The record goes first. Once it is gone the attachment is unreachable,
+	// which is what the requirement asks for; the bytes are housekeeping.
+	if err := s.queries.DeleteAttachment(ctx, id); err != nil {
+		return fmt.Errorf("attachments: deleting %s: %w", id, err)
+	}
+
+	s.reclaimIfUnreferenced(ctx, attachment)
+	return nil
+}
+
+// DeleteForEvent removes every attachment a message carried.
+//
+// Called when a message is deleted, so that removing a message removes what it
+// carried rather than leaving the files reachable by anyone who kept a link.
+func (s *Service) DeleteForEvent(ctx context.Context, eventID string) error {
+	files, err := s.ForEvent(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	for _, attachment := range files {
+		if err := s.Delete(ctx, attachment.ID); err != nil && !errors.Is(err, ErrNotFound) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// reclaimIfUnreferenced removes stored bytes that nothing points at any more.
+//
+// Failures are logged rather than returned. The attachment is already gone as
+// far as anyone can tell; an object left behind costs disk until the next sweep
+// and is far better than an error on a deletion that did in fact happen.
+func (s *Service) reclaimIfUnreferenced(ctx context.Context, attachment *Attachment) {
+	remaining, err := s.queries.CountAttachmentsWithStorageKey(ctx, attachment.StorageKey)
+	if err == nil && remaining == 0 {
+		_ = s.store.Delete(ctx, attachment.StorageKey)
+	}
+
+	if attachment.PreviewKey == "" {
+		return
+	}
+
+	// A preview is content-addressed too, and two attachments of the same
+	// image share one, so it needs the same count.
+	previewKey := attachment.PreviewKey
+	remainingPreviews, err := s.queries.CountAttachmentsWithPreviewKey(ctx, &previewKey)
+	if err == nil && remainingPreviews == 0 {
+		_ = s.store.Delete(ctx, previewKey)
+	}
+}
+
+// ReclaimOrphans removes uploads that never became part of a message.
+//
+// An attachment is uploaded before the message that carries it, so one that is
+// never sent leaves a row and an object behind. Someone who picks a file and
+// then changes their mind is the ordinary case, not an attack, and this is the
+// cost of letting them do that.
+//
+// olderThan should be comfortably longer than a slow upload followed by a
+// person taking their time: reclaiming an attachment somebody is about to send
+// would lose it. Returns how many were removed.
+func (s *Service) ReclaimOrphans(ctx context.Context, olderThan time.Duration, limit int32) (int, error) {
+	cutoff := time.Now().Add(-olderThan)
+
+	orphans, err := s.queries.ListOrphanedAttachments(ctx, dbgen.ListOrphanedAttachmentsParams{
+		CreatedAt: cutoff,
+		Limit:     limit,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("attachments: listing orphans: %w", err)
+	}
+
+	removed := 0
+	for _, row := range orphans {
+		attachment := fromRow(row)
+
+		if err := s.queries.DeleteAttachment(ctx, attachment.ID); err != nil {
+			// One failure must not stop the sweep; the rest are still worth
+			// reclaiming and this one is retried next time.
+			continue
+		}
+
+		s.reclaimIfUnreferenced(ctx, attachment)
+		removed++
+	}
+
+	return removed, nil
 }

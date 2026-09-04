@@ -15,13 +15,18 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 )
 
-// presignedLifetime is how long a download link stays valid.
+// presignedLifetime is how long a redirect to the object store stays valid.
 //
-// Short, because the link carries its own authorisation: anyone holding it can
-// fetch the file until it expires, whatever happens to the room's membership in
-// the meantime. Long enough for a browser to follow a redirect and for a slow
-// connection to start the transfer.
-const presignedLifetime = 5 * time.Minute
+// Deliberately very short. A presigned URL is a bearer token: anyone holding it
+// can fetch the file, whatever happens to the room's membership in the
+// meantime, and the object store has no idea who the person is. This is long
+// enough for the browser that was just authorised to follow the redirect it was
+// given, and too short to be worth passing on.
+//
+// The requirement is that a download link be bound to the authorised person.
+// An object store's presigned URL cannot be — so the redirect is issued per
+// request, after the check, rather than handed out as a shareable link.
+const presignedLifetime = 30 * time.Second
 
 // attachmentResponse is the public shape of an attachment.
 type attachmentResponse struct {
@@ -164,10 +169,21 @@ func (s *Server) handleDownloadAttachment(c *echo.Context) error {
 	}
 
 	// Where the object store can serve the bytes itself, hand the transfer over
-	// rather than streaming a large file through this process. The redirect is
-	// issued now, after the permission check, and expires quickly.
-	if url, err := s.attachments.PresignedURL(ctx, attachment, presignedLifetime); err == nil && url != "" {
-		return c.Redirect(http.StatusFound, url)
+	// rather than streaming a large file through this process.
+	//
+	// Only for a request that is not a range request. A media element seeking
+	// through a video would be redirected on every range, each hop costing a
+	// signature and a round trip, and Range headers do not always survive a
+	// redirect — so those are streamed here, where the range is handled
+	// directly.
+	if c.Request().Header.Get("Range") == "" {
+		if url, err := s.attachments.PresignedURL(ctx, attachment, presignedLifetime); err == nil && url != "" {
+			// Never cached: the URL carries its own authorisation and expires
+			// in seconds, so a cache holding it would serve a stale token to
+			// whoever asked next.
+			c.Response().Header().Set("Cache-Control", "private, no-store")
+			return c.Redirect(http.StatusFound, url)
+		}
 	}
 
 	reader, err := s.attachments.Open(ctx, attachment)

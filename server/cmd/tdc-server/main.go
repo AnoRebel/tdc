@@ -140,7 +140,7 @@ func run() error {
 		Limiter:  cache.NewLimiter(memoryCache),
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
-		Attachments: attachments.NewService(pool, objectStore, attachments.DefaultLimits()),
+		Attachments: newAttachmentService(pool, objectStore, cfg, log),
 		Presence:    presenceService,
 	}
 
@@ -271,4 +271,30 @@ func sweepPeriodically(ctx context.Context, service *presence.Service, log *slog
 			}
 		}
 	}
+}
+
+// newAttachmentService wires attachments, with malware scanning only when an
+// operator has configured a scanner.
+//
+// Scanning is optional and off by default: this server must work without any
+// external service, which is what makes it possible to self-host at no cost.
+func newAttachmentService(
+	pool *db.Pool,
+	store storage.Store,
+	cfg config.Config,
+	log *slog.Logger,
+) *attachments.Service {
+	service := attachments.NewService(pool, store, attachments.DefaultLimits(), log)
+
+	if address := cfg.Attachments.ScannerAddress; address != "" {
+		log.Info("malware scanning is enabled",
+			"address", address, "failOpen", cfg.Attachments.ScannerFailOpen)
+
+		return service.WithScanner(
+			attachments.NewClamAVScanner(address, cfg.Attachments.ScannerTimeout),
+			cfg.Attachments.ScannerFailOpen,
+		)
+	}
+
+	return service
 }

@@ -42,7 +42,20 @@ func newTestAPI(t *testing.T) http.Handler {
 	return newTestAPIConfigured(t, nil)
 }
 
-func newTestAPIConfigured(t *testing.T, origins []string) http.Handler {
+// newTestAPIWithScanner builds a handler whose attachments are scanned, for the
+// tests that exercise the fail-closed policy.
+func newTestAPIWithScanner(t *testing.T, address string, failOpen bool) http.Handler {
+	t.Helper()
+	return newTestAPIConfigured(t, nil, func(s *attachments.Service) *attachments.Service {
+		return s.WithScanner(attachments.NewClamAVScanner(address, 2*time.Second), failOpen)
+	})
+}
+
+func newTestAPIConfigured(
+	t *testing.T,
+	origins []string,
+	adjust ...func(*attachments.Service) *attachments.Service,
+) http.Handler {
 	t.Helper()
 
 	url := dbtest.URL(t, "httpapi")
@@ -102,8 +115,11 @@ func newTestAPIConfigured(t *testing.T, origins []string) http.Handler {
 		// The local store, in a directory the test framework removes: the
 		// object-store backends have their own tests, and what matters here is
 		// the behaviour above the interface.
-		Attachments: attachments.NewService(pool, testStore(t), attachments.DefaultLimits()),
-		Presence:    presence.NewService(queries),
+		Attachments: configureAttachments(
+			attachments.NewService(pool, testStore(t), attachments.DefaultLimits(), logger),
+			adjust,
+		),
+		Presence: presence.NewService(queries),
 	}, logger)
 
 	t.Cleanup(func() {
@@ -113,6 +129,18 @@ func newTestAPIConfigured(t *testing.T, origins []string) http.Handler {
 	})
 
 	return server.Handler()
+}
+
+// configureAttachments applies whatever a test asked for, so the common case
+// needs no argument at all.
+func configureAttachments(
+	service *attachments.Service,
+	adjust []func(*attachments.Service) *attachments.Service,
+) *attachments.Service {
+	for _, apply := range adjust {
+		service = apply(service)
+	}
+	return service
 }
 
 // testStore opens a throwaway attachment store for one test.

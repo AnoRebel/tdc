@@ -328,6 +328,17 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 		return roomError(err)
 	}
 
+	// The files go with the message. Leaving them reachable would mean a
+	// deletion removed the words and kept the photograph, which is not what
+	// anyone deleting a message expects.
+	//
+	// Logged rather than returned: the message is already deleted, and failing
+	// the request now would suggest to the caller that it was not.
+	if err := s.attachments.DeleteForEvent(ctx, c.Param("eventId")); err != nil {
+		s.log.Error("cannot remove a deleted message's attachments",
+			"eventId", c.Param("eventId"), "error", err)
+	}
+
 	s.publishEvent(ctx, event)
 	return c.JSON(http.StatusCreated, messageResponseOf(event))
 }
