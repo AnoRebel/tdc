@@ -25,6 +25,11 @@ type Setting struct {
 // is displayed, logged or exported.
 var secretKeys = map[string]bool{
 	"database.url": true,
+	// The object store's credentials. The access key is an identifier rather
+	// than a secret, but it is redacted too: together the pair is a working
+	// credential, and an operator reading this view needs neither half of it.
+	"storage.s3.access_key": true,
+	"storage.s3.secret_key": true,
 }
 
 // Redact returns a value safe to display.
@@ -81,6 +86,14 @@ func (c Config) Describe(path string) []Setting {
 		{"database.max_conn_lifetime", c.Database.MaxConnLifetime.String(), defaults.Database.MaxConnLifetime.String()},
 		{"database.max_conn_idle_time", c.Database.MaxConnIdleTime.String(), defaults.Database.MaxConnIdleTime.String()},
 		{"database.auto_migrate", fmt.Sprint(c.Database.AutoMigrate), fmt.Sprint(defaults.Database.AutoMigrate)},
+		{"storage.backend", c.Storage.Backend, defaults.Storage.Backend},
+		{"storage.directory", c.Storage.Directory, defaults.Storage.Directory},
+		{"storage.s3.endpoint", c.Storage.S3.Endpoint, defaults.Storage.S3.Endpoint},
+		{"storage.s3.bucket", c.Storage.S3.Bucket, defaults.Storage.S3.Bucket},
+		{"storage.s3.region", c.Storage.S3.Region, defaults.Storage.S3.Region},
+		{"storage.s3.access_key", c.Storage.S3.AccessKey, defaults.Storage.S3.AccessKey},
+		{"storage.s3.secret_key", c.Storage.S3.SecretKey, defaults.Storage.S3.SecretKey},
+		{"storage.s3.path_style", fmt.Sprint(c.Storage.S3.PathStyle), fmt.Sprint(defaults.Storage.S3.PathStyle)},
 		{"log.level", c.Log.Level, defaults.Log.Level},
 		{"log.format", c.Log.Format, defaults.Log.Format},
 	}

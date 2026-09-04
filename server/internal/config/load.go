@@ -192,6 +192,15 @@ func Load(path string) (Config, error) {
 	cfg.Database.MaxConnIdleTime = l.duration("database.max_conn_idle_time", d.Database.MaxConnIdleTime)
 	cfg.Database.AutoMigrate = l.boolean("database.auto_migrate", d.Database.AutoMigrate)
 
+	cfg.Storage.Backend = l.oneOf("storage.backend", d.Storage.Backend, "local", "s3-aws", "s3-minio")
+	cfg.Storage.Directory = l.str("storage.directory", d.Storage.Directory)
+	cfg.Storage.S3.Endpoint = l.str("storage.s3.endpoint", d.Storage.S3.Endpoint)
+	cfg.Storage.S3.Bucket = l.str("storage.s3.bucket", d.Storage.S3.Bucket)
+	cfg.Storage.S3.Region = l.str("storage.s3.region", d.Storage.S3.Region)
+	cfg.Storage.S3.AccessKey = l.str("storage.s3.access_key", d.Storage.S3.AccessKey)
+	cfg.Storage.S3.SecretKey = l.str("storage.s3.secret_key", d.Storage.S3.SecretKey)
+	cfg.Storage.S3.PathStyle = l.boolean("storage.s3.path_style", d.Storage.S3.PathStyle)
+
 	cfg.Log.Level = l.oneOf("log.level", d.Log.Level, "debug", "info", "warn", "error")
 	cfg.Log.Format = l.oneOf("log.format", d.Log.Format, "json", "text")
 
@@ -220,6 +229,30 @@ func (c Config) validate() []Problem {
 
 	if strings.TrimSpace(c.Server.Name) == "" {
 		add("server.name", "must not be empty")
+	}
+
+	switch backend := strings.TrimSpace(c.Storage.Backend); backend {
+	case "", "local":
+		if strings.TrimSpace(c.Storage.Directory) == "" {
+			add("storage.directory", "is required when the storage backend is local")
+		}
+	case "s3-aws", "s3-minio":
+		// Reported field by field rather than as one message, so an operator
+		// sees exactly which values are missing.
+		if strings.TrimSpace(c.Storage.S3.Endpoint) == "" {
+			add("storage.s3.endpoint", "is required when the storage backend is %s", backend)
+		}
+		if strings.TrimSpace(c.Storage.S3.Bucket) == "" {
+			add("storage.s3.bucket", "is required when the storage backend is %s", backend)
+		}
+		if strings.TrimSpace(c.Storage.S3.AccessKey) == "" {
+			add("storage.s3.access_key", "is required when the storage backend is %s", backend)
+		}
+		if strings.TrimSpace(c.Storage.S3.SecretKey) == "" {
+			add("storage.s3.secret_key", "is required when the storage backend is %s", backend)
+		}
+	default:
+		add("storage.backend", "must be local, s3-aws, or s3-minio (got %q)", backend)
 	}
 
 	if c.Database.MinConnections > c.Database.MaxConnections {

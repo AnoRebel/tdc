@@ -15,7 +15,39 @@ const EnvPrefix = "TDC_"
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	Storage  StorageConfig
 	Log      LogConfig
+}
+
+// StorageConfig says where uploaded files are kept.
+//
+// The default keeps them in a directory, so a small deployment needs no object
+// store at all. An operator who wants one picks whichever S3 client they would
+// rather run: the two speak to the same stores and behave identically, so the
+// choice is preference, and changing it is one word.
+type StorageConfig struct {
+	// Backend is "local", "s3-aws", or "s3-minio".
+	Backend string
+	// Directory is where the local backend keeps files.
+	Directory string
+	// S3 configures either S3 backend, and is ignored by the local one.
+	S3 S3Config
+}
+
+// S3Config addresses an S3-compatible object store.
+type S3Config struct {
+	// Endpoint is the store's address, e.g. "https://s3.example.org".
+	Endpoint string
+	Bucket   string
+	// Region is usually ignored by self-hosted stores, but signing requires
+	// one, so it defaults rather than forcing an operator to invent a value.
+	Region    string
+	AccessKey string
+	SecretKey string
+	// PathStyle addresses buckets as endpoint/bucket rather than
+	// bucket.endpoint. Most self-hosted stores need it, and a host without dots
+	// cannot do virtual-host style at all.
+	PathStyle bool
 }
 
 // ServerConfig describes how the server presents itself and listens.
@@ -117,6 +149,14 @@ func Default() Config {
 			MaxConnLifetime: time.Hour,
 			MaxConnIdleTime: 30 * time.Minute,
 			AutoMigrate:     true,
+		},
+		Storage: StorageConfig{
+			Backend:   "local",
+			Directory: "./data/attachments",
+			S3: S3Config{
+				Region:    "us-east-1",
+				PathStyle: true,
+			},
 		},
 		Log: LogConfig{
 			Level:  "info",
