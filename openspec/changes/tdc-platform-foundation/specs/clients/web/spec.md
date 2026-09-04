@@ -156,6 +156,91 @@ An upload MUST NOT block the conversation: a participant can continue reading an
 - **WHEN** an upload is in flight
 - **THEN** the participant can still read and send messages
 
+### Requirement: Confirmation before destructive actions
+
+An action that destroys something a person cannot recover SHALL require a distinct confirmation before it happens, and the confirmation MUST name what is about to be lost.
+
+Confirmation MUST NOT be the default-focused choice, so that a reflexive keypress cannot complete a destruction, and the confirming control MUST be visibly distinct from the one that cancels.
+
+An action that is reversible — leaving a channel, muting, hiding — MUST NOT demand confirmation, because a prompt on everything trains people to dismiss prompts without reading them.
+
+#### Scenario: Deleting a message is confirmed
+
+- **WHEN** a participant deletes a message
+- **THEN** they are asked to confirm
+- **AND** the message is named or shown in the prompt
+
+#### Scenario: Cancelling leaves everything intact
+
+- **WHEN** a participant dismisses a confirmation
+- **THEN** nothing is destroyed and the interface returns to where it was
+
+#### Scenario: A reflexive keypress does not destroy
+
+- **WHEN** a confirmation appears
+- **THEN** the destructive choice is not the one a plain Enter or Escape activates
+
+#### Scenario: Reversible actions are not interrupted
+
+- **WHEN** a participant takes an action they can undo
+- **THEN** no confirmation is required
+
+### Requirement: Contextual actions
+
+A message, attachment, conversation and person SHALL each offer their available actions from a context menu, opened by right-click with a pointer and by a long press on a touch screen.
+
+Every action reachable from a context menu MUST also be reachable another way, so that the menu is a shortcut and never the only route.
+
+A context menu MUST close on Escape and on a click outside it, MUST be navigable by keyboard, and MUST NOT offer an action the person is not permitted to take.
+
+#### Scenario: A message offers its actions
+
+- **WHEN** a participant opens the context menu on a message
+- **THEN** the actions available to them on that message are listed
+
+#### Scenario: Long press opens the menu on a touch screen
+
+- **WHEN** a participant presses and holds a message on a touch screen
+- **THEN** the same menu opens
+
+#### Scenario: Unavailable actions are absent
+
+- **WHEN** a participant opens the menu on someone else's message
+- **THEN** actions they are not permitted to take are not shown
+
+#### Scenario: The menu is dismissable
+
+- **WHEN** a context menu is open and the participant presses Escape or clicks away
+- **THEN** the menu closes and nothing is acted on
+
+#### Scenario: Actions remain reachable without the menu
+
+- **WHEN** a participant does not use the context menu
+- **THEN** every action it offers is still reachable
+
+### Requirement: Touch interaction
+
+The client SHALL be operable by touch throughout, and every action available with a pointer MUST be available with a finger.
+
+Interactive targets MUST be large enough to hit reliably, and an action that depends on hovering MUST have a touch equivalent, since a touch screen has no hover.
+
+A swipe gesture MAY offer a shortcut to a common action, and where one does, it MUST be discoverable another way and MUST NOT be the only route to that action.
+
+#### Scenario: Hover-only actions have a touch route
+
+- **WHEN** an action is revealed by hovering with a pointer
+- **THEN** a touch user can reach the same action
+
+#### Scenario: Targets are large enough
+
+- **WHEN** the interface is used on a touch screen
+- **THEN** interactive targets meet the documented minimum size
+
+#### Scenario: A swipe is a shortcut, not a requirement
+
+- **WHEN** a swipe gesture performs an action
+- **THEN** that action is also reachable without gesturing
+
 ### Requirement: Responsive layout
 
 The application SHALL be usable on screens from small phones to large desktops, with all functionality reachable at every supported size.

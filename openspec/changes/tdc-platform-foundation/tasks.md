@@ -84,6 +84,9 @@ Goal: attachments with previews and safe link unfurling.
 - [ ] 5.11 Build the web upload, preview, and link-preview interface with the user-controlled automatic-media setting; verify disabling it prevents media fetches until requested (`messaging/attachments`, `clients/web`)
 - [x] 5.11a Build the attachment viewer for images, animated images, video, audio and PDF, opening over the conversation with keyboard dismissal and navigation between one message's attachments; verify an unrenderable type still shows name, size and type with a download, and that rendered content cannot reach the application's session or storage (`clients/web`)
 - [x] 5.11b Build upload feedback with real transfer progress, cancellation, and a retry that does not re-select the file; verify progress comes from the transfer rather than a simulation, a refusal names the limit it broke, and the conversation stays usable while a file is in flight (`clients/web`)
+- [ ] 5.11c Build context menus for messages, attachments and conversations, opened by right-click and by long press, keyboard-navigable and dismissable, offering only permitted actions; verify every action remains reachable without the menu (`clients/web`)
+- [ ] 5.11d Require confirmation before destructive actions, naming what is lost and never defaulting focus to the destructive choice; verify a reversible action is not interrupted and a reflexive keypress cannot destroy (`clients/web`)
+- [ ] 5.11e Make every hover-revealed action reachable by touch, size targets to the documented minimum, and add swipe shortcuts that are discoverable another way; verify on a touch viewport that no capability is pointer-only (`clients/web`)
 - [ ] **MILESTONE 5** — Demonstrate: a user uploads an image and sees a thumbnail, another user downloads it, a non-member is refused, a posted link renders a preview, and a link to a private network address produces no preview. Tag `v0.5.0-dev`.
 
 ## 6. Phase 6 — People find out what happened
