@@ -669,6 +669,15 @@ watch(roomId, load, { immediate: true });
                     v-if="!message.removed && message.attachments.length"
                     :attachments="message.attachments"
                   />
+
+                  <!-- Only the first link: a message full of them would
+                       otherwise produce a wall of cards taller than the
+                       conversation. -->
+                  <LinkPreview
+                    v-if="!message.removed && firstLinkIn(message.body)"
+                    :key="firstLinkIn(message.body) ?? ''"
+                    :url="firstLinkIn(message.body)!"
+                  />
                 </div>
               </MessageRow>
 

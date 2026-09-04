@@ -17,10 +17,12 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db"
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
+	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
 
 // Config describes how the HTTP server should listen.
@@ -79,6 +81,8 @@ type Server struct {
 	limiter     *cache.Limiter
 	rooms       *rooms.Service
 	attachments *attachments.Service
+	unfurl      *unfurl.Service
+	queries     *dbgen.Queries
 	presence    *presence.Service
 	hub         *realtime.Hub
 	realtime    *realtime.Server
@@ -96,6 +100,7 @@ type Services struct {
 	Limiter     *cache.Limiter
 	Rooms       *rooms.Service
 	Attachments *attachments.Service
+	Unfurl      *unfurl.Service
 	Presence    *presence.Service
 }
 
@@ -122,6 +127,8 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		limiter:     services.Limiter,
 		rooms:       services.Rooms,
 		attachments: services.Attachments,
+		unfurl:      services.Unfurl,
+		queries:     dbgen.New(pool),
 		presence:    services.Presence,
 		config:      cfg,
 	}

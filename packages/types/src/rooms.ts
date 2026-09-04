@@ -173,3 +173,20 @@ export interface UploadProgress {
   /** Set once the upload completes. */
   attachment?: Attachment;
 }
+
+/**
+ * What a link turned out to be.
+ *
+ * The image is a URL on whatever site was linked, never something this server
+ * stored: fetching it here would turn every posted link into an outbound
+ * request to an address of the poster's choosing. A client decides under its
+ * own policy whether to load it.
+ */
+export interface LinkPreview {
+  /** The address finally fetched, so a shortener resolves to where it led. */
+  url: string;
+  title?: string;
+  description?: string;
+  siteName?: string;
+  imageUrl?: string;
+}

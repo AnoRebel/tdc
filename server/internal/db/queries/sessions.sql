@@ -34,3 +34,9 @@ WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL;
 -- name: DeleteExpiredSessions :exec
 DELETE FROM sessions
 WHERE expires_at < NOW() - INTERVAL '30 days';
+
+-- name: SetLinkPreviewPreference :exec
+UPDATE users SET link_previews_enabled = $2 WHERE id = $1;
+
+-- name: GetLinkPreviewPreference :one
+SELECT link_previews_enabled FROM users WHERE id = $1;

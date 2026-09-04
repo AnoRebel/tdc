@@ -204,6 +204,7 @@ func Load(path string) (Config, error) {
 	cfg.Attachments.ScannerAddress = l.str("attachments.scanner_address", d.Attachments.ScannerAddress)
 	cfg.Attachments.ScannerTimeout = l.duration("attachments.scanner_timeout", d.Attachments.ScannerTimeout)
 	cfg.Attachments.ScannerFailOpen = l.boolean("attachments.scanner_fail_open", d.Attachments.ScannerFailOpen)
+	cfg.Attachments.LinkPreviews = l.boolean("attachments.link_previews", d.Attachments.LinkPreviews)
 
 	cfg.Log.Level = l.oneOf("log.level", d.Log.Level, "debug", "info", "warn", "error")
 	cfg.Log.Format = l.oneOf("log.format", d.Log.Format, "json", "text")

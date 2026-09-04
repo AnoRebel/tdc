@@ -33,6 +33,13 @@ type AttachmentsConfig struct {
 	// by default: a scanner that is down must not become a silent bypass, and
 	// choosing otherwise should be a decision rather than an accident.
 	ScannerFailOpen bool
+
+	// LinkPreviews lets this server fetch a summary of links people post.
+	//
+	// On by default because a preview is genuinely useful, but an operator who
+	// would rather their server never made an outbound request on a member's
+	// behalf can turn it off for everyone.
+	LinkPreviews bool
 }
 
 // StorageConfig says where uploaded files are kept.
@@ -178,6 +185,7 @@ func Default() Config {
 			ScannerAddress:  "",
 			ScannerTimeout:  30 * time.Second,
 			ScannerFailOpen: false,
+			LinkPreviews:    true,
 		},
 		Log: LogConfig{
 			Level:  "info",

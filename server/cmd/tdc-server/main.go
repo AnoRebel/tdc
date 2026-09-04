@@ -29,6 +29,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/storage"
+	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
 
 func main() {
@@ -141,7 +142,9 @@ func run() error {
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
 		Attachments: newAttachmentService(pool, objectStore, cfg, log),
-		Presence:    presenceService,
+		Unfurl: unfurl.NewService(memoryCache,
+			unfurl.Settings{Enabled: cfg.Attachments.LinkPreviews}, log),
+		Presence: presenceService,
 	}
 
 	server := httpapi.New(httpapi.Config{

@@ -62,8 +62,19 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
 	return err
 }
 
+const getLinkPreviewPreference = `-- name: GetLinkPreviewPreference :one
+SELECT link_previews_enabled FROM users WHERE id = $1
+`
+
+func (q *Queries) GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, getLinkPreviewPreference, id)
+	var link_previews_enabled bool
+	err := row.Scan(&link_previews_enabled)
+	return link_previews_enabled, err
+}
+
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip_address, sessions.created_at, sessions.last_seen_at, sessions.expires_at, sessions.revoked_at, users.id, users.username, users.username_folded, users.display_name, users.email, users.email_folded, users.email_verified, users.suspended_at, users.suspended_until, users.suspended_by, users.suspension_note, users.created_at, users.updated_at, users.sends_typing_indication
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip_address, sessions.created_at, sessions.last_seen_at, sessions.expires_at, sessions.revoked_at, users.id, users.username, users.username_folded, users.display_name, users.email, users.email_folded, users.email_verified, users.suspended_at, users.suspended_until, users.suspended_by, users.suspension_note, users.created_at, users.updated_at, users.sends_typing_indication, users.link_previews_enabled
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = $1
@@ -103,6 +114,7 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (
 		&i.User.CreatedAt,
 		&i.User.UpdatedAt,
 		&i.User.SendsTypingIndication,
+		&i.User.LinkPreviewsEnabled,
 	)
 	return i, err
 }
@@ -180,6 +192,20 @@ type RevokeSessionParams struct {
 
 func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) error {
 	_, err := q.db.Exec(ctx, revokeSession, arg.ID, arg.UserID)
+	return err
+}
+
+const setLinkPreviewPreference = `-- name: SetLinkPreviewPreference :exec
+UPDATE users SET link_previews_enabled = $2 WHERE id = $1
+`
+
+type SetLinkPreviewPreferenceParams struct {
+	ID                  uuid.UUID
+	LinkPreviewsEnabled bool
+}
+
+func (q *Queries) SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error {
+	_, err := q.db.Exec(ctx, setLinkPreviewPreference, arg.ID, arg.LinkPreviewsEnabled)
 	return err
 }
 

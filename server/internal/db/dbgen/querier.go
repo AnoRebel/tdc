@@ -76,6 +76,7 @@ type Querier interface {
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
+	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
@@ -156,6 +157,7 @@ type Querier interface {
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
+	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.

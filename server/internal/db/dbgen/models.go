@@ -188,6 +188,7 @@ type User struct {
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	SendsTypingIndication bool
+	LinkPreviewsEnabled   bool
 }
 
 type UserPresence struct {

@@ -64,6 +64,11 @@ func (s *Server) routes() {
 	s.echo.GET("/api/attachments/:id", s.handleDownloadAttachment, requireAuthentication)
 	s.echo.GET("/api/attachments/:id/preview", s.handleAttachmentPreview, requireAuthentication)
 
+	// Link previews. A POST because the link is private: a query string ends
+	// up in access logs, proxy logs and browser history, and a body does not.
+	s.echo.POST("/api/previews", s.handlePreviewLink, requireAuthentication)
+	me.PUT("/preferences/link-previews", s.handleSetPreviewPreference)
+
 	// Direct conversations, which are found by their participants rather than
 	// by name.
 	direct := s.echo.Group("/api/direct", requireAuthentication)
