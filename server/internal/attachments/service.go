@@ -1,11 +1,13 @@
 package attachments
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"os"
 	"path/filepath"
@@ -37,7 +39,23 @@ type Attachment struct {
 	ContentType string
 	Size        int64
 	CreatedAt   time.Time
+
+	// Width and Height are the original's dimensions where they are known, so
+	// a client can reserve the right space before the image arrives rather
+	// than letting the conversation jump as attachments load.
+	Width  int
+	Height int
+
+	// PreviewKey is empty when no preview was generated, which is the common
+	// case: most attachments are not images.
+	PreviewKey    string
+	PreviewType   string
+	PreviewWidth  int
+	PreviewHeight int
 }
+
+// HasPreview reports whether a reduced version of this attachment exists.
+func (a *Attachment) HasPreview() bool { return a.PreviewKey != "" }
 
 // Service accepts and serves attachments.
 type Service struct {
@@ -125,6 +143,11 @@ func (s *Service) Upload(
 		return nil, fmt.Errorf("attachments: storing the uploaded file: %w", err)
 	}
 
+	// A preview is a convenience, so a failure to make one must not fail the
+	// upload: the file is still perfectly usable without it, and a malformed
+	// image is exactly the case where generation is expected to fail.
+	preview := s.makePreview(ctx, spooled, contentType)
+
 	record, err := s.queries.CreateAttachment(ctx, dbgen.CreateAttachmentParams{
 		ID:              uuid.New(),
 		StorageKey:      key,
@@ -134,6 +157,12 @@ func (s *Service) Upload(
 		Filename:        safeFilename(declaredName),
 		ContentType:     contentType,
 		SizeBytes:       size,
+		PreviewKey:      preview.key,
+		PreviewType:     preview.contentType,
+		PreviewWidth:    preview.width,
+		PreviewHeight:   preview.height,
+		Width:           preview.sourceWidth,
+		Height:          preview.sourceHeight,
 	})
 	if err != nil {
 		// The bytes are already stored. Leaving them costs a little disk until
@@ -335,6 +364,105 @@ func fromRow(row dbgen.Attachment) *Attachment {
 	if row.EventID != nil {
 		attachment.EventID = *row.EventID
 	}
+	if row.PreviewKey != nil {
+		attachment.PreviewKey = *row.PreviewKey
+	}
+	if row.PreviewType != nil {
+		attachment.PreviewType = *row.PreviewType
+	}
+	if row.PreviewWidth != nil {
+		attachment.PreviewWidth = int(*row.PreviewWidth)
+	}
+	if row.PreviewHeight != nil {
+		attachment.PreviewHeight = int(*row.PreviewHeight)
+	}
+	if row.Width != nil {
+		attachment.Width = int(*row.Width)
+	}
+	if row.Height != nil {
+		attachment.Height = int(*row.Height)
+	}
 	attachment.CreatedAt = row.CreatedAt
 	return attachment
+}
+
+// previewResult is what preview generation produced, with every field nil when
+// no preview was made.
+type previewResult struct {
+	key          *string
+	contentType  *string
+	width        *int32
+	height       *int32
+	sourceWidth  *int32
+	sourceHeight *int32
+}
+
+// makePreview generates and stores a reduced version of an image.
+//
+// Every failure is swallowed deliberately. A preview is a convenience: an
+// attachment without one still downloads, still displays once fetched, and
+// still shows its name and size. Failing the upload because a reduced copy
+// could not be made would turn a cosmetic problem into a lost file — and a
+// malformed image, which is precisely where generation fails, is also precisely
+// where someone most wants the original preserved for inspection.
+func (s *Service) makePreview(ctx context.Context, spooled *os.File, contentType string) previewResult {
+	var result previewResult
+
+	if !CanThumbnail(contentType) {
+		return result
+	}
+
+	if _, err := spooled.Seek(0, io.SeekStart); err != nil {
+		return result
+	}
+
+	// The source dimensions are worth recording even when the preview itself
+	// fails, so a client can still reserve the right space.
+	if config, _, err := image.DecodeConfig(spooled); err == nil {
+		width, height := int32(config.Width), int32(config.Height)
+		result.sourceWidth, result.sourceHeight = &width, &height
+	}
+
+	if _, err := spooled.Seek(0, io.SeekStart); err != nil {
+		return result
+	}
+
+	thumbnail, err := GenerateThumbnail(spooled, contentType)
+	if err != nil {
+		return result
+	}
+
+	// Content-addressed like the original, so two identical previews share one
+	// object and a key discloses nothing.
+	digest := sha256.Sum256(thumbnail.Data)
+	key := "preview/" + hex.EncodeToString(digest[:])
+
+	if err := s.store.Put(ctx, key, bytes.NewReader(thumbnail.Data),
+		int64(len(thumbnail.Data)), thumbnail.ContentType); err != nil {
+		return result
+	}
+
+	width, height := int32(thumbnail.Width), int32(thumbnail.Height)
+	result.key = &key
+	result.contentType = &thumbnail.ContentType
+	result.width, result.height = &width, &height
+
+	return result
+}
+
+// OpenPreview returns an attachment's reduced version for streaming.
+func (s *Service) OpenPreview(ctx context.Context, attachment *Attachment) (io.ReadCloser, error) {
+	if !attachment.HasPreview() {
+		return nil, ErrNotFound
+	}
+
+	reader, _, err := s.store.Get(ctx, attachment.PreviewKey)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("attachments: reading the preview of %s: %w", attachment.ID, err)
+	}
+
+	return reader, nil
 }

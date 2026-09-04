@@ -81,6 +81,81 @@ Users MUST be able to restrict automatic media loading.
 - **WHEN** a returning user opens the application
 - **THEN** unchanged application assets are served from cache rather than re-downloaded
 
+### Requirement: Attachment viewing
+
+The client SHALL display an attachment's content in place rather than requiring a download, for every type it can render: images, animated images, video, audio, and PDF documents.
+
+A viewer MUST open from the conversation without navigating away from it, MUST be dismissable by keyboard as well as by pointer, and MUST allow moving between the attachments of one message without closing and reopening.
+
+An attachment the client cannot render MUST still show its name, size and type, and offer to download it, rather than showing an error or an empty frame.
+
+Rendering MUST NOT grant uploaded content the privileges of the application: an attachment is displayed in a context that cannot reach the application's session, storage, or other attachments.
+
+#### Scenario: An image opens in place
+
+- **WHEN** a participant selects an image attachment
+- **THEN** it is displayed at full size over the conversation
+- **AND** dismissing it returns to the conversation where it was
+
+#### Scenario: Video and audio play without downloading
+
+- **WHEN** a participant plays a video or audio attachment
+- **THEN** playback begins without first downloading the whole file
+
+#### Scenario: A document is readable in place
+
+- **WHEN** a participant opens a PDF attachment
+- **THEN** its pages are displayed without leaving the application
+
+#### Scenario: Several attachments are navigable
+
+- **WHEN** a message carries more than one viewable attachment
+- **THEN** a participant can move between them from within the viewer
+
+#### Scenario: An unviewable file degrades gracefully
+
+- **WHEN** an attachment's type cannot be rendered
+- **THEN** its name, size and type are shown with the option to download it
+
+#### Scenario: The viewer is dismissable by keyboard
+
+- **WHEN** a participant presses the dismiss key
+- **THEN** the viewer closes and focus returns to where it was opened from
+
+### Requirement: Upload feedback
+
+The client SHALL show the progress of an upload while it is in flight, and MUST let the person cancel it before it completes.
+
+Progress MUST be reported from the transfer itself rather than simulated, and a failed upload MUST say why and offer to retry without the person selecting the file again.
+
+An upload MUST NOT block the conversation: a participant can continue reading and writing while a file is transferring.
+
+#### Scenario: Progress reflects the transfer
+
+- **WHEN** a file is uploading
+- **THEN** the proportion transferred is displayed and advances as the transfer does
+
+#### Scenario: An upload can be cancelled
+
+- **WHEN** a participant cancels an upload in flight
+- **THEN** the transfer stops and nothing is attached
+
+#### Scenario: A failure is explained and retryable
+
+- **WHEN** an upload fails
+- **THEN** the reason is shown
+- **AND** the participant can retry without selecting the file again
+
+#### Scenario: A refused file says which limit it broke
+
+- **WHEN** the server refuses a file for exceeding a limit
+- **THEN** the client states which limit and what the file was
+
+#### Scenario: The conversation stays usable
+
+- **WHEN** an upload is in flight
+- **THEN** the participant can still read and send messages
+
 ### Requirement: Responsive layout
 
 The application SHALL be usable on screens from small phones to large desktops, with all functionality reachable at every supported size.

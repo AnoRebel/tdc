@@ -46,6 +46,19 @@ func (q *Queries) AttachToEvent(ctx context.Context, arg AttachToEventParams) (i
 	return result.RowsAffected(), nil
 }
 
+const countAttachmentsWithPreviewKey = `-- name: CountAttachmentsWithPreviewKey :one
+SELECT count(*) FROM attachments WHERE preview_key = $1
+`
+
+// Counts what still points at a stored preview, so its bytes are only removed
+// once nothing references them.
+func (q *Queries) CountAttachmentsWithPreviewKey(ctx context.Context, previewKey *string) (int64, error) {
+	row := q.db.QueryRow(ctx, countAttachmentsWithPreviewKey, previewKey)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countAttachmentsWithStorageKey = `-- name: CountAttachmentsWithStorageKey :one
 SELECT count(*) FROM attachments WHERE storage_key = $1
 `
@@ -62,9 +75,10 @@ func (q *Queries) CountAttachmentsWithStorageKey(ctx context.Context, storageKey
 const createAttachment = `-- name: CreateAttachment :one
 INSERT INTO attachments (
     id, storage_key, uploader_id, uploader_address, room_id,
-    filename, content_type, size_bytes
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at
+    filename, content_type, size_bytes,
+    preview_key, preview_type, preview_width, preview_height, width, height
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height
 `
 
 type CreateAttachmentParams struct {
@@ -76,6 +90,12 @@ type CreateAttachmentParams struct {
 	Filename        string
 	ContentType     string
 	SizeBytes       int64
+	PreviewKey      *string
+	PreviewType     *string
+	PreviewWidth    *int32
+	PreviewHeight   *int32
+	Width           *int32
+	Height          *int32
 }
 
 func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error) {
@@ -88,6 +108,12 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		arg.Filename,
 		arg.ContentType,
 		arg.SizeBytes,
+		arg.PreviewKey,
+		arg.PreviewType,
+		arg.PreviewWidth,
+		arg.PreviewHeight,
+		arg.Width,
+		arg.Height,
 	)
 	var i Attachment
 	err := row.Scan(
@@ -101,6 +127,12 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		&i.ContentType,
 		&i.SizeBytes,
 		&i.CreatedAt,
+		&i.PreviewKey,
+		&i.PreviewType,
+		&i.PreviewWidth,
+		&i.PreviewHeight,
+		&i.Width,
+		&i.Height,
 	)
 	return i, err
 }
@@ -115,7 +147,7 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAttachment = `-- name: GetAttachment :one
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at FROM attachments WHERE id = $1
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height FROM attachments WHERE id = $1
 `
 
 func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error) {
@@ -132,12 +164,18 @@ func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, 
 		&i.ContentType,
 		&i.SizeBytes,
 		&i.CreatedAt,
+		&i.PreviewKey,
+		&i.PreviewType,
+		&i.PreviewWidth,
+		&i.PreviewHeight,
+		&i.Width,
+		&i.Height,
 	)
 	return i, err
 }
 
 const listAttachmentsForEvent = `-- name: ListAttachmentsForEvent :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height FROM attachments
 WHERE event_id = $1
 ORDER BY created_at
 `
@@ -162,6 +200,12 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 			&i.ContentType,
 			&i.SizeBytes,
 			&i.CreatedAt,
+			&i.PreviewKey,
+			&i.PreviewType,
+			&i.PreviewWidth,
+			&i.PreviewHeight,
+			&i.Width,
+			&i.Height,
 		); err != nil {
 			return nil, err
 		}
@@ -174,7 +218,7 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 }
 
 const listOrphanedAttachments = `-- name: ListOrphanedAttachments :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height FROM attachments
 WHERE event_id IS NULL AND created_at < $1
 ORDER BY created_at
 LIMIT $2
@@ -206,6 +250,12 @@ func (q *Queries) ListOrphanedAttachments(ctx context.Context, arg ListOrphanedA
 			&i.ContentType,
 			&i.SizeBytes,
 			&i.CreatedAt,
+			&i.PreviewKey,
+			&i.PreviewType,
+			&i.PreviewWidth,
+			&i.PreviewHeight,
+			&i.Width,
+			&i.Height,
 		); err != nil {
 			return nil, err
 		}

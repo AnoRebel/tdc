@@ -1,8 +1,9 @@
 -- name: CreateAttachment :one
 INSERT INTO attachments (
     id, storage_key, uploader_id, uploader_address, room_id,
-    filename, content_type, size_bytes
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    filename, content_type, size_bytes,
+    preview_key, preview_type, preview_width, preview_height, width, height
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: GetAttachment :one
@@ -40,3 +41,8 @@ SELECT * FROM attachments
 WHERE event_id IS NULL AND created_at < $1
 ORDER BY created_at
 LIMIT $2;
+
+-- Counts what still points at a stored preview, so its bytes are only removed
+-- once nothing references them.
+-- name: CountAttachmentsWithPreviewKey :one
+SELECT count(*) FROM attachments WHERE preview_key = $1;

@@ -3,6 +3,9 @@ package httpapi_test
 import (
 	"bytes"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -365,4 +368,107 @@ func truncate(s string) string {
 		return s[:300] + "…"
 	}
 	return s
+}
+
+// TestImagePreviewIsGeneratedAndServed covers the preview path end to end.
+//
+// A conversation full of photographs is unusable on metered mobile data if
+// every one is fetched at full size, which is what previews exist to prevent.
+func TestImagePreviewIsGeneratedAndServed(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	// Big enough that a preview is meaningfully smaller than the original.
+	large := image.NewRGBA(image.Rect(0, 0, 1600, 1200))
+	for y := 0; y < 1200; y++ {
+		for x := 0; x < 1600; x++ {
+			large.Set(x, y, color.RGBA{R: uint8(x % 256), G: uint8(y % 256), B: 128, A: 255})
+		}
+	}
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, large); err != nil {
+		t.Fatalf("encoding the test image: %v", err)
+	}
+
+	recorder := uploadFile(t, handler, token, roomID, "photo.png", encoded.Bytes())
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d: %s", recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var uploaded struct {
+		URL        string `json:"url"`
+		PreviewURL string `json:"previewUrl"`
+		Width      int    `json:"width"`
+		Height     int    `json:"height"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decoding the upload response: %v", err)
+	}
+
+	if uploaded.PreviewURL == "" {
+		t.Fatal("an image was uploaded without a preview")
+	}
+	// The original's dimensions let a client reserve space before it arrives.
+	if uploaded.Width != 1600 || uploaded.Height != 1200 {
+		t.Errorf("the original is reported as %dx%d, uploaded 1600x1200",
+			uploaded.Width, uploaded.Height)
+	}
+
+	preview := call(t, handler, http.MethodGet, uploaded.PreviewURL, nil, token)
+	if preview.Code != http.StatusOK {
+		t.Fatalf("the preview returned %d: %s", preview.Code, truncate(preview.Body.String()))
+	}
+
+	decoded, _, err := image.Decode(bytes.NewReader(preview.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("the preview does not decode as an image: %v", err)
+	}
+	if decoded.Bounds().Dx() > 512 || decoded.Bounds().Dy() > 512 {
+		t.Errorf("the preview is %dx%d, beyond the bound",
+			decoded.Bounds().Dx(), decoded.Bounds().Dy())
+	}
+
+	// The whole point: it must be substantially cheaper than the original.
+	if preview.Body.Len() >= encoded.Len() {
+		t.Errorf("the preview is %d bytes against a %d-byte original",
+			preview.Body.Len(), encoded.Len())
+	}
+
+	// A preview is private content, held to the same authorisation.
+	outsider := registerAndSignIn(t, handler, "juma")
+	if refused := call(t, handler, http.MethodGet, uploaded.PreviewURL, nil, outsider); refused.Code == http.StatusOK {
+		t.Error("a non-member fetched the preview")
+	}
+}
+
+// TestUnpreviewableUploadHasNoPreviewURL checks that a file with no preview
+// degrades to a plain attachment rather than a broken image.
+func TestUnpreviewableUploadHasNoPreviewURL(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "notes.txt",
+		[]byte("habari ya asubuhi, hii ni maandishi ya kawaida"))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d: %s", recorder.Code, recorder.Body)
+	}
+
+	var uploaded struct {
+		PreviewURL string `json:"previewUrl"`
+		Filename   string `json:"filename"`
+		Size       int64  `json:"size"`
+	}
+	json.Unmarshal(recorder.Body.Bytes(), &uploaded)
+
+	if uploaded.PreviewURL != "" {
+		t.Errorf("a text file was given a preview at %q", uploaded.PreviewURL)
+	}
+	// It still carries what a client needs to display it usefully.
+	if uploaded.Filename == "" || uploaded.Size == 0 {
+		t.Error("an unpreviewable file lost its name or size")
+	}
 }

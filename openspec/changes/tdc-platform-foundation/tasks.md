@@ -82,6 +82,8 @@ Goal: attachments with previews and safe link unfurling.
 - [ ] 5.9 Implement attachment deletion and orphan reclamation; verify deleted attachments are unreachable and referenced ones survive cleanup (`messaging/attachments`)
 - [ ] 5.10 Implement the optional malware-scanning hook, disabled by default and failing closed; verify an unreachable scanner refuses the upload unless fail-open is configured (`messaging/attachments`)
 - [ ] 5.11 Build the web upload, preview, and link-preview interface with the user-controlled automatic-media setting; verify disabling it prevents media fetches until requested (`messaging/attachments`, `clients/web`)
+- [ ] 5.11a Build the attachment viewer for images, animated images, video, audio and PDF, opening over the conversation with keyboard dismissal and navigation between one message's attachments; verify an unrenderable type still shows name, size and type with a download, and that rendered content cannot reach the application's session or storage (`clients/web`)
+- [ ] 5.11b Build upload feedback with real transfer progress, cancellation, and a retry that does not re-select the file; verify progress comes from the transfer rather than a simulation, a refusal names the limit it broke, and the conversation stays usable while a file is in flight (`clients/web`)
 - [ ] **MILESTONE 5** — Demonstrate: a user uploads an image and sees a thumbnail, another user downloads it, a non-member is refused, a posted link renders a preview, and a link to a private network address produces no preview. Tag `v0.5.0-dev`.
 
 ## 6. Phase 6 — People find out what happened
@@ -117,6 +119,7 @@ Goal: a server an operator can actually run, configure, and moderate.
 - [ ] 7.11 Implement retention policies globally and per channel with disclosure and audited shortening; verify content is removed at expiry (`platform/moderation`)
 - [ ] 7.12 Implement user blocking without disclosure, with moderators retaining full view; verify the blocked user is not informed (`platform/moderation`)
 - [ ] 7.13 Implement disposable chats with server-enforced expiry; verify expired content is not served to a client offline through the expiry (`messaging/channels`)
+- [ ] 7.13a Implement per-message lifetimes — a duration from sending, expiry once every other participant has seen it, and a duration after each recipient first sees it — enforced server-side and removing the message's attachments with it; verify an expired message is not served to a client that was offline throughout, that it leaves a placeholder disclosing nothing, and that a lifetime can be shortened but never extended (`messaging/channels`)
 - [ ] 7.14 Implement audit retention, export, and recording of expiry; verify export round-trips and expiry itself produces an entry (`platform/audit-log`)
 - [ ] 7.14a Implement server visibility — public, limited, private — enforced server-side on peer discovery and room browsing; verify a limited server is not returned to an unlisted requester, a private server is not discoverable at all, and a private room on a public server stays undiscoverable (`federation/protocol`)
 - [ ] 7.15 Build the web administration and moderation interface; verify an administrator can perform every action above without using the API directly

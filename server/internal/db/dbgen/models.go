@@ -22,6 +22,12 @@ type Attachment struct {
 	ContentType     string
 	SizeBytes       int64
 	CreatedAt       time.Time
+	PreviewKey      *string
+	PreviewType     *string
+	PreviewWidth    *int32
+	PreviewHeight   *int32
+	Width           *int32
+	Height          *int32
 }
 
 type AuditEntry struct {

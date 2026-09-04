@@ -34,12 +34,25 @@ type attachmentResponse struct {
 	URL string `json:"url"`
 	// Renderable says whether a client can expect to display this inline,
 	// which saves it guessing from the type.
-	Renderable bool   `json:"renderable"`
+	Renderable bool `json:"renderable"`
+	// PreviewURL is a reduced version, where one exists. Empty otherwise, and
+	// a client then shows the name, size and type instead of a broken image.
+	PreviewURL string `json:"previewUrl,omitempty"`
+	// Width and Height are the original's dimensions where known, so a client
+	// can reserve the right space and the conversation does not jump as
+	// attachments arrive.
+	Width      int    `json:"width,omitempty"`
+	Height     int    `json:"height,omitempty"`
 	UploadedBy string `json:"uploadedBy"`
 	UploadedAt string `json:"uploadedAt"`
 }
 
 func attachmentResponseOf(attachment *attachments.Attachment) attachmentResponse {
+	previewURL := ""
+	if attachment.HasPreview() {
+		previewURL = "/api/attachments/" + attachment.ID.String() + "/preview"
+	}
+
 	return attachmentResponse{
 		ID:          attachment.ID.String(),
 		Filename:    attachment.Filename,
@@ -47,6 +60,9 @@ func attachmentResponseOf(attachment *attachments.Attachment) attachmentResponse
 		Size:        attachment.Size,
 		URL:         "/api/attachments/" + attachment.ID.String(),
 		Renderable:  attachments.IsRenderable(attachment.ContentType),
+		PreviewURL:  previewURL,
+		Width:       attachment.Width,
+		Height:      attachment.Height,
 		UploadedBy:  attachment.UploaderAddress,
 		UploadedAt:  attachment.CreatedAt.UTC().Format(time.RFC3339),
 	}
@@ -253,4 +269,47 @@ func attachmentError(err error) error {
 	}
 
 	return err
+}
+
+// handleAttachmentPreview serves the reduced version of an attachment.
+//
+// Separate from the attachment itself so that a conversation full of images
+// costs a few kilobytes each rather than the originals, which is the difference
+// between usable and unusable on metered mobile data.
+func (s *Server) handleAttachmentPreview(c *echo.Context) error {
+	user, _ := currentUser(c)
+	ctx := c.Request().Context()
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such attachment")
+	}
+
+	attachment, err := s.attachments.Get(ctx, id)
+	if err != nil {
+		return attachmentError(err)
+	}
+
+	// The same authorisation as the original: a preview is a smaller copy of
+	// the same private content.
+	if _, err := s.rooms.RequireMembership(ctx, attachment.RoomID, user.ID); err != nil {
+		return roomError(err)
+	}
+
+	reader, err := s.attachments.OpenPreview(ctx, attachment)
+	if err != nil {
+		return attachmentError(err)
+	}
+	defer reader.Close()
+
+	header := c.Response().Header()
+	header.Set("X-Content-Type-Options", "nosniff")
+	header.Set("Content-Security-Policy", "default-src 'none'; sandbox; frame-ancestors 'none'")
+	header.Set("X-Frame-Options", "DENY")
+	// A preview is displayed inline — that is its purpose — so it carries no
+	// attachment disposition. That is safe because a preview is always an image
+	// this server encoded itself, never the bytes somebody uploaded.
+	header.Set("Cache-Control", "private, max-age=300")
+
+	return c.Stream(http.StatusOK, attachment.PreviewType, reader)
 }

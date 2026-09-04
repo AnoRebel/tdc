@@ -38,6 +38,9 @@ type Querier interface {
 	// closes, not the first, so someone on a phone and a laptop does not appear
 	// offline when they close one.
 	ConnectionOpened(ctx context.Context, userID uuid.UUID) (UserPresence, error)
+	// Counts what still points at a stored preview, so its bytes are only removed
+	// once nothing references them.
+	CountAttachmentsWithPreviewKey(ctx context.Context, previewKey *string) (int64, error)
 	// Counts what still points at a stored object, so the bytes are only removed
 	// once nothing references them.
 	CountAttachmentsWithStorageKey(ctx context.Context, storageKey string) (int64, error)

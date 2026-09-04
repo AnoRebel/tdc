@@ -62,6 +62,7 @@ func (s *Server) routes() {
 	rooms.POST("/:id/attachments", s.handleUploadAttachment)
 	s.echo.GET("/api/attachments/limits", s.handleAttachmentLimits, requireAuthentication)
 	s.echo.GET("/api/attachments/:id", s.handleDownloadAttachment, requireAuthentication)
+	s.echo.GET("/api/attachments/:id/preview", s.handleAttachmentPreview, requireAuthentication)
 
 	// Direct conversations, which are found by their participants rather than
 	// by name.

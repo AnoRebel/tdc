@@ -148,6 +148,56 @@ Expiry MUST be enforced by the server rather than relying on clients to hide exp
 - **WHEN** a client with cached content reconnects after expiry
 - **THEN** the expired content is no longer served and the client discards it
 
+### Requirement: Disappearing messages
+
+A participant SHALL be able to give an individual message a lifetime, independently of whether the conversation itself is disposable, and the server MUST remove the message when that lifetime elapses.
+
+A lifetime SHALL be expressible either as a duration from sending, or as expiry once every other participant has seen it, or as expiry a chosen duration after each recipient first sees it.
+
+Expiry MUST be enforced by the server: an expired message MUST NOT be served to any client, including one that was offline throughout its lifetime and one requesting a range that would have contained it.
+
+A message's lifetime MUST be visible to every participant while the message is still readable, so that nobody is surprised by its removal, and MUST NOT be extendable after sending — only shortened, and only by its sender or a moderator.
+
+An expired message SHALL leave the same placeholder a deleted message leaves, so that the conversation does not appear never to have contained it, and the placeholder MUST NOT disclose the removed content.
+
+#### Scenario: A message expires on its own timer
+
+- **WHEN** a message is sent with a lifetime and that lifetime elapses
+- **THEN** the server removes its content
+- **AND** it is not served to any client thereafter
+
+#### Scenario: A message expires after being seen
+
+- **WHEN** a message is sent to expire on viewing and every other participant has seen it
+- **THEN** the server removes its content within a bounded time
+
+#### Scenario: Expiry survives a client being offline
+
+- **WHEN** a client that was offline throughout a message's lifetime reconnects
+- **THEN** the expired message is not delivered
+- **AND** any copy the client already held is discarded
+
+#### Scenario: An expired message leaves a placeholder
+
+- **WHEN** a message expires
+- **THEN** participants see that a message was there and has gone
+- **AND** the placeholder does not disclose what it said
+
+#### Scenario: A lifetime is disclosed before expiry
+
+- **WHEN** a participant reads a message that will expire
+- **THEN** its remaining lifetime is visible to them
+
+#### Scenario: A lifetime cannot be extended
+
+- **WHEN** a sender attempts to lengthen a lifetime after sending
+- **THEN** the change is refused
+
+#### Scenario: Attachments expire with their message
+
+- **WHEN** a message carrying attachments expires
+- **THEN** those attachments are removed and no longer retrievable
+
 ### Requirement: Discovery
 
 Users SHALL be able to browse and search the channels they are permitted to see, and search MUST never return a channel the requesting user is not permitted to discover.
