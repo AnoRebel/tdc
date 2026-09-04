@@ -71,7 +71,7 @@ Goal: threads, direct messages, presence, and read state — enough that it comp
 
 Goal: attachments with previews and safe link unfurling.
 
-- [ ] 5.1 Implement the storage interface with a local-filesystem default and two S3-compatible implementations, one on `aws-sdk-go-v2` and one on `minio-go`, selected by configuration per the design; verify attachments work with no object store configured, and that each S3 implementation satisfies the same interface tests (`messaging/attachments`)
+- [x] 5.1 Implement the storage interface with a local-filesystem default and two S3-compatible implementations, one on `aws-sdk-go-v2` and one on `minio-go`, selected by configuration per the design; verify attachments work with no object store configured, and that each S3 implementation satisfies the same interface tests (`messaging/attachments`)
 - [ ] 5.2 Implement upload with server-enforced size and type limits; verify a client bypassing its own validation is refused and told which limit it exceeded (`messaging/attachments`)
 - [ ] 5.3 Implement content-based type detection and inert serving headers; verify a mismatched declared type is handled by detected type and cannot execute in the app's browsing context (`messaging/attachments`)
 - [ ] 5.4 Implement retrieval authorization and expiring, user-bound download links; verify knowing a storage location alone does not grant access (`messaging/attachments`)
