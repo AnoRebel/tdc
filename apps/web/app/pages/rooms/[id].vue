@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   Hash,
+  Maximize2,
   MoreVertical,
   Paperclip,
   Lock,
@@ -63,6 +64,16 @@ const pendingDelete = ref<{ id: string; body: string } | null>(null);
 // several megabytes, and on metered mobile data sending the original to be
 // looked at on a screen is the person's money spent for nothing.
 const { resize, presets } = useImageResize();
+
+/**
+ * Whether to send the original rather than a reduced copy.
+ *
+ * Off by default because most sharing is of photographs to be looked at, and
+ * on metered data the original costs the sender money for detail nobody sees.
+ * Sending it anyway is a deliberate choice — for a screenshot whose text must
+ * stay sharp, or a photograph someone else will edit.
+ */
+const sendOriginal = ref(false);
 
 const openThreadId = ref<string | null>(null);
 const threadCounts = ref<Record<string, number>>({});
@@ -302,9 +313,9 @@ async function pickFiles(event: Event) {
   for (const original of files) {
     // Anything that is not a reducible image comes back untouched, so this is
     // safe to apply to everything.
-    const file = await resize(original, presets.shared);
+    const file = sendOriginal.value ? original : await resize(original, presets.shared);
 
-    const started = uploads.upload(roomId.value, file);
+    const started = uploads.upload(roomId.value, file, original);
     void started.then((upload) => pending.set(upload.id, file));
   }
 }
@@ -725,6 +736,25 @@ watch(roomId, load, { immediate: true });
             @click="filePicker?.click()"
           >
             <Paperclip class="size-4" />
+          </button>
+
+          <!-- The choice sits where the file is picked rather than in
+               settings: it is a per-message decision, and someone sharing a
+               screenshot whose text must stay sharp needs it to hand. -->
+          <button
+            type="button"
+            class="btn size-8 shrink-0 px-0"
+            :class="sendOriginal ? 'btn-primary' : 'btn-ghost'"
+            :disabled="room.archived"
+            :aria-pressed="sendOriginal"
+            :title="
+              sendOriginal
+                ? 'Sending images at full size. Click to reduce them instead.'
+                : 'Images are reduced before sending. Click to send them at full size.'
+            "
+            @click="sendOriginal = !sendOriginal"
+          >
+            <Maximize2 class="size-4" />
           </button>
           <textarea
             ref="composer"

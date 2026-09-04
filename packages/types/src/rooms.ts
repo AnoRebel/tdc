@@ -172,6 +172,16 @@ export interface UploadProgress {
   error?: string;
   /** Set once the upload completes. */
   attachment?: Attachment;
+  /**
+   * True when the client reduced the file before sending it.
+   *
+   * Recorded per upload rather than read from a setting, so the tray reports
+   * what actually happened to this file — the toggle may have been changed
+   * since, and a file that could not be reduced was sent whole regardless.
+   */
+  reduced?: boolean;
+  /** The original's size, where it differed, so the saving is visible. */
+  originalSize?: number;
 }
 
 /**

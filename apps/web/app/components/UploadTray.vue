@@ -74,6 +74,17 @@ function readableSize(bytes: number): string {
           >
             {{ readableSize(upload.transferred) }} / {{ readableSize(upload.size) }}
           </span>
+
+          <!-- What was actually sent. Someone who meant to share a screenshot
+               at full size needs to see whether they did, without opening the
+               file to check. -->
+          <span
+            v-else-if="upload.status === 'done'"
+            class="shrink-0 text-[0.6875rem] text-muted-foreground"
+          >
+            <template v-if="upload.reduced"> reduced to {{ readableSize(upload.size) }} </template>
+            <template v-else>full size · {{ readableSize(upload.size) }}</template>
+          </span>
         </p>
 
         <!-- The reason, not just the fact: a refusal names the limit it broke,

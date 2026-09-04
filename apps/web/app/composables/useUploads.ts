@@ -46,7 +46,7 @@ export function useUploads() {
    * failure needs to stay visible next to a retry button rather than vanishing
    * into an unhandled promise.
    */
-  function upload(roomId: string, file: File): Promise<UploadProgress> {
+  function upload(roomId: string, file: File, original?: File): Promise<UploadProgress> {
     const id = crypto.randomUUID();
 
     const entry: UploadProgress = {
@@ -55,6 +55,11 @@ export function useUploads() {
       size: file.size,
       transferred: 0,
       status: "waiting",
+      // Reduced only when the file being sent is genuinely smaller than what
+      // was picked: a file that could not be reduced was sent whole, and
+      // saying otherwise would be a lie the tray repeats.
+      reduced: original !== undefined && original.size > file.size,
+      originalSize: original?.size,
     };
     uploads.value.push(entry);
 
