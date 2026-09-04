@@ -64,6 +64,10 @@ func (s *Server) routes() {
 	s.echo.GET("/api/attachments/:id", s.handleDownloadAttachment, requireAuthentication)
 	s.echo.GET("/api/attachments/:id/preview", s.handleAttachmentPreview, requireAuthentication)
 
+	// Search. A GET, so a search is shareable and bookmarkable: the term is
+	// the caller's own words about their own conversations.
+	s.echo.GET("/api/search", s.handleSearch, requireAuthentication)
+
 	// Link previews. A POST because the link is private: a query string ends
 	// up in access logs, proxy logs and browser history, and a body does not.
 	s.echo.POST("/api/previews", s.handlePreviewLink, requireAuthentication)

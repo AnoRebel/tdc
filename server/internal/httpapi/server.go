@@ -22,6 +22,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
+	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
 
@@ -82,6 +83,7 @@ type Server struct {
 	rooms       *rooms.Service
 	attachments *attachments.Service
 	unfurl      *unfurl.Service
+	search      *search.Service
 	queries     *dbgen.Queries
 	presence    *presence.Service
 	hub         *realtime.Hub
@@ -101,6 +103,7 @@ type Services struct {
 	Rooms       *rooms.Service
 	Attachments *attachments.Service
 	Unfurl      *unfurl.Service
+	Search      *search.Service
 	Presence    *presence.Service
 }
 
@@ -128,6 +131,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		rooms:       services.Rooms,
 		attachments: services.Attachments,
 		unfurl:      services.Unfurl,
+		search:      services.Search,
 		queries:     dbgen.New(pool),
 		presence:    services.Presence,
 		config:      cfg,

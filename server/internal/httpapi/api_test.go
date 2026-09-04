@@ -24,6 +24,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
+	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/storage"
 )
 
@@ -119,6 +120,7 @@ func newTestAPIConfigured(
 			attachments.NewService(pool, testStore(t), attachments.DefaultLimits(), logger),
 			adjust,
 		),
+		Search:   search.NewService(pool),
 		Presence: presence.NewService(queries),
 	}, logger)
 

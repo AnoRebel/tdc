@@ -90,6 +90,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
+	IndexMessage(ctx context.Context, arg IndexMessageParams) error
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
@@ -156,6 +157,20 @@ type Querier interface {
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	// Full-text search, restricted to rooms the caller is in.
+	//
+	// The membership join is the authorisation, done in the query rather than by
+	// filtering afterwards: a result that is fetched and then discarded has still
+	// been read from disk, and a mistake in the filtering would leak it.
+	//
+	// websearch_to_tsquery never raises a syntax error, whatever is typed at it,
+	// which is why hostile input needs no sanitising here.
+	SearchMessages(ctx context.Context, arg SearchMessagesParams) ([]SearchMessagesRow, error)
+	// Prefix and fuzzy matching, for search-as-you-type.
+	//
+	// websearch_to_tsquery cannot match a prefix, so "mkut" finds nothing there.
+	// Trigram similarity finds it, and tolerates a typo at the same time.
+	SearchMessagesFuzzy(ctx context.Context, arg SearchMessagesFuzzyParams) ([]SearchMessagesFuzzyRow, error)
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
@@ -171,6 +186,7 @@ type Querier interface {
 	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
 	TouchPresence(ctx context.Context, userID uuid.UUID) error
 	TouchSession(ctx context.Context, id uuid.UUID) error
+	UnindexMessage(ctx context.Context, eventID string) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
 }

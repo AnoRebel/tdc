@@ -276,6 +276,8 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		}
 	}
 
+	s.indexForSearch(ctx, event, request.Body)
+
 	// Delivered after it is stored, so a client that misses the live frame
 	// still finds the message on reconnection.
 	s.publishEvent(ctx, event)
@@ -339,6 +341,16 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 			"eventId", c.Param("eventId"), "error", err)
 	}
 
+	// A deleted message that stayed searchable would be a deletion that did
+	// not delete: the placeholder says the content is gone, and search has to
+	// agree.
+	if s.search != nil {
+		if err := s.search.Unindex(ctx, c.Param("eventId")); err != nil {
+			s.log.Error("cannot remove a deleted message from the search index",
+				"eventId", c.Param("eventId"), "error", err)
+		}
+	}
+
 	s.publishEvent(ctx, event)
 	return c.JSON(http.StatusCreated, messageResponseOf(event))
 }
@@ -391,5 +403,20 @@ func roomError(err error) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	default:
 		return err
+	}
+}
+
+// indexForSearch records a message so it can be found later.
+//
+// Failures are logged rather than returned. Somebody whose message did not
+// send because a search index was unavailable has lost something real;
+// somebody whose message is briefly unsearchable has not.
+func (s *Server) indexForSearch(ctx context.Context, event dbgen.Event, body string) {
+	if s.search == nil {
+		return
+	}
+
+	if err := s.search.Index(ctx, event, body); err != nil {
+		s.log.Error("cannot index a message for search", "eventId", event.ID, "error", err)
 	}
 }

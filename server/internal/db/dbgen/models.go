@@ -82,6 +82,16 @@ type EventIdempotency struct {
 	CreatedAt   time.Time
 }
 
+type MessageSearch struct {
+	EventID       string
+	RoomID        uuid.UUID
+	SenderID      *uuid.UUID
+	SenderAddress string
+	Body          string
+	SentAt        int64
+	SearchVector  interface{}
+}
+
 type Role struct {
 	ID          uuid.UUID
 	Name        string

@@ -28,6 +28,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
+	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/storage"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
@@ -142,6 +143,7 @@ func run() error {
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
 		Attachments: newAttachmentService(pool, objectStore, cfg, log),
+		Search:      search.NewService(pool),
 		Unfurl: unfurl.NewService(memoryCache,
 			unfurl.Settings{Enabled: cfg.Attachments.LinkPreviews}, log),
 		Presence: presenceService,
