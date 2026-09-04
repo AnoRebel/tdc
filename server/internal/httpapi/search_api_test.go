@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -192,4 +193,164 @@ func urlQueryEscape(value string) string {
 		encoded = append(encoded, '%', hex[b>>4], hex[b&0x0f])
 	}
 	return string(encoded)
+}
+
+// everythingHits is one search across the product.
+type everythingHits struct {
+	Messages []searchHit `json:"messages"`
+	Rooms    []struct {
+		ID         string `json:"id"`
+		Name       string `json:"name"`
+		Visibility string `json:"visibility"`
+		Member     bool   `json:"member"`
+	} `json:"rooms"`
+	People []struct {
+		ID          string `json:"id"`
+		Username    string `json:"username"`
+		DisplayName string `json:"displayName"`
+	} `json:"people"`
+}
+
+func searchEverything(t *testing.T, handler http.Handler, token, query string) everythingHits {
+	t.Helper()
+
+	recorder := call(t, handler, http.MethodGet,
+		"/api/search/everything?q="+url.QueryEscape(query), nil, token)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("searching returned %d: %s", recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var hits everythingHits
+	if err := json.Unmarshal(recorder.Body.Bytes(), &hits); err != nil {
+		t.Fatalf("decoding the search: %v", err)
+	}
+	return hits
+}
+
+// TestSearchFindsRoomsAndPeople covers the ordinary case: one box, three kinds
+// of answer.
+func TestSearchFindsRoomsAndPeople(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "mkutano", "public")
+	sendMessage(t, handler, owner, roomID, "Karibu kwenye mkutano wetu")
+
+	registerAndSignIn(t, handler, "mkutano-fan")
+
+	hits := searchEverything(t, handler, owner, "mkutano")
+
+	if len(hits.Rooms) != 1 {
+		t.Errorf("found %d rooms for a channel called mkutano, expected 1", len(hits.Rooms))
+	}
+	if len(hits.People) != 1 {
+		t.Errorf("found %d people, expected 1", len(hits.People))
+	}
+	if len(hits.Messages) != 1 {
+		t.Errorf("found %d messages, expected 1", len(hits.Messages))
+	}
+}
+
+/*
+TestSearchDoesNotDiscloseAPrivateRoom is the rule the feature turns on.
+
+A private channel appears only to somebody already in it. Search is the easiest
+place to get this wrong, because the obvious query — match the name — leaks the
+existence of every private conversation on the server to anyone who can guess
+part of its name. Somebody being excluded from a channel should not be able to
+learn it exists.
+*/
+func TestSearchDoesNotDiscloseAPrivateRoom(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	makeRoom(t, handler, owner, "bodi-ya-wakurugenzi", "private")
+
+	stranger := registerAndSignIn(t, handler, "amina")
+
+	hits := searchEverything(t, handler, stranger, "bodi")
+	if len(hits.Rooms) != 0 {
+		t.Errorf("a stranger's search found %d private rooms: %v", len(hits.Rooms), hits.Rooms)
+	}
+
+	// And the owner, who is in it, does find it — otherwise the test above
+	// would pass against a search that returned nothing at all.
+	found := searchEverything(t, handler, owner, "bodi")
+	if len(found.Rooms) != 1 {
+		t.Fatalf("a member found %d rooms, expected their own private room", len(found.Rooms))
+	}
+	if !found.Rooms[0].Member {
+		t.Error("the room a member found is not marked as one they are in")
+	}
+}
+
+/*
+TestSearchDoesNotListDirectMessages checks that a private conversation is not a
+room anybody can find.
+
+A direct conversation is a room underneath, so a search over rooms would list
+every DM somebody has ever had alongside their channels — and, worse, name the
+other participant in a list built for joining things. Excluded by kind, not by
+membership, because even both participants should not see it here.
+*/
+func TestSearchDoesNotListDirectMessages(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	other := registerAndSignIn(t, handler, "amina")
+
+	// The identifier comes from search itself, which is the only place a test
+	// can learn it without reaching past the API.
+	found := searchEverything(t, handler, owner, "amina")
+	if len(found.People) != 1 {
+		t.Fatalf("looking up amina found %d people, expected 1", len(found.People))
+	}
+
+	opened := call(t, handler, http.MethodPost, "/api/direct",
+		map[string]any{"userIds": []string{found.People[0].ID}}, owner)
+	if opened.Code != http.StatusOK && opened.Code != http.StatusCreated {
+		t.Fatalf("opening a direct conversation returned %d: %s",
+			opened.Code, truncate(opened.Body.String()))
+	}
+
+	// Both participants, and by every term that would match it.
+	for name, token := range map[string]string{"the opener": owner, "the recipient": other} {
+		for _, query := range []string{"amina", "admin"} {
+			hits := searchEverything(t, handler, token, query)
+			for _, room := range hits.Rooms {
+				t.Errorf("%s searching %q found a direct conversation as a room: %q",
+					name, query, room.Name)
+			}
+		}
+	}
+}
+
+// TestEmptySearchReturnsNothing checks that a blank box does not mean
+// everything, which would be both a slow query and a disclosure.
+func TestEmptySearchReturnsNothing(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	makeRoom(t, handler, owner, "general", "public")
+
+	for _, query := range []string{"", "   "} {
+		hits := searchEverything(t, handler, owner, query)
+		if len(hits.Rooms)+len(hits.People)+len(hits.Messages) != 0 {
+			t.Errorf("the search %q returned results", query)
+		}
+	}
+}
+
+// TestSearchRequiresAuthentication checks the endpoint is not a way to
+// enumerate a server's channels and members without an account.
+func TestSearchRequiresAuthentication(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	makeRoom(t, handler, owner, "general", "public")
+
+	recorder := call(t, handler, http.MethodGet, "/api/search/everything?q=general", nil, "")
+	if recorder.Code != http.StatusUnauthorized {
+		t.Errorf("an anonymous search returned %d, expected 401", recorder.Code)
+	}
 }

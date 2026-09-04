@@ -178,6 +178,129 @@ func (q *Queries) SearchMessagesFuzzy(ctx context.Context, arg SearchMessagesFuz
 	return items, nil
 }
 
+const searchPeople = `-- name: SearchPeople :many
+SELECT id, username, display_name
+FROM users
+WHERE username ILIKE '%' || $1::text || '%'
+   OR display_name ILIKE '%' || $1::text || '%'
+ORDER BY
+  -- An exact match first, then a prefix, then anything containing it. Somebody
+  -- typing a whole username wants that person, not the twelve others whose
+  -- names contain it.
+  (lower(username) = lower($1::text)) DESC,
+  (username ILIKE $1::text || '%') DESC,
+  username
+LIMIT $2
+`
+
+type SearchPeopleParams struct {
+	Query       string
+	ResultLimit int32
+}
+
+type SearchPeopleRow struct {
+	ID          uuid.UUID
+	Username    string
+	DisplayName string
+}
+
+// People, by username or display name.
+//
+// Only what a member list already discloses: a name and an address. Anything
+// somebody has chosen to withhold stays withheld, and search must not become
+// the way around a privacy setting.
+func (q *Queries) SearchPeople(ctx context.Context, arg SearchPeopleParams) ([]SearchPeopleRow, error) {
+	rows, err := q.db.Query(ctx, searchPeople, arg.Query, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchPeopleRow{}
+	for rows.Next() {
+		var i SearchPeopleRow
+		if err := rows.Scan(&i.ID, &i.Username, &i.DisplayName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchRooms = `-- name: SearchRooms :many
+SELECT r.id, r.slug, r.name, r.topic, r.kind, r.visibility,
+       (r.archived_at IS NOT NULL) AS archived,
+       (m.user_id IS NOT NULL) AS is_member
+FROM rooms r
+LEFT JOIN room_members m ON m.room_id = r.id AND m.user_id = $1
+WHERE r.kind <> 'direct'
+  AND (r.visibility = 'public' OR m.user_id IS NOT NULL)
+  AND (
+        r.name ILIKE '%' || $2::text || '%'
+        OR r.slug ILIKE '%' || $2::text || '%'
+        OR coalesce(r.topic, '') ILIKE '%' || $2::text || '%'
+      )
+ORDER BY (m.user_id IS NOT NULL) DESC, r.name
+LIMIT $3
+`
+
+type SearchRoomsParams struct {
+	UserID      uuid.UUID
+	Query       string
+	ResultLimit int32
+}
+
+type SearchRoomsRow struct {
+	ID         uuid.UUID
+	Slug       *string
+	Name       string
+	Topic      string
+	Kind       string
+	Visibility string
+	Archived   interface{}
+	IsMember   interface{}
+}
+
+// Rooms a person may find, by name or topic.
+//
+// No index is added for this, deliberately. A server has hundreds of channels
+// where it has millions of messages, so Postgres reads the table and is done
+// before an index lookup would have finished planning — and an index here
+// would cost storage and a write on every rename for nothing.
+//
+// Visibility is the authorisation: a private channel appears only to somebody
+// already in it, so searching cannot be used to discover that one exists.
+func (q *Queries) SearchRooms(ctx context.Context, arg SearchRoomsParams) ([]SearchRoomsRow, error) {
+	rows, err := q.db.Query(ctx, searchRooms, arg.UserID, arg.Query, arg.ResultLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchRoomsRow{}
+	for rows.Next() {
+		var i SearchRoomsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.Topic,
+			&i.Kind,
+			&i.Visibility,
+			&i.Archived,
+			&i.IsMember,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const unindexMessage = `-- name: UnindexMessage :exec
 DELETE FROM message_search WHERE event_id = $1
 `

@@ -191,6 +191,22 @@ type Querier interface {
 	// websearch_to_tsquery cannot match a prefix, so "mkut" finds nothing there.
 	// Trigram similarity finds it, and tolerates a typo at the same time.
 	SearchMessagesFuzzy(ctx context.Context, arg SearchMessagesFuzzyParams) ([]SearchMessagesFuzzyRow, error)
+	// People, by username or display name.
+	//
+	// Only what a member list already discloses: a name and an address. Anything
+	// somebody has chosen to withhold stays withheld, and search must not become
+	// the way around a privacy setting.
+	SearchPeople(ctx context.Context, arg SearchPeopleParams) ([]SearchPeopleRow, error)
+	// Rooms a person may find, by name or topic.
+	//
+	// No index is added for this, deliberately. A server has hundreds of channels
+	// where it has millions of messages, so Postgres reads the table and is done
+	// before an index lookup would have finished planning — and an index here
+	// would cost storage and a write on every rename for nothing.
+	//
+	// Visibility is the authorisation: a private channel appears only to somebody
+	// already in it, so searching cannot be used to discover that one exists.
+	SearchRooms(ctx context.Context, arg SearchRoomsParams) ([]SearchRoomsRow, error)
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error

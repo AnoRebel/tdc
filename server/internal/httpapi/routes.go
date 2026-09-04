@@ -73,6 +73,9 @@ func (s *Server) routes() {
 	// Search. A GET, so a search is shareable and bookmarkable: the term is
 	// the caller's own words about their own conversations.
 	s.echo.GET("/api/search", s.handleSearch, requireAuthentication)
+	// One box, one question: messages, conversations and people together,
+	// rather than three requests resolving at different times.
+	s.echo.GET("/api/search/everything", s.handleSearchEverything, requireAuthentication)
 
 	// Link previews. A POST because the link is private: a query string ends
 	// up in access logs, proxy logs and browser history, and a body does not.

@@ -43,3 +43,47 @@ WHERE (
   AND (@all_rooms::boolean OR s.room_id = @room_id::uuid)
 ORDER BY s.sent_at DESC
 LIMIT @result_limit;
+
+-- Rooms a person may find, by name or topic.
+--
+-- No index is added for this, deliberately. A server has hundreds of channels
+-- where it has millions of messages, so Postgres reads the table and is done
+-- before an index lookup would have finished planning — and an index here
+-- would cost storage and a write on every rename for nothing.
+--
+-- Visibility is the authorisation: a private channel appears only to somebody
+-- already in it, so searching cannot be used to discover that one exists.
+-- name: SearchRooms :many
+SELECT r.id, r.slug, r.name, r.topic, r.kind, r.visibility,
+       (r.archived_at IS NOT NULL) AS archived,
+       (m.user_id IS NOT NULL) AS is_member
+FROM rooms r
+LEFT JOIN room_members m ON m.room_id = r.id AND m.user_id = @user_id
+WHERE r.kind <> 'direct'
+  AND (r.visibility = 'public' OR m.user_id IS NOT NULL)
+  AND (
+        r.name ILIKE '%' || @query::text || '%'
+        OR r.slug ILIKE '%' || @query::text || '%'
+        OR coalesce(r.topic, '') ILIKE '%' || @query::text || '%'
+      )
+ORDER BY (m.user_id IS NOT NULL) DESC, r.name
+LIMIT @result_limit;
+
+-- People, by username or display name.
+--
+-- Only what a member list already discloses: a name and an address. Anything
+-- somebody has chosen to withhold stays withheld, and search must not become
+-- the way around a privacy setting.
+-- name: SearchPeople :many
+SELECT id, username, display_name
+FROM users
+WHERE username ILIKE '%' || @query::text || '%'
+   OR display_name ILIKE '%' || @query::text || '%'
+ORDER BY
+  -- An exact match first, then a prefix, then anything containing it. Somebody
+  -- typing a whole username wants that person, not the twelve others whose
+  -- names contain it.
+  (lower(username) = lower(@query::text)) DESC,
+  (username ILIKE @query::text || '%') DESC,
+  username
+LIMIT @result_limit;

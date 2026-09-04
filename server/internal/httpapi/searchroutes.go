@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,6 +83,136 @@ func (s *Server) handleSearch(c *echo.Context) error {
 			Highlighted: result.Highlighted,
 			SentAt:      time.UnixMilli(result.SentAt).UTC().Format(time.RFC3339),
 		})
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+// roomHit is a conversation that matched.
+type roomHit struct {
+	ID         string `json:"id"`
+	Slug       string `json:"slug,omitempty"`
+	Name       string `json:"name"`
+	Topic      string `json:"topic,omitempty"`
+	Visibility string `json:"visibility"`
+	Archived   bool   `json:"archived"`
+	// Member lets a client offer "open" rather than "join".
+	Member bool `json:"member"`
+}
+
+// personHit is somebody who matched.
+type personHit struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+	Address     string `json:"address"`
+}
+
+// everythingResponse is one search across the whole product.
+//
+// Returned together rather than as three requests, because somebody typing
+// into one box is asking one question: three round trips would mean three
+// spinners resolving at different times for what reads as a single answer.
+type everythingResponse struct {
+	Messages []searchResult `json:"messages"`
+	Rooms    []roomHit      `json:"rooms"`
+	People   []personHit    `json:"people"`
+}
+
+/*
+handleSearchEverything searches messages, conversations and people at once.
+
+Bounded deliberately. Each kind is capped separately and small by default,
+because this runs on every keystroke of a search box: the cost of being wrong
+here is paid on every character somebody types, not once per search.
+
+Messages are the expensive part and are skipped when only names are wanted,
+which is what an autocomplete actually needs.
+*/
+func (s *Server) handleSearchEverything(c *echo.Context) error {
+	user, _ := currentUser(c)
+	ctx := c.Request().Context()
+
+	if s.search == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "search is not available")
+	}
+
+	text := c.QueryParam("q")
+	if strings.TrimSpace(text) == "" {
+		// An empty search matches nothing rather than everything.
+		return c.JSON(http.StatusOK, everythingResponse{
+			Messages: []searchResult{},
+			Rooms:    []roomHit{},
+			People:   []personHit{},
+		})
+	}
+
+	// Small by default: this is a dropdown under a text box, not a results
+	// page, and a hundred rows would be slower to render than to find.
+	limit := 8
+	if raw := c.QueryParam("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= 25 {
+			limit = parsed
+		}
+	}
+
+	response := everythingResponse{
+		Messages: []searchResult{},
+		Rooms:    []roomHit{},
+		People:   []personHit{},
+	}
+
+	rooms, err := s.search.Rooms(ctx, user.ID, text, limit)
+	if err != nil {
+		return err
+	}
+	for _, room := range rooms {
+		response.Rooms = append(response.Rooms, roomHit{
+			ID:         room.ID.String(),
+			Slug:       room.Slug,
+			Name:       room.Name,
+			Topic:      room.Topic,
+			Visibility: room.Visibility,
+			Archived:   room.Archived,
+			Member:     room.Member,
+		})
+	}
+
+	people, err := s.search.People(ctx, text, limit)
+	if err != nil {
+		return err
+	}
+	for _, person := range people {
+		response.People = append(response.People, personHit{
+			ID:          person.ID.String(),
+			Username:    person.Username,
+			DisplayName: person.DisplayName,
+			Address:     s.rooms.UserAddress(person.Username),
+		})
+	}
+
+	// Messages are the only part that touches a large table, so they are
+	// skipped where a caller has said it only wants names — which is what a
+	// jump-to box needs, and what runs on every keystroke.
+	if c.QueryParam("messages") != "false" {
+		messages, err := s.search.Search(ctx, user.ID, search.Query{
+			Text:   text,
+			Prefix: c.QueryParam("prefix") == "true",
+			Limit:  limit,
+		})
+		if err != nil {
+			return err
+		}
+		for _, result := range messages {
+			response.Messages = append(response.Messages, searchResult{
+				EventID:     result.EventID,
+				RoomID:      result.RoomID.String(),
+				Sender:      result.Sender,
+				Body:        result.Body,
+				Highlighted: result.Highlighted,
+				SentAt:      time.UnixMilli(result.SentAt).UTC().Format(time.RFC3339),
+			})
+		}
 	}
 
 	return c.JSON(http.StatusOK, response)

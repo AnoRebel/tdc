@@ -217,3 +217,122 @@ func (s *Service) Unindex(ctx context.Context, eventID string) error {
 
 // ErrUnavailable is returned when search cannot run at all.
 var ErrUnavailable = errors.New("search: unavailable")
+
+// RoomResult is a conversation that matched.
+type RoomResult struct {
+	ID         uuid.UUID
+	Slug       string
+	Name       string
+	Topic      string
+	Kind       string
+	Visibility string
+	Archived   bool
+	// Member says whether the person is already in it, so a client can offer
+	// "open" rather than "join".
+	Member bool
+}
+
+// PersonResult is somebody who matched.
+//
+// Only what a member list already discloses. Search must not become the way
+// around a privacy setting, so nothing withheld appears here.
+type PersonResult struct {
+	ID          uuid.UUID
+	Username    string
+	DisplayName string
+}
+
+/*
+Rooms finds conversations by name or topic.
+
+No index backs this, deliberately. A server has hundreds of channels where it
+has millions of messages, so Postgres reads the small table and is finished
+before an index lookup would have been planned — and an index would cost
+storage and a write on every rename to save nothing measurable.
+
+Visibility is the authorisation: a private channel is returned only to somebody
+already in it, so searching cannot be used to discover that one exists.
+*/
+func (s *Service) Rooms(ctx context.Context, userID uuid.UUID, query string, limit int) ([]RoomResult, error) {
+	text := strings.TrimSpace(query)
+	if text == "" {
+		return nil, nil
+	}
+	if limit <= 0 || limit > maxResults {
+		limit = maxResults
+	}
+
+	rows, err := s.queries.SearchRooms(ctx, dbgen.SearchRoomsParams{
+		UserID:      userID,
+		Query:       text,
+		ResultLimit: int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("search: rooms: %w", err)
+	}
+
+	results := make([]RoomResult, 0, len(rows))
+	for _, row := range rows {
+		result := RoomResult{
+			ID:         row.ID,
+			Name:       row.Name,
+			Kind:       row.Kind,
+			Visibility: row.Visibility,
+			// sqlc types a computed boolean as interface{}, since it cannot
+			// see through the expression. A failed assertion yields false,
+			// which is the safe reading for both: an unknown room is treated
+			// as not archived and not joined, so a client offers to join
+			// rather than wrongly claiming membership.
+			Archived: asBool(row.Archived),
+			Member:   asBool(row.IsMember),
+		}
+		if row.Slug != nil {
+			result.Slug = *row.Slug
+		}
+		result.Topic = row.Topic
+		results = append(results, result)
+	}
+
+	return results, nil
+}
+
+// People finds somebody by name.
+func (s *Service) People(ctx context.Context, query string, limit int) ([]PersonResult, error) {
+	text := strings.TrimSpace(query)
+	if text == "" {
+		return nil, nil
+	}
+	if limit <= 0 || limit > maxResults {
+		limit = maxResults
+	}
+
+	rows, err := s.queries.SearchPeople(ctx, dbgen.SearchPeopleParams{
+		Query:       text,
+		ResultLimit: int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("search: people: %w", err)
+	}
+
+	results := make([]PersonResult, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, PersonResult{
+			ID:          row.ID,
+			Username:    row.Username,
+			DisplayName: row.DisplayName,
+		})
+	}
+
+	return results, nil
+}
+
+// asBool reads a boolean sqlc could not type, defaulting to false.
+//
+// Used for computed columns, where sqlc sees an expression rather than a
+// column and gives up on the type. False is the safe default for every use
+// here: a room whose membership cannot be read is treated as not joined,
+// which offers to join rather than claiming access somebody may not have.
+func asBool(value any) bool {
+	got, ok := value.(bool)
+	return ok && got
+}
