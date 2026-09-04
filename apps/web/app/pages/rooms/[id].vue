@@ -564,19 +564,18 @@ function openThread(messageId: string) {
 
 /** Refreshes reply counts after posting in a thread. */
 async function refreshThreadCounts() {
-  const roots = visible.value.map((message) => message.id);
-  const counts: Record<string, number> = {};
-  await Promise.all(
-    roots.map(async (rootId) => {
-      try {
-        const thread = await roomsApi.thread(roomId.value, rootId);
-        if (thread.replies.length > 0) counts[rootId] = thread.replies.length;
-      } catch {
-        // A thread that cannot be read is simply not counted.
-      }
-    }),
-  );
-  threadCounts.value = counts;
+  try {
+    const summaries = await roomsApi.threadSummaries(roomId.value);
+
+    const counts: Record<string, number> = {};
+    for (const [rootId, summary] of Object.entries(summaries)) {
+      if (summary.replyCount > 0) counts[rootId] = summary.replyCount;
+    }
+    threadCounts.value = counts;
+  } catch {
+    // Counts are decoration on a timeline that has already loaded. Losing them
+    // is not worth an error over what is otherwise a working conversation.
+  }
 }
 
 function shortName(address: string): string {

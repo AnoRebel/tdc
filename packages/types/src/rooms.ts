@@ -200,3 +200,10 @@ export interface LinkPreview {
   siteName?: string;
   imageUrl?: string;
 }
+
+/** How many replies one message has, without fetching them. */
+export interface ThreadSummary {
+  replyCount: number;
+  /** Milliseconds since the epoch, so a client can order by recent activity. */
+  lastReplyAt: number;
+}

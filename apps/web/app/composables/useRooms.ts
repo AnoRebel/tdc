@@ -4,6 +4,7 @@ import type {
   Room,
   RoomMember,
   Thread,
+  ThreadSummary,
   TypingPerson,
   UnreadCounts,
 } from "@tdc/types";
@@ -78,6 +79,17 @@ export function useRooms() {
     return api.get<Thread>(`/api/rooms/${roomId}/threads/${rootId}`);
   }
 
+  /**
+   * Reply counts for every thread in a room, in one request.
+   *
+   * A timeline needs a count per message to render. Asking per message meant a
+   * request each — and each of those returned every reply body in full, only
+   * for the client to take its length.
+   */
+  function threadSummaries(roomId: string): Promise<Record<string, ThreadSummary>> {
+    return api.get<Record<string, ThreadSummary>>(`/api/rooms/${roomId}/threads`);
+  }
+
   function reply(
     roomId: string,
     rootId: string,
@@ -133,6 +145,7 @@ export function useRooms() {
     edit,
     remove,
     thread,
+    threadSummaries,
     reply,
     openDirect,
     listDirect,

@@ -129,6 +129,13 @@ type Querier interface {
 	// Just the identifiers, for deciding who a live event should reach.
 	ListRoomMemberIDs(ctx context.Context, roomID uuid.UUID) ([]uuid.UUID, error)
 	ListRoomMembers(ctx context.Context, roomID uuid.UUID) ([]ListRoomMembersRow, error)
+	// Reply counts for every thread in a room, in one query.
+	//
+	// By room rather than by a list of message identifiers: a timeline wants the
+	// counts for what it is drawing, and asking per message meant one request per
+	// message. Replies are counted against the room they were sent to, so a root
+	// that has scrolled out of the loaded window still reports correctly.
+	ListRoomThreadSummaries(ctx context.Context, roomID uuid.UUID) ([]ListRoomThreadSummariesRow, error)
 	// The main timeline: replies live in their thread, not in the channel, unless
 	// explicitly surfaced.
 	ListRoomTimelineExcludingReplies(ctx context.Context, arg ListRoomTimelineExcludingRepliesParams) ([]Event, error)

@@ -71,3 +71,17 @@ LEFT JOIN events ON events.room_id = room_members.room_id
     AND (events.sender_id IS NULL OR events.sender_id <> room_members.user_id)
 WHERE room_members.user_id = $1
 GROUP BY room_members.room_id;
+
+-- name: ListRoomThreadSummaries :many
+-- Reply counts for every thread in a room, in one query.
+--
+-- By room rather than by a list of message identifiers: a timeline wants the
+-- counts for what it is drawing, and asking per message meant one request per
+-- message. Replies are counted against the room they were sent to, so a root
+-- that has scrolled out of the loaded window still reports correctly.
+SELECT thread_root_id,
+       COUNT(*)::bigint AS reply_count,
+       MAX(created_at)::bigint AS last_reply_at
+FROM events
+WHERE room_id = $1 AND thread_root_id IS NOT NULL
+GROUP BY thread_root_id;

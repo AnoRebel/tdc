@@ -222,6 +222,37 @@ func (s *Service) ThreadSummaries(ctx context.Context, rootIDs []string) (map[st
 	return summaries, nil
 }
 
+/*
+RoomThreadSummaries returns reply counts for every thread in a room.
+
+By room rather than by a list of identifiers, because that is what a timeline
+actually needs: one call to draw the whole view, instead of one per message.
+Authorisation is the caller's to make — it has the room and the person.
+*/
+func (s *Service) RoomThreadSummaries(
+	ctx context.Context,
+	roomID uuid.UUID,
+) (map[string]ThreadSummary, error) {
+	rows, err := s.store.ListRoomThreadSummaries(ctx, roomID)
+	if err != nil {
+		return nil, fmt.Errorf("read room thread summaries: %w", err)
+	}
+
+	summaries := make(map[string]ThreadSummary, len(rows))
+	for _, row := range rows {
+		if row.ThreadRootID == nil {
+			continue
+		}
+		summaries[*row.ThreadRootID] = ThreadSummary{
+			RootID:      *row.ThreadRootID,
+			ReplyCount:  row.ReplyCount,
+			LastReplyAt: row.LastReplyAt,
+		}
+	}
+
+	return summaries, nil
+}
+
 // participantKey identifies a direct conversation by who is in it.
 //
 // Sorted, so the key does not depend on which person opened the conversation:

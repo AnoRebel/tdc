@@ -334,3 +334,50 @@ func (s *Server) handleListTyping(c *echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, response)
 }
+
+// threadSummary is how many replies one message has.
+type threadSummary struct {
+	ReplyCount  int64 `json:"replyCount"`
+	LastReplyAt int64 `json:"lastReplyAt"`
+}
+
+/*
+handleThreadSummaries returns reply counts for a room's timeline in one call.
+
+A count per message is what a timeline needs to render, and asking for each one
+separately meant a room with fifty messages made fifty requests to draw itself.
+The batch query already existed; only the way in was missing.
+
+Scoped to the room and its membership, so this cannot be used to count replies
+in a conversation the caller cannot read.
+*/
+func (s *Server) handleThreadSummaries(c *echo.Context) error {
+	user, _ := currentUser(c)
+	ctx := c.Request().Context()
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	// The same check the single-thread endpoint makes. Counts disclose that a
+	// conversation is active, so they are not more public than its messages.
+	if _, err := s.rooms.Visible(ctx, roomID, user.ID); err != nil {
+		return roomError(err)
+	}
+
+	summaries, err := s.rooms.RoomThreadSummaries(ctx, roomID)
+	if err != nil {
+		return err
+	}
+
+	response := make(map[string]threadSummary, len(summaries))
+	for rootID, summary := range summaries {
+		response[rootID] = threadSummary{
+			ReplyCount:  summary.ReplyCount,
+			LastReplyAt: summary.LastReplyAt,
+		}
+	}
+
+	return c.JSON(http.StatusOK, response)
+}

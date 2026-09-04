@@ -50,6 +50,9 @@ func (s *Server) routes() {
 	rooms.POST("/:id/messages", s.handleSendMessage)
 	rooms.PATCH("/:id/messages/:eventId", s.handleEditMessage)
 	rooms.DELETE("/:id/messages/:eventId", s.handleDeleteMessage)
+	// Counts for the whole timeline at once. Without this a client asks per
+	// message, which is one request per message drawn.
+	rooms.GET("/:id/threads", s.handleThreadSummaries)
 	rooms.GET("/:id/threads/:eventId", s.handleThread)
 	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread)
 	rooms.POST("/:id/read", s.handleMarkRead)

@@ -228,6 +228,47 @@ func (q *Queries) ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) 
 	return items, nil
 }
 
+const listRoomThreadSummaries = `-- name: ListRoomThreadSummaries :many
+SELECT thread_root_id,
+       COUNT(*)::bigint AS reply_count,
+       MAX(created_at)::bigint AS last_reply_at
+FROM events
+WHERE room_id = $1 AND thread_root_id IS NOT NULL
+GROUP BY thread_root_id
+`
+
+type ListRoomThreadSummariesRow struct {
+	ThreadRootID *string
+	ReplyCount   int64
+	LastReplyAt  int64
+}
+
+// Reply counts for every thread in a room, in one query.
+//
+// By room rather than by a list of message identifiers: a timeline wants the
+// counts for what it is drawing, and asking per message meant one request per
+// message. Replies are counted against the room they were sent to, so a root
+// that has scrolled out of the loaded window still reports correctly.
+func (q *Queries) ListRoomThreadSummaries(ctx context.Context, roomID uuid.UUID) ([]ListRoomThreadSummariesRow, error) {
+	rows, err := q.db.Query(ctx, listRoomThreadSummaries, roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRoomThreadSummariesRow{}
+	for rows.Next() {
+		var i ListRoomThreadSummariesRow
+		if err := rows.Scan(&i.ThreadRootID, &i.ReplyCount, &i.LastReplyAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRoomTimelineExcludingReplies = `-- name: ListRoomTimelineExcludingReplies :many
 SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events
 WHERE room_id = $1 AND thread_root_id IS NULL
