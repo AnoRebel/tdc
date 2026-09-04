@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
+import { LoaderCircle } from "lucide-vue-next";
+
+definePageMeta({ layout: "auth" });
 
 const { register } = useAuth();
 const router = useRouter();
@@ -34,99 +37,85 @@ async function submit() {
 </script>
 
 <template>
-  <main class="centred">
-    <form class="card" @submit.prevent="submit">
-      <h1>Create an account</h1>
+  <div>
+    <h1 class="text-xl font-semibold">Create an account</h1>
+    <p class="mt-1 text-sm text-muted-foreground">
+      Your username becomes your address on this server.
+    </p>
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <form class="mt-6 space-y-4" @submit.prevent="submit">
+      <p
+        v-if="error"
+        class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        role="alert"
+      >
+        {{ error }}
+      </p>
 
-      <div class="field">
-        <label for="username">Username</label>
+      <div>
+        <label for="username" class="mb-1.5 block text-sm font-medium">Username</label>
         <input
           id="username"
           v-model="username"
+          class="input"
           name="username"
           autocomplete="username"
           required
           autofocus
         />
-        <span class="hint">Letters, digits, underscore, dot and hyphen.</span>
       </div>
 
-      <div class="field">
-        <label for="displayName">Display name <span class="optional">(optional)</span></label>
-        <input id="displayName" v-model="displayName" name="displayName" autocomplete="name" />
+      <div>
+        <label for="displayName" class="mb-1.5 block text-sm font-medium">
+          Display name
+          <span class="font-normal text-muted-foreground">(optional)</span>
+        </label>
+        <input
+          id="displayName"
+          v-model="displayName"
+          class="input"
+          name="displayName"
+          autocomplete="name"
+        />
       </div>
 
-      <div class="field">
-        <label for="email">Email <span class="optional">(optional)</span></label>
-        <input id="email" v-model="email" name="email" type="email" autocomplete="email" />
-        <span class="hint">Used only to recover your account.</span>
+      <div>
+        <label for="email" class="mb-1.5 block text-sm font-medium">
+          Email
+          <span class="font-normal text-muted-foreground">(optional)</span>
+        </label>
+        <input
+          id="email"
+          v-model="email"
+          class="input"
+          name="email"
+          type="email"
+          autocomplete="email"
+        />
       </div>
 
-      <div class="field">
-        <label for="password">Password</label>
+      <div>
+        <label for="password" class="mb-1.5 block text-sm font-medium">Password</label>
         <input
           id="password"
           v-model="password"
+          class="input"
           name="password"
           type="password"
           autocomplete="new-password"
           required
-          minlength="12"
         />
-        <span class="hint">
-          At least 12 characters. A memorable phrase is stronger than a short, complicated word.
-        </span>
       </div>
 
-      <button type="submit" :disabled="submitting">
-        {{ submitting ? "Creating…" : "Create account" }}
+      <button type="submit" class="btn btn-primary h-9 w-full" :disabled="submitting">
+        <LoaderCircle v-if="submitting" class="size-4 animate-spin" />
+        {{ submitting ? "Creating account" : "Create account" }}
       </button>
-
-      <p class="alternative">
-        Already have an account?
-        <NuxtLink to="/signin">Sign in</NuxtLink>
-      </p>
     </form>
-  </main>
+
+    <p class="mt-6 text-center text-sm text-muted-foreground">
+      Already have an account?
+      <NuxtLink to="/signin" class="font-medium text-primary hover:underline">Sign in</NuxtLink>
+    </p>
+  </div>
 </template>
-
-<style scoped>
-.centred {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 1rem;
-}
-
-.card {
-  width: 100%;
-  max-width: 26rem;
-  padding: 2rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-h1 {
-  margin: 0 0 1.5rem;
-  font-size: 1.5rem;
-}
-
-.optional {
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-button {
-  width: 100%;
-}
-
-.alternative {
-  margin: 1.25rem 0 0;
-  font-size: 0.9375rem;
-  color: var(--text-muted);
-  text-align: center;
-}
-</style>

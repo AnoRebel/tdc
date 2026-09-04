@@ -16,7 +16,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
+    "typescript": "catalog:tooling",
     "vitest": "catalog:testing",
     "eslint": "catalog:tooling",
     "typescript-eslint": "catalog:tooling",

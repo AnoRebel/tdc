@@ -63,3 +63,43 @@ export interface HealthStatus {
   /** Per-subsystem detail, e.g. { database: "ok" }. */
   checks: Record<string, "ok" | "degraded" | "unavailable">;
 }
+
+/**
+ * How discoverable a server is to the rest of the network.
+ *
+ * The same three-way choice a room has, applied one level up: an operator
+ * running a server for a particular community decides who may find it at all,
+ * and that decision is enforced by the server itself rather than by whatever
+ * client happens to be asking.
+ */
+export type ServerVisibility =
+  /** Any connected server may discover it and browse the rooms it publishes. */
+  | "public"
+  /** Only servers its operator has listed may discover it. */
+  | "limited"
+  /** Not discoverable; reachable only through an existing explicit connection. */
+  | "private";
+
+/**
+ * Another server this one is connected to.
+ *
+ * A person browses these to find rooms beyond their own server. What comes
+ * back has already been filtered by each peer's visibility, so a client can
+ * present everything it receives without deciding what to hide.
+ */
+export interface ConnectedServer {
+  /** The domain that identifies it, e.g. "vue.tdc.or.tz". */
+  domain: string;
+  /** Operator-chosen display name. */
+  name: string;
+  /** Short description of who the server is for. */
+  description: string;
+  visibility: ServerVisibility;
+  /**
+   * Whether the connection is currently usable. A server that is listed but
+   * unreachable is still shown, so its absence is visible rather than silent.
+   */
+  reachable: boolean;
+  /** How many of its rooms this person may browse, when it publishes any. */
+  publishedRoomCount?: number;
+}

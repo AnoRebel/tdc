@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
+import { LoaderCircle } from "lucide-vue-next";
 
-definePageMeta({ layout: false });
+definePageMeta({ layout: "auth" });
 
 const { signIn, setupStatus } = useAuth();
 const router = useRouter();
@@ -45,17 +46,25 @@ async function submit() {
 </script>
 
 <template>
-  <main class="centred">
-    <form class="card" @submit.prevent="submit">
-      <h1>Sign in</h1>
+  <div>
+    <h1 class="text-xl font-semibold">Sign in</h1>
+    <p class="mt-1 text-sm text-muted-foreground">Welcome back.</p>
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <form class="mt-6 space-y-4" @submit.prevent="submit">
+      <p
+        v-if="error"
+        class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        role="alert"
+      >
+        {{ error }}
+      </p>
 
-      <div class="field">
-        <label for="username">Username or email</label>
+      <div>
+        <label for="username" class="mb-1.5 block text-sm font-medium"> Username or email </label>
         <input
           id="username"
           v-model="username"
+          class="input"
           name="username"
           autocomplete="username"
           required
@@ -63,11 +72,12 @@ async function submit() {
         />
       </div>
 
-      <div class="field">
-        <label for="password">Password</label>
+      <div>
+        <label for="password" class="mb-1.5 block text-sm font-medium">Password</label>
         <input
           id="password"
           v-model="password"
+          class="input"
           name="password"
           type="password"
           autocomplete="current-password"
@@ -75,48 +85,17 @@ async function submit() {
         />
       </div>
 
-      <button type="submit" :disabled="submitting">
-        {{ submitting ? "Signing in…" : "Sign in" }}
+      <button type="submit" class="btn btn-primary h-9 w-full" :disabled="submitting">
+        <LoaderCircle v-if="submitting" class="size-4 animate-spin" />
+        {{ submitting ? "Signing in" : "Sign in" }}
       </button>
-
-      <p class="alternative">
-        No account yet?
-        <NuxtLink to="/register">Create one</NuxtLink>
-      </p>
     </form>
-  </main>
+
+    <p class="mt-6 text-center text-sm text-muted-foreground">
+      No account yet?
+      <NuxtLink to="/register" class="font-medium text-primary hover:underline">
+        Create one
+      </NuxtLink>
+    </p>
+  </div>
 </template>
-
-<style scoped>
-.centred {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 1rem;
-}
-
-.card {
-  width: 100%;
-  max-width: 24rem;
-  padding: 2rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-h1 {
-  margin: 0 0 1.5rem;
-  font-size: 1.5rem;
-}
-
-button {
-  width: 100%;
-}
-
-.alternative {
-  margin: 1.25rem 0 0;
-  font-size: 0.9375rem;
-  color: var(--text-muted);
-  text-align: center;
-}
-</style>

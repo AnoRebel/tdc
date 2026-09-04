@@ -118,6 +118,7 @@ Goal: a server an operator can actually run, configure, and moderate.
 - [ ] 7.12 Implement user blocking without disclosure, with moderators retaining full view; verify the blocked user is not informed (`platform/moderation`)
 - [ ] 7.13 Implement disposable chats with server-enforced expiry; verify expired content is not served to a client offline through the expiry (`messaging/channels`)
 - [ ] 7.14 Implement audit retention, export, and recording of expiry; verify export round-trips and expiry itself produces an entry (`platform/audit-log`)
+- [ ] 7.14a Implement server visibility — public, limited, private — enforced server-side on peer discovery and room browsing; verify a limited server is not returned to an unlisted requester, a private server is not discoverable at all, and a private room on a public server stays undiscoverable (`federation/protocol`)
 - [ ] 7.15 Build the web administration and moderation interface; verify an administrator can perform every action above without using the API directly
 - [ ] **MILESTONE 7** — Demonstrate: an operator configures limits and registration policy, a moderator removes a message and suspends a user, a filtered word is blocked, a disposable chat expires, and every one of those actions appears in the audit log. Tag `v0.7.0-dev`.
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
+import { ArrowLeft, ShieldAlert } from "lucide-vue-next";
 
 /**
  * The audit log.
@@ -9,7 +10,7 @@ import { isApiError } from "@tdc/types";
  * a visitor who navigates here without it sees the refusal the server gave.
  */
 
-definePageMeta({ middleware: "auth" });
+definePageMeta({ middleware: "auth", layout: "app" });
 
 interface AuditEntry {
   id: number;
@@ -44,118 +45,90 @@ function when(value: string): string {
 </script>
 
 <template>
-  <div class="page">
-    <header class="bar">
-      <h1>Audit log</h1>
-      <NuxtLink class="link-button" to="/">Back</NuxtLink>
+  <div class="flex-1 overflow-y-auto">
+    <header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+      <NuxtLink to="/settings" class="btn btn-ghost size-7 px-0" aria-label="Back to settings">
+        <ArrowLeft class="size-4" />
+      </NuxtLink>
+      <h1 class="text-sm font-semibold">Audit log</h1>
+      <span v-if="!error" class="tabular ml-auto text-xs text-muted-foreground">
+        {{ entries.length }} most recent
+      </span>
     </header>
 
-    <p v-if="error" class="error" role="alert">
-      {{ error }}
-      <span v-if="requiredPermission">
-        You would need the <code>{{ requiredPermission }}</code> permission.
-      </span>
-    </p>
+    <div class="max-w-4xl px-4 py-6">
+      <div
+        v-if="error"
+        class="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/8 p-4"
+        role="alert"
+      >
+        <ShieldAlert class="mt-0.5 size-4 shrink-0 text-destructive" />
+        <div class="text-sm">
+          <p class="font-medium text-destructive">{{ error }}</p>
+          <p v-if="requiredPermission" class="mt-1 text-muted-foreground">
+            This needs the
+            <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+              {{ requiredPermission }}
+            </code>
+            permission.
+          </p>
+        </div>
+      </div>
 
-    <table v-else class="entries">
-      <caption class="lead">
-        Every security- and administration-relevant action, most recent first. Reading this log is
-        itself recorded.
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col">When</th>
-          <th scope="col">Who</th>
-          <th scope="col">Action</th>
-          <th scope="col">Target</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="entry in entries" :key="entry.id">
-          <td>{{ when(entry.occurredAt) }}</td>
-          <td>{{ entry.actor }}</td>
-          <td>
-            <code>{{ entry.action }}</code>
-          </td>
-          <td class="target">
-            <span v-if="entry.targetKind">{{ entry.targetKind }}</span>
-            <span v-else class="none">—</span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+      <template v-else>
+        <p class="text-sm text-muted-foreground">
+          Every security- and administration-relevant action, most recent first. Reading this log is
+          itself recorded.
+        </p>
+
+        <!-- Scrolls inside its own container so the page never scrolls
+             sideways on a narrow screen. -->
+        <div class="mt-4 overflow-x-auto rounded-lg border bg-surface">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b text-left">
+                <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
+                  When
+                </th>
+                <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">Who</th>
+                <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
+                  Action
+                </th>
+                <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
+                  Target
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="entry in entries"
+                :key="entry.id"
+                class="border-b transition last:border-0 hover:bg-surface-sunken"
+              >
+                <td class="px-3 py-2 whitespace-nowrap">
+                  <time class="text-muted-foreground">{{ when(entry.occurredAt) }}</time>
+                </td>
+                <td class="px-3 py-2">{{ entry.actor }}</td>
+                <td class="px-3 py-2">
+                  <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                    {{ entry.action }}
+                  </code>
+                </td>
+                <td class="px-3 py-2 text-muted-foreground">
+                  {{ entry.targetKind ?? "—" }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p
+            v-if="entries.length === 0"
+            class="px-3 py-8 text-center text-sm text-muted-foreground"
+          >
+            Nothing recorded yet.
+          </p>
+        </div>
+      </template>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.page {
-  max-width: 60rem;
-  margin: 0 auto;
-  padding: 1rem;
-}
-
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--border);
-}
-
-h1 {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.link-button {
-  padding: 0.5rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.entries {
-  width: 100%;
-  margin-top: 1.5rem;
-  border-collapse: collapse;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.lead {
-  padding: 0.75rem;
-  color: var(--text-muted);
-  font-size: 0.9375rem;
-  text-align: left;
-  caption-side: top;
-}
-
-th,
-td {
-  padding: 0.6rem 0.75rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.9375rem;
-}
-
-th {
-  background: var(--surface-sunken);
-  font-size: 0.8125rem;
-}
-
-tbody tr:last-child td {
-  border-bottom: none;
-}
-
-code {
-  font-size: 0.8125rem;
-}
-
-.none {
-  color: var(--text-muted);
-}
-</style>

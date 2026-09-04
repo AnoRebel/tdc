@@ -1,29 +1,39 @@
 <script setup lang="ts">
 import type { LiveEventPayload, Message, Presence, Room, TypingPerson } from "@tdc/types";
 import { isApiError } from "@tdc/types";
-import { Bubble } from "~/components/ui/bubble";
+import {
+  Check,
+  Hash,
+  Lock,
+  MessageSquareText,
+  Pencil,
+  SendHorizontal,
+  Trash2,
+} from "lucide-vue-next";
+import { Avatar } from "~/components/ui/avatar";
 import { Kbd } from "~/components/ui/kbd";
-import { Message as MessageRow, MessageGroup } from "~/components/ui/message";
-import { Separator } from "~/components/ui/separator";
-import { Spinner } from "~/components/ui/spinner";
+import { Skeleton } from "~/components/ui/skeleton";
 
-definePageMeta({ middleware: "auth" });
+definePageMeta({ middleware: "auth", layout: "app" });
 
 const route = useRoute();
 const roomId = computed(() => String(route.params.id));
 
 const { user } = useAuth();
 const roomsApi = useRooms();
+const refreshRooms = inject<() => Promise<void>>("refreshRooms", async () => {});
 
 const room = ref<Room | null>(null);
 const messages = ref<Message[]>([]);
 const draft = ref("");
 const error = ref<string | null>(null);
+const loading = ref(true);
 const sending = ref(false);
 const editing = ref<string | null>(null);
 const editDraft = ref("");
 
 const timelineElement = ref<HTMLElement | null>(null);
+const composer = ref<HTMLTextAreaElement | null>(null);
 
 const openThreadId = ref<string | null>(null);
 const threadCounts = ref<Record<string, number>>({});
@@ -78,25 +88,63 @@ const visible = computed(() => {
     }));
 });
 
-/** Groups consecutive messages from one sender, so a run reads as one turn. */
+/**
+ * Groups consecutive messages from one sender, so a run reads as one turn.
+ *
+ * A gap of more than five minutes starts a new group even from the same
+ * person: two messages an hour apart are two thoughts, not one.
+ */
 const grouped = computed(() => {
-  const groups: { sender: string; mine: boolean; items: (typeof visible.value)[number][] }[] = [];
+  const groups: {
+    sender: string;
+    mine: boolean;
+    at: string;
+    items: (typeof visible.value)[number][];
+  }[] = [];
 
   for (const message of visible.value) {
     const previous = groups.at(-1);
-    if (previous && previous.sender === message.sender) {
+    const sameSender = previous?.sender === message.sender;
+    const soonAfter =
+      previous &&
+      new Date(message.sentAt).getTime() - new Date(previous.items.at(-1)!.sentAt).getTime() <
+        5 * 60 * 1000;
+
+    if (previous && sameSender && soonAfter) {
       previous.items.push(message);
       continue;
     }
+
     groups.push({
       sender: message.sender,
       mine: message.sender === user.value?.address,
+      at: message.sentAt,
       items: [message],
     });
   }
 
   return groups;
 });
+
+/** Date headings between groups, so a long history stays navigable. */
+function dayBreakBefore(index: number): string | null {
+  const group = grouped.value[index];
+  if (!group) return null;
+
+  const day = new Date(group.at).toDateString();
+  const previousDay = index > 0 ? new Date(grouped.value[index - 1]!.at).toDateString() : null;
+  if (day === previousDay) return null;
+
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86_400_000).toDateString();
+  if (day === today) return "Today";
+  if (day === yesterday) return "Yesterday";
+  return new Date(group.at).toLocaleDateString([], {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
 
 const live = useLiveConnection({
   onEvent(eventRoomId, sequence, payload: LiveEventPayload) {
@@ -137,6 +185,7 @@ const live = useLiveConnection({
 });
 
 async function load() {
+  loading.value = true;
   try {
     room.value = await roomsApi.get(roomId.value);
     messages.value = await roomsApi.timeline(roomId.value);
@@ -150,6 +199,8 @@ async function load() {
     void refreshThreadCounts();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not open this room.";
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -202,6 +253,14 @@ const announceTyping = useThrottleFn(() => {
   }
 }, 4000);
 
+/** Grows the composer with the message, up to a limit, then scrolls. */
+function fitComposer() {
+  const element = composer.value;
+  if (!element) return;
+  element.style.height = "auto";
+  element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
+}
+
 async function send() {
   const body = draft.value.trim();
   if (!body || sending.value) return;
@@ -214,6 +273,8 @@ async function send() {
   const clientToken = crypto.randomUUID();
   const previous = draft.value;
   draft.value = "";
+  await nextTick();
+  fitComposer();
 
   try {
     const sent = await roomsApi.send(roomId.value, body, clientToken);
@@ -225,6 +286,8 @@ async function send() {
   } catch (cause) {
     // The text is restored, so a failure does not lose what was typed.
     draft.value = previous;
+    await nextTick();
+    fitComposer();
     error.value = isApiError(cause) ? cause.message : "Could not send that message.";
   } finally {
     sending.value = false;
@@ -261,6 +324,7 @@ async function remove(messageId: string) {
 async function join() {
   try {
     room.value = await roomsApi.join(roomId.value);
+    await refreshRooms();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not join this room.";
   }
@@ -300,157 +364,240 @@ watch(roomId, load, { immediate: true });
 </script>
 
 <template>
-  <div class="flex h-screen">
-    <div class="flex min-w-0 flex-1 flex-col">
-      <header class="flex items-center justify-between gap-4 border-b px-4 py-3">
-        <div>
-          <h1 class="text-base font-semibold">{{ room?.name ?? "Loading…" }}</h1>
-          <p v-if="room?.topic" class="text-xs text-muted-foreground">{{ room.topic }}</p>
-          <p v-else-if="room" class="text-xs text-muted-foreground">{{ room.address }}</p>
+  <div class="flex min-h-0 flex-1">
+    <section class="flex min-w-0 flex-1 flex-col">
+      <header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+        <component
+          :is="room?.visibility === 'private' ? Lock : Hash"
+          class="size-4 shrink-0 text-muted-foreground"
+        />
+
+        <div class="min-w-0">
+          <h1 class="truncate text-sm leading-tight font-semibold">
+            {{ room?.name ?? "Loading" }}
+          </h1>
+          <p v-if="room?.topic" class="truncate text-xs leading-tight text-muted-foreground">
+            {{ room.topic }}
+          </p>
         </div>
 
-        <div class="flex items-center gap-3 text-xs">
+        <div class="ml-auto flex shrink-0 items-center gap-3 text-xs">
           <span
-            :class="[
-              'flex items-center gap-1.5',
-              live.state.value === 'connected' ? 'text-muted-foreground' : 'text-destructive',
-            ]"
+            v-if="onlineCount > 0"
+            class="flex items-center gap-1.5 text-muted-foreground"
+            :title="`${onlineCount} online`"
           >
-            <Spinner v-if="live.state.value === 'reconnecting'" class="size-3" />
-            <span
-              v-else
-              :class="[
-                'size-2 rounded-full',
-                live.state.value === 'connected' ? 'bg-green-500' : 'bg-destructive',
-              ]"
-            />
-            {{ live.state.value }}
+            <span class="size-1.5 rounded-full bg-success" />
+            <span class="tabular">{{ onlineCount }}</span>
           </span>
-          <span v-if="onlineCount > 0" class="flex items-center gap-1.5 text-muted-foreground">
-            <span class="size-2 rounded-full bg-green-500" />
-            {{ onlineCount }} here
+
+          <!-- Only worth a person's attention when it is not working. -->
+          <span
+            v-if="live.state.value !== 'connected'"
+            class="flex items-center gap-1.5 text-warning"
+          >
+            <span class="size-1.5 animate-pulse rounded-full bg-warning" />
+            {{ live.state.value === "reconnecting" ? "Reconnecting" : "Offline" }}
           </span>
-          <NuxtLink to="/" class="rounded-md border px-2.5 py-1 hover:bg-accent">Rooms</NuxtLink>
         </div>
       </header>
 
       <p
         v-if="error"
-        class="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive"
+        class="shrink-0 border-b bg-destructive/10 px-4 py-2 text-sm text-destructive"
         role="alert"
       >
         {{ error }}
       </p>
 
-      <div ref="timelineElement" class="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        <Separator v-if="grouped.length === 0" label="No messages yet" />
+      <div ref="timelineElement" class="flex-1 overflow-y-auto px-4 py-4">
+        <!-- Shaped like the messages it stands in for, so the layout does not
+             jump when the real thing arrives. -->
+        <div v-if="loading" class="space-y-5">
+          <div v-for="n in 4" :key="n" class="flex gap-2.5">
+            <Skeleton class="size-8 shrink-0 rounded-[0.5rem]" />
+            <div class="min-w-0 flex-1 space-y-1.5">
+              <Skeleton class="h-3 w-24" />
+              <Skeleton class="h-4" :style="{ width: `${45 + ((n * 17) % 45)}%` }" />
+            </div>
+          </div>
+        </div>
 
-        <MessageGroup v-for="(group, index) in grouped" :key="index" :mine="group.mine">
-          <p class="px-1 text-xs font-medium text-muted-foreground">
-            {{ group.mine ? "You" : shortName(group.sender) }}
-          </p>
+        <div v-else-if="grouped.length === 0" class="grid h-full place-items-center text-center">
+          <div>
+            <span class="mx-auto grid size-10 place-items-center rounded-xl bg-muted">
+              <Hash class="size-4 text-muted-foreground" />
+            </span>
+            <p class="mt-3 text-sm font-medium">This is the start of {{ room?.name }}</p>
+            <p class="mt-0.5 text-xs text-muted-foreground">
+              {{ room?.member ? "Send the first message." : "Join to take part." }}
+            </p>
+          </div>
+        </div>
 
-          <MessageRow v-for="message in group.items" :key="message.id" :mine="group.mine">
-            <div class="group flex items-end gap-1.5">
-              <div
-                v-if="group.mine && !message.removed"
-                class="flex gap-1 opacity-0 transition group-hover:opacity-100"
-              >
-                <button
-                  type="button"
-                  class="rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent"
-                  @click="startEditing(message)"
+        <div v-else class="space-y-0.5">
+          <template v-for="(group, index) in grouped" :key="index">
+            <!-- A dated rule, rather than a bare separator, so scrolling back
+                 through history stays oriented. -->
+            <div v-if="dayBreakBefore(index)" class="flex items-center gap-3 py-3">
+              <span class="h-px flex-1 bg-border" />
+              <span class="text-[0.6875rem] font-medium text-muted-foreground">
+                {{ dayBreakBefore(index) }}
+              </span>
+              <span class="h-px flex-1 bg-border" />
+            </div>
+
+            <article class="group/msg flex gap-2.5 rounded-lg px-2 py-1 hover:bg-surface-sunken/60">
+              <Avatar :name="group.sender" class="mt-0.5" />
+
+              <div class="min-w-0 flex-1">
+                <p class="mb-0.5 flex items-baseline gap-2 leading-tight">
+                  <span class="text-sm font-semibold">
+                    {{ group.mine ? "You" : shortName(group.sender) }}
+                  </span>
+                  <time class="text-[0.6875rem] text-muted-foreground">
+                    {{ when(group.at) }}
+                  </time>
+                </p>
+
+                <div
+                  v-for="message in group.items"
+                  :key="message.id"
+                  class="group/row flex items-start gap-2"
                 >
-                  Edit
-                </button>
+                  <div class="min-w-0 flex-1">
+                    <form
+                      v-if="editing === message.id"
+                      class="py-1"
+                      @submit.prevent="saveEdit(message.id)"
+                    >
+                      <input
+                        v-model="editDraft"
+                        class="input h-8"
+                        @keydown.esc="editing = null"
+                        autofocus
+                      />
+                      <p class="mt-1 text-[0.6875rem] text-muted-foreground">
+                        <Kbd>Enter</Kbd> to save, <Kbd>Esc</Kbd> to cancel
+                      </p>
+                    </form>
+
+                    <p
+                      v-else
+                      class="max-w-[70ch] text-sm leading-relaxed break-words whitespace-pre-wrap"
+                      :class="message.removed && 'text-muted-foreground italic'"
+                    >
+                      {{ message.removed ? "This message was removed" : message.body }}
+                      <span
+                        v-if="message.edited && !message.removed"
+                        class="text-[0.6875rem] text-muted-foreground"
+                      >
+                        (edited)
+                      </span>
+                    </p>
+                  </div>
+
+                  <!-- Actions appear on the row being pointed at, so the
+                       timeline is not a wall of buttons. -->
+                  <div
+                    v-if="!message.removed && editing !== message.id"
+                    class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100"
+                  >
+                    <button
+                      v-if="room?.member"
+                      type="button"
+                      class="btn btn-ghost size-6 px-0"
+                      title="Reply in thread"
+                      @click="openThread(message.id)"
+                    >
+                      <MessageSquareText class="size-3.5" />
+                    </button>
+                    <button
+                      v-if="group.mine"
+                      type="button"
+                      class="btn btn-ghost size-6 px-0"
+                      title="Edit"
+                      @click="startEditing(message)"
+                    >
+                      <Pencil class="size-3.5" />
+                    </button>
+                    <button
+                      v-if="group.mine"
+                      type="button"
+                      class="btn btn-danger size-6 px-0"
+                      title="Delete"
+                      @click="remove(message.id)"
+                    >
+                      <Trash2 class="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+
                 <button
+                  v-for="message in group.items.filter((m) => threadCounts[m.id])"
+                  :key="`thread-${message.id}`"
                   type="button"
-                  class="rounded px-1.5 py-0.5 text-xs text-destructive hover:bg-accent"
-                  @click="remove(message.id)"
+                  class="mt-1 flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition hover:bg-accent"
+                  @click="openThread(message.id)"
                 >
-                  Delete
+                  <MessageSquareText class="size-3" />
+                  {{
+                    threadCounts[message.id] === 1
+                      ? "1 reply"
+                      : `${threadCounts[message.id]} replies`
+                  }}
                 </button>
               </div>
-
-              <Bubble
-                :variant="message.removed ? 'redacted' : group.mine ? 'mine' : 'default'"
-                :align="group.mine ? 'end' : 'start'"
-              >
-                <template v-if="editing === message.id">
-                  <input
-                    v-model="editDraft"
-                    class="w-full rounded border bg-background px-2 py-1 text-sm text-foreground"
-                    @keydown.enter.prevent="saveEdit(message.id)"
-                    @keydown.esc="editing = null"
-                  />
-                  <span class="mt-1 block text-[0.6875rem] opacity-70">
-                    <Kbd>Enter</Kbd> to save, <Kbd>Esc</Kbd> to cancel
-                  </span>
-                </template>
-
-                <template v-else>
-                  {{ message.removed ? "This message was removed" : message.body }}
-                  <span class="ml-2 align-baseline text-[0.6875rem] opacity-60">
-                    {{ when(message.sentAt) }}<template v-if="message.edited"> · edited</template>
-                  </span>
-                </template>
-              </Bubble>
-            </div>
-          </MessageRow>
-
-          <button
-            v-for="message in group.items.filter((m) => threadCounts[m.id] || !m.removed)"
-            v-show="threadCounts[message.id] || room?.member"
-            :key="`thread-${message.id}`"
-            type="button"
-            class="px-1 text-xs text-muted-foreground underline-offset-2 hover:underline"
-            @click="openThread(message.id)"
-          >
-            <template v-if="threadCounts[message.id]">
-              {{
-                threadCounts[message.id] === 1 ? "1 reply" : `${threadCounts[message.id]} replies`
-              }}
-            </template>
-            <template v-else>Reply in thread</template>
-          </button>
-        </MessageGroup>
+            </article>
+          </template>
+        </div>
       </div>
 
-      <p v-if="typingLabel" class="px-4 pb-1 text-xs text-muted-foreground" aria-live="polite">
-        {{ typingLabel }}…
-      </p>
+      <footer class="shrink-0 px-4 pt-1 pb-4">
+        <p class="h-4 text-xs text-muted-foreground" aria-live="polite">
+          {{ typingLabel ? `${typingLabel}…` : "" }}
+        </p>
 
-      <footer class="border-t px-4 py-3">
-        <form v-if="room?.member" class="flex gap-2" @submit.prevent="send">
-          <input
+        <form
+          v-if="room?.member"
+          class="flex items-end gap-2 rounded-xl border bg-surface p-1.5 shadow-xs transition focus-within:border-ring focus-within:shadow-sm"
+          @submit.prevent="send"
+        >
+          <textarea
+            ref="composer"
             v-model="draft"
-            @input="announceTyping"
+            rows="1"
             :disabled="room.archived"
             :placeholder="room.archived ? 'This room is archived' : `Message ${room.name}`"
-            class="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            autocomplete="off"
+            class="max-h-40 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+            @input="
+              announceTyping();
+              fitComposer();
+            "
+            @keydown.enter.exact.prevent="send"
           />
           <button
             type="submit"
+            class="btn btn-primary size-8 shrink-0 px-0"
             :disabled="sending || room.archived || !draft.trim()"
-            class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            title="Send"
           >
-            Send
+            <SendHorizontal class="size-4" />
           </button>
         </form>
 
-        <div v-else-if="room" class="flex items-center justify-between gap-4">
-          <p class="text-sm text-muted-foreground">Join this room to take part.</p>
-          <button
-            type="button"
-            class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            @click="join"
-          >
+        <div
+          v-else-if="room"
+          class="flex items-center justify-between gap-4 rounded-xl border bg-surface px-3 py-2.5"
+        >
+          <p class="text-sm text-muted-foreground">Join this channel to take part.</p>
+          <button type="button" class="btn btn-primary" @click="join">
+            <Check class="size-3.5" />
             Join
           </button>
         </div>
       </footer>
-    </div>
+    </section>
 
     <ThreadPanel
       v-if="openThreadId && user"

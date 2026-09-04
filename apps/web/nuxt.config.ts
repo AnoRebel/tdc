@@ -21,6 +21,18 @@ export default defineNuxtConfig({
 
   css: ["~/assets/css/main.css"],
 
+  components: [
+    {
+      path: "~/components",
+      // The vendored shadcn directories each carry an index.ts barrel, which
+      // the scanner would otherwise register as a second component under the
+      // same name as the .vue file beside it. Components are imported from
+      // those barrels explicitly, so only .vue files need auto-registering.
+      extensions: [".vue"],
+      pathPrefix: true,
+    },
+  ],
+
   runtimeConfig: {
     public: {
       // Empty means "same origin", which is how the production build is

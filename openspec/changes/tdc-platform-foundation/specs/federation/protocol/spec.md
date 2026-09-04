@@ -172,6 +172,47 @@ Blocking a server MUST stop both incoming and outgoing exchange with it, and MUS
 - **WHEN** an operator changes federation trust settings
 - **THEN** the change is recorded in the audit log
 
+### Requirement: Connected servers are visible and have a visibility of their own
+
+A person SHALL be able to see the servers their own server is connected to, and to browse the rooms each connected server publishes, without leaving the application.
+
+Each connected server SHALL carry a visibility that its own operator sets, in the same way a room does:
+
+- **public** — any connected server may discover it and browse its published rooms;
+- **limited** — only servers the operator has listed may discover it, and it is not returned to others;
+- **private** — it is not discoverable at all, and is reachable only by a server that already holds an explicit connection to it.
+
+A server's visibility MUST be enforced by the server itself, not by the client presenting it: a server MUST NOT return a peer, or a peer's rooms, to a requester the peer's visibility excludes.
+
+A room's own visibility MUST still apply after its server has been discovered, so that a private room on a public server remains undiscoverable.
+
+#### Scenario: Public server is browsable
+
+- **WHEN** a person browses connected servers
+- **THEN** servers whose visibility is public are listed
+- **AND** the rooms those servers publish can be browsed
+
+#### Scenario: Limited server is hidden from servers not listed
+
+- **WHEN** a server whose visibility is limited is asked for its rooms by a server it has not listed
+- **THEN** it is not returned, and no rooms are disclosed
+
+#### Scenario: Private server is not discoverable
+
+- **WHEN** a person browses connected servers
+- **THEN** servers whose visibility is private are not listed to anyone who does not already hold a connection to them
+
+#### Scenario: Room visibility survives server discovery
+
+- **WHEN** a person browses a public connected server
+- **THEN** only rooms that server publishes are listed
+- **AND** its private rooms remain undiscoverable
+
+#### Scenario: Visibility change is auditable
+
+- **WHEN** an operator changes their server's visibility
+- **THEN** the change is recorded in the audit log
+
 ### Requirement: Local policy is preserved
 
 A server SHALL apply its own moderation and content policy to federated content shown to its users, and MUST be able to remove content locally without the cooperation of the originating server.

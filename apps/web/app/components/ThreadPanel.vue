@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { Message, Thread } from "@tdc/types";
 import { isApiError } from "@tdc/types";
-import { Bubble } from "~/components/ui/bubble";
-import { Separator } from "~/components/ui/separator";
+import { SendHorizontal, X } from "lucide-vue-next";
+import { Avatar } from "~/components/ui/avatar";
+import { Skeleton } from "~/components/ui/skeleton";
 
 /**
  * A thread, opened beside the channel.
@@ -72,64 +73,106 @@ function when(value: string): string {
 </script>
 
 <template>
-  <aside class="flex w-full max-w-md flex-col border-l">
-    <header class="flex items-center justify-between border-b px-4 py-3">
+  <aside class="flex w-80 shrink-0 flex-col border-l bg-surface-sunken">
+    <header class="flex h-12 shrink-0 items-center gap-2 border-b px-3">
       <h2 class="text-sm font-semibold">Thread</h2>
+      <span v-if="thread" class="text-xs text-muted-foreground">
+        {{ thread.replies.length === 1 ? "1 reply" : `${thread.replies.length} replies` }}
+      </span>
       <button
         type="button"
-        class="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+        class="btn btn-ghost ml-auto size-7 px-0"
+        aria-label="Close thread"
         @click="emit('close')"
       >
-        Close
+        <X class="size-4" />
       </button>
     </header>
 
-    <p v-if="error" class="bg-destructive/10 px-4 py-2 text-sm text-destructive" role="alert">
+    <p
+      v-if="error"
+      class="shrink-0 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+      role="alert"
+    >
       {{ error }}
     </p>
 
-    <div v-if="thread" class="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-      <div class="space-y-1">
-        <p class="text-xs font-medium text-muted-foreground">
-          {{ thread.root.sender === selfAddress ? "You" : shortName(thread.root.sender) }}
-        </p>
-        <Bubble :variant="thread.root.redacted ? 'redacted' : 'default'">
-          {{ bodyOf(thread.root) }}
-          <span class="ml-2 text-[0.6875rem] opacity-60">{{ when(thread.root.sentAt) }}</span>
-        </Bubble>
-      </div>
+    <div class="flex-1 space-y-4 overflow-y-auto px-3 py-3">
+      <template v-if="thread">
+        <!-- The message the thread hangs off, set apart so it reads as the
+             subject rather than the first reply. -->
+        <article class="rounded-lg border bg-surface p-3">
+          <div class="flex gap-2.5">
+            <Avatar :name="thread.root.sender" size="sm" class="mt-0.5" />
+            <div class="min-w-0 flex-1">
+              <p class="flex items-baseline gap-2">
+                <span class="text-xs font-semibold">
+                  {{ thread.root.sender === selfAddress ? "You" : shortName(thread.root.sender) }}
+                </span>
+                <time class="text-[0.6875rem] text-muted-foreground">
+                  {{ when(thread.root.sentAt) }}
+                </time>
+              </p>
+              <p
+                class="text-sm leading-relaxed break-words whitespace-pre-wrap"
+                :class="thread.root.redacted && 'text-muted-foreground italic'"
+              >
+                {{ bodyOf(thread.root) }}
+              </p>
+            </div>
+          </div>
+        </article>
 
-      <Separator
-        :label="thread.replies.length === 1 ? '1 reply' : `${thread.replies.length} replies`"
-      />
-
-      <div v-for="reply in thread.replies" :key="reply.id" class="space-y-1">
-        <p class="text-xs font-medium text-muted-foreground">
-          {{ reply.sender === selfAddress ? "You" : shortName(reply.sender) }}
-        </p>
-        <Bubble
-          :variant="reply.redacted ? 'redacted' : reply.sender === selfAddress ? 'mine' : 'default'"
+        <p
+          v-if="thread.replies.length === 0"
+          class="py-6 text-center text-xs text-muted-foreground"
         >
-          {{ bodyOf(reply) }}
-          <span class="ml-2 text-[0.6875rem] opacity-60">{{ when(reply.sentAt) }}</span>
-        </Bubble>
+          No replies yet. Start the discussion.
+        </p>
+
+        <article v-for="reply in thread.replies" :key="reply.id" class="flex gap-2.5 px-1">
+          <Avatar :name="reply.sender" size="sm" class="mt-0.5" />
+          <div class="min-w-0 flex-1">
+            <p class="mb-0.5 flex items-baseline gap-2 leading-tight">
+              <span class="text-xs font-semibold">
+                {{ reply.sender === selfAddress ? "You" : shortName(reply.sender) }}
+              </span>
+              <time class="text-[0.6875rem] text-muted-foreground">{{ when(reply.sentAt) }}</time>
+            </p>
+            <p
+              class="text-sm leading-relaxed break-words whitespace-pre-wrap"
+              :class="reply.redacted && 'text-muted-foreground italic'"
+            >
+              {{ bodyOf(reply) }}
+            </p>
+          </div>
+        </article>
+      </template>
+
+      <div v-else class="space-y-4">
+        <Skeleton class="h-16 rounded-lg" />
+        <Skeleton class="h-10 w-3/4" />
       </div>
     </div>
 
-    <footer class="border-t px-4 py-3">
-      <form class="flex gap-2" @submit.prevent="send">
+    <footer class="shrink-0 px-3 pt-1 pb-4">
+      <form
+        class="flex items-end gap-2 rounded-xl border bg-surface p-1.5 shadow-xs transition focus-within:border-ring"
+        @submit.prevent="send"
+      >
         <input
           v-model="draft"
-          placeholder="Reply in thread"
-          class="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          placeholder="Reply"
+          class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
           autocomplete="off"
         />
         <button
           type="submit"
+          class="btn btn-primary size-8 shrink-0 px-0"
           :disabled="sending || !draft.trim()"
-          class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          title="Reply"
         >
-          Reply
+          <SendHorizontal class="size-4" />
         </button>
       </form>
     </footer>

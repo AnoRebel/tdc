@@ -1,0 +1,80 @@
+import js from "@eslint/js";
+import vue from "eslint-plugin-vue";
+import globals from "globals";
+import typescript from "typescript-eslint";
+import vueParser from "vue-eslint-parser";
+
+/**
+ * The shared rule set.
+ *
+ * Formatting is prettier's job, so nothing here reports on whitespace, quotes
+ * or semicolons — a rule that disagrees with the formatter only produces
+ * conflicts. What is left is the part a formatter cannot see: unused code,
+ * unsafe patterns, and Vue's own correctness rules.
+ */
+export default typescript.config(
+  {
+    ignores: [
+      "**/.nuxt/**",
+      "**/.output/**",
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/bin/**",
+      "server/**",
+      "apps/desktop/build/**",
+    ],
+  },
+
+  js.configs.recommended,
+  ...typescript.configs.recommended,
+  ...vue.configs["flat/recommended"],
+
+  {
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      // An unused argument prefixed with _ is a deliberate signature match,
+      // not an oversight.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      // `any` defeats the point of the strict compiler settings, but a warning
+      // rather than an error so it does not block a work in progress.
+      "@typescript-eslint/no-explicit-any": "warn",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+      // TypeScript resolves identifiers itself, and reports the ones that do
+      // not exist far more accurately than this rule can. Leaving it on would
+      // mean an error on every Nuxt auto-import — ref, computed, useRoute —
+      // which are real bindings the compiler already knows about.
+      "no-undef": "off",
+    },
+  },
+
+  {
+    files: ["**/*.vue"],
+    languageOptions: {
+      parser: vueParser,
+      parserOptions: { parser: typescript.parser, sourceType: "module" },
+    },
+    rules: {
+      // Nuxt auto-imports components and resolves single-word names such as
+      // `Avatar` from the components directory, so this rule fires on correct
+      // code.
+      "vue/multi-word-component-names": "off",
+      // Formatting again: prettier owns how attributes wrap.
+      "vue/max-attributes-per-line": "off",
+      "vue/singleline-html-element-content-newline": "off",
+      "vue/html-self-closing": "off",
+      "vue/html-indent": "off",
+      "vue/html-closing-bracket-newline": "off",
+      "vue/attributes-order": "off",
+      // An optional pass-through `class` has no sensible default — undefined
+      // is exactly what the class merger expects when nothing is given.
+      "vue/require-default-prop": "off",
+    },
+  },
+);

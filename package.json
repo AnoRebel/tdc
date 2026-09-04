@@ -54,10 +54,16 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "catalog:tooling",
     "@types/node": "^26.2.0",
+    "eslint": "catalog:tooling",
+    "eslint-plugin-vue": "catalog:tooling",
+    "globals": "catalog:tooling",
     "lefthook": "^2.1.10",
     "prettier": "catalog:tooling",
-    "typescript": "^7.0.2"
+    "typescript": "catalog:tooling",
+    "typescript-eslint": "catalog:tooling",
+    "vue-eslint-parser": "catalog:tooling"
   },
   "trustedDependencies": [
     "lefthook"
@@ -74,13 +80,13 @@
     "build:web": "bun run --filter=@tdc/web build",
     "build:server": "cd server && go build -o ../bin/tdc-server ./cmd/tdc-server",
     "build:desktop": "cd apps/desktop && wails3 task build",
-    "typecheck": "bun run --recursive typecheck",
-    "lint": "bun run --recursive lint",
-    "lint:fix": "bun run --recursive lint:fix",
+    "typecheck": "bun run --filter=@tdc/web --filter=@tdc/types typecheck",
+    "lint": "bun run --filter=@tdc/web --filter=@tdc/types lint",
+    "lint:fix": "bun run --filter=@tdc/web --filter=@tdc/types lint:fix",
     "lint:go": "cd server && golangci-lint run",
     "format": "prettier --write \"**/*.{ts,tsx,vue,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,vue,js,json,md}\"",
-    "test": "bun run --recursive test",
+    "test": "bun run --filter=@tdc/web --filter=@tdc/types test",
     "test:go": "cd server && go test -race ./...",
     "clean": "rm -rf node_modules apps/*/node_modules apps/*/*/node_modules packages/*/node_modules bin"
   }

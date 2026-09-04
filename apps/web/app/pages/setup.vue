@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
+import { LoaderCircle, ShieldCheck } from "lucide-vue-next";
+
+definePageMeta({ layout: "auth" });
 
 /**
  * First-run setup: creates the server's first administrator.
@@ -43,20 +46,31 @@ async function submit() {
 </script>
 
 <template>
-  <main class="centred">
-    <form class="card" @submit.prevent="submit">
-      <h1>Set up this server</h1>
-      <p class="lead">
-        This server has no accounts yet. The account you create now will administer it.
+  <div>
+    <span class="grid size-9 place-items-center rounded-lg bg-primary/12">
+      <ShieldCheck class="size-4 text-primary" />
+    </span>
+
+    <h1 class="mt-4 text-xl font-semibold">Set up this server</h1>
+    <p class="mt-1 text-sm text-muted-foreground">
+      This account becomes the server's administrator. It can only be created once.
+    </p>
+
+    <form class="mt-6 space-y-4" @submit.prevent="submit">
+      <p
+        v-if="error"
+        class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        role="alert"
+      >
+        {{ error }}
       </p>
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-
-      <div class="field">
-        <label for="username">Username</label>
+      <div>
+        <label for="username" class="mb-1.5 block text-sm font-medium">Username</label>
         <input
           id="username"
           v-model="username"
+          class="input"
           name="username"
           autocomplete="username"
           required
@@ -64,66 +78,37 @@ async function submit() {
         />
       </div>
 
-      <div class="field">
-        <label for="displayName">Display name <span class="optional">(optional)</span></label>
-        <input id="displayName" v-model="displayName" name="displayName" autocomplete="name" />
+      <div>
+        <label for="displayName" class="mb-1.5 block text-sm font-medium">
+          Display name
+          <span class="font-normal text-muted-foreground">(optional)</span>
+        </label>
+        <input
+          id="displayName"
+          v-model="displayName"
+          class="input"
+          name="displayName"
+          autocomplete="name"
+        />
       </div>
 
-      <div class="field">
-        <label for="password">Password</label>
+      <div>
+        <label for="password" class="mb-1.5 block text-sm font-medium">Password</label>
         <input
           id="password"
           v-model="password"
+          class="input"
           name="password"
           type="password"
           autocomplete="new-password"
           required
-          minlength="12"
         />
-        <span class="hint">At least 12 characters.</span>
       </div>
 
-      <button type="submit" :disabled="submitting">
-        {{ submitting ? "Setting up…" : "Create administrator" }}
+      <button type="submit" class="btn btn-primary h-9 w-full" :disabled="submitting">
+        <LoaderCircle v-if="submitting" class="size-4 animate-spin" />
+        {{ submitting ? "Creating administrator" : "Create administrator" }}
       </button>
     </form>
-  </main>
+  </div>
 </template>
-
-<style scoped>
-.centred {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 1rem;
-}
-
-.card {
-  width: 100%;
-  max-width: 26rem;
-  padding: 2rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-h1 {
-  margin: 0 0 0.5rem;
-  font-size: 1.5rem;
-}
-
-.lead {
-  margin: 0 0 1.5rem;
-  color: var(--text-muted);
-  font-size: 0.9375rem;
-}
-
-.optional {
-  font-weight: 400;
-  color: var(--text-muted);
-}
-
-button {
-  width: 100%;
-}
-</style>
