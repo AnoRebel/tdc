@@ -87,7 +87,29 @@ function previewStyle(attachment: Attachment) {
         </span>
       </button>
 
-      <!-- Video and audio: no preview image, but still openable in place. -->
+      <!-- Audio and video play where they sit, so listening to a voice note or
+           watching a screen recording does not take over the conversation.
+           Enlarging is offered for when the detail matters more. -->
+      <AudioPlayer
+        v-else-if="attachment.kind === 'audio'"
+        :src="mediaUrl(attachment.url)"
+        :title="attachment.filename"
+        expandable
+        @expand="open(attachment)"
+      />
+
+      <VideoPlayer
+        v-else-if="attachment.kind === 'video'"
+        :src="mediaUrl(attachment.url)"
+        :title="attachment.filename"
+        :width="attachment.width"
+        :height="attachment.height"
+        expandable
+        @expand="open(attachment)"
+      />
+
+      <!-- A document or text file: opened in the viewer, where there is room
+           to read it. -->
       <button
         v-else-if="attachment.renderable"
         type="button"

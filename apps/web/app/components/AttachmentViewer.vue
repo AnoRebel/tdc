@@ -145,6 +145,7 @@ onBeforeUnmount(() => {
           crossorigin="use-credentials"
           controls
           autoplay
+          playsinline
           class="max-h-full max-w-full rounded-lg"
           @click.stop
         />

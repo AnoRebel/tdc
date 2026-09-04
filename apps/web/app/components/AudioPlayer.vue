@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Pause, Play, Volume2, VolumeX } from "lucide-vue-next";
+import { Maximize2, Pause, Play, Volume2, VolumeX } from "lucide-vue-next";
 
 /**
  * An audio player, rather than the browser's default controls.
@@ -16,7 +16,15 @@ const props = defineProps<{
   src: string;
   /** Shown above the controls, so a person knows what they are playing. */
   title?: string;
+  /**
+   * Offers a control to open the file in the larger viewer. Set where the
+   * player sits in the conversation; omitted inside the viewer itself, where
+   * there is nowhere further to go.
+   */
+  expandable?: boolean;
 }>();
+
+const emit = defineEmits<{ expand: [] }>();
 
 const audio = ref<HTMLAudioElement | null>(null);
 
@@ -26,6 +34,22 @@ const currentTime = ref(0);
 const duration = ref(0);
 /** True while a stream is still being fetched, so the seek bar says so. */
 const buffering = ref(false);
+
+/**
+ * Playback speed.
+ *
+ * A recorded meeting is often listened to at speed, and a voice note in a
+ * language you are still learning at less than speed. The presets are the ones
+ * every podcast player settled on, so they need no explanation.
+ */
+const speeds = [0.5, 1, 1.5, 2] as const;
+const speed = ref<number>(1);
+
+function cycleSpeed() {
+  const next = speeds[(speeds.indexOf(speed.value as (typeof speeds)[number]) + 1) % speeds.length];
+  speed.value = next ?? 1;
+  if (audio.value) audio.value.playbackRate = speed.value;
+}
 
 const progress = computed(() =>
   duration.value > 0 ? (currentTime.value / duration.value) * 100 : 0,
@@ -109,7 +133,10 @@ function clock(seconds: number): string {
       @pause="playing = false"
       @ended="playing = false"
       @timeupdate="currentTime = audio?.currentTime ?? 0"
-      @loadedmetadata="duration = audio?.duration ?? 0"
+      @loadedmetadata="
+        duration = audio?.duration ?? 0;
+        if (audio) audio.playbackRate = speed;
+      "
       @waiting="buffering = true"
       @playing="buffering = false"
       @canplay="buffering = false"
@@ -165,6 +192,19 @@ function clock(seconds: number): string {
         {{ clock(duration) }}
       </span>
 
+      <!-- Speed cycles rather than opening a menu: four values, one of which
+           is almost always wanted, is faster to reach by tapping through than
+           by opening something. -->
+      <button
+        type="button"
+        class="btn btn-ghost tabular h-8 shrink-0 px-1.5 text-xs font-medium"
+        :aria-label="`Playback speed, currently ${speed} times`"
+        :title="`Speed: ${speed}×`"
+        @click="cycleSpeed"
+      >
+        {{ speed }}×
+      </button>
+
       <button
         type="button"
         class="btn btn-ghost size-8 shrink-0 px-0"
@@ -173,6 +213,17 @@ function clock(seconds: number): string {
       >
         <VolumeX v-if="muted" class="size-4" />
         <Volume2 v-else class="size-4" />
+      </button>
+
+      <button
+        v-if="props.expandable"
+        type="button"
+        class="btn btn-ghost size-8 shrink-0 px-0"
+        aria-label="Open in the viewer"
+        title="Open in the viewer"
+        @click="emit('expand')"
+      >
+        <Maximize2 class="size-3.5" />
       </button>
     </div>
   </div>

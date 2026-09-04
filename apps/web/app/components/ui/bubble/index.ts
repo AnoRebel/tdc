@@ -16,7 +16,11 @@ export { default as Bubble } from "./Bubble.vue";
  */
 export const bubbleVariants = cva(
   [
-    "relative w-fit max-w-[min(42rem,72%)] px-3 py-1.5 text-sm leading-relaxed",
+    // The cap is on viewport width, not a percentage. A percentage max-width
+    // resolves against the parent, and the parent here sizes to its content —
+    // so the two chase each other down and every bubble collapses to its
+    // longest word. Verified by measuring: a 72% cap resolved to 49px.
+    "relative w-fit max-w-[min(42rem,68vw)] px-3 py-1.5 text-sm leading-relaxed",
     "break-words whitespace-pre-wrap transition-shadow duration-200",
   ],
   {

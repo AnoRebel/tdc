@@ -553,7 +553,7 @@ watch(roomId, load, { immediate: true });
                 </div>
 
                 <div
-                  class="flex min-w-0 flex-1 flex-col gap-1"
+                  class="flex w-fit max-w-full flex-col gap-1"
                   :class="group.mine ? 'items-end' : 'items-start'"
                 >
                   <Bubble

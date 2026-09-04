@@ -24,8 +24,13 @@ const props = defineProps<Props>();
     data-slot="message"
     :class="
       cn(
-        'group/row flex w-full items-end gap-1.5',
-        props.mine ? 'justify-end' : 'justify-start',
+        // w-fit rather than w-full: a row stretched across the page puts the
+        // hover controls at the far edge, yards from the message they act on.
+        // Sizing to content keeps them beside the bubble — but max-w-full is
+        // needed with it, or a long message would overflow the timeline
+        // instead of wrapping.
+        'group/row flex w-fit max-w-full items-end gap-1.5',
+        props.mine ? 'self-end' : 'self-start',
         props.class,
       )
     "
