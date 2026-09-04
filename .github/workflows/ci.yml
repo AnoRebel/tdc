@@ -1,0 +1,226 @@
+# Continuous integration.
+#
+# Tiered by branch, deliberately. `dev` is where work lands first and where
+# people iterate, so it runs the fast checks and gets out of the way. `beta` and
+# `main` are what other people run, so they get everything — a slow gate is
+# worth it on the branches where a mistake reaches someone else.
+name: CI
+
+on:
+  push:
+    branches: [dev, beta, main]
+  pull_request:
+    branches: [dev, beta, main]
+
+# A new push supersedes whatever was running for the same branch. Reviewing the
+# results of a commit that has already been replaced wastes both minutes and
+# attention.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned, because a Go release can change vet's rules and turn a green branch
+  # red for reasons that have nothing to do with the change under review.
+  GO_VERSION: "1.27.0"
+
+jobs:
+  # Decides which tier this run is. Expressed once here rather than repeated as
+  # a condition on every job, so the rule stays legible.
+  tier:
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.decide.outputs.full }}
+    steps:
+      - id: decide
+        run: |
+          case "${{ github.base_ref || github.ref_name }}" in
+            beta|main) echo "full=true"  >> "$GITHUB_OUTPUT" ;;
+            *)         echo "full=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  web:
+    name: Web and shared packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Deliberately unpinned: Bun releases often and stays compatible, and
+          # taking the latest means an incompatibility surfaces in a build here
+          # rather than months later on a contributor's machine.
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+  server:
+    name: Server
+    runs-on: ubuntu-latest
+
+    services:
+      # The Debian image rather than Alpine, matching production: musl's
+      # collation differs from glibc's, and a test that passes here and fails
+      # there is worse than no test.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tdc
+          POSTGRES_PASSWORD: tdc
+          POSTGRES_DB: tdc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tdc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - name: Formatting
+        working-directory: server
+        run: |
+          # gofmt reports rather than exits non-zero, so the check has to be
+          # explicit or a badly formatted file passes silently.
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        working-directory: server
+        run: go vet ./...
+
+      - name: Test
+        working-directory: server
+        run: go test -race ./...
+
+      - name: Build
+        working-directory: server
+        run: go build ./...
+
+  # The heavier checks, on the branches other people actually run.
+  licences:
+    name: Licence audit
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - name: Check Go dependency licences
+        working-directory: server
+        run: |
+          # AGPL in the default path would make this impossible to self-host
+          # freely, which is the whole premise. An operator may still choose an
+          # AGPL service to run alongside; that is different from linking one.
+          go install github.com/google/go-licenses@latest
+          go-licenses check ./... --disallowed_types=forbidden,restricted
+
+  vulnerabilities:
+    name: Vulnerability scan
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - name: govulncheck
+        working-directory: server
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  migrations:
+    name: Migrations apply cleanly
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tdc
+          POSTGRES_PASSWORD: tdc
+          POSTGRES_DB: tdc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tdc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - name: Apply every migration from empty
+        working-directory: server
+        env:
+          TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+        run: |
+          # A migration that only works against the schema its author happened
+          # to have is the classic way an upgrade breaks for everyone else. The
+          # test applies the whole sequence to an empty database, then applies
+          # it again to check the runner is idempotent.
+          go test ./internal/db/ -run TestMigrationsApplyFromEmpty -v
+
+  # One required check for branch protection, rather than a list that has to be
+  # updated whenever a job is added or renamed.
+  ci-success:
+    name: CI
+    if: always()
+    needs: [web, server, licences, vulnerabilities, migrations]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify every job succeeded or was skipped
+        run: |
+          # "skipped" is fine — that is the fast tier deliberately not running
+          # the heavy jobs. "failure" and "cancelled" are not.
+          results='${{ join(needs.*.result, " ") }}'
+          echo "Job results: $results"
+
+          for result in $results; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "A required job reported: $result"; exit 1 ;;
+            esac
+          done
