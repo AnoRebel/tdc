@@ -3,7 +3,10 @@ import type { Message, Thread } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { SendHorizontal, X } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
+import { Bubble } from "~/components/ui/bubble";
+import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
+import { Spinner } from "~/components/ui/spinner";
 
 /**
  * A thread, opened beside the channel.
@@ -113,20 +116,19 @@ function when(value: string): string {
                   {{ when(thread.root.sentAt) }}
                 </time>
               </p>
-              <p
-                class="text-sm leading-relaxed break-words whitespace-pre-wrap"
-                :class="thread.root.redacted && 'text-muted-foreground italic'"
-              >
+              <Bubble :variant="thread.root.redacted ? 'redacted' : 'default'" class="max-w-full">
                 {{ bodyOf(thread.root) }}
-              </p>
+              </Bubble>
             </div>
           </div>
         </article>
 
-        <p
-          v-if="thread.replies.length === 0"
-          class="py-6 text-center text-xs text-muted-foreground"
-        >
+        <Separator
+          v-if="thread.replies.length"
+          :label="thread.replies.length === 1 ? '1 reply' : `${thread.replies.length} replies`"
+        />
+
+        <p v-else class="py-6 text-center text-xs text-muted-foreground">
           No replies yet. Start the discussion.
         </p>
 
@@ -139,12 +141,14 @@ function when(value: string): string {
               </span>
               <time class="text-[0.6875rem] text-muted-foreground">{{ when(reply.sentAt) }}</time>
             </p>
-            <p
-              class="text-sm leading-relaxed break-words whitespace-pre-wrap"
-              :class="reply.redacted && 'text-muted-foreground italic'"
+            <Bubble
+              :variant="
+                reply.redacted ? 'redacted' : reply.sender === selfAddress ? 'mine' : 'default'
+              "
+              class="max-w-full"
             >
               {{ bodyOf(reply) }}
-            </p>
+            </Bubble>
           </div>
         </article>
       </template>
@@ -172,7 +176,8 @@ function when(value: string): string {
           :disabled="sending || !draft.trim()"
           title="Reply"
         >
-          <SendHorizontal class="size-4" />
+          <Spinner v-if="sending" size="sm" />
+          <SendHorizontal v-else class="size-4" />
         </button>
       </form>
     </footer>

@@ -11,8 +11,12 @@ import {
   Trash2,
 } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
+import { Bubble } from "~/components/ui/bubble";
 import { Kbd } from "~/components/ui/kbd";
+import { Message as MessageRow, MessageGroup } from "~/components/ui/message";
+import { Separator } from "~/components/ui/separator";
 import { Skeleton } from "~/components/ui/skeleton";
+import { Spinner } from "~/components/ui/spinner";
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
@@ -396,7 +400,8 @@ watch(roomId, load, { immediate: true });
             v-if="live.state.value !== 'connected'"
             class="flex items-center gap-1.5 text-warning"
           >
-            <span class="size-1.5 animate-pulse rounded-full bg-warning" />
+            <Spinner v-if="live.state.value === 'reconnecting'" size="sm" />
+            <span v-else class="size-1.5 rounded-full bg-warning" />
             {{ live.state.value === "reconnecting" ? "Reconnecting" : "Offline" }}
           </span>
         </div>
@@ -435,120 +440,109 @@ watch(roomId, load, { immediate: true });
           </div>
         </div>
 
-        <div v-else class="space-y-0.5">
+        <div v-else class="space-y-3">
           <template v-for="(group, index) in grouped" :key="index">
-            <!-- A dated rule, rather than a bare separator, so scrolling back
-                 through history stays oriented. -->
-            <div v-if="dayBreakBefore(index)" class="flex items-center gap-3 py-3">
-              <span class="h-px flex-1 bg-border" />
-              <span class="text-[0.6875rem] font-medium text-muted-foreground">
-                {{ dayBreakBefore(index) }}
-              </span>
-              <span class="h-px flex-1 bg-border" />
-            </div>
+            <!-- A dated rule, so scrolling back through history stays
+                 oriented. -->
+            <Separator v-if="dayBreakBefore(index)" :label="dayBreakBefore(index)!" />
 
-            <article class="group/msg flex gap-2.5 rounded-lg px-2 py-1 hover:bg-surface-sunken/60">
-              <Avatar :name="group.sender" class="mt-0.5" />
+            <MessageGroup :mine="group.mine">
+              <!-- The name and avatar appear once for the run, on the side the
+                   bubbles are on. -->
+              <div
+                class="flex items-center gap-2 px-0.5"
+                :class="group.mine ? 'flex-row-reverse' : 'flex-row'"
+              >
+                <Avatar :name="group.sender" size="sm" />
+                <span class="text-xs font-semibold">
+                  {{ group.mine ? "You" : shortName(group.sender) }}
+                </span>
+                <time class="text-[0.6875rem] text-muted-foreground">{{ when(group.at) }}</time>
+              </div>
 
-              <div class="min-w-0 flex-1">
-                <p class="mb-0.5 flex items-baseline gap-2 leading-tight">
-                  <span class="text-sm font-semibold">
-                    {{ group.mine ? "You" : shortName(group.sender) }}
-                  </span>
-                  <time class="text-[0.6875rem] text-muted-foreground">
-                    {{ when(group.at) }}
-                  </time>
-                </p>
-
+              <MessageRow
+                v-for="(message, position) in group.items"
+                :key="message.id"
+                :mine="group.mine"
+              >
+                <!-- Actions sit outside the bubble, on the side away from the
+                     edge, and appear only on the row being pointed at. -->
                 <div
-                  v-for="message in group.items"
-                  :key="message.id"
-                  class="group/row flex items-start gap-2"
+                  v-if="!message.removed && editing !== message.id"
+                  class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100"
+                  :class="group.mine ? 'order-first' : 'order-last'"
                 >
-                  <div class="min-w-0 flex-1">
-                    <form
-                      v-if="editing === message.id"
-                      class="py-1"
-                      @submit.prevent="saveEdit(message.id)"
-                    >
-                      <input
-                        v-model="editDraft"
-                        class="input h-8"
-                        @keydown.esc="editing = null"
-                        autofocus
-                      />
-                      <p class="mt-1 text-[0.6875rem] text-muted-foreground">
-                        <Kbd>Enter</Kbd> to save, <Kbd>Esc</Kbd> to cancel
-                      </p>
-                    </form>
-
-                    <p
-                      v-else
-                      class="max-w-[70ch] text-sm leading-relaxed break-words whitespace-pre-wrap"
-                      :class="message.removed && 'text-muted-foreground italic'"
-                    >
-                      {{ message.removed ? "This message was removed" : message.body }}
-                      <span
-                        v-if="message.edited && !message.removed"
-                        class="text-[0.6875rem] text-muted-foreground"
-                      >
-                        (edited)
-                      </span>
-                    </p>
-                  </div>
-
-                  <!-- Actions appear on the row being pointed at, so the
-                       timeline is not a wall of buttons. -->
-                  <div
-                    v-if="!message.removed && editing !== message.id"
-                    class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100"
+                  <button
+                    v-if="room?.member"
+                    type="button"
+                    class="btn btn-ghost size-6 px-0"
+                    title="Reply in thread"
+                    @click="openThread(message.id)"
                   >
-                    <button
-                      v-if="room?.member"
-                      type="button"
-                      class="btn btn-ghost size-6 px-0"
-                      title="Reply in thread"
-                      @click="openThread(message.id)"
-                    >
-                      <MessageSquareText class="size-3.5" />
-                    </button>
-                    <button
-                      v-if="group.mine"
-                      type="button"
-                      class="btn btn-ghost size-6 px-0"
-                      title="Edit"
-                      @click="startEditing(message)"
-                    >
-                      <Pencil class="size-3.5" />
-                    </button>
-                    <button
-                      v-if="group.mine"
-                      type="button"
-                      class="btn btn-danger size-6 px-0"
-                      title="Delete"
-                      @click="remove(message.id)"
-                    >
-                      <Trash2 class="size-3.5" />
-                    </button>
-                  </div>
+                    <MessageSquareText class="size-3.5" />
+                  </button>
+                  <button
+                    v-if="group.mine"
+                    type="button"
+                    class="btn btn-ghost size-6 px-0"
+                    title="Edit"
+                    @click="startEditing(message)"
+                  >
+                    <Pencil class="size-3.5" />
+                  </button>
+                  <button
+                    v-if="group.mine"
+                    type="button"
+                    class="btn btn-danger size-6 px-0"
+                    title="Delete"
+                    @click="remove(message.id)"
+                  >
+                    <Trash2 class="size-3.5" />
+                  </button>
                 </div>
 
-                <button
-                  v-for="message in group.items.filter((m) => threadCounts[m.id])"
-                  :key="`thread-${message.id}`"
-                  type="button"
-                  class="mt-1 flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition hover:bg-accent"
-                  @click="openThread(message.id)"
+                <Bubble
+                  :variant="message.removed ? 'redacted' : group.mine ? 'mine' : 'default'"
+                  :align="group.mine ? 'end' : 'start'"
+                  :continued="position > 0"
                 >
-                  <MessageSquareText class="size-3" />
-                  {{
-                    threadCounts[message.id] === 1
-                      ? "1 reply"
-                      : `${threadCounts[message.id]} replies`
-                  }}
-                </button>
-              </div>
-            </article>
+                  <form v-if="editing === message.id" @submit.prevent="saveEdit(message.id)">
+                    <input
+                      v-model="editDraft"
+                      class="input h-8"
+                      @keydown.esc="editing = null"
+                      autofocus
+                    />
+                    <p class="mt-1 text-[0.6875rem] opacity-70">
+                      <Kbd>Enter</Kbd> to save, <Kbd>Esc</Kbd> to cancel
+                    </p>
+                  </form>
+
+                  <template v-else>
+                    {{ message.removed ? "This message was removed" : message.body }}
+                    <span
+                      v-if="message.edited && !message.removed"
+                      class="ml-1 align-baseline text-[0.6875rem] opacity-60"
+                    >
+                      edited
+                    </span>
+                  </template>
+                </Bubble>
+              </MessageRow>
+
+              <button
+                v-for="message in group.items.filter((m) => threadCounts[m.id])"
+                :key="`thread-${message.id}`"
+                type="button"
+                class="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition hover:bg-accent"
+                @click="openThread(message.id)"
+              >
+                <MessageSquareText class="size-3" />
+                {{
+                  threadCounts[message.id] === 1 ? "1 reply" : `${threadCounts[message.id]} replies`
+                }}
+              </button>
+            </MessageGroup>
           </template>
         </div>
       </div>
@@ -582,7 +576,8 @@ watch(roomId, load, { immediate: true });
             :disabled="sending || room.archived || !draft.trim()"
             title="Send"
           >
-            <SendHorizontal class="size-4" />
+            <Spinner v-if="sending" size="sm" />
+            <SendHorizontal v-else class="size-4" />
           </button>
         </form>
 

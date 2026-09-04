@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
-import { LoaderCircle } from "lucide-vue-next";
+import { Spinner } from "~/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
 
@@ -86,7 +86,7 @@ async function submit() {
       </div>
 
       <button type="submit" class="btn btn-primary h-9 w-full" :disabled="submitting">
-        <LoaderCircle v-if="submitting" class="size-4 animate-spin" />
+        <Spinner v-if="submitting" size="sm" />
         {{ submitting ? "Signing in" : "Sign in" }}
       </button>
     </form>
