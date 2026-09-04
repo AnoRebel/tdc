@@ -11,6 +11,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
@@ -68,19 +69,20 @@ type Config struct {
 
 // Server owns the HTTP listener and the routes mounted on it.
 type Server struct {
-	echo     *echo.Echo
-	http     *http.Server
-	log      *slog.Logger
-	db       *db.Pool
-	identity *identity.Service
-	authz    *authz.Service
-	audit    *audit.Recorder
-	limiter  *cache.Limiter
-	rooms    *rooms.Service
-	presence *presence.Service
-	hub      *realtime.Hub
-	realtime *realtime.Server
-	config   Config
+	echo        *echo.Echo
+	http        *http.Server
+	log         *slog.Logger
+	db          *db.Pool
+	identity    *identity.Service
+	authz       *authz.Service
+	audit       *audit.Recorder
+	limiter     *cache.Limiter
+	rooms       *rooms.Service
+	attachments *attachments.Service
+	presence    *presence.Service
+	hub         *realtime.Hub
+	realtime    *realtime.Server
+	config      Config
 }
 
 // Services are the collaborators the HTTP layer needs.
@@ -88,12 +90,13 @@ type Server struct {
 // Grouped into one parameter rather than a growing argument list, so adding a
 // dependency does not change every call site.
 type Services struct {
-	Identity *identity.Service
-	Authz    *authz.Service
-	Audit    *audit.Recorder
-	Limiter  *cache.Limiter
-	Rooms    *rooms.Service
-	Presence *presence.Service
+	Identity    *identity.Service
+	Authz       *authz.Service
+	Audit       *audit.Recorder
+	Limiter     *cache.Limiter
+	Rooms       *rooms.Service
+	Attachments *attachments.Service
+	Presence    *presence.Service
 }
 
 // New builds a server with the health and version routes mounted. It does not
@@ -110,16 +113,17 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 	e.HTTPErrorHandler = echo.DefaultHTTPErrorHandler(cfg.ExposeInternalErrors)
 
 	s := &Server{
-		echo:     e,
-		log:      log,
-		db:       pool,
-		identity: services.Identity,
-		authz:    services.Authz,
-		audit:    services.Audit,
-		limiter:  services.Limiter,
-		rooms:    services.Rooms,
-		presence: services.Presence,
-		config:   cfg,
+		echo:        e,
+		log:         log,
+		db:          pool,
+		identity:    services.Identity,
+		authz:       services.Authz,
+		audit:       services.Audit,
+		limiter:     services.Limiter,
+		rooms:       services.Rooms,
+		attachments: services.Attachments,
+		presence:    services.Presence,
+		config:      cfg,
 	}
 
 	// The hub reads membership from the rooms service at delivery time, which

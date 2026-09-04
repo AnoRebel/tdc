@@ -1,0 +1,368 @@
+package httpapi_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+// Real magic bytes, so detection sees what a real file would look like.
+var (
+	testPNG = []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 'I', 'H', 'D', 'R'}
+	testELF = []byte{0x7F, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0x3E, 0}
+	testSVG = []byte(`<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`)
+)
+
+// uploadFile posts a file to a room the way a browser would.
+func uploadFile(
+	t *testing.T,
+	handler http.Handler,
+	token, roomID, filename string,
+	content []byte,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+
+	part, err := form.CreateFormFile("file", filename)
+	if err != nil {
+		t.Fatalf("building the upload form: %v", err)
+	}
+	if _, err := part.Write(content); err != nil {
+		t.Fatalf("writing the upload body: %v", err)
+	}
+	if err := form.Close(); err != nil {
+		t.Fatalf("closing the upload form: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/rooms/"+roomID+"/attachments", &body)
+	request.Header.Set("Content-Type", form.FormDataContentType())
+	if token != "" {
+		request.AddCookie(&http.Cookie{Name: "tdc_session", Value: token})
+	}
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	return recorder
+}
+
+// TestUploadAndDownloadRoundTrip covers the ordinary case end to end.
+func TestUploadAndDownloadRoundTrip(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "screenshot.png", testPNG)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d: %s", recorder.Code, recorder.Body)
+	}
+
+	var uploaded struct {
+		ID          string `json:"id"`
+		Filename    string `json:"filename"`
+		ContentType string `json:"contentType"`
+		Size        int64  `json:"size"`
+		URL         string `json:"url"`
+		Renderable  bool   `json:"renderable"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decoding the upload response: %v", err)
+	}
+
+	if uploaded.ContentType != "image/png" {
+		t.Errorf("content type is %q, expected image/png", uploaded.ContentType)
+	}
+	if uploaded.Size != int64(len(testPNG)) {
+		t.Errorf("size is %d, uploaded %d bytes", uploaded.Size, len(testPNG))
+	}
+	if !uploaded.Renderable {
+		t.Error("a PNG is not reported as renderable")
+	}
+
+	download := call(t, handler, http.MethodGet, uploaded.URL, nil, token)
+	if download.Code != http.StatusOK {
+		t.Fatalf("download returned %d: %s", download.Code, download.Body)
+	}
+	if !bytes.Equal(download.Body.Bytes(), testPNG) {
+		t.Error("the downloaded bytes differ from what was uploaded")
+	}
+}
+
+// TestUploadDetectsTypeFromContent is the "declared type is not trusted"
+// requirement, exercised through the API rather than the unit under it.
+func TestUploadDetectsTypeFromContent(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	// A PNG, uploaded under a name that claims it is something else entirely.
+	recorder := uploadFile(t, handler, token, roomID, "invoice.pdf", testPNG)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d: %s", recorder.Code, recorder.Body)
+	}
+
+	var uploaded struct {
+		ContentType string `json:"contentType"`
+		Filename    string `json:"filename"`
+	}
+	json.Unmarshal(recorder.Body.Bytes(), &uploaded)
+
+	if uploaded.ContentType != "image/png" {
+		t.Errorf("the server believed the filename: type is %q, content is a PNG",
+			uploaded.ContentType)
+	}
+	// The name is still kept, because it is what the download is called.
+	if uploaded.Filename != "invoice.pdf" {
+		t.Errorf("the filename was changed to %q", uploaded.Filename)
+	}
+}
+
+// TestBlockedTypeIsRefused covers the default protection against binaries.
+func TestBlockedTypeIsRefused(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	// Named as an image, but an ELF binary inside.
+	recorder := uploadFile(t, handler, token, roomID, "kitten.png", testELF)
+
+	if recorder.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("an executable upload returned %d, expected 415: %s",
+			recorder.Code, recorder.Body)
+	}
+	// The refusal has to say what was wrong, or the person cannot act on it.
+	if !strings.Contains(recorder.Body.String(), "x-executable") {
+		t.Errorf("the refusal does not name the detected type: %s", recorder.Body)
+	}
+}
+
+// TestAttachmentsAreServedInertly is the second half of the same protection.
+//
+// An SVG carrying script, served from the application's origin with its real
+// type, would run that script with the application's cookies available. This
+// checks the headers that stop it.
+func TestAttachmentsAreServedInertly(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "diagram.svg", testSVG)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d: %s", recorder.Code, recorder.Body)
+	}
+
+	var uploaded struct {
+		URL         string `json:"url"`
+		ContentType string `json:"contentType"`
+		Renderable  bool   `json:"renderable"`
+	}
+	json.Unmarshal(recorder.Body.Bytes(), &uploaded)
+
+	// Stored as what it is.
+	if uploaded.ContentType != "image/svg+xml" {
+		t.Errorf("the SVG was stored as %q", uploaded.ContentType)
+	}
+	// But never offered for inline display.
+	if uploaded.Renderable {
+		t.Error("the SVG is reported as renderable")
+	}
+
+	download := call(t, handler, http.MethodGet, uploaded.URL, nil, token)
+	if download.Code != http.StatusOK {
+		t.Fatalf("download returned %d", download.Code)
+	}
+
+	header := download.Header()
+
+	// Served as something no browser will execute.
+	if served := header.Get("Content-Type"); !strings.HasPrefix(served, "application/octet-stream") {
+		t.Errorf("the SVG is served as %q; a browser would render it", served)
+	}
+	if header.Get("X-Content-Type-Options") != "nosniff" {
+		t.Error("nosniff is missing, so a browser may guess the type back")
+	}
+	if disposition := header.Get("Content-Disposition"); !strings.HasPrefix(disposition, "attachment") {
+		t.Errorf("Content-Disposition is %q, so this renders as a page", disposition)
+	}
+	if policy := header.Get("Content-Security-Policy"); !strings.Contains(policy, "sandbox") {
+		t.Errorf("the policy does not sandbox the content: %q", policy)
+	}
+	if header.Get("X-Frame-Options") != "DENY" {
+		t.Error("the attachment can be framed back into the application")
+	}
+	if cache := header.Get("Cache-Control"); !strings.Contains(cache, "no-store") {
+		t.Errorf("a private attachment is cacheable: %q", cache)
+	}
+}
+
+// TestNonMemberCannotUploadOrDownload checks that the room's permissions govern
+// its files.
+//
+// Knowing an identifier is not authorisation: an attachment must not be a way
+// to read a room, and a room must not be usable as storage by someone who
+// cannot post to it.
+func TestNonMemberCannotUploadOrDownload(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "private-plans", "public")
+
+	recorder := uploadFile(t, handler, owner, roomID, "notes.png", testPNG)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("the owner's upload returned %d: %s", recorder.Code, recorder.Body)
+	}
+
+	var uploaded struct {
+		URL string `json:"url"`
+	}
+	json.Unmarshal(recorder.Body.Bytes(), &uploaded)
+
+	// A second person, who is not in that room.
+	outsider := registerAndSignIn(t, handler, "juma")
+
+	download := call(t, handler, http.MethodGet, uploaded.URL, nil, outsider)
+	if download.Code == http.StatusOK {
+		t.Error("a non-member downloaded the attachment")
+	}
+
+	upload := uploadFile(t, handler, outsider, roomID, "theirs.png", testPNG)
+	if upload.Code == http.StatusCreated {
+		t.Error("a non-member uploaded to a room they are not in")
+	}
+}
+
+// TestUnauthenticatedAccessIsRefused checks the routes are behind the session
+// middleware at all — the kind of thing a unit test on the handler cannot see.
+func TestUnauthenticatedAccessIsRefused(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "notes.png", testPNG)
+	var uploaded struct {
+		URL string `json:"url"`
+	}
+	json.Unmarshal(recorder.Body.Bytes(), &uploaded)
+
+	// No cookie at all.
+	if anonymous := call(t, handler, http.MethodGet, uploaded.URL, nil, ""); anonymous.Code != http.StatusUnauthorized {
+		t.Errorf("an unauthenticated download returned %d, expected 401", anonymous.Code)
+	}
+	if anonymous := uploadFile(t, handler, "", roomID, "x.png", testPNG); anonymous.Code != http.StatusUnauthorized {
+		t.Errorf("an unauthenticated upload returned %d, expected 401", anonymous.Code)
+	}
+}
+
+// TestOversizedUploadNamesTheLimit checks that a refusal is specific.
+func TestOversizedUploadNamesTheLimit(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	// Past the 25 MiB default, built from a real PNG header so the file is
+	// refused for its size rather than its type.
+	oversized := append(append([]byte{}, testPNG...), bytes.Repeat([]byte{0}, (25<<20)+1024)...)
+
+	recorder := uploadFile(t, handler, token, roomID, "huge.png", oversized)
+	if recorder.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("an oversized upload returned %d, expected 413: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+	if !strings.Contains(recorder.Body.String(), "file size") {
+		t.Errorf("the refusal does not name the limit: %s", truncate(recorder.Body.String()))
+	}
+}
+
+// TestLimitsAreAdvertised checks that a client can learn the rules before it
+// spends someone's bandwidth breaking them.
+func TestLimitsAreAdvertised(t *testing.T) {
+	handler := newTestAPI(t)
+	token := completeSetup(t, handler)
+
+	recorder := call(t, handler, http.MethodGet, "/api/attachments/limits", nil, token)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("limits returned %d: %s", recorder.Code, recorder.Body)
+	}
+
+	var limits struct {
+		MaxFileSize   int64    `json:"maxFileSize"`
+		MaxPerMessage int      `json:"maxPerMessage"`
+		BlockedTypes  []string `json:"blockedTypes"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &limits); err != nil {
+		t.Fatalf("decoding the limits: %v", err)
+	}
+
+	if limits.MaxFileSize <= 0 {
+		t.Error("the advertised file-size limit is not usable")
+	}
+	if limits.MaxPerMessage <= 0 {
+		t.Error("the advertised per-message limit is not usable")
+	}
+	if len(limits.BlockedTypes) == 0 {
+		t.Error("no blocked types are advertised, so a client cannot warn in advance")
+	}
+}
+
+// TestFilenameIsNeutralised checks that a hostile filename cannot escape the
+// header it is written into, nor imply a path.
+func TestFilenameIsNeutralised(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	for _, hostile := range []string{
+		`../../etc/passwd`,
+		`..\..\windows\system32`,
+		`evil".png`,
+		"line\nbreak.png",
+	} {
+		recorder := uploadFile(t, handler, token, roomID, hostile, testPNG)
+		if recorder.Code != http.StatusCreated {
+			// Refusing outright is also acceptable.
+			continue
+		}
+
+		var uploaded struct {
+			Filename string `json:"filename"`
+			URL      string `json:"url"`
+		}
+		json.Unmarshal(recorder.Body.Bytes(), &uploaded)
+
+		if strings.ContainsAny(uploaded.Filename, `/\`) {
+			t.Errorf("%q was stored as %q, still carrying a separator", hostile, uploaded.Filename)
+		}
+		if strings.ContainsAny(uploaded.Filename, "\r\n") {
+			t.Errorf("%q was stored as %q, still carrying a line break", hostile, uploaded.Filename)
+		}
+
+		download := call(t, handler, http.MethodGet, uploaded.URL, nil, token)
+		disposition := download.Header().Get("Content-Disposition")
+		if strings.ContainsAny(disposition, "\r\n") {
+			t.Errorf("%q produced a header that breaks across lines: %q", hostile, disposition)
+		}
+		if !strings.HasPrefix(disposition, "attachment") {
+			t.Errorf("%q produced a disposition of %q", hostile, disposition)
+		}
+	}
+}
+
+// truncate keeps a failure message readable when a body is large.
+func truncate(s string) string {
+	if len(s) > 300 {
+		return s[:300] + "…"
+	}
+	return s
+}

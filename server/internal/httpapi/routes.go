@@ -57,6 +57,12 @@ func (s *Server) routes() {
 	rooms.POST("/:id/typing", s.handleStartTyping)
 	rooms.GET("/:id/typing", s.handleListTyping)
 
+	// Attachments. Uploaded to a room before the message that carries them, so
+	// a refusal costs only the upload and a failed send does not lose the file.
+	rooms.POST("/:id/attachments", s.handleUploadAttachment)
+	s.echo.GET("/api/attachments/limits", s.handleAttachmentLimits, requireAuthentication)
+	s.echo.GET("/api/attachments/:id", s.handleDownloadAttachment, requireAuthentication)
+
 	// Direct conversations, which are found by their participants rather than
 	// by name.
 	direct := s.echo.Group("/api/direct", requireAuthentication)

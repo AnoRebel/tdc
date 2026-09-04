@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/cache"
@@ -23,6 +24,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
+	"github.com/AnoRebel/tdc/server/internal/storage"
 )
 
 const testPassword = "correct horse battery staple"
@@ -84,7 +86,11 @@ func newTestAPI(t *testing.T) http.Handler {
 		Audit:    audit.NewRecorder(queries, logger),
 		Limiter:  cache.NewLimiter(memory),
 		Rooms:    rooms.NewService(queries, events.NewKeyring(signingKey), "tdc.test", logger),
-		Presence: presence.NewService(queries),
+		// The local store, in a directory the test framework removes: the
+		// object-store backends have their own tests, and what matters here is
+		// the behaviour above the interface.
+		Attachments: attachments.NewService(pool, testStore(t), attachments.DefaultLimits()),
+		Presence:    presence.NewService(queries),
 	}, logger)
 
 	t.Cleanup(func() {
@@ -94,6 +100,19 @@ func newTestAPI(t *testing.T) http.Handler {
 	})
 
 	return server.Handler()
+}
+
+// testStore opens a throwaway attachment store for one test.
+func testStore(t *testing.T) storage.Store {
+	t.Helper()
+
+	store, err := storage.NewLocal(t.TempDir())
+	if err != nil {
+		t.Fatalf("opening the attachment store: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+
+	return store
 }
 
 // call issues a request and returns the recorder.

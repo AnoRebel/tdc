@@ -11,6 +11,19 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+type Attachment struct {
+	ID              uuid.UUID
+	StorageKey      string
+	UploaderID      *uuid.UUID
+	UploaderAddress string
+	RoomID          uuid.UUID
+	EventID         *string
+	Filename        string
+	ContentType     string
+	SizeBytes       int64
+	CreatedAt       time.Time
+}
+
 type AuditEntry struct {
 	ID         int64
 	OccurredAt time.Time

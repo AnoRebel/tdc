@@ -19,6 +19,12 @@ type Querier interface {
 	AppendThreadedEvent(ctx context.Context, arg AppendThreadedEventParams) (Event, error)
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
+	// Binds an attachment to the message that carries it.
+	//
+	// Scoped to the uploader and to attachments not already attached, so one
+	// person cannot claim another's upload, and an attachment cannot be moved
+	// between messages after the fact.
+	AttachToEvent(ctx context.Context, arg AttachToEventParams) (int64, error)
 	// A status with an expiry reverts on its own, so a temporary one needs no
 	// later action from the person who set it.
 	ClearExpiredStatuses(ctx context.Context) error
@@ -32,6 +38,9 @@ type Querier interface {
 	// closes, not the first, so someone on a phone and a laptop does not appear
 	// offline when they close one.
 	ConnectionOpened(ctx context.Context, userID uuid.UUID) (UserPresence, error)
+	// Counts what still points at a stored object, so the bytes are only removed
+	// once nothing references them.
+	CountAttachmentsWithStorageKey(ctx context.Context, storageKey string) (int64, error)
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
@@ -45,12 +54,14 @@ type Querier interface {
 	// denial. The administrator floor uses this to refuse a change that would
 	// leave nobody able to administer the server.
 	CountUsersWithPermission(ctx context.Context, permission string) (int64, error)
+	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAttachment(ctx context.Context, id uuid.UUID) error
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
@@ -59,6 +70,7 @@ type Querier interface {
 	DeleteServerConfigValue(ctx context.Context, key string) error
 	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
+	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
@@ -77,6 +89,7 @@ type Querier interface {
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
+	ListAttachmentsForEvent(ctx context.Context, eventID *string) ([]Attachment, error)
 	// Filters are optional: a NULL argument matches everything, so one query
 	// serves the whole administrative view rather than one per filter combination.
 	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)
@@ -85,6 +98,8 @@ type Querier interface {
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	// Attachments that never became part of a message, oldest first.
+	ListOrphanedAttachments(ctx context.Context, arg ListOrphanedAttachmentsParams) ([]Attachment, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
 	// The most recent events, for opening a room.
 	ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEventsParams) ([]Event, error)

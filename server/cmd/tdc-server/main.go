@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
@@ -27,6 +28,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
+	"github.com/AnoRebel/tdc/server/internal/storage"
 )
 
 func main() {
@@ -111,6 +113,26 @@ func run() error {
 	// lapse take effect.
 	go sweepPeriodically(ctx, presenceService, log)
 
+	// Where attachments are kept is the operator's choice; the default keeps
+	// them in a directory, so a small deployment needs no object store.
+	objectStore, err := storage.Open(storage.Config{
+		Backend:   storage.Backend(cfg.Storage.Backend),
+		Directory: cfg.Storage.Directory,
+		S3: storage.S3Config{
+			Endpoint:     cfg.Storage.S3.Endpoint,
+			Bucket:       cfg.Storage.S3.Bucket,
+			Region:       cfg.Storage.S3.Region,
+			AccessKey:    cfg.Storage.S3.AccessKey,
+			SecretKey:    cfg.Storage.S3.SecretKey,
+			UsePathStyle: cfg.Storage.S3.PathStyle,
+		},
+	})
+	if err != nil {
+		log.Error("attachment storage is unavailable", "error", err)
+		return err
+	}
+	defer objectStore.Close()
+
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
@@ -118,7 +140,8 @@ func run() error {
 		Limiter:  cache.NewLimiter(memoryCache),
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
-		Presence: presenceService,
+		Attachments: attachments.NewService(pool, objectStore, attachments.DefaultLimits()),
+		Presence:    presenceService,
 	}
 
 	server := httpapi.New(httpapi.Config{
