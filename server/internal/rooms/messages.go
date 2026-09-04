@@ -49,7 +49,7 @@ func (s *Service) append(
 	}
 
 	event := events.Event{
-		Room:      s.Address(room.Slug),
+		Room:      s.RoomAddress(room),
 		Sender:    s.UserAddress(sender.Username),
 		Origin:    s.serverName,
 		Type:      eventType,
@@ -274,7 +274,9 @@ func (s *Service) Timeline(ctx context.Context, roomID, userID uuid.UUID, limit 
 		limit = 50
 	}
 
-	timeline, err := s.store.ListRecentRoomEvents(ctx, dbgen.ListRecentRoomEventsParams{
+	// Replies are excluded: they live in their thread, not the channel, unless
+	// a client explicitly asks for the thread.
+	timeline, err := s.store.ListRoomTimelineExcludingReplies(ctx, dbgen.ListRoomTimelineExcludingRepliesParams{
 		RoomID: roomID,
 		Limit:  limit,
 	})

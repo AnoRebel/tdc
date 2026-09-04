@@ -52,8 +52,23 @@ func NewService(store Store, keyring *events.Keyring, serverName string, log *sl
 }
 
 // Address returns the federated address of a room on this server.
-func (s *Service) Address(slug string) string {
-	return slug + "@" + s.serverName
+//
+// A direct conversation has no slug: it is found by its participants rather
+// than by name, because a name would make it discoverable, which a private
+// conversation must not be. Its address names the room's identifier instead.
+func (s *Service) Address(slug *string) string {
+	if slug == nil || *slug == "" {
+		return ""
+	}
+	return *slug + "@" + s.serverName
+}
+
+// RoomAddress returns an address for any room, including one with no slug.
+func (s *Service) RoomAddress(room dbgen.Room) string {
+	if address := s.Address(room.Slug); address != "" {
+		return address
+	}
+	return room.ID.String() + "@" + s.serverName
 }
 
 // UserAddress returns the federated address of a local user.
@@ -98,10 +113,11 @@ func (s *Service) Create(ctx context.Context, input NewRoom) (dbgen.Room, error)
 		visibility = "public"
 	}
 
+	folded := strings.ToLower(slug)
 	room, err := s.store.CreateRoom(ctx, dbgen.CreateRoomParams{
 		ID:                uuid.New(),
-		Slug:              slug,
-		SlugFolded:        strings.ToLower(slug),
+		Slug:              &slug,
+		SlugFolded:        &folded,
 		Name:              name,
 		Topic:             strings.TrimSpace(input.Topic),
 		Kind:              kind,

@@ -63,7 +63,7 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
 }
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip_address, sessions.created_at, sessions.last_seen_at, sessions.expires_at, sessions.revoked_at, users.id, users.username, users.username_folded, users.display_name, users.email, users.email_folded, users.email_verified, users.suspended_at, users.suspended_until, users.suspended_by, users.suspension_note, users.created_at, users.updated_at
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip_address, sessions.created_at, sessions.last_seen_at, sessions.expires_at, sessions.revoked_at, users.id, users.username, users.username_folded, users.display_name, users.email, users.email_folded, users.email_verified, users.suspended_at, users.suspended_until, users.suspended_by, users.suspension_note, users.created_at, users.updated_at, users.sends_typing_indication
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = $1
@@ -102,6 +102,7 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (
 		&i.User.SuspensionNote,
 		&i.User.CreatedAt,
 		&i.User.UpdatedAt,
+		&i.User.SendsTypingIndication,
 	)
 	return i, err
 }

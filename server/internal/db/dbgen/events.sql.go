@@ -18,7 +18,7 @@ INSERT INTO events (
     origin_server, type, content, created_at, nonce, signature, key_id
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce
+RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id
 `
 
 type AppendEventParams struct {
@@ -70,6 +70,7 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (Event
 		&i.RedactedAt,
 		&i.RedactedBy,
 		&i.Nonce,
+		&i.ThreadRootID,
 	)
 	return i, err
 }
@@ -119,7 +120,7 @@ func (q *Queries) FindIdempotentSubmission(ctx context.Context, arg FindIdempote
 }
 
 const getEventByID = `-- name: GetEventByID :one
-SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce FROM events WHERE id = $1
+SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events WHERE id = $1
 `
 
 func (q *Queries) GetEventByID(ctx context.Context, id string) (Event, error) {
@@ -141,6 +142,7 @@ func (q *Queries) GetEventByID(ctx context.Context, id string) (Event, error) {
 		&i.RedactedAt,
 		&i.RedactedBy,
 		&i.Nonce,
+		&i.ThreadRootID,
 	)
 	return i, err
 }
@@ -157,7 +159,7 @@ func (q *Queries) LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int
 }
 
 const listRecentRoomEvents = `-- name: ListRecentRoomEvents :many
-SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce FROM events
+SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events
 WHERE room_id = $1
 ORDER BY sequence DESC
 LIMIT $2
@@ -194,6 +196,7 @@ func (q *Queries) ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEv
 			&i.RedactedAt,
 			&i.RedactedBy,
 			&i.Nonce,
+			&i.ThreadRootID,
 		); err != nil {
 			return nil, err
 		}
@@ -206,7 +209,7 @@ func (q *Queries) ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEv
 }
 
 const listRoomEvents = `-- name: ListRoomEvents :many
-SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce FROM events
+SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events
 WHERE room_id = $1 AND sequence > $2 AND sequence <= $3
 ORDER BY sequence
 `
@@ -243,6 +246,7 @@ func (q *Queries) ListRoomEvents(ctx context.Context, arg ListRoomEventsParams) 
 			&i.RedactedAt,
 			&i.RedactedBy,
 			&i.Nonce,
+			&i.ThreadRootID,
 		); err != nil {
 			return nil, err
 		}

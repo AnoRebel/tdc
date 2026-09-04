@@ -53,6 +53,7 @@ type Event struct {
 	RedactedAt    *time.Time
 	RedactedBy    *uuid.UUID
 	Nonce         string
+	ThreadRootID  *string
 }
 
 type EventIdempotency struct {
@@ -80,8 +81,8 @@ type RolePermission struct {
 
 type Room struct {
 	ID                uuid.UUID
-	Slug              string
-	SlugFolded        string
+	Slug              *string
+	SlugFolded        *string
 	Name              string
 	Topic             string
 	Kind              string
@@ -93,6 +94,7 @@ type Room struct {
 	ArchivedAt        *time.Time
 	ArchivedBy        *uuid.UUID
 	MessageTtlSeconds *int32
+	ParticipantKey    *string
 }
 
 type RoomMember struct {
@@ -123,6 +125,17 @@ type ServerConfig struct {
 	UpdatedBy *string
 }
 
+type ServerStatus struct {
+	ID                      uuid.UUID
+	Key                     string
+	Label                   string
+	SuppressesNotifications bool
+	Colour                  string
+	SortOrder               int32
+	BuiltIn                 bool
+	CreatedAt               time.Time
+}
+
 type Session struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -135,20 +148,38 @@ type Session struct {
 	RevokedAt  *time.Time
 }
 
+type TypingIndicator struct {
+	RoomID    uuid.UUID
+	UserID    uuid.UUID
+	ExpiresAt time.Time
+}
+
 type User struct {
-	ID             uuid.UUID
-	Username       string
-	UsernameFolded string
-	DisplayName    string
-	Email          *string
-	EmailFolded    *string
-	EmailVerified  bool
-	SuspendedAt    *time.Time
-	SuspendedUntil *time.Time
-	SuspendedBy    *uuid.UUID
-	SuspensionNote *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                    uuid.UUID
+	Username              string
+	UsernameFolded        string
+	DisplayName           string
+	Email                 *string
+	EmailFolded           *string
+	EmailVerified         bool
+	SuspendedAt           *time.Time
+	SuspendedUntil        *time.Time
+	SuspendedBy           *uuid.UUID
+	SuspensionNote        *string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	SendsTypingIndication bool
+}
+
+type UserPresence struct {
+	UserID          uuid.UUID
+	Connections     int32
+	Status          string
+	StatusText      string
+	StatusExpiresAt *time.Time
+	Invisible       bool
+	LastSeenAt      time.Time
+	UpdatedAt       time.Time
 }
 
 type UserRole struct {

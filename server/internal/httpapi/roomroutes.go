@@ -31,14 +31,19 @@ type roomResponse struct {
 }
 
 func (s *Server) roomResponse(room dbgen.Room, member bool) roomResponse {
+	slug := ""
+	if room.Slug != nil {
+		slug = *room.Slug
+	}
+
 	return roomResponse{
 		ID:         room.ID.String(),
-		Slug:       room.Slug,
+		Slug:       slug,
 		Name:       room.Name,
 		Topic:      room.Topic,
 		Kind:       room.Kind,
 		Visibility: room.Visibility,
-		Address:    room.Slug + "@" + s.serverName(),
+		Address:    s.rooms.RoomAddress(room),
 		Archived:   room.ArchivedAt != nil,
 		Member:     member,
 	}

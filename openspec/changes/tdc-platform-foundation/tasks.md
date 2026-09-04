@@ -57,12 +57,12 @@ Goal: the core product. Channels, messages, and live delivery between real clien
 
 Goal: threads, direct messages, presence, and read state — enough that it competes with what TDC uses today.
 
-- [ ] 4.1 Implement threads inheriting the parent channel's permissions; verify replies stay out of the main timeline and follow channel visibility (`messaging/channels`)
-- [ ] 4.2 Implement direct and group direct messages not readable through administrative interfaces; verify an administrator cannot read them via ordinary endpoints (`messaging/channels`)
-- [ ] 4.3 Implement presence derived from connection state with expiry on ungraceful disconnect and an invisible option; verify presence returns to offline within the bound after a dropped connection (`messaging/realtime`)
-- [ ] 4.4 Implement operator-configurable statuses with expiry and notification suppression; verify a status reverts automatically at its expiry (`messaging/realtime`)
-- [ ] 4.5 Implement typing indication with automatic expiry and a user opt-out; verify the indicator disappears when not refreshed (`messaging/realtime`)
-- [ ] 4.6 Implement per-conversation read state converging across a user's devices, cached per the design; verify reading on one device updates the others and an offline device converges on reconnect (`messaging/realtime`)
+- [x] 4.1 Implement threads inheriting the parent channel's permissions; verify replies stay out of the main timeline and follow channel visibility (`messaging/channels`)
+- [x] 4.2 Implement direct and group direct messages not readable through administrative interfaces; verify an administrator cannot read them via ordinary endpoints (`messaging/channels`)
+- [x] 4.3 Implement presence derived from connection state with expiry on ungraceful disconnect and an invisible option; verify presence returns to offline within the bound after a dropped connection (`messaging/realtime`)
+- [x] 4.4 Implement operator-configurable statuses with expiry and notification suppression; verify a status reverts automatically at its expiry (`messaging/realtime`)
+- [x] 4.5 Implement typing indication with automatic expiry and a user opt-out; verify the indicator disappears when not refreshed (`messaging/realtime`)
+- [x] 4.6 Implement per-conversation read state converging across a user's devices, cached per the design; verify reading on one device updates the others and an offline device converges on reconnect (`messaging/realtime`)
 - [ ] 4.7 Implement channel discovery and search respecting visibility; verify search never returns a channel the user cannot discover (`messaging/channels`)
 - [ ] 4.8 Build the web interface for threads, direct messages, presence, and unread indicators; verify each is usable end to end
 - [ ] **MILESTONE 4** — Demonstrate: a threaded conversation, a private direct message, live presence and typing indicators between two clients, and unread counts that clear correctly across two devices signed in as the same user. Tag `v0.4.0-dev`.

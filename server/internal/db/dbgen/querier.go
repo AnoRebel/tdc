@@ -15,18 +15,38 @@ type Querier interface {
 	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) error
 	AppendAuditEntry(ctx context.Context, arg AppendAuditEntryParams) (AuditEntry, error)
 	AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error)
+	// A reply carries the identifier of the message that started the thread.
+	AppendThreadedEvent(ctx context.Context, arg AppendThreadedEventParams) (Event, error)
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
+	// A status with an expiry reverts on its own, so a temporary one needs no
+	// later action from the person who set it.
+	ClearExpiredStatuses(ctx context.Context) error
+	ClearExpiredTyping(ctx context.Context) error
+	// GREATEST keeps the count from going negative if a close is somehow counted
+	// twice, which would otherwise leave someone permanently "present".
+	ConnectionClosed(ctx context.Context, userID uuid.UUID) error
+	// Records a connection, marking the person present.
+	//
+	// Counted rather than set to true: presence ends when the last connection
+	// closes, not the first, so someone on a phone and a laptop does not appear
+	// offline when they close one.
+	ConnectionOpened(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
 	CountEventsSince(ctx context.Context, arg CountEventsSinceParams) (int64, error)
+	CountThreadReplies(ctx context.Context, threadRootID *string) (int64, error)
+	// Messages after the member's read position, excluding their own: a person's
+	// own messages are not unread to them.
+	CountUnread(ctx context.Context, arg CountUnreadParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	// How many people hold a permission at server scope without an explicit
 	// denial. The administrator floor uses this to refuse a change that would
 	// leave nobody able to administer the server.
 	CountUsersWithPermission(ctx context.Context, permission string) (int64, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
+	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
@@ -37,16 +57,19 @@ type Querier interface {
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteRole(ctx context.Context, id uuid.UUID) error
 	DeleteServerConfigValue(ctx context.Context, key string) error
+	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
+	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetRoleByName(ctx context.Context, name string) (Role, error)
 	GetRoomByID(ctx context.Context, id uuid.UUID) (Room, error)
-	GetRoomBySlug(ctx context.Context, slugFolded string) (Room, error)
+	GetRoomBySlug(ctx context.Context, slugFolded *string) (Room, error)
 	GetSchemaVersion(ctx context.Context) (GetSchemaVersionRow, error)
 	GetServerConfigValue(ctx context.Context, key string) (ServerConfig, error)
+	GetServerStatus(ctx context.Context, key string) (ServerStatus, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error)
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
@@ -58,9 +81,11 @@ type Querier interface {
 	// serves the whole administrative view rather than one per filter combination.
 	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
+	ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
 	// The most recent events, for opening a room.
 	ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEventsParams) ([]Event, error)
 	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]RolePermission, error)
@@ -71,13 +96,25 @@ type Querier interface {
 	// Just the identifiers, for deciding who a live event should reach.
 	ListRoomMemberIDs(ctx context.Context, roomID uuid.UUID) ([]uuid.UUID, error)
 	ListRoomMembers(ctx context.Context, roomID uuid.UUID) ([]ListRoomMembersRow, error)
+	// The main timeline: replies live in their thread, not in the channel, unless
+	// explicitly surfaced.
+	ListRoomTimelineExcludingReplies(ctx context.Context, arg ListRoomTimelineExcludingRepliesParams) ([]Event, error)
 	// Rooms the user is a member of, plus public rooms they could join. A private
 	// room they are not in never appears, which is what keeps its existence
 	// undisclosed.
 	ListRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	ListRoomsUserIsIn(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	ListServerConfig(ctx context.Context) ([]ServerConfig, error)
+	ListServerStatuses(ctx context.Context) ([]ServerStatus, error)
 	ListSessionsForUser(ctx context.Context, userID uuid.UUID) ([]Session, error)
+	ListThreadReplies(ctx context.Context, threadRootID *string) ([]Event, error)
+	// How many replies each of a set of messages has, and when the latest arrived,
+	// so a timeline can show "3 replies" without fetching them.
+	ListThreadSummaries(ctx context.Context, dollar_1 []string) ([]ListThreadSummariesRow, error)
+	ListTyping(ctx context.Context, roomID uuid.UUID) ([]ListTypingRow, error)
+	// Unread counts for every room a person is in, in one query rather than one
+	// per room.
+	ListUnreadCounts(ctx context.Context, userID uuid.UUID) ([]ListUnreadCountsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	// Allocates the next position in a room's total order.
 	//
@@ -93,17 +130,26 @@ type Querier interface {
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) error
 	RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
+	// Clears presence for connections that ended without a clean close, which is
+	// what makes an ungraceful disconnect expire rather than persist.
+	ResetStalePresence(ctx context.Context, lastSeenAt time.Time) error
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.
 	SetRolePermission(ctx context.Context, arg SetRolePermissionParams) error
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
+	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
+	SetTypingPreference(ctx context.Context, arg SetTypingPreferenceParams) error
+	StartTyping(ctx context.Context, arg StartTypingParams) error
+	StopTyping(ctx context.Context, arg StopTypingParams) error
 	SuspendUser(ctx context.Context, arg SuspendUserParams) error
 	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
+	TouchPresence(ctx context.Context, userID uuid.UUID) error
 	TouchSession(ctx context.Context, id uuid.UUID) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error

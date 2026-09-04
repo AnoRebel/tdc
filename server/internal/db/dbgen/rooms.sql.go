@@ -47,13 +47,13 @@ func (q *Queries) ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error 
 const createRoom = `-- name: CreateRoom :one
 INSERT INTO rooms (id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, message_ttl_seconds)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds
+RETURNING id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key
 `
 
 type CreateRoomParams struct {
 	ID                uuid.UUID
-	Slug              string
-	SlugFolded        string
+	Slug              *string
+	SlugFolded        *string
 	Name              string
 	Topic             string
 	Kind              string
@@ -92,12 +92,13 @@ func (q *Queries) CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, e
 		&i.ArchivedAt,
 		&i.ArchivedBy,
 		&i.MessageTtlSeconds,
+		&i.ParticipantKey,
 	)
 	return i, err
 }
 
 const getRoomByID = `-- name: GetRoomByID :one
-SELECT id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds FROM rooms WHERE id = $1
+SELECT id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key FROM rooms WHERE id = $1
 `
 
 func (q *Queries) GetRoomByID(ctx context.Context, id uuid.UUID) (Room, error) {
@@ -118,15 +119,16 @@ func (q *Queries) GetRoomByID(ctx context.Context, id uuid.UUID) (Room, error) {
 		&i.ArchivedAt,
 		&i.ArchivedBy,
 		&i.MessageTtlSeconds,
+		&i.ParticipantKey,
 	)
 	return i, err
 }
 
 const getRoomBySlug = `-- name: GetRoomBySlug :one
-SELECT id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds FROM rooms WHERE slug_folded = $1
+SELECT id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key FROM rooms WHERE slug_folded = $1
 `
 
-func (q *Queries) GetRoomBySlug(ctx context.Context, slugFolded string) (Room, error) {
+func (q *Queries) GetRoomBySlug(ctx context.Context, slugFolded *string) (Room, error) {
 	row := q.db.QueryRow(ctx, getRoomBySlug, slugFolded)
 	var i Room
 	err := row.Scan(
@@ -144,6 +146,7 @@ func (q *Queries) GetRoomBySlug(ctx context.Context, slugFolded string) (Room, e
 		&i.ArchivedAt,
 		&i.ArchivedBy,
 		&i.MessageTtlSeconds,
+		&i.ParticipantKey,
 	)
 	return i, err
 }
@@ -234,7 +237,7 @@ func (q *Queries) ListRoomMembers(ctx context.Context, roomID uuid.UUID) ([]List
 }
 
 const listRoomsForUser = `-- name: ListRoomsForUser :many
-SELECT DISTINCT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.kind, rooms.visibility, rooms.home_server, rooms.created_by, rooms.created_at, rooms.updated_at, rooms.archived_at, rooms.archived_by, rooms.message_ttl_seconds
+SELECT DISTINCT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.kind, rooms.visibility, rooms.home_server, rooms.created_by, rooms.created_at, rooms.updated_at, rooms.archived_at, rooms.archived_by, rooms.message_ttl_seconds, rooms.participant_key
 FROM rooms
 LEFT JOIN room_members ON room_members.room_id = rooms.id AND room_members.user_id = $1
 WHERE room_members.user_id IS NOT NULL
@@ -269,6 +272,7 @@ func (q *Queries) ListRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Roo
 			&i.ArchivedAt,
 			&i.ArchivedBy,
 			&i.MessageTtlSeconds,
+			&i.ParticipantKey,
 		); err != nil {
 			return nil, err
 		}
@@ -281,7 +285,7 @@ func (q *Queries) ListRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Roo
 }
 
 const listRoomsUserIsIn = `-- name: ListRoomsUserIsIn :many
-SELECT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.kind, rooms.visibility, rooms.home_server, rooms.created_by, rooms.created_at, rooms.updated_at, rooms.archived_at, rooms.archived_by, rooms.message_ttl_seconds
+SELECT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.kind, rooms.visibility, rooms.home_server, rooms.created_by, rooms.created_at, rooms.updated_at, rooms.archived_at, rooms.archived_by, rooms.message_ttl_seconds, rooms.participant_key
 FROM rooms
 JOIN room_members ON room_members.room_id = rooms.id
 WHERE room_members.user_id = $1
@@ -312,6 +316,7 @@ func (q *Queries) ListRoomsUserIsIn(ctx context.Context, userID uuid.UUID) ([]Ro
 			&i.ArchivedAt,
 			&i.ArchivedBy,
 			&i.MessageTtlSeconds,
+			&i.ParticipantKey,
 		); err != nil {
 			return nil, err
 		}
@@ -340,7 +345,7 @@ func (q *Queries) RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberPara
 const renameRoom = `-- name: RenameRoom :one
 UPDATE rooms SET name = $2, topic = $3, updated_at = NOW()
 WHERE id = $1
-RETURNING id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds
+RETURNING id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key
 `
 
 type RenameRoomParams struct {
@@ -367,6 +372,7 @@ func (q *Queries) RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, e
 		&i.ArchivedAt,
 		&i.ArchivedBy,
 		&i.MessageTtlSeconds,
+		&i.ParticipantKey,
 	)
 	return i, err
 }
