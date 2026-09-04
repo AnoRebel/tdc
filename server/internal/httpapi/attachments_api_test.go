@@ -2,10 +2,12 @@ package httpapi_test
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"image"
 	"image/color"
 	"image/png"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -356,7 +358,10 @@ func TestFilenameIsNeutralised(t *testing.T) {
 		if strings.ContainsAny(disposition, "\r\n") {
 			t.Errorf("%q produced a header that breaks across lines: %q", hostile, disposition)
 		}
-		if !strings.HasPrefix(disposition, "attachment") {
+		// Images now play inline, so either disposition is correct here. What
+		// matters is that the name carries no separator and no line break: those
+		// are what would let a filename escape the header or imply a path.
+		if !strings.HasPrefix(disposition, "attachment") && !strings.HasPrefix(disposition, "inline") {
 			t.Errorf("%q produced a disposition of %q", hostile, disposition)
 		}
 	}
@@ -470,5 +475,184 @@ func TestUnpreviewableUploadHasNoPreviewURL(t *testing.T) {
 	// It still carries what a client needs to display it usefully.
 	if uploaded.Filename == "" || uploaded.Size == 0 {
 		t.Error("an unpreviewable file lost its name or size")
+	}
+}
+
+// TestMediaIsSeekableAndPlaysInline covers what a media element needs.
+//
+// A browser playing audio or video asks for byte ranges: it fetches the header
+// to learn the duration, then seeks. Answering every range with the whole file
+// leaves it unable to seek, and some browsers will not report a duration at
+// all — the player then shows "0:00 of 0:00" and cannot be scrubbed.
+func TestMediaIsSeekableAndPlaysInline(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "sauti.wav", testWAV())
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d: %s", recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var uploaded struct {
+		URL  string `json:"url"`
+		Kind string `json:"kind"`
+	}
+	json.Unmarshal(recorder.Body.Bytes(), &uploaded)
+
+	if uploaded.Kind != "audio" {
+		t.Errorf("a WAV was classified as %q", uploaded.Kind)
+	}
+
+	full := call(t, handler, http.MethodGet, uploaded.URL, nil, token)
+	if full.Code != http.StatusOK {
+		t.Fatalf("download returned %d", full.Code)
+	}
+
+	// Media plays where it stands rather than downloading.
+	if disposition := full.Header().Get("Content-Disposition"); !strings.HasPrefix(disposition, "inline") {
+		t.Errorf("audio is served as %q, so a browser would save it instead of playing it",
+			disposition)
+	}
+	if full.Header().Get("Accept-Ranges") != "bytes" {
+		t.Error("Accept-Ranges is missing, so a player cannot offer a seek bar")
+	}
+
+	// A sandbox directive on the response puts the resource in an opaque
+	// origin, and a media element then refuses to load it at all — the request
+	// hangs with no error. Found by playing a file in a browser; a unit test on
+	// the headers alone would happily have asserted the stricter policy.
+	policy := full.Header().Get("Content-Security-Policy")
+	if strings.Contains(policy, "sandbox") {
+		t.Errorf("media is served with %q; sandbox stops a player loading it", policy)
+	}
+	// The rest of the policy must survive, so this is still not a document.
+	if !strings.Contains(policy, "default-src 'none'") {
+		t.Errorf("media policy %q no longer restricts what it may load", policy)
+	}
+	if !strings.Contains(policy, "frame-ancestors 'none'") {
+		t.Errorf("media policy %q allows framing back into the application", policy)
+	}
+
+	// And a range request must actually be honoured.
+	request := httptest.NewRequest(http.MethodGet, uploaded.URL, nil)
+	request.Header.Set("Range", "bytes=0-99")
+	request.AddCookie(&http.Cookie{Name: "tdc_session", Value: token})
+
+	ranged := httptest.NewRecorder()
+	handler.ServeHTTP(ranged, request)
+
+	if ranged.Code != http.StatusPartialContent {
+		t.Fatalf("a range request returned %d, expected 206; seeking would not work",
+			ranged.Code)
+	}
+	if got := ranged.Body.Len(); got != 100 {
+		t.Errorf("the range returned %d bytes, asked for 100", got)
+	}
+	if ranged.Header().Get("Content-Range") == "" {
+		t.Error("the partial response does not say which range it is")
+	}
+}
+
+// TestNonMediaStillDownloads checks that making media inline did not make
+// everything inline.
+//
+// An attachment disposition is one of the things keeping uploaded content from
+// being rendered in the application's origin, so it must survive for anything
+// that is not plainly media.
+func TestNonMediaStillDownloads(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	for _, file := range []struct {
+		name    string
+		content []byte
+	}{
+		{"diagram.svg", testSVG},
+		{"archive.zip", []byte{'P', 'K', 0x03, 0x04, 0x14, 0, 0, 0, 8, 0}},
+	} {
+		recorder := uploadFile(t, handler, token, roomID, file.name, file.content)
+		if recorder.Code != http.StatusCreated {
+			t.Fatalf("uploading %s returned %d", file.name, recorder.Code)
+		}
+
+		var uploaded struct {
+			URL string `json:"url"`
+		}
+		json.Unmarshal(recorder.Body.Bytes(), &uploaded)
+
+		download := call(t, handler, http.MethodGet, uploaded.URL, nil, token)
+		disposition := download.Header().Get("Content-Disposition")
+		if !strings.HasPrefix(disposition, "attachment") {
+			t.Errorf("%s is served as %q; it must download", file.name, disposition)
+		}
+
+		// Anything not plainly media keeps the sandbox, which is what stops an
+		// uploaded document acting in the application's origin.
+		if policy := download.Header().Get("Content-Security-Policy"); !strings.Contains(policy, "sandbox") {
+			t.Errorf("%s is served with %q; it must be sandboxed", file.name, policy)
+		}
+	}
+}
+
+// testWAV builds a real WAV, so the browser-facing behaviour is exercised
+// against a file a player would actually accept.
+func testWAV() []byte {
+	const rate, seconds = 8000, 1
+	samples := rate * seconds
+
+	var file bytes.Buffer
+	write := func(values ...any) {
+		for _, value := range values {
+			binary.Write(&file, binary.LittleEndian, value)
+		}
+	}
+
+	file.WriteString("RIFF")
+	write(uint32(36 + samples*2))
+	file.WriteString("WAVEfmt ")
+	write(uint32(16), uint16(1), uint16(1), uint32(rate), uint32(rate*2), uint16(2), uint16(16))
+	file.WriteString("data")
+	write(uint32(samples * 2))
+
+	for i := 0; i < samples; i++ {
+		write(int16(math.Sin(float64(i)/rate*440*2*math.Pi) * 8000))
+	}
+
+	return file.Bytes()
+}
+
+// TestCORSPermitsRangeRequests covers what a media element needs across
+// origins.
+//
+// In development the app and the API are on different ports, so audio and video
+// are cross-origin. A browser preflights the Range header, and a preflight that
+// does not permit it makes the request stall with no error — the player never
+// loads and nothing says why. The symptom is invisible until someone tries to
+// play a file.
+func TestCORSPermitsRangeRequests(t *testing.T) {
+	handler := newTestAPIWithOrigins(t, []string{"http://localhost:3000"})
+
+	request := httptest.NewRequest(http.MethodOptions, "/api/attachments/whatever", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+	request.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	request.Header.Set("Access-Control-Request-Headers", "range")
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+
+	allowed := recorder.Header().Get("Access-Control-Allow-Headers")
+	if !strings.Contains(strings.ToLower(allowed), "range") {
+		t.Errorf("the preflight permits %q; without Range a media element stalls", allowed)
+	}
+
+	exposed := recorder.Header().Get("Access-Control-Expose-Headers")
+	for _, header := range []string{"Content-Range", "Accept-Ranges"} {
+		if !strings.Contains(exposed, header) {
+			t.Errorf("%s is not exposed, so the player cannot see that seeking works", header)
+		}
 	}
 }

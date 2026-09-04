@@ -48,6 +48,11 @@ const uploads = useUploads();
 /** Files picked but not yet sent, kept so a retry needs no second selection. */
 const pending = new Map<string, File>();
 
+// Photographs are reduced before they leave the device. A phone camera produces
+// several megabytes, and on metered mobile data sending the original to be
+// looked at on a screen is the person's money spent for nothing.
+const { resize, presets } = useImageResize();
+
 const openThreadId = ref<string | null>(null);
 const threadCounts = ref<Record<string, number>>({});
 const presenceByUser = ref<Record<string, Presence>>({});
@@ -283,14 +288,19 @@ async function pickFiles(event: Event) {
   // Cleared so picking the same file twice in a row still fires a change.
   input.value = "";
 
-  for (const file of files) {
+  for (const original of files) {
+    // Anything that is not a reducible image comes back untouched, so this is
+    // safe to apply to everything.
+    const file = await resize(original, presets.shared);
+
     const started = uploads.upload(roomId.value, file);
     void started.then((upload) => pending.set(upload.id, file));
-    pending.set(file.name, file);
   }
 }
 
 function retryUpload(id: string) {
+  // The already-reduced file, so a retry does not repeat the work or re-send
+  // the original.
   const file = pending.get(id);
   if (file) void uploads.retry(roomId.value, id, file);
 }

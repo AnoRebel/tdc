@@ -3,8 +3,10 @@ package httpapi
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,6 +37,12 @@ type attachmentResponse struct {
 	// Renderable says whether a client can expect to display this inline,
 	// which saves it guessing from the type.
 	Renderable bool `json:"renderable"`
+	// Kind says how to display it: "image", "video", "audio", "pdf", "text",
+	// "markdown", or "" for anything only downloadable. Decided here so every
+	// client makes the same choice, and so markdown — which has no magic bytes
+	// and is detected as plain text — is recognised once rather than by each
+	// client guessing from a filename.
+	Kind string `json:"kind,omitempty"`
 	// PreviewURL is a reduced version, where one exists. Empty otherwise, and
 	// a client then shows the name, size and type instead of a broken image.
 	PreviewURL string `json:"previewUrl,omitempty"`
@@ -55,6 +63,7 @@ func attachmentResponseOf(attachment *attachments.Attachment) attachmentResponse
 
 	return attachmentResponse{
 		ID:          attachment.ID.String(),
+		Kind:        attachmentKind(attachment),
 		Filename:    attachment.Filename,
 		ContentType: attachment.ContentType,
 		Size:        attachment.Size,
@@ -169,6 +178,19 @@ func (s *Server) handleDownloadAttachment(c *echo.Context) error {
 
 	setInertHeaders(c, attachment)
 
+	// A media element asks for byte ranges: it fetches the header to learn the
+	// duration, then seeks. Answering every range request with the whole file
+	// leaves it unable to seek, and some browsers will not even report a
+	// duration without range support. ServeContent handles this properly when
+	// the reader can seek, which the filesystem store's file can.
+	if seeker, ok := reader.(io.ReadSeeker); ok {
+		http.ServeContent(
+			c.Response(), c.Request(),
+			attachment.Filename, attachment.CreatedAt, seeker,
+		)
+		return nil
+	}
+
 	return c.Stream(http.StatusOK, attachments.ServingType(attachment.ContentType), reader)
 }
 
@@ -188,15 +210,68 @@ func setInertHeaders(c *echo.Context, attachment *attachments.Attachment) {
 	header := c.Response().Header()
 
 	header.Set("X-Content-Type-Options", "nosniff")
-	header.Set("Content-Disposition", downloadDisposition(attachment.Filename))
-	header.Set("Content-Security-Policy", "default-src 'none'; sandbox; frame-ancestors 'none'")
 	header.Set("X-Frame-Options", "DENY")
 	// Attachments are private to a room, so no shared cache may keep one.
 	header.Set("Cache-Control", "private, max-age=0, no-store")
 
+	// The type the browser is told about, which for active content is
+	// deliberately not the type it really is.
+	header.Set("Content-Type", attachments.ServingType(attachment.ContentType))
+
+	// Media plays rather than downloads. "inline" is safe here only because the
+	// type above is inert for anything a browser would act on: an SVG or an
+	// HTML file is already being served as application/octet-stream by the time
+	// it reaches this line, and that downloads whatever the disposition says.
+	if playsInline(attachment.ContentType) {
+		header.Set("Content-Disposition", inlineDisposition(attachment.Filename))
+		// Says seeking is possible, which a media element checks before it will
+		// offer a seek bar.
+		header.Set("Accept-Ranges", "bytes")
+
+		// Deliberately without "sandbox". A sandbox directive on a response
+		// puts the resource in an opaque origin, and a media or image element
+		// then refuses to load it at all — the request simply hangs, with no
+		// error to explain why. The remaining directives still stop this being
+		// treated as a document; what makes it safe to relax is that only
+		// audio, video and raster images reach this branch, none of which can
+		// execute. Everything else keeps the stricter policy below.
+		header.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		return
+	}
+
+	// Anything that is not plainly media is treated as hostile: sandboxed into
+	// an opaque origin, unable to load anything, and unable to be framed.
+	header.Set("Content-Security-Policy", "default-src 'none'; sandbox; frame-ancestors 'none'")
+
+	header.Set("Content-Disposition", downloadDisposition(attachment.Filename))
+
 	if attachment.Size > 0 {
 		header.Set("Content-Length", strconv.FormatInt(attachment.Size, 10))
 	}
+}
+
+// playsInline reports whether a browser should render this where it stands
+// rather than save it.
+//
+// Only audio, video and images: types a media or image element handles, none of
+// which execute. Everything else keeps the attachment disposition.
+func playsInline(contentType string) bool {
+	if contentType == "image/svg+xml" {
+		// An image by type, a document by capability. Downloaded, never shown.
+		return false
+	}
+
+	return strings.HasPrefix(contentType, "audio/") ||
+		strings.HasPrefix(contentType, "video/") ||
+		strings.HasPrefix(contentType, "image/")
+}
+
+// inlineDisposition names a file that is displayed rather than saved.
+//
+// The name still matters: it is what a browser suggests should the person
+// choose to save it after all.
+func inlineDisposition(filename string) string {
+	return "inline" + strings.TrimPrefix(downloadDisposition(filename), "attachment")
 }
 
 // contentDisposition names the download, with the filename escaped.
@@ -334,4 +409,34 @@ func parseAttachmentIDs(raw []string) ([]uuid.UUID, error) {
 	}
 
 	return ids, nil
+}
+
+// attachmentKind says how a client should display an attachment.
+//
+// Decided on the server so every client — web, desktop, and anything a third
+// party writes — makes the same choice, and so a change of policy does not need
+// each of them updated.
+func attachmentKind(attachment *attachments.Attachment) string {
+	contentType := attachment.ContentType
+
+	switch {
+	case contentType == "image/svg+xml":
+		// Served as an opaque download, so not displayable at all.
+		return ""
+	case strings.HasPrefix(contentType, "image/"):
+		return "image"
+	case strings.HasPrefix(contentType, "video/"):
+		return "video"
+	case strings.HasPrefix(contentType, "audio/"):
+		return "audio"
+	case contentType == "application/pdf":
+		return "pdf"
+	case attachments.IsTextual(contentType):
+		if attachments.IsMarkdown(contentType, attachment.Filename) {
+			return "markdown"
+		}
+		return "text"
+	default:
+		return ""
+	}
 }

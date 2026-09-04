@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Attachment } from "@tdc/types";
-import { Download, FileText, Music, Play } from "lucide-vue-next";
+import { Download, FileCode, FileText, Music, Play } from "lucide-vue-next";
 
 /**
  * A message's attachments, as they appear in the conversation.
@@ -33,9 +33,18 @@ function readableSize(bytes: number): string {
 
 /** The icon for a file with no preview, so the type is legible at a glance. */
 function iconFor(attachment: Attachment) {
-  if (attachment.contentType.startsWith("video/")) return Play;
-  if (attachment.contentType.startsWith("audio/")) return Music;
-  return FileText;
+  switch (attachment.kind) {
+    case "video":
+      return Play;
+    case "audio":
+      return Music;
+    case "markdown":
+      return FileText;
+    case "text":
+      return FileCode;
+    default:
+      return FileText;
+  }
 }
 
 /**

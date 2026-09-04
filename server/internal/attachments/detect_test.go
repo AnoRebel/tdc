@@ -140,9 +140,80 @@ func TestRenderableExcludesSVG(t *testing.T) {
 		}
 	}
 
-	for _, not := range []string{"application/zip", "text/plain", "application/octet-stream"} {
+	// Text is viewable now that there is a viewer for it; these are the types
+	// with nothing to show but their name and size.
+	for _, not := range []string{"application/zip", "application/octet-stream"} {
 		if attachments.IsRenderable(not) {
 			t.Errorf("%q is reported as renderable", not)
 		}
+	}
+}
+
+// TestTextualTypesAreViewable covers the files a developer community actually
+// passes around — logs, configuration, patches — which are worth reading in
+// place rather than downloading to see three lines.
+func TestTextualTypesAreViewable(t *testing.T) {
+	for _, textual := range []string{
+		"text/plain",
+		"text/markdown",
+		"text/csv",
+		"application/json",
+		"application/yaml",
+		"application/toml",
+	} {
+		if !attachments.IsTextual(textual) {
+			t.Errorf("%q is not treated as text", textual)
+		}
+		if !attachments.IsRenderable(textual) {
+			t.Errorf("%q is not viewable, so it would only be downloadable", textual)
+		}
+	}
+}
+
+// TestActiveTextTypesStayUnviewable is the important half of the same rule.
+//
+// text/html is text, and rendering it is exactly what must never happen: it
+// would run in the application's origin with the reader's session available.
+// The type test must not accidentally let it through.
+func TestActiveTextTypesStayUnviewable(t *testing.T) {
+	for _, active := range []string{
+		"text/html",
+		"application/xhtml+xml",
+		"text/xml",
+		"application/xml",
+		"image/svg+xml",
+		"application/javascript",
+		"text/javascript",
+	} {
+		if attachments.IsTextual(active) {
+			t.Errorf("%q is treated as ordinary text; it must not be", active)
+		}
+		if attachments.IsRenderable(active) {
+			t.Errorf("%q is reported as viewable; a client might then render it", active)
+		}
+	}
+}
+
+// TestMarkdownIsRecognisedByName checks the case detection cannot cover.
+//
+// Markdown has no magic bytes: a document opening with a heading is
+// indistinguishable from one opening with a hash, so every detector reports it
+// as text/plain. The filename is the only evidence there is.
+func TestMarkdownIsRecognisedByName(t *testing.T) {
+	for _, name := range []string{"README.md", "notes.markdown", "CHANGELOG.MD", "guide.mdown"} {
+		if !attachments.IsMarkdown("text/plain", name) {
+			t.Errorf("%q is not recognised as markdown", name)
+		}
+	}
+
+	for _, name := range []string{"notes.txt", "server.log", "data.json", "mdfile", "a.md.txt"} {
+		if attachments.IsMarkdown("text/plain", name) {
+			t.Errorf("%q is treated as markdown", name)
+		}
+	}
+
+	// A declared type settles it regardless of the name.
+	if !attachments.IsMarkdown("text/markdown", "no-extension") {
+		t.Error("a declared markdown type was not honoured")
 	}
 }

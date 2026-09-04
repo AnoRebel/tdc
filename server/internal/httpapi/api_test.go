@@ -30,7 +30,19 @@ import (
 const testPassword = "correct horse battery staple"
 
 // newTestAPI builds a server over a real database, cleaned before and after.
+// newTestAPIWithOrigins builds a handler that permits a cross-origin caller,
+// for the tests that exercise browser behaviour across origins.
+func newTestAPIWithOrigins(t *testing.T, origins []string) http.Handler {
+	t.Helper()
+	return newTestAPIConfigured(t, origins)
+}
+
 func newTestAPI(t *testing.T) http.Handler {
+	t.Helper()
+	return newTestAPIConfigured(t, nil)
+}
+
+func newTestAPIConfigured(t *testing.T, origins []string) http.Handler {
 	t.Helper()
 
 	url := dbtest.URL(t, "httpapi")
@@ -79,7 +91,8 @@ func newTestAPI(t *testing.T) http.Handler {
 		SessionLifetime: time.Hour,
 		// Off so the test client's cookie jar behaves as a browser would over
 		// plain HTTP.
-		SecureCookies: false,
+		SecureCookies:  false,
+		AllowedOrigins: origins,
 	}, pool, httpapi.Services{
 		Identity: identity.NewService(queries, logger),
 		Authz:    authz.NewService(queries),

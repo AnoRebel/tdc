@@ -75,6 +75,12 @@ export default typescript.config(
       // An optional pass-through `class` has no sensible default — undefined
       // is exactly what the class merger expects when nothing is given.
       "vue/require-default-prop": "off",
+      // v-html is genuinely dangerous and the warning is right to exist, but
+      // the rule cannot see that a value was sanitised. It stays a warning
+      // rather than an error so that each use has to be justified in review
+      // without blocking the build; the only current use renders markdown that
+      // has been through a parser with raw HTML disabled and then DOMPurify.
+      "vue/no-v-html": "warn",
     },
   },
 );

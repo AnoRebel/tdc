@@ -35,7 +35,13 @@ FROM alpine:3.21 AS runtime
 # ca-certificates is needed for outbound TLS (federation, link previews,
 # webhooks). tzdata so timestamps render in the operator's zone.
 RUN apk add --no-cache ca-certificates tzdata \
-    && adduser -D -u 10001 -h /home/tdc tdc
+    && adduser -D -u 10001 -h /home/tdc tdc \
+    # Created here, owned by the unprivileged user, because Docker copies the
+    # ownership of an image directory onto a fresh named volume mounted over
+    # it. Without this the volume arrives owned by root and the server — which
+    # deliberately does not run as root — cannot write an attachment to it.
+    && mkdir -p /var/lib/tdc/attachments \
+    && chown -R tdc:tdc /var/lib/tdc
 
 COPY --from=build /out/tdc-server /usr/local/bin/tdc-server
 

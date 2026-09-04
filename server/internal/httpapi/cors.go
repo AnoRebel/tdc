@@ -17,11 +17,26 @@ import (
 // by default, which is correct for the normal deployment where the web app is
 // served from the same origin as the API.
 func cors(allowedOrigins []string) echo.MiddlewareFunc {
+	// Exposed on every response, not only preflights: a browser hides response
+	// headers from script unless they are listed here, and a media element
+	// needs to see the range headers to know seeking is possible.
+	exposedHeaders := strings.Join([]string{
+		"Content-Length",
+		"Content-Range",
+		"Accept-Ranges",
+		"Content-Disposition",
+	}, ", ")
+
 	allowedHeaders := strings.Join([]string{
 		echo.HeaderOrigin,
 		echo.HeaderContentType,
 		echo.HeaderAccept,
 		echo.HeaderAuthorization,
+		// A media element playing from another origin asks for byte ranges,
+		// and a preflight that does not permit the header makes the request
+		// stall with no error at all — the player simply never loads. Cheap to
+		// allow, and invisible until audio is tried across origins.
+		"Range",
 	}, ", ")
 
 	allowedMethods := strings.Join([]string{
@@ -47,6 +62,7 @@ func cors(allowedOrigins []string) echo.MiddlewareFunc {
 			if origin != "" && slices.Contains(allowedOrigins, origin) {
 				header.Set(echo.HeaderAccessControlAllowOrigin, origin)
 				header.Set(echo.HeaderAccessControlAllowCredentials, "true")
+				header.Set(echo.HeaderAccessControlExposeHeaders, exposedHeaders)
 
 				if c.Request().Method == http.MethodOptions {
 					header.Set(echo.HeaderAccessControlAllowMethods, allowedMethods)

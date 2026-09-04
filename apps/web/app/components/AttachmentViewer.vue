@@ -30,21 +30,14 @@ const dialog = ref<HTMLElement | null>(null);
 const current = computed(() => props.attachments[index.value]);
 const hasSeveral = computed(() => props.attachments.length > 1);
 
-/** How a given attachment should be displayed. */
-const kind = computed<"image" | "video" | "audio" | "pdf" | "none">(() => {
-  const type = current.value?.contentType ?? "";
-
-  // SVG is an image by type and a document by capability, and the server hands
-  // it back as an opaque download for that reason. Rendering it here would
-  // undo that.
-  if (type === "image/svg+xml") return "none";
-
-  if (type.startsWith("image/")) return "image";
-  if (type.startsWith("video/")) return "video";
-  if (type.startsWith("audio/")) return "audio";
-  if (type === "application/pdf") return "pdf";
-  return "none";
-});
+/**
+ * How a given attachment should be displayed.
+ *
+ * Taken from the server rather than derived from the content type here. Markdown
+ * has no magic bytes and is detected as plain text, so the decision needs the
+ * filename too — and making it once on the server means every client agrees.
+ */
+const kind = computed(() => current.value?.kind ?? "none");
 
 function next() {
   if (hasSeveral.value) index.value = (index.value + 1) % props.attachments.length;
@@ -144,21 +137,35 @@ onBeforeUnmount(() => {
           @click.stop
         />
 
+        <!-- As with audio: a cross-origin media element sends no cookies
+             unless asked, and the session is a cookie. -->
         <video
           v-else-if="kind === 'video'"
           :src="mediaUrl(current!.url)"
+          crossorigin="use-credentials"
           controls
           autoplay
           class="max-h-full max-w-full rounded-lg"
           @click.stop
         />
 
-        <audio
+        <AudioPlayer
           v-else-if="kind === 'audio'"
           :src="mediaUrl(current!.url)"
-          controls
-          autoplay
-          class="w-full max-w-lg"
+          :title="current!.filename"
+          @click.stop
+        />
+
+        <!-- Text and markdown are fetched and rendered here rather than handed
+             to the browser as a document: the server serves attachments
+             inertly so nothing interprets them, and a frame would undo that. -->
+        <TextViewer
+          v-else-if="kind === 'text' || kind === 'markdown'"
+          :src="mediaUrl(current!.url)"
+          :filename="current!.filename"
+          :kind="kind"
+          :size="current!.size"
+          class="max-h-full"
           @click.stop
         />
 

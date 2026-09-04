@@ -84,7 +84,57 @@ func IsRenderable(detected string) bool {
 		return true
 	case detected == "application/pdf":
 		return true
+	case IsTextual(detected):
+		return true
 	default:
 		return false
 	}
+}
+
+// IsTextual reports whether an attachment is text a person can read.
+//
+// A shared log, patch or configuration file is something people in a developer
+// community pass around constantly, and downloading one to look at three lines
+// is a poor experience. These are still served inertly — the client fetches the
+// bytes and renders them as text it escapes itself, never as markup a browser
+// interprets.
+//
+// Detection reports most source files as text/plain, so the specific types here
+// are the ones that carry their own identity.
+func IsTextual(detected string) bool {
+	switch detected {
+	case "text/plain",
+		"text/markdown",
+		"text/csv",
+		"text/tab-separated-values",
+		"application/json",
+		"application/x-ndjson",
+		"application/toml",
+		"application/yaml",
+		"text/x-yaml",
+		"text/x-log":
+		return true
+	}
+
+	// Anything else claiming to be text is still text, but the guard above
+	// keeps types like text/html — which must never be rendered — out.
+	return false
+}
+
+// IsMarkdown reports whether an attachment should be rendered as markdown
+// rather than shown as plain text.
+//
+// Decided from the type where one is declared, and otherwise from the file's
+// name, because detection reports a .md file as text/plain: markdown has no
+// magic bytes, and a document that opens with a heading is indistinguishable
+// from one that opens with a hash.
+func IsMarkdown(detected, filename string) bool {
+	if detected == "text/markdown" {
+		return true
+	}
+
+	lower := strings.ToLower(filename)
+	return strings.HasSuffix(lower, ".md") ||
+		strings.HasSuffix(lower, ".markdown") ||
+		strings.HasSuffix(lower, ".mdown")
 }

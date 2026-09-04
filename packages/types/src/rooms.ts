@@ -122,6 +122,12 @@ export interface Attachment {
   /** Whether a client can be expected to display this inline. */
   renderable: boolean;
   /**
+   * How to display it. Decided by the server so every client agrees, and so
+   * markdown — which has no magic bytes and is detected as plain text — is
+   * recognised once rather than by each client guessing from a filename.
+   */
+  kind?: "image" | "video" | "audio" | "pdf" | "text" | "markdown";
+  /**
    * A reduced version, where one exists. Absent for anything that is not an
    * image, and a client then shows the name, size and type instead of a broken
    * image.
