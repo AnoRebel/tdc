@@ -9,6 +9,13 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
+/*
+ * The date picker's own styles, imported before the variables below so that
+ * ours win. It is themed entirely through CSS variables, which is why it fits
+ * here rather than needing its markup overridden.
+ */
+@import "@vuepic/vue-datepicker/dist/main.css";
+
 @custom-variant dark (&:is(.dark *));
 
 /*
@@ -372,4 +379,87 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * The date picker, in this application's colours.
+ *
+ * A component rather than the browser's own datetime input, because that
+ * renders as a different control on every platform — a wheel on iOS, a
+ * dropdown on Chrome, nothing at all on Firefox for some types — and none of
+ * them can be made to look like the rest of this.
+ *
+ * Mapped onto the existing tokens rather than given its own palette, so a
+ * change to the theme reaches the picker without anybody remembering to update
+ * a second list of colours.
+ */
+/*
+ * The class names below are v14's. The documentation still shows the v13
+ * spelling (dp__theme_dark), which does not match anything the component
+ * emits — so variables written against it silently never applied and the
+ * picker kept its own grey.
+ */
+.dp--theme-dark,
+.dp--theme-light,
+.dp--menu-wrapper,
+.dp__main {
+  --dp-background-color: var(--color-surface);
+  --dp-text-color: var(--color-foreground);
+  --dp-hover-color: var(--color-accent);
+  --dp-hover-text-color: var(--color-accent-foreground);
+  --dp-hover-icon-color: var(--color-foreground);
+  --dp-primary-color: var(--color-primary);
+  --dp-primary-text-color: var(--color-primary-foreground);
+  --dp-primary-disabled-color: var(--color-muted);
+  --dp-secondary-color: var(--color-muted-foreground);
+  --dp-border-color: var(--color-border);
+  --dp-menu-border-color: var(--color-border);
+  --dp-border-color-hover: var(--color-border-strong);
+  --dp-border-color-focus: var(--color-ring);
+  --dp-disabled-color: var(--color-muted);
+  --dp-disabled-color-text: var(--color-muted-foreground);
+  --dp-scroll-bar-background: var(--color-surface);
+  --dp-scroll-bar-color: var(--color-border-strong);
+  --dp-success-color: var(--color-success);
+  --dp-icon-color: var(--color-muted-foreground);
+  --dp-danger-color: var(--color-destructive);
+  --dp-marker-color: var(--color-primary);
+  --dp-tooltip-color: var(--color-surface-raised);
+  --dp-highlight-color: color-mix(in oklab, var(--color-primary) 15%, transparent);
+
+  /* Matching the rest of the interface rather than the library's defaults. */
+  --dp-font-family: inherit;
+  --dp-border-radius: var(--radius-md);
+  --dp-cell-border-radius: var(--radius-sm);
+  --dp-font-size: 0.8125rem;
+  --dp-preview-font-size: 0.75rem;
+  --dp-time-font-size: 0.8125rem;
+  --dp-cell-size: 32px;
+  --dp-button-height: 32px;
+  --dp-menu-min-width: 17rem;
+}
+
+/*
+ * The menu is teleported to the body, so it sits outside the dialog that
+ * opened it — as a sibling of that dialog rather than a child.
+ *
+ * It therefore has to out-rank the dialog's own backdrop, not merely the page
+ * beneath it. A value equal to the dialog's loses on document order alone,
+ * which is why the calendar was appearing behind the panel that opened it.
+ */
+.dp--menu-wrapper {
+  /*
+   * Fixed rather than absolute, which is what the library uses by default.
+   * The dialog that opens this is fixed, and a fixed element paints above an
+   * absolute sibling regardless of z-index — so the calendar kept appearing
+   * behind the panel it belongs to.
+   */
+  position: fixed;
+  z-index: 70;
+}
+
+/* The library draws its own shadow; this matches the application's. */
+.dp--menu {
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
 }
