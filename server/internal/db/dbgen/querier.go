@@ -78,6 +78,7 @@ type Querier interface {
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
+	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
 	// Raises a notification, once.
 	//
 	// The conflict clause is what stops a redelivered or edited message notifying
@@ -104,6 +105,8 @@ type Querier interface {
 	DeleteServerConfigValue(ctx context.Context, key string) error
 	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
+	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)
+	FindInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
@@ -129,6 +132,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
+	HasUsedInvitation(ctx context.Context, arg HasUsedInvitationParams) (bool, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
@@ -148,6 +152,13 @@ type Querier interface {
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	// Who joined through one invitation, newest first.
+	ListInvitationUsers(ctx context.Context, invitationID uuid.UUID) ([]ListInvitationUsersRow, error)
+	// What a channel has outstanding, for whoever manages it.
+	//
+	// Includes revoked and expired ones: somebody auditing what was issued needs
+	// to see what has been withdrawn, not only what still works.
+	ListInvitationsForRoom(ctx context.Context, arg ListInvitationsForRoomParams) ([]Invitation, error)
 	ListNotificationPreferences(ctx context.Context, userID uuid.UUID) ([]ListNotificationPreferencesRow, error)
 	// The moderation queue: oldest first, so nothing waits indefinitely behind
 	// newer arrivals.
@@ -201,6 +212,7 @@ type Querier interface {
 	// Somebody's own outstanding messages, soonest first.
 	ListScheduledMessagesForUser(ctx context.Context, senderID uuid.UUID) ([]ScheduledMessage, error)
 	ListServerConfig(ctx context.Context) ([]ServerConfig, error)
+	ListServerInvitations(ctx context.Context, limit int32) ([]Invitation, error)
 	ListServerStatuses(ctx context.Context) ([]ServerStatus, error)
 	ListSessionsForUser(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	ListThreadReplies(ctx context.Context, threadRootID *string) ([]Event, error)
@@ -255,6 +267,16 @@ type Querier interface {
 	// A person's own pinned conversation, which says nothing to anybody else.
 	PinRoom(ctx context.Context, arg PinRoomParams) error
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
+	// Claims one use, atomically.
+	//
+	// The count is incremented in the same statement that checks it, so two people
+	// accepting the last use of an invitation cannot both succeed. A check
+	// followed by an update would be a race with a real consequence: an invitation
+	// limited to one use admitting two people.
+	RecordInvitationUse(ctx context.Context, id uuid.UUID) (int64, error)
+	// Who accepted, for the audit trail. ON CONFLICT DO NOTHING because somebody
+	// accepting twice is one person, not two.
+	RecordInvitationUser(ctx context.Context, arg RecordInvitationUserParams) error
 	// Removes content while leaving the event in place, so ordering and the
 	// surrounding events stay verifiable.
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
@@ -272,6 +294,9 @@ type Querier interface {
 	ResolveReport(ctx context.Context, arg ResolveReportParams) (Report, error)
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
+	// Revoking is idempotent in effect but recorded once: a second revocation
+	// leaves the first one's timestamp, which is when it actually stopped working.
+	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (Invitation, error)
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
 	// Full-text search, restricted to rooms the caller is in.

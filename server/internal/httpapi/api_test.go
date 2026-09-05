@@ -22,6 +22,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/invitations"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/presence"
@@ -106,7 +107,7 @@ func newTestAPIConfigured(
 			// Settings are global rather than owned by a user or a room, so
 			// unlike everything else here they survive into the next test and
 			// silently change its policy.
-			"DELETE FROM server_config",
+			"DELETE FROM server_config", "DELETE FROM invitations",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)
@@ -150,11 +151,12 @@ func newTestAPIConfigured(
 			attachments.NewService(pool, testStore(t), attachments.DefaultLimits(), logger),
 			adjust,
 		),
-		Search:     search.NewService(pool),
-		Notify:     notify.NewService(pool, logger),
-		Moderation: moderation.NewService(pool, logger),
-		Settings:   settings.NewService(pool, logger),
-		Presence:   presence.NewService(queries),
+		Search:      search.NewService(pool),
+		Notify:      notify.NewService(pool, logger),
+		Moderation:  moderation.NewService(pool, logger),
+		Settings:    settings.NewService(pool, logger),
+		Invitations: invitations.NewService(pool, logger),
+		Presence:    presence.NewService(queries),
 	}, logger)
 
 	t.Cleanup(func() {

@@ -84,6 +84,28 @@ type EventIdempotency struct {
 	CreatedAt   time.Time
 }
 
+type Invitation struct {
+	ID               uuid.UUID
+	TokenHash        []byte
+	CodeHash         []byte
+	RoomID           *uuid.UUID
+	CreatedBy        *uuid.UUID
+	CreatedByAddress string
+	BoundTo          *string
+	MaxUses          *int32
+	Uses             int32
+	ExpiresAt        *time.Time
+	RevokedAt        *time.Time
+	RevokedBy        *uuid.UUID
+	CreatedAt        time.Time
+}
+
+type InvitationUse struct {
+	InvitationID uuid.UUID
+	UserID       uuid.UUID
+	UsedAt       time.Time
+}
+
 type MessageSearch struct {
 	EventID       string
 	RoomID        uuid.UUID

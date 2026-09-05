@@ -95,8 +95,20 @@ a number nobody chose would stop working for reasons its operator cannot see.
 `/api/admin/usage` reports what is being used against what is allowed, so a
 limit is visible before it starts refusing.
 
-The `invitation` policy currently refuses everybody, because invitations are
-not built yet. Choosing it today is choosing to close registration.
+Under the `invitation` policy somebody registers with a link or a code an
+existing member issued. Channels have their own invitations too, for admitting
+somebody to one conversation rather than to the server.
+
+An invitation may expire, carry a use limit, and be bound to one email address
+so that forwarding it does not work. Revoking one takes effect immediately —
+somebody already holding the link cannot be un-sent it, so the only withdrawal
+is the server refusing to honour it.
+
+Every refusal is the same refusal. Expired, exhausted, revoked, bound to
+somebody else and never-existent all answer identically, because a response
+that distinguished them would tell somebody guessing codes when they had
+guessed right. Codes are rate limited far more strictly than links for the same
+reason: a code is short enough to type, and therefore short enough to guess at.
 
 ### Optional external services
 

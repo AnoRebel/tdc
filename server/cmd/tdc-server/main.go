@@ -27,6 +27,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/gifs"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/invitations"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/presence"
@@ -152,7 +153,8 @@ func run() error {
 		Moderation:  moderation.NewService(pool, log),
 		// Policy an operator changes while the server runs, as distinct from
 		// the configuration file that decides how the process is wired.
-		Settings: settings.NewService(pool, log),
+		Settings:    settings.NewService(pool, log),
+		Invitations: invitations.NewService(pool, log),
 		// Off unless an operator configured a provider and a key. Searches are
 		// proxied through this server, so the key stays here and the provider
 		// sees one server rather than everybody using it.

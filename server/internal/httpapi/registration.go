@@ -50,13 +50,7 @@ func (s *Server) mayRegister(ctx context.Context, email, invitation string) erro
 		return errRegistrationClosed
 
 	case "invitation":
-		// Invitations are not built yet, so this refuses everybody rather than
-		// pretending to check one. An operator choosing it today is choosing
-		// to close registration, which is at least what it looks like.
-		if invitation == "" {
-			return errInvitationRequired
-		}
-		return errInvitationRequired
+		return s.invitationAdmits(ctx, invitation, email)
 
 	case "domain":
 		return s.emailDomainAllowed(ctx, email)
@@ -67,6 +61,28 @@ func (s *Server) mayRegister(ctx context.Context, email, invitation string) erro
 		// its own registration.
 		return nil
 	}
+}
+
+/*
+invitationAdmits checks the invitation somebody registered with.
+
+Only whether it would be accepted, not accepting it: the account does not exist
+yet, so there is nobody to record as having used it. The use is claimed after
+the account is created, which is why this and that are separate steps.
+
+Every refusal is the same refusal, for the same reason the redemption endpoint
+gives one: distinguishing "expired" from "no such invitation" during
+registration would make the registration form an oracle for guessing codes.
+*/
+func (s *Server) invitationAdmits(ctx context.Context, secret, email string) error {
+	if s.invitations == nil || strings.TrimSpace(secret) == "" {
+		return errInvitationRequired
+	}
+
+	if !s.invitations.WouldAdmit(ctx, secret, email) {
+		return errInvitationRequired
+	}
+	return nil
 }
 
 /*

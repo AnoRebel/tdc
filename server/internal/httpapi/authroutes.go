@@ -127,6 +127,13 @@ func (s *Server) handleRegister(c *echo.Context) error {
 		return registrationError(err)
 	}
 
+	// The invitation is claimed once the account exists, since there was
+	// nobody to record as having used it before. A failure here costs the use
+	// count, not the account.
+	if s.invitations != nil && request.Invitation != "" {
+		s.invitations.ClaimForRegistration(ctx, request.Invitation, user.ID)
+	}
+
 	// Recorded before the response, so an account never exists without the
 	// record of its creation.
 	if err := s.audit.Record(ctx, audit.Entry{

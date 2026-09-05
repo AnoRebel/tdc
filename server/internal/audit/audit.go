@@ -35,6 +35,13 @@ const (
 	ActionUserSuspended  Action = "user.suspended"
 	ActionUserReinstated Action = "user.reinstated"
 
+	// Invitations: who issued one, who accepted it, and who withdrew it. The
+	// secret itself is never recorded — a log holding working invitations
+	// would be a second place they leak from.
+	ActionInvitationIssued   Action = "invitation.issued"
+	ActionInvitationAccepted Action = "invitation.accepted"
+	ActionInvitationRevoked  Action = "invitation.revoked"
+
 	// Server configuration an operator changes while it runs.
 	ActionSettingChanged Action = "server.setting.changed"
 

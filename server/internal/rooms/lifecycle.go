@@ -339,3 +339,59 @@ func (s *Service) RoomsUserIsIn(ctx context.Context, userID uuid.UUID) ([]dbgen.
 	}
 	return joined, nil
 }
+
+/*
+AddMemberByInvitation admits somebody who holds a valid invitation.
+
+Distinct from Join, which admits anybody to a public room and refuses a private
+one — an invitation is the authority a private channel is joined by, so the
+visibility check that Join makes would refuse exactly the case this exists for.
+
+The caller has already established that the invitation is valid and names this
+room. This does not re-check it: an authority checked in two places is an
+authority two places can disagree about.
+*/
+func (s *Service) AddMemberByInvitation(ctx context.Context, roomID, userID uuid.UUID) error {
+	room, err := s.store.GetRoomByID(ctx, roomID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrRoomNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("read room: %w", err)
+	}
+
+	// An archived channel is not joined, however somebody was invited to it:
+	// the invitation may predate the archiving.
+	if room.ArchivedAt != nil {
+		return ErrArchived
+	}
+
+	already, err := s.store.IsRoomMember(ctx, dbgen.IsRoomMemberParams{
+		RoomID: roomID, UserID: userID,
+	})
+	if err != nil {
+		return fmt.Errorf("check membership: %w", err)
+	}
+	if already {
+		return nil
+	}
+
+	if err := s.store.AddRoomMember(ctx, dbgen.AddRoomMemberParams{
+		RoomID: roomID, UserID: userID,
+	}); err != nil {
+		return fmt.Errorf("add member: %w", err)
+	}
+
+	user, err := s.store.GetUserByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("read user: %w", err)
+	}
+
+	content, err := json.Marshal(map[string]any{"member": s.UserAddress(user.Username)})
+	if err != nil {
+		return fmt.Errorf("encode join: %w", err)
+	}
+
+	_, err = s.append(ctx, room, user, events.TypeMemberJoined, content, "")
+	return err
+}

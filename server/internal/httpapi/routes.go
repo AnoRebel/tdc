@@ -54,6 +54,13 @@ func (s *Server) routes() {
 	// message, which is one request per message drawn.
 	rooms.GET("/:id/threads", s.handleThreadSummaries)
 
+	// Invitations to a channel. Issuing takes the invite permission, since an
+	// invitation admits somebody to a conversation and that is the channel's
+	// decision rather than any member's.
+	rooms.GET("/:id/invitations", s.handleListChannelInvitations)
+	rooms.POST("/:id/invitations", s.handleIssueChannelInvitation,
+		requirePermission(authz.PermChannelInvite))
+
 	// Reactions. Read for the whole timeline at once, for the same reason
 	// thread counts are: a request per message is a request per message drawn.
 	rooms.GET("/:id/reactions", s.handleRoomReactions)
@@ -127,6 +134,12 @@ func (s *Server) routes() {
 	// Searching a third-party GIF library, when an operator has configured
 	// one. Authenticated, so this server is not an open proxy to somebody
 	// else's API on the operator's key.
+	// Redeeming an invitation. Authenticated: an invitation admits an account
+	// to something, so there has to be an account.
+	s.echo.POST("/api/invitations/redeem", s.handleRedeemInvitation, requireAuthentication)
+	s.echo.DELETE("/api/invitations/:id", s.handleRevokeInvitation, requireAuthentication,
+		requirePermission(authz.PermChannelInvite))
+
 	s.echo.GET("/api/gifs", s.handleSearchGifs, requireAuthentication)
 
 	s.echo.GET("/api/search", s.handleSearch, requireAuthentication)
@@ -162,6 +175,13 @@ func (s *Server) routes() {
 		requirePermission(authz.PermRoleManage))
 	admin.GET("/audit", s.handleReadAudit,
 		requirePermission(authz.PermServerViewAudit))
+
+	// Invitations to the server itself, for the registration policy that
+	// requires one.
+	admin.GET("/invitations", s.handleListServerInvitations,
+		requirePermission(authz.PermUserInvite))
+	admin.POST("/invitations", s.handleIssueServerInvitation,
+		requirePermission(authz.PermUserInvite))
 
 	// Policy an operator changes while the server runs: who may register, how
 	// much this server will hold.
