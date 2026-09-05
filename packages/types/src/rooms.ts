@@ -122,11 +122,26 @@ export interface Attachment {
   /** Whether a client can be expected to display this inline. */
   renderable: boolean;
   /**
+   * What the sender wrote about this file. Per attachment, so several sent
+   * together can each say something different.
+   */
+  caption?: string;
+  /**
    * How to display it. Decided by the server so every client agrees, and so
    * markdown — which has no magic bytes and is detected as plain text — is
    * recognised once rather than by each client guessing from a filename.
    */
-  kind?: "image" | "video" | "audio" | "pdf" | "text" | "markdown";
+  kind?:
+    | "image"
+    | "video"
+    | "audio"
+    | "pdf"
+    | "text"
+    | "markdown"
+    | "code"
+    | "archive"
+    | "document"
+    | "file";
   /**
    * A reduced version, where one exists. Absent for anything that is not an
    * image, and a client then shows the name, size and type instead of a broken
@@ -144,6 +159,54 @@ export interface Attachment {
 }
 
 /** What an operator permits to be uploaded. */
+/** A reaction, grouped by emoji rather than listed per person. */
+export interface Reaction {
+  emoji: string;
+  count: number;
+  /** Everybody who reacted, as addresses, so a client can name them. */
+  users: string[];
+  /** Whether the reader is among them, so the button can show its state. */
+  mine: boolean;
+}
+
+/** A message a room has marked as important. */
+export interface PinnedMessage {
+  message: Message;
+  pinnedBy: string;
+  pinnedAt: number;
+}
+
+/** Something written now and sent later. */
+export interface ScheduledMessage {
+  id: string;
+  roomId: string;
+  body: string;
+  attachments?: string[];
+  threadRoot?: string;
+  /** Milliseconds since the epoch. */
+  sendAt: number;
+}
+
+/** Why something was reported. */
+export type ReportReason =
+  "spam" | "harassment" | "hate" | "violence" | "sexual" | "illegal" | "other";
+
+/** A filed complaint. */
+export interface Report {
+  id: string;
+  roomId?: string;
+  eventId?: string;
+  subject: string;
+  reporter?: string;
+  reason: ReportReason;
+  detail?: string;
+  /** A copy of what was reported, kept so the report survives a deletion. */
+  reportedBody?: string;
+  status: "open" | "resolved" | "dismissed";
+  resolution?: string;
+  createdAt: number;
+}
+
 export interface AttachmentLimits {
   maxFileSize: number;
   maxMessageSize: number;

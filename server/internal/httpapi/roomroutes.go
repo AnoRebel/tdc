@@ -304,7 +304,7 @@ func (s *Server) handleEditMessage(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	event, err := s.rooms.EditMessage(ctx, roomID, user.ID, c.Param("eventId"), request.Body)
+	event, err := s.rooms.EditMessage(ctx, roomID, user.ID, eventIDParam(c), request.Body)
 	if err != nil {
 		return roomError(err)
 	}
@@ -326,7 +326,7 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 	// service enforces authorship when it is absent.
 	moderator := currentPermissions(c).AllowsChannel(authz.PermMessageDeleteAny, roomID).Allowed
 
-	event, err := s.rooms.DeleteMessage(ctx, roomID, user.ID, c.Param("eventId"), moderator)
+	event, err := s.rooms.DeleteMessage(ctx, roomID, user.ID, eventIDParam(c), moderator)
 	if err != nil {
 		return roomError(err)
 	}
@@ -337,18 +337,18 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 	//
 	// Logged rather than returned: the message is already deleted, and failing
 	// the request now would suggest to the caller that it was not.
-	if err := s.attachments.DeleteForEvent(ctx, c.Param("eventId")); err != nil {
+	if err := s.attachments.DeleteForEvent(ctx, eventIDParam(c)); err != nil {
 		s.log.Error("cannot remove a deleted message's attachments",
-			"eventId", c.Param("eventId"), "error", err)
+			"eventId", eventIDParam(c), "error", err)
 	}
 
 	// A deleted message that stayed searchable would be a deletion that did
 	// not delete: the placeholder says the content is gone, and search has to
 	// agree.
 	if s.search != nil {
-		if err := s.search.Unindex(ctx, c.Param("eventId")); err != nil {
+		if err := s.search.Unindex(ctx, eventIDParam(c)); err != nil {
 			s.log.Error("cannot remove a deleted message from the search index",
-				"eventId", c.Param("eventId"), "error", err)
+				"eventId", eventIDParam(c), "error", err)
 		}
 	}
 

@@ -38,7 +38,7 @@ func (s *Server) handleReact(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	err = s.rooms.React(c.Request().Context(), roomID, user.ID, c.Param("eventId"), request.Emoji)
+	err = s.rooms.React(c.Request().Context(), roomID, user.ID, eventIDParam(c), request.Emoji)
 	if errors.Is(err, rooms.ErrNotAnEmoji) {
 		return echo.NewHTTPError(http.StatusBadRequest, "a reaction must be a single emoji")
 	}
@@ -65,7 +65,7 @@ func (s *Server) handleUnreact(c *echo.Context) error {
 	}
 
 	if err := s.rooms.Unreact(
-		c.Request().Context(), roomID, user.ID, c.Param("eventId"), emoji,
+		c.Request().Context(), roomID, user.ID, eventIDParam(c), emoji,
 	); err != nil {
 		return roomError(err)
 	}

@@ -4,14 +4,18 @@ import { isApiError } from "@tdc/types";
 import type { MenuItem } from "~/components/ContextMenu.vue";
 import {
   Check,
+  CheckSquare,
   Copy,
+  Flag,
+  Forward,
   Hash,
+  Lock,
   Maximize2,
+  MessageSquareText,
   MoreVertical,
   Paperclip,
-  Lock,
-  MessageSquareText,
   Pencil,
+  Pin,
   SendHorizontal,
   Trash2,
 } from "lucide-vue-next";
@@ -77,6 +81,115 @@ const sendOriginal = ref(false);
 
 const openThreadId = ref<string | null>(null);
 const threadCounts = ref<Record<string, number>>({});
+
+const reactions = useReactions(roomId);
+const pins = usePins(roomId);
+
+/*
+ * Messages the reader has picked out, for acting on several at once.
+ *
+ * A Set rather than a flag on each message: the timeline is rebuilt from the
+ * event log on every change, so a flag stored on a message would be lost the
+ * moment an edit or a deletion arrived.
+ */
+const selected = ref<Set<string>>(new Set());
+const selecting = computed(() => selected.value.size > 0);
+
+/** What is being forwarded, or reported, while the dialog is open. */
+const forwarding = ref<string[]>([]);
+const reporting = ref<{ id: string; body: string } | null>(null);
+
+function toggleSelected(messageId: string) {
+  const next = new Set(selected.value);
+  if (next.has(messageId)) {
+    next.delete(messageId);
+  } else {
+    next.add(messageId);
+  }
+  selected.value = next;
+}
+
+function clearSelection() {
+  selected.value = new Set();
+}
+
+const showPinned = ref(false);
+
+/** Every other room this person can post in, as forwarding destinations. */
+const forwardableRooms = ref<Room[]>([]);
+
+/** The readable text of a message, for the pinned list. */
+function bodyOf(message: Message): string {
+  const content = message.content as { body?: string } | undefined;
+  return content?.body ?? "";
+}
+
+/**
+ * Copies the selected messages as text.
+ *
+ * Attributed and in order, because a block of quoted lines with no names is
+ * not something anybody can paste anywhere useful.
+ */
+async function copySelected() {
+  const lines = visible.value
+    .filter((message) => selected.value.has(message.id))
+    .map((message) => `${shortName(message.sender)}: ${message.body}`);
+
+  try {
+    await navigator.clipboard?.writeText(lines.join("\n"));
+  } catch {
+    // Clipboard access can be refused. Nothing is lost that the reader cannot
+    // do by selecting the text themselves.
+  }
+  clearSelection();
+}
+
+/**
+ * Forwards the selected messages to another conversation.
+ *
+ * One request each rather than one for all: each becomes its own message at
+ * the destination, which is what keeps a forwarded conversation readable in
+ * order rather than collapsed into one wall of quoted text.
+ */
+async function forwardTo(destination: string) {
+  const ids = [...forwarding.value];
+  forwarding.value = [];
+
+  try {
+    for (const id of ids) {
+      await roomsApi.forward(roomId.value, id, destination);
+    }
+    clearSelection();
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : "Could not forward that.";
+  }
+}
+
+/** Files a report for a moderator to look at. */
+async function submitReport(filing: { reason: string; detail: string }) {
+  const message = reporting.value;
+  reporting.value = null;
+  if (!message) return;
+
+  try {
+    await roomsApi.report({
+      room: roomId.value,
+      eventId: message.id,
+      reason: filing.reason,
+      detail: filing.detail,
+    });
+    reported.value = true;
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : "Could not file that report.";
+  }
+}
+
+// Shown briefly after filing, because a report has no visible effect and
+// somebody who saw nothing happen would file it again.
+const reported = ref(false);
+watch(reported, (filed) => {
+  if (filed) setTimeout(() => (reported.value = false), 4000);
+});
 const presenceByUser = ref<Record<string, Presence>>({});
 const typingNow = ref<TypingPerson[]>([]);
 
@@ -237,6 +350,9 @@ async function load() {
     // what was missed rather than repeating what is already shown.
     live.subscribe(roomId.value, messages.value.at(-1)?.sequence);
     void refreshThreadCounts();
+    void reactions.refresh();
+    void pins.refresh();
+    void loadForwardable();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not open this room.";
   } finally {
@@ -265,6 +381,18 @@ watch(
     if (typeof eventId === "string" && eventId) jumpTo(eventId);
   },
 );
+
+/** Rooms this person is in, other than the current one. */
+async function loadForwardable() {
+  try {
+    const all = await roomsApi.list();
+    forwardableRooms.value = all.filter(
+      (candidate) => candidate.member && candidate.id !== roomId.value,
+    );
+  } catch {
+    forwardableRooms.value = [];
+  }
+}
 
 async function loadPresence() {
   try {
@@ -509,6 +637,35 @@ function menuFor(
       icon: MessageSquareText,
       action: () => openThread(message.id),
     });
+    items.push({
+      label: "Forward",
+      icon: Forward,
+      action: () => {
+        forwarding.value = [message.id];
+      },
+    });
+    items.push({
+      label: pins.pinnedIds.value.has(message.id) ? "Unpin" : "Pin to channel",
+      icon: Pin,
+      action: () => togglePin(message.id),
+    });
+    items.push({
+      label: "Select",
+      icon: CheckSquare,
+      action: () => toggleSelected(message.id),
+    });
+  }
+
+  // Reporting somebody else's message, never one's own: there is nothing to
+  // tell a moderator about a message you wrote and can delete yourself.
+  if (!mine && !message.removed) {
+    items.push({
+      label: "Report",
+      icon: Flag,
+      action: () => {
+        reporting.value = { id: message.id, body: message.body };
+      },
+    });
   }
 
   if (mine && !message.removed) {
@@ -524,6 +681,34 @@ function menuFor(
   }
 
   return items;
+}
+
+/*
+ * Pins or unpins a message.
+ *
+ * Pinning speaks for the room rather than the person, so the server requires a
+ * permission for it. A refusal is reported rather than swallowed: somebody who
+ * clicked pin and saw nothing happen would click it again.
+ */
+async function togglePin(messageId: string) {
+  try {
+    if (pins.pinnedIds.value.has(messageId)) {
+      await pins.unpin(messageId);
+    } else {
+      await pins.pin(messageId);
+    }
+  } catch (cause) {
+    error.value = isApiError(cause)
+      ? cause.requiredPermission
+        ? "You do not have permission to pin messages in this channel."
+        : cause.message
+      : "Could not pin that message.";
+  }
+}
+
+/** Adds or removes one of the reader's own reactions. */
+function react(messageId: string, emoji: string) {
+  void reactions.toggle(messageId, emoji, user.value?.address ?? "");
 }
 
 /** Asks before deleting, since a deleted message cannot be brought back. */
@@ -628,6 +813,73 @@ watch(roomId, load, { immediate: true });
           </span>
         </div>
       </header>
+
+      <!-- What the channel has marked as important, collapsed to one line: a
+           list of pinned messages above every conversation would push the
+           conversation itself off the screen. -->
+      <button
+        v-if="pins.pinned.value.length"
+        type="button"
+        class="flex w-full shrink-0 cursor-pointer items-center gap-2 border-b bg-muted/30 px-4 py-1.5 text-left text-xs transition-colors hover:bg-muted/50"
+        @click="showPinned = !showPinned"
+      >
+        <Pin class="size-3.5 shrink-0 text-muted-foreground" />
+        <span class="truncate text-muted-foreground">
+          {{
+            pins.pinned.value.length === 1
+              ? "1 pinned message"
+              : `${pins.pinned.value.length} pinned messages`
+          }}
+        </span>
+        <ChevronDown
+          class="ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform"
+          :class="showPinned && 'rotate-180'"
+        />
+      </button>
+
+      <div v-if="showPinned && pins.pinned.value.length" class="shrink-0 border-b bg-muted/10">
+        <ul class="max-h-40 overflow-y-auto p-2">
+          <li v-for="item in pins.pinned.value" :key="item.message.id">
+            <button
+              type="button"
+              class="flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent"
+              @click="jumpTo(item.message.id)"
+            >
+              <Avatar :name="item.message.sender" size="sm" class="mt-0.5 shrink-0" />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-xs font-medium">
+                  {{ shortName(item.message.sender) }}
+                </span>
+                <span class="block truncate text-xs text-muted-foreground">
+                  {{ bodyOf(item.message) }}
+                </span>
+              </span>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Acting on several messages at once. Appears only while something is
+           selected, so it costs nothing the rest of the time. -->
+      <div
+        v-if="selecting"
+        class="flex shrink-0 items-center gap-2 border-b bg-accent/40 px-4 py-2 text-xs"
+      >
+        <span class="font-medium">
+          {{ selected.size === 1 ? "1 message selected" : `${selected.size} messages selected` }}
+        </span>
+        <button type="button" class="btn btn-ghost h-7 px-2" @click="forwarding = [...selected]">
+          <Forward class="size-3.5" />
+          Forward
+        </button>
+        <button type="button" class="btn btn-ghost h-7 px-2" @click="copySelected">
+          <Copy class="size-3.5" />
+          Copy
+        </button>
+        <button type="button" class="btn btn-ghost ml-auto h-7 px-2" @click="clearSelection">
+          Cancel
+        </button>
+      </div>
 
       <p
         v-if="error"
@@ -743,10 +995,34 @@ watch(roomId, load, { immediate: true });
                   </button>
                 </div>
 
+                <!-- Only while selecting: a checkbox beside every message all
+                     the time would add a column of controls to a conversation
+                     that is mostly read rather than acted on. -->
+                <label
+                  v-if="selecting && !message.removed"
+                  class="flex shrink-0 cursor-pointer items-center"
+                  :class="group.mine ? 'order-last' : 'order-first'"
+                >
+                  <input
+                    type="checkbox"
+                    class="size-4 cursor-pointer accent-primary"
+                    :checked="selected.has(message.id)"
+                    :aria-label="`Select this message`"
+                    @change="toggleSelected(message.id)"
+                  />
+                </label>
+
                 <div
                   class="flex w-fit max-w-full flex-col gap-1"
                   :class="group.mine ? 'items-end' : 'items-start'"
                 >
+                  <span
+                    v-if="pins.pinnedIds.value.has(message.id)"
+                    class="flex items-center gap-1 text-[0.6875rem] text-muted-foreground"
+                  >
+                    <Pin class="size-3" />
+                    Pinned
+                  </span>
                   <Bubble
                     v-if="message.body || message.removed"
                     :variant="message.removed ? 'redacted' : group.mine ? 'mine' : 'default'"
@@ -779,6 +1055,13 @@ watch(roomId, load, { immediate: true });
                   <AttachmentList
                     v-if="!message.removed && message.attachments.length"
                     :attachments="message.attachments"
+                  />
+
+                  <ReactionBar
+                    v-if="!message.removed"
+                    :reactions="reactions.forEvent(message.id)"
+                    :can-react="!!room?.member"
+                    @react="react(message.id, $event)"
                   />
 
                   <!-- Only the first link: a message full of them would
@@ -910,6 +1193,21 @@ watch(roomId, load, { immediate: true });
       confirm-label="Delete"
       @cancel="pendingDelete = null"
       @confirm="remove(pendingDelete.id)"
+    />
+
+    <ForwardDialog
+      v-if="forwarding.length"
+      :count="forwarding.length"
+      :rooms="forwardableRooms"
+      @cancel="forwarding = []"
+      @forward="forwardTo"
+    />
+
+    <ReportDialog
+      v-if="reporting"
+      :body="reporting.body"
+      @cancel="reporting = null"
+      @report="submitReport"
     />
 
     <ThreadPanel

@@ -23,7 +23,7 @@ func (s *Server) handlePinMessage(c *echo.Context) error {
 	}
 
 	if err := s.rooms.PinMessage(
-		c.Request().Context(), roomID, user.ID, c.Param("eventId"),
+		c.Request().Context(), roomID, user.ID, eventIDParam(c),
 	); err != nil {
 		return roomError(err)
 	}
@@ -40,7 +40,7 @@ func (s *Server) handleUnpinMessage(c *echo.Context) error {
 	}
 
 	if err := s.rooms.UnpinMessage(
-		c.Request().Context(), roomID, user.ID, c.Param("eventId"),
+		c.Request().Context(), roomID, user.ID, eventIDParam(c),
 	); err != nil {
 		return roomError(err)
 	}

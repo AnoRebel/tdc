@@ -5,6 +5,8 @@ import type {
   RoomMember,
   Thread,
   ThreadSummary,
+  Report,
+  ScheduledMessage,
   TypingPerson,
   UnreadCounts,
 } from "@tdc/types";
@@ -86,6 +88,65 @@ export function useRooms() {
    * request each — and each of those returned every reply body in full, only
    * for the client to take its length.
    */
+  /**
+   * Sends a copy of a message to another conversation.
+   *
+   * A copy rather than a link: a link would vanish when the original is
+   * deleted and be readable only by people who can see where it came from.
+   */
+  function forward(
+    roomId: string,
+    eventId: string,
+    to: string,
+    comment?: string,
+  ): Promise<Message> {
+    return api.post<Message>(
+      `/api/rooms/${roomId}/messages/${encodeURIComponent(eventId)}/forward`,
+      { to, comment, clientToken: crypto.randomUUID() },
+    );
+  }
+
+  /** Files a report for a moderator to look at. */
+  function report(filing: {
+    room?: string;
+    eventId?: string;
+    subject?: string;
+    reason: string;
+    detail?: string;
+  }): Promise<Report> {
+    return api.post<Report>("/api/reports", filing);
+  }
+
+  /** Writes a caption on one uploaded file, before the message is sent. */
+  function captionAttachment(attachmentId: string, caption: string): Promise<void> {
+    return api.put(`/api/attachments/${attachmentId}/caption`, { caption });
+  }
+
+  /** Writes a message now to be sent later. */
+  function schedule(
+    roomId: string,
+    body: string,
+    sendAt: Date,
+    attachments?: string[],
+    threadRoot?: string,
+  ): Promise<ScheduledMessage> {
+    return api.post<ScheduledMessage>(`/api/rooms/${roomId}/scheduled`, {
+      body,
+      sendAt: sendAt.toISOString(),
+      attachments,
+      threadRoot,
+    });
+  }
+
+  /** Somebody's own outstanding scheduled messages. */
+  function scheduled(): Promise<ScheduledMessage[]> {
+    return api.get<ScheduledMessage[]>("/api/me/scheduled");
+  }
+
+  function cancelScheduled(id: string): Promise<void> {
+    return api.delete(`/api/me/scheduled/${id}`);
+  }
+
   function threadSummaries(roomId: string): Promise<Record<string, ThreadSummary>> {
     return api.get<Record<string, ThreadSummary>>(`/api/rooms/${roomId}/threads`);
   }
@@ -146,6 +207,12 @@ export function useRooms() {
     remove,
     thread,
     threadSummaries,
+    forward,
+    report,
+    captionAttachment,
+    schedule,
+    scheduled,
+    cancelScheduled,
     reply,
     openDirect,
     listDirect,

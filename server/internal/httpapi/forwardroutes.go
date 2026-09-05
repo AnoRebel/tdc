@@ -48,7 +48,7 @@ func (s *Server) handleForward(c *echo.Context) error {
 
 	event, err := s.rooms.Forward(
 		c.Request().Context(), fromRoomID, toRoomID, user.ID,
-		c.Param("eventId"), request.Comment, request.ClientToken)
+		eventIDParam(c), request.Comment, request.ClientToken)
 	if err != nil {
 		return roomError(err)
 	}

@@ -1,8 +1,11 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -92,6 +95,97 @@ func TestReactingAndTakingItBack(t *testing.T) {
 	if after := reactionsIn(t, handler, other, roomID); len(after[eventID]) != 0 {
 		t.Errorf("%d reactions remain after removal", len(after[eventID]))
 	}
+}
+
+/*
+TestEventIdentifiersWorkEncodedOrNot is a regression test for a bug that was
+invisible until a client behaved correctly.
+
+Event identifiers begin with "$", which a correct client percent-encodes in a
+path. Echo hands back the raw segment rather than the decoded one, so reading
+the parameter directly yielded "%24abc" and every lookup missed. Clients that
+sent the "$" unencoded worked, which is why it went unnoticed — so both
+spellings are tested.
+*/
+func TestEventIdentifiersWorkEncodedOrNot(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+	eventID := sendMessage(t, handler, owner, roomID, "Ujumbe wa kujaribu")
+
+	// url.PathEscape leaves "$" alone, since it is a legal path character —
+	// so it does not reproduce this at all. A browser's encodeURIComponent
+	// does escape it, which is what a client actually sends.
+	spellings := map[string]string{
+		"raw":     eventID,
+		"encoded": strings.Replace(eventID, "$", "%24", 1),
+	}
+
+	for name, spelling := range spellings {
+		t.Run(name, func(t *testing.T) {
+			recorder := callRawPath(t, handler, http.MethodGet,
+				"/api/rooms/"+roomID+"/threads/"+spelling, nil, owner)
+
+			if recorder.Code != http.StatusOK {
+				t.Errorf("reading a thread by its %s identifier returned %d: %s",
+					name, recorder.Code, truncate(recorder.Body.String()))
+			}
+		})
+	}
+
+	// And the same for a route that writes, since that is where it was found.
+	recorder := callRawPath(t, handler, http.MethodPut,
+		"/api/rooms/"+roomID+"/messages/"+strings.Replace(eventID, "$", "%24", 1)+"/reactions",
+		map[string]any{"emoji": "👍"}, owner)
+	if recorder.Code != http.StatusNoContent {
+		t.Errorf("reacting by an encoded identifier returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+}
+
+/*
+callRawPath issues a request with the path left exactly as written.
+
+httptest.NewRequest parses the URL and fills in the decoded path, so a test
+using it never sees what a real client sends: the router gets "$abc" where a
+browser sent "%24abc". Setting RawPath is what makes an encoded identifier
+reach the handler encoded, which is the condition the decoding exists for.
+*/
+func callRawPath(
+	t *testing.T,
+	handler http.Handler,
+	method, path string,
+	body any,
+	token string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	var reader io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("encode body: %v", err)
+		}
+		reader = bytes.NewReader(encoded)
+	}
+
+	request := httptest.NewRequest(method, path, reader)
+
+	// Go only keeps RawPath when it differs from the decoded form, so this is
+	// set explicitly rather than relying on the parse.
+	request.URL.RawPath = path
+
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	return recorder
 }
 
 // TestReactingTwiceCountsOnce checks the rule the unique constraint encodes.

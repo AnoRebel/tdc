@@ -27,7 +27,7 @@ func (s *Server) handleThread(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
-	root, replies, err := s.rooms.Thread(c.Request().Context(), roomID, user.ID, c.Param("eventId"))
+	root, replies, err := s.rooms.Thread(c.Request().Context(), roomID, user.ID, eventIDParam(c))
 	if err != nil {
 		return roomError(err)
 	}
@@ -58,7 +58,7 @@ func (s *Server) handleReplyInThread(c *echo.Context) error {
 	}
 
 	reply, err := s.rooms.ReplyInThread(ctx, roomID, user.ID,
-		c.Param("eventId"), request.Body, request.ClientToken)
+		eventIDParam(c), request.Body, request.ClientToken)
 	if err != nil {
 		return roomError(err)
 	}
