@@ -280,11 +280,22 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		}
 	}
 
-	s.indexForSearch(ctx, event, request.Body)
-	s.notifyRecipients(ctx, event, request.Body, roomID)
+	// Neither of these blocks the response. The message is already stored,
+	// which is the part that matters; making somebody wait for a search index
+	// and a set of badges before their message appears is a cost paid on every
+	// send for something nobody is watching.
+	body := request.Body
+	s.inBackground(ctx, "index", func(ctx context.Context) {
+		s.indexForSearch(ctx, event, body)
+	})
+	s.inBackground(ctx, "notify", func(ctx context.Context) {
+		s.notifyRecipients(ctx, event, body, roomID)
+	})
 
 	// Delivered after it is stored, so a client that misses the live frame
-	// still finds the message on reconnection.
+	// still finds the message on reconnection. This one stays on the request
+	// path: it is an in-memory fan-out, and doing it later would mean the
+	// sender's own client sees its message arrive after the response.
 	s.publishEvent(ctx, event)
 
 	return c.JSON(http.StatusCreated, s.withAttachments(ctx, messageResponseOf(event)))

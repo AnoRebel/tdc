@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -98,6 +99,10 @@ type Server struct {
 	hub         *realtime.Hub
 	realtime    *realtime.Server
 	config      Config
+
+	// background counts work detached from requests — notifications and search
+	// indexing — so shutdown can wait for it rather than cutting it off.
+	background sync.WaitGroup
 }
 
 // Services are the collaborators the HTTP layer needs.
@@ -242,6 +247,11 @@ func (s *Server) Run(ctx context.Context) error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.config.ShutdownTimeout)
 	defer cancel()
+
+	// Work detached from requests — notifications, search indexing — is waited
+	// for, so the server does not exit with a notification half-written. Each
+	// piece carries its own deadline, so this cannot wait indefinitely.
+	s.WaitForBackground()
 
 	if err := s.http.Shutdown(shutdownCtx); err != nil {
 		// Shutdown returning an error means in-flight requests outlasted the

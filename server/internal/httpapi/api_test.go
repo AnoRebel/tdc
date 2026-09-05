@@ -157,7 +157,10 @@ func newTestAPIConfigured(
 		pool.Close()
 	})
 
-	return server.Handler()
+	// Notifications and search indexing run detached from the request, so a
+	// test asserting on either would otherwise race the work it is checking.
+	// The handler waits for that work before returning.
+	return settledHandler{handler: server.Handler(), server: server}
 }
 
 // configureAttachments applies whatever a test asked for, so the common case
@@ -573,4 +576,24 @@ func mustCall(
 			method, path, recorder.Code, wantStatus, recorder.Body.String())
 	}
 	return recorder
+}
+
+/*
+settledHandler waits for a request's background work before returning.
+
+Notifications and search indexing are deliberately detached from the request,
+so the response does not wait for them. That makes every test asserting on
+either racy: the assertion runs before the work does.
+
+Waiting here rather than sleeping in each test keeps the tests about behaviour
+rather than about timing, and fails fast if that work ever stops finishing.
+*/
+type settledHandler struct {
+	handler http.Handler
+	server  *httpapi.Server
+}
+
+func (h settledHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.handler.ServeHTTP(w, r)
+	h.server.WaitForBackground()
 }

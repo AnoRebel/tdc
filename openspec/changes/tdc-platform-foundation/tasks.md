@@ -98,7 +98,7 @@ Goal: notifications and search, so the product works when you are not looking at
 - [x] 6.2 Implement global and per-conversation preferences with override, applied across devices; verify a muted conversation still updates unread state (`platform/notifications`)
 - [x] 6.3 Implement suppression while actively viewing, withdrawal when read elsewhere, and status interaction with priority override; verify no notification is raised for the conversation in view (`platform/notifications`)
 - [ ] 6.4 Implement batching and optional periodic summaries; verify a burst produces one batched notification rather than one per message (`platform/notifications`)
-- [ ] 6.5 Make notification delivery non-blocking and failure-tolerant; verify an unreachable push service does not delay message delivery or lose unread state (`platform/notifications`)
+- [x] 6.5 Make notification delivery non-blocking and failure-tolerant; verify an unreachable push service does not delay message delivery or lose unread state (`platform/notifications`)
 - [x] 6.6 Implement the `Searcher` interface with a Postgres implementation using a separate search table, a stored generated `tsvector` column, and a GIN index; verify reindexing does not touch the messages table
 - [x] 6.7 Implement query parsing with `websearch_to_tsquery`, recency ordering, and `ts_headline` highlighting; verify hostile input never raises a syntax error and results are ordered by recency
 - [x] 6.8 Implement `pg_trgm` fuzzy and prefix matching for autocomplete; verify prefix queries return results `websearch_to_tsquery` alone cannot
