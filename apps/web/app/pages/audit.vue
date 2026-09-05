@@ -12,6 +12,8 @@ import { ArrowLeft, ShieldAlert } from "lucide-vue-next";
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
+useHead({ title: "Audit log" });
+
 interface AuditEntry {
   id: number;
   occurredAt: string;

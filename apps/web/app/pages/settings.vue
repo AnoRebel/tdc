@@ -8,6 +8,8 @@ import { Avatar } from "~/components/ui/avatar";
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
+useHead({ title: "Settings" });
+
 const { user, can, signOut, listSessions, revokeSession } = useAuth();
 const api = useApi();
 const router = useRouter();

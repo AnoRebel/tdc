@@ -4,6 +4,8 @@ import { Spinner } from "~/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
 
+useHead({ title: "Sign in" });
+
 const { signIn, setupStatus } = useAuth();
 const router = useRouter();
 

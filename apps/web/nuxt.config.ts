@@ -15,6 +15,22 @@ export default defineNuxtConfig({
   // authentication, and a single-page app is what the desktop client embeds.
   ssr: false,
 
+  app: {
+    head: {
+      // The title template lives in app.vue: a function here does not survive
+      // serialisation into the built config and is silently dropped.
+      htmlAttrs: { lang: "en" },
+      meta: [
+        {
+          name: "description",
+          content:
+            "Chat, project tracking, and a directory connecting developers " +
+            "with the people who need them.",
+        },
+      ],
+    },
+  },
+
   devtools: { enabled: true },
 
   modules: ["@vueuse/nuxt"],

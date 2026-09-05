@@ -12,6 +12,8 @@ import { Hash, MessagesSquare } from "lucide-vue-next";
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
+useHead({ title: "Home" });
+
 const roomsApi = useRooms();
 const { user } = useAuth();
 

@@ -14,6 +14,11 @@ import { Skeleton } from "~/components/ui/skeleton";
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
+useHead({
+  // The server being viewed, so several open at once stay distinguishable.
+  title: computed(() => String(useRoute().params.domain ?? "Server")),
+});
+
 const route = useRoute();
 const api = useApi();
 

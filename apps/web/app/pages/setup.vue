@@ -5,6 +5,8 @@ import { Spinner } from "~/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
 
+useHead({ title: "Set up this server" });
+
 /**
  * First-run setup: creates the server's first administrator.
  *

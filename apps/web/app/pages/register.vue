@@ -4,6 +4,8 @@ import { Spinner } from "~/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
 
+useHead({ title: "Create an account" });
+
 const { register } = useAuth();
 const router = useRouter();
 

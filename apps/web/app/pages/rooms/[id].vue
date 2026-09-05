@@ -137,6 +137,30 @@ watch([scheduled, reported], () => {
   if (reported.value) setTimeout(() => (reported.value = false), 4000);
 });
 
+/*
+ * The tab reads as the conversation, with unread messages counted in front.
+ *
+ * A count in the title is what makes a background tab useful: somebody working
+ * in another window sees "(3) General" without switching to it, which is the
+ * whole reason a browser puts the title where it does.
+ *
+ * The conversation's own unread count rather than every notification: this tab
+ * is that conversation, and a number covering other channels would be a number
+ * about something the reader is not looking at.
+ */
+useHead({
+  title: computed(() => {
+    const name = room.value?.name;
+    if (!name) return "Loading";
+
+    const waiting = unreadHere.value;
+    return waiting > 0 ? `(${waiting}) ${name}` : name;
+  }),
+});
+
+/** How many messages are unread in this conversation. */
+const unreadHere = ref(0);
+
 const showPinned = ref(false);
 const attaching = ref(false);
 const choosingEmoji = ref(false);
@@ -523,6 +547,7 @@ async function load() {
     void refreshThreadCounts();
     void reactions.refresh();
     void pins.refresh();
+    void refreshUnreadHere();
     void loadForwardable();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not open this room.";
@@ -552,6 +577,22 @@ watch(
     if (typeof eventId === "string" && eventId) jumpTo(eventId);
   },
 );
+
+/*
+ * Reads this conversation's unread count, for the tab title.
+ *
+ * Read from the server rather than counted locally, because the count has to
+ * survive a reload and agree with what every other client shows — a number the
+ * tab invented would drift from the badge beside the channel name.
+ */
+async function refreshUnreadHere() {
+  try {
+    const counts = await roomsApi.unread();
+    unreadHere.value = counts[roomId.value] ?? 0;
+  } catch {
+    // A title without a count is still a correct title.
+  }
+}
 
 /** Rooms this person is in, other than the current one. */
 async function loadForwardable() {

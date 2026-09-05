@@ -6,6 +6,21 @@
 // Styling lives entirely in assets/css/main.css. Nothing global belongs here:
 // a second palette defined in this file would silently override the design
 // system's tokens, and a bare `button` rule would fight every `.btn` class.
+
+/*
+ * The title template, here rather than in nuxt.config.
+ *
+ * A function in the config does not survive serialisation into the built
+ * config — it is silently dropped, and every page ends up showing only its own
+ * title with no product name. Here it is ordinary code that runs.
+ *
+ * A function rather than a "%s" string because the string form has no null
+ * branch: a page setting no title would render " — TDC" with a dangling
+ * separator, and setting a default title instead produces "TDC — TDC".
+ */
+useHead({
+  titleTemplate: (page?: string) => (page ? `${page} — TDC` : "TDC"),
+});
 </script>
 
 <template>
