@@ -26,7 +26,12 @@ func webRoot(t *testing.T) string {
 		}
 	}
 
-	write("index.html", "<!doctype html><title>TDC</title><div id=app></div>")
+	// Shaped like what Nuxt builds, head and all: social metadata is inserted
+	// after <head>, so a fixture without one would exercise a path the real
+	// shell never takes.
+	write("index.html",
+		`<!DOCTYPE html><html><head><meta charset="utf-8">`+
+			`</head><body><div id=app></div></body></html>`)
 	write("_nuxt/entry.a1b2c3.js", "console.log('app')")
 	write("favicon.ico", "icon-bytes")
 

@@ -100,6 +100,10 @@ type Server struct {
 	realtime    *realtime.Server
 	config      Config
 
+	// shell is the built application's index.html, held in memory so social
+	// metadata can be inserted per request.
+	shell []byte
+
 	// background counts work detached from requests — notifications and search
 	// indexing — so shutdown can wait for it rather than cutting it off.
 	background sync.WaitGroup

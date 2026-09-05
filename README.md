@@ -139,6 +139,17 @@ Without it, sending a GIF still works — it uploads like any other file and
 animates in the conversation. Only searching a library from inside the app is
 missing.
 
+### Link previews of this server
+
+A public channel's address, and the server's own, carry the metadata that link
+previews read — so posting one into another chat application shows what it is
+rather than a blank box with a URL.
+
+Nothing private does. A private channel's link produces no metadata at all, not
+even a line saying it is private, because a preview is generated for anybody
+holding the link including somebody with no account here: naming one would
+confirm it exists.
+
 ### Federation
 
 Off. Servers do not yet exchange events. The groundwork is in place — every

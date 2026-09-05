@@ -38,10 +38,15 @@ func (s *Server) mountWebApp(root string) {
 
 	// The shell must exist, or there is nothing to serve and every route would
 	// answer with an error rather than an application.
-	if _, err := fs.Stat(files, "index.html"); err != nil {
+	shell, err := fs.ReadFile(files, "index.html")
+	if err != nil {
 		s.log.Warn("a web root was configured but has no index.html", "path", root)
 		return
 	}
+
+	// Held in memory: it is a few kilobytes, served on every navigation, and
+	// rewritten per request to describe what is being shared.
+	s.shell = shell
 
 	/*
 		Everything no real route claimed.
@@ -86,17 +91,20 @@ func (s *Server) serveWebFile(c *echo.Context, files fs.FS) error {
 		}
 	}
 
-	// Not a file: the application's own router will resolve it.
-	//
-	// Never cached. The shell names the hashed assets for the version it was
-	// built with, so a cached shell after a deployment asks for files that are
-	// no longer there and the application fails to start.
-	c.Response().Header().Set("Cache-Control", "no-cache")
+	/*
+		Not a file: the application's own router will resolve it.
 
-	// FileFS rather than File: File resolves against echo's own filesystem,
-	// which defaults to the working directory, so an absolute path is treated
-	// as relative to it and never found.
-	return c.FileFS("index.html", files)
+		Served from memory with social metadata inserted, rather than from
+		disk, because a link shared outside this server previews from what a
+		crawler reads — and a client-rendered application returns an empty
+		shell to anything that does not run JavaScript.
+
+		Never cached: the shell is shared by every route, and a cached copy
+		would describe whichever page was fetched first. It also names the
+		hashed assets for the version it was built with, so a stale one asks
+		for files that no longer exist.
+	*/
+	return s.serveShellWithMeta(c, s.shell, request.URL.Path)
 }
 
 /*
