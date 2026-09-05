@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -210,3 +211,59 @@ func (s *Service) CompleteSetup(ctx context.Context, input NewUser) (dbgen.User,
 
 	return user, nil
 }
+
+/*
+Suspend bars somebody from the server and ends their sessions.
+
+Two steps, both necessary. The flag stops a new sign-in and is checked on every
+request, so an open connection stops working at once. Revoking the sessions is
+what makes that immediate rather than merely eventual — without it, a client
+holding a valid session would keep being told its session is invalid on every
+request, which works but leaves a row that looks live.
+
+A reason is required. Somebody suspended is entitled to know why, and a
+decision nobody can explain is one nobody can review.
+*/
+func (s *Service) Suspend(
+	ctx context.Context,
+	userID, by uuid.UUID,
+	reason string,
+	until *time.Time,
+) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return ErrReasonRequired
+	}
+
+	if err := s.store.SuspendUser(ctx, dbgen.SuspendUserParams{
+		ID:             userID,
+		SuspendedUntil: until,
+		SuspendedBy:    &by,
+		SuspensionNote: &reason,
+	}); err != nil {
+		return fmt.Errorf("suspend: %w", err)
+	}
+
+	// Every session, on every device. A suspension that left one device signed
+	// in would be no suspension at all.
+	if err := s.store.RevokeAllSessionsForUser(ctx, userID); err != nil {
+		return fmt.Errorf("suspend: revoking sessions: %w", err)
+	}
+
+	return nil
+}
+
+// LiftSuspension restores an account.
+//
+// Sessions are not restored: they were revoked, and somebody returning signs in
+// again. Reviving them would mean a device somebody had lost access to comes
+// back with it.
+func (s *Service) LiftSuspension(ctx context.Context, userID uuid.UUID) error {
+	if err := s.store.LiftUserSuspension(ctx, userID); err != nil {
+		return fmt.Errorf("lift suspension: %w", err)
+	}
+	return nil
+}
+
+// ErrReasonRequired is returned when a suspension carries no explanation.
+var ErrReasonRequired = errors.New("a reason is required")

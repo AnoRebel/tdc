@@ -201,6 +201,12 @@ func (s *Server) routes() {
 	admin.POST("/invitations", s.handleIssueServerInvitation,
 		requirePermission(authz.PermUserInvite))
 
+	// Suspension, which is server-wide where a ban is confined to a channel.
+	admin.POST("/users/:id/suspend", s.handleSuspendUser,
+		requirePermission(authz.PermUserSuspend))
+	admin.DELETE("/users/:id/suspend", s.handleLiftSuspension,
+		requirePermission(authz.PermUserSuspend))
+
 	// Policy an operator changes while the server runs: who may register, how
 	// much this server will hold.
 	admin.GET("/settings", s.handleListSettings,

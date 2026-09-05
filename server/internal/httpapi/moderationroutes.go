@@ -10,6 +10,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 )
 
@@ -282,4 +283,80 @@ func (s *Server) recordModeration(
 	}); err != nil {
 		s.log.Error("cannot record a moderation action", "action", action, "error", err)
 	}
+}
+
+type suspendRequest struct {
+	// Reason is required: somebody suspended is entitled to know why.
+	Reason string `json:"reason"`
+	// Hours is how long. Absent or zero is indefinite.
+	Hours int `json:"hours,omitempty"`
+}
+
+/*
+handleSuspendUser bars somebody from the server.
+
+Server-wide, where a ban is confined to a channel. Their sessions end at once —
+the flag is checked on every request, and the sessions are revoked as well so
+nothing is left looking live.
+*/
+func (s *Server) handleSuspendUser(c *echo.Context) error {
+	actor, _ := currentUser(c)
+	ctx := c.Request().Context()
+
+	target, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such person")
+	}
+
+	// Suspending yourself would lock the server's own administrator out of it,
+	// which is a mistake nobody recovers from without database access.
+	if target == actor.ID {
+		return echo.NewHTTPError(http.StatusBadRequest,
+			"you cannot suspend your own account")
+	}
+
+	var request suspendRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	var until *time.Time
+	if request.Hours > 0 {
+		expiry := time.Now().Add(time.Duration(request.Hours) * time.Hour)
+		until = &expiry
+	}
+
+	err = s.identity.Suspend(ctx, target, actor.ID, request.Reason, until)
+	if errors.Is(err, identity.ErrReasonRequired) {
+		return echo.NewHTTPError(http.StatusBadRequest, "a reason is required")
+	}
+	if err != nil {
+		return err
+	}
+
+	s.recordModeration(c, actor, audit.ActionUserSuspended, "user", target.String(),
+		map[string]any{"reason": request.Reason, "hours": request.Hours})
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// handleLiftSuspension restores an account.
+//
+// Sessions are not restored: somebody returning signs in again, rather than a
+// device they may have lost coming back with them.
+func (s *Server) handleLiftSuspension(c *echo.Context) error {
+	actor, _ := currentUser(c)
+
+	target, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such person")
+	}
+
+	if err := s.identity.LiftSuspension(c.Request().Context(), target); err != nil {
+		return err
+	}
+
+	s.recordModeration(c, actor, audit.ActionUserReinstated, "user", target.String(), nil)
+
+	return c.NoContent(http.StatusNoContent)
 }

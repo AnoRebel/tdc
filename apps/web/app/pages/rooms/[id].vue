@@ -22,6 +22,7 @@ import {
   Pencil,
   Pin,
   SendHorizontal,
+  ShieldOff,
   Smile,
   Trash2,
   UserX,
@@ -39,7 +40,7 @@ definePageMeta({ middleware: "auth", layout: "app" });
 const route = useRoute();
 const roomId = computed(() => String(route.params.id));
 
-const { user } = useAuth();
+const { user, can } = useAuth();
 const roomsApi = useRooms();
 const refreshRooms = inject<() => Promise<void>>("refreshRooms", async () => {});
 
@@ -211,6 +212,44 @@ watch(blocked, (done) => {
 });
 
 const showPinned = ref(false);
+const showBans = ref(false);
+
+/** Who is about to be banned, while the form is up. */
+const banning = ref<{ sender: string } | null>(null);
+
+/*
+ * Bans somebody from this channel.
+ *
+ * The reason is required by the server and asked for here rather than
+ * defaulted: a ban nobody can explain is a ban nobody can review, and the
+ * person banned is entitled to it.
+ */
+async function banSender(sender: string, reason: string, hours?: number) {
+  const username = shortName(sender);
+  banning.value = null;
+
+  try {
+    const found = await api.get<{ people: { id: string; username: string }[] }>(
+      `/api/search/everything?q=${encodeURIComponent(username)}&messages=false`,
+    );
+
+    const person = found.people.find(
+      (candidate: { id: string; username: string }) => candidate.username === username,
+    );
+    if (!person) {
+      error.value = "Could not find that person to ban.";
+      return;
+    }
+
+    await roomsApi.banFromChannel(roomId.value, person.id, reason, hours);
+
+    // Shown at once, so the moderator sees the result of what they just did
+    // rather than having to go looking for it.
+    showBans.value = true;
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : "Could not ban that person.";
+  }
+}
 const attaching = ref(false);
 const choosingEmoji = ref(false);
 const scheduling = ref(false);
@@ -939,6 +978,19 @@ function menuFor(
         blocking.value = { sender };
       },
     });
+
+    // Banning, which is a moderator's decision rather than a personal one, so
+    // it appears only for whoever holds that authority.
+    if (can("moderation.restrict")) {
+      items.push({
+        label: `Ban ${shortName(sender)} from this channel`,
+        icon: ShieldOff,
+        destructive: true,
+        action: () => {
+          banning.value = { sender };
+        },
+      });
+    }
   }
 
   if (mine && !message.removed) {
@@ -1107,8 +1159,25 @@ watch(roomId, load, { immediate: true });
             <span v-else class="size-1.5 rounded-full bg-warning" />
             {{ live.state.value === "reconnecting" ? "Reconnecting" : "Offline" }}
           </span>
+
+          <!-- Only for whoever moderates: a ban that can only be issued is a
+               ban nobody reverses, so the way back in lives beside it. -->
+          <button
+            v-if="can('moderation.restrict')"
+            type="button"
+            class="btn btn-ghost size-7 px-0"
+            :aria-label="showBans ? 'Hide bans' : 'Show who is banned'"
+            :title="showBans ? 'Hide bans' : 'Show who is banned'"
+            @click="showBans = !showBans"
+          >
+            <ShieldOff class="size-3.5" />
+          </button>
         </div>
       </header>
+
+      <div v-if="showBans" class="shrink-0 border-b bg-muted/10 px-4 py-3">
+        <ChannelBans :room-id="roomId" />
+      </div>
 
       <!-- What the channel has marked as important, collapsed to one line: a
            list of pinned messages above every conversation would push the
@@ -1567,6 +1636,13 @@ watch(roomId, load, { immediate: true });
     >
       Blocked. They are not told.
     </p>
+
+    <BanDialog
+      v-if="banning"
+      :username="shortName(banning.sender)"
+      @cancel="banning = null"
+      @ban="(reason, hours) => banSender(banning!.sender, reason, hours)"
+    />
 
     <ScheduleDialog
       v-if="scheduling"

@@ -106,6 +106,21 @@ export function useRooms() {
     );
   }
 
+  /**
+   * Bans somebody from one channel.
+   *
+   * Confined to that channel: every other membership they hold is untouched,
+   * which is what separates a ban from a suspension.
+   */
+  function banFromChannel(
+    roomId: string,
+    userId: string,
+    reason: string,
+    hours?: number,
+  ): Promise<void> {
+    return api.post(`/api/rooms/${roomId}/bans`, { user: userId, reason, hours });
+  }
+
   /** Files a report for a moderator to look at. */
   function report(filing: {
     room?: string;
@@ -209,6 +224,7 @@ export function useRooms() {
     threadSummaries,
     forward,
     report,
+    banFromChannel,
     captionAttachment,
     schedule,
     scheduled,

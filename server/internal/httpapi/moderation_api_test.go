@@ -367,3 +367,118 @@ func TestModeratorsCanStillMakeContact(t *testing.T) {
 			"beyond contact by the people responsible for the server", recorder.Code)
 	}
 }
+
+/*
+TestSuspensionEndsLiveSessions is the claim 7.10 makes.
+
+A suspension that only stopped the next sign-in would leave somebody working
+for as long as their session lasted — which for a device left open is
+indefinitely. The flag is checked on every request and the sessions are revoked
+as well, so a suspension takes effect on a connection already in use.
+*/
+func TestSuspensionEndsLiveSessions(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	person := registerAndSignIn(t, handler, "amina")
+	targetID := userIDOf(t, handler, owner, "amina")
+
+	// Working before.
+	before := call(t, handler, http.MethodGet, "/api/me", nil, person)
+	if before.Code != http.StatusOK {
+		t.Fatalf("the session did not work before suspension: %d", before.Code)
+	}
+
+	suspended := call(t, handler, http.MethodPost,
+		"/api/admin/users/"+targetID+"/suspend",
+		map[string]any{"reason": "Kuvunja sheria za seva"}, owner)
+	if suspended.Code != http.StatusNoContent {
+		t.Fatalf("suspending returned %d: %s", suspended.Code, truncate(suspended.Body.String()))
+	}
+
+	// The same session, immediately after.
+	after := call(t, handler, http.MethodGet, "/api/me", nil, person)
+	if after.Code == http.StatusOK {
+		t.Error("a suspended account's existing session still worked")
+	}
+
+	// And they cannot sign in again.
+	again := call(t, handler, http.MethodPost, "/api/auth/signin", map[string]any{
+		"username": "amina", "password": testPassword,
+	}, "")
+	if again.Code == http.StatusOK {
+		t.Error("a suspended account signed in again")
+	}
+}
+
+// TestSuspensionRequiresAReason keeps the decision reviewable.
+func TestSuspensionRequiresAReason(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	registerAndSignIn(t, handler, "amina")
+	targetID := userIDOf(t, handler, owner, "amina")
+
+	recorder := call(t, handler, http.MethodPost,
+		"/api/admin/users/"+targetID+"/suspend", map[string]any{}, owner)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Errorf("suspending without a reason returned %d, expected 400", recorder.Code)
+	}
+}
+
+/*
+TestSuspendingYourselfIsRefused prevents a mistake nobody recovers from.
+
+The server's own administrator suspending themselves would lock them out of the
+server with no way back except database access.
+*/
+func TestSuspendingYourselfIsRefused(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	ownerID := userIDOf(t, handler, owner, "founder")
+
+	recorder := call(t, handler, http.MethodPost,
+		"/api/admin/users/"+ownerID+"/suspend",
+		map[string]any{"reason": "Kwa bahati mbaya"}, owner)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Errorf("suspending yourself returned %d, expected it to be refused",
+			recorder.Code)
+	}
+
+	// And they are still working.
+	still := call(t, handler, http.MethodGet, "/api/me", nil, owner)
+	if still.Code != http.StatusOK {
+		t.Error("the administrator locked themselves out")
+	}
+}
+
+// TestLiftingASuspensionRestoresTheAccount covers the reversal.
+//
+// Sessions are not restored: somebody returning signs in again, rather than a
+// device they may have lost access to coming back with them.
+func TestLiftingASuspensionRestoresTheAccount(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	registerAndSignIn(t, handler, "amina")
+	targetID := userIDOf(t, handler, owner, "amina")
+
+	call(t, handler, http.MethodPost, "/api/admin/users/"+targetID+"/suspend",
+		map[string]any{"reason": "Kwa muda"}, owner)
+
+	lifted := call(t, handler, http.MethodDelete,
+		"/api/admin/users/"+targetID+"/suspend", nil, owner)
+	if lifted.Code != http.StatusNoContent {
+		t.Fatalf("lifting returned %d: %s", lifted.Code, truncate(lifted.Body.String()))
+	}
+
+	again := call(t, handler, http.MethodPost, "/api/auth/signin", map[string]any{
+		"username": "amina", "password": testPassword,
+	}, "")
+	if again.Code != http.StatusOK {
+		t.Errorf("a reinstated account could not sign in: %d", again.Code)
+	}
+}
