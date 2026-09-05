@@ -5,18 +5,24 @@ import type { MenuItem } from "~/components/ContextMenu.vue";
 import {
   Check,
   CheckSquare,
+  ChevronDown,
+  Clock,
   Copy,
+  FileText,
   Flag,
   Forward,
   Hash,
+  Image as ImageIcon,
   Lock,
   Maximize2,
   MessageSquareText,
   MoreVertical,
+  Music,
   Paperclip,
   Pencil,
   Pin,
   SendHorizontal,
+  Smile,
   Trash2,
 } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
@@ -113,7 +119,142 @@ function clearSelection() {
   selected.value = new Set();
 }
 
+/*
+ * Brief confirmations for the two actions that leave no trace.
+ *
+ * A scheduled message does not appear in the conversation and a report has no
+ * visible effect, so without a word somebody would do either of them twice.
+ *
+ * Declared here, above everything that sets them: const is not hoisted, and
+ * assigning to one of these from a handler defined earlier in the file threw a
+ * reference error that silently swallowed the confirmation.
+ */
+const scheduled = ref(false);
+const reported = ref(false);
+
+watch([scheduled, reported], () => {
+  if (scheduled.value) setTimeout(() => (scheduled.value = false), 4000);
+  if (reported.value) setTimeout(() => (reported.value = false), 4000);
+});
+
 const showPinned = ref(false);
+const attaching = ref(false);
+const choosingEmoji = ref(false);
+const scheduling = ref(false);
+
+/*
+ * Only one composer menu at a time.
+ *
+ * Opening the emoji picker while the attachment menu was up left both on
+ * screen, overlapping, with no way to tell which a click would reach. Each
+ * closes the other rather than each carrying its own dismissal logic.
+ */
+watch(attaching, (open) => {
+  if (open) choosingEmoji.value = false;
+});
+watch(choosingEmoji, (open) => {
+  if (open) attaching.value = false;
+});
+
+/** Closes both when the reader clicks anywhere else. */
+function closeComposerMenus(event: MouseEvent) {
+  if (!attaching.value && !choosingEmoji.value) return;
+
+  const target = event.target as HTMLElement;
+  if (target.closest("[data-composer-menu]")) return;
+
+  attaching.value = false;
+  choosingEmoji.value = false;
+}
+
+onMounted(() => document.addEventListener("click", closeComposerMenus));
+onBeforeUnmount(() => document.removeEventListener("click", closeComposerMenus));
+
+/*
+ * What the file picker should offer.
+ *
+ * A phone's chooser is a different screen for photos, for the camera and for
+ * documents, and it decides which one to show from the accept attribute. A
+ * bare "attach" opens the file browser, which is the least useful of the
+ * three for the thing people most often send.
+ */
+const pickerAccept = ref("");
+
+const attachmentOptions = [
+  { label: "Photo or video", accept: "image/*,video/*", icon: ImageIcon },
+  { label: "Audio", accept: "audio/*", icon: Music },
+  {
+    label: "Document",
+    accept: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.txt,.md",
+    icon: FileText,
+  },
+  { label: "Any file", accept: "", icon: Paperclip },
+];
+
+/** Opens the picker filtered to one kind. */
+async function pickWith(accept: string) {
+  attaching.value = false;
+  pickerAccept.value = accept;
+
+  // The attribute has to reach the element before it is opened, or the picker
+  // shows whatever the previous choice was.
+  await nextTick();
+  filePicker.value?.click();
+}
+
+/** Puts an emoji where the cursor is, rather than at the end. */
+function insertEmoji(emoji: string) {
+  const element = composer.value;
+  if (!element) {
+    draft.value += emoji;
+    return;
+  }
+
+  const start = element.selectionStart ?? draft.value.length;
+  const end = element.selectionEnd ?? start;
+
+  draft.value = draft.value.slice(0, start) + emoji + draft.value.slice(end);
+
+  // Back to just after what was inserted, so typing continues where the
+  // reader was rather than at the end of the message.
+  void nextTick(() => {
+    element.focus();
+    element.selectionStart = element.selectionEnd = start + emoji.length;
+  });
+}
+
+/** Writes a caption on one uploaded file, before the message is sent. */
+async function captionAttachment(attachmentId: string, caption: string) {
+  try {
+    await roomsApi.captionAttachment(attachmentId, caption);
+  } catch {
+    // A caption that does not save leaves the file without one, which is a
+    // smaller loss than interrupting somebody mid-message to say so.
+  }
+}
+
+/** Sends the message later rather than now. */
+async function scheduleDraft(sendAt: Date) {
+  const body = draft.value.trim();
+  scheduling.value = false;
+  if (!body) return;
+
+  try {
+    await roomsApi.schedule(
+      roomId.value,
+      body,
+      sendAt,
+      uploads.uploads.value
+        .filter((upload) => upload.attachment)
+        .map((upload) => upload.attachment!.id),
+    );
+    draft.value = "";
+    uploads.clearFinished();
+    scheduled.value = true;
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : "Could not schedule that message.";
+  }
+}
 
 /** Every other room this person can post in, as forwarding destinations. */
 const forwardableRooms = ref<Room[]>([]);
@@ -184,12 +325,6 @@ async function submitReport(filing: { reason: string; detail: string }) {
   }
 }
 
-// Shown briefly after filing, because a report has no visible effect and
-// somebody who saw nothing happen would file it again.
-const reported = ref(false);
-watch(reported, (filed) => {
-  if (filed) setTimeout(() => (reported.value = false), 4000);
-});
 const presenceByUser = ref<Record<string, Presence>>({});
 const typingNow = ref<TypingPerson[]>([]);
 
@@ -1103,6 +1238,7 @@ watch(roomId, load, { immediate: true });
           @cancel="uploads.cancel"
           @retry="retryUpload"
           @dismiss="uploads.remove"
+          @caption="captionAttachment"
         />
 
         <form
@@ -1110,16 +1246,47 @@ watch(roomId, load, { immediate: true });
           class="flex items-end gap-2 rounded-xl border bg-surface p-1.5 shadow-xs transition focus-within:border-ring focus-within:shadow-sm"
           @submit.prevent="send"
         >
-          <input ref="filePicker" type="file" multiple class="sr-only" @change="pickFiles" />
-          <button
-            type="button"
-            class="btn btn-ghost size-8 shrink-0 px-0"
-            :disabled="room.archived"
-            title="Attach a file"
-            @click="filePicker?.click()"
-          >
-            <Paperclip class="size-4" />
-          </button>
+          <input
+            ref="filePicker"
+            type="file"
+            multiple
+            :accept="pickerAccept"
+            class="sr-only"
+            @change="pickFiles"
+          />
+
+          <!-- A menu rather than one button, so the picker can be told what to
+               offer. A phone's file chooser is a different screen for photos,
+               for the camera and for documents, and a bare "attach" opens the
+               least useful of the three. -->
+          <div class="relative shrink-0" data-composer-menu>
+            <button
+              type="button"
+              class="btn btn-ghost size-8 px-0"
+              :disabled="room.archived"
+              title="Attach"
+              aria-label="Attach"
+              @click="attaching = !attaching"
+            >
+              <Paperclip class="size-4" />
+            </button>
+
+            <div
+              v-if="attaching"
+              class="absolute bottom-full left-0 z-20 mb-1 w-44 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+            >
+              <button
+                v-for="option in attachmentOptions"
+                :key="option.label"
+                type="button"
+                class="flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+                @click="pickWith(option.accept)"
+              >
+                <component :is="option.icon" class="size-4 shrink-0 text-muted-foreground" />
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
 
           <!-- The choice sits where the file is picked rather than in
                settings: it is a per-message decision, and someone sharing a
@@ -1139,6 +1306,34 @@ watch(roomId, load, { immediate: true });
           >
             <Maximize2 class="size-4" />
           </button>
+          <button
+            type="button"
+            class="btn btn-ghost size-8 shrink-0 px-0"
+            :disabled="room.archived || !draft.trim()"
+            title="Send later"
+            aria-label="Send later"
+            @click="scheduling = true"
+          >
+            <Clock class="size-4" />
+          </button>
+
+          <div class="relative shrink-0" data-composer-menu>
+            <button
+              type="button"
+              class="btn btn-ghost size-8 px-0"
+              :disabled="room.archived"
+              title="Emoji"
+              aria-label="Emoji"
+              @click="choosingEmoji = !choosingEmoji"
+            >
+              <Smile class="size-4" />
+            </button>
+
+            <div v-if="choosingEmoji" class="absolute bottom-full left-0 z-20 mb-1">
+              <EmojiPicker v-model="choosingEmoji" @pick="insertEmoji" />
+            </div>
+          </div>
+
           <textarea
             ref="composer"
             v-model="draft"
@@ -1194,6 +1389,31 @@ watch(roomId, load, { immediate: true });
       @cancel="pendingDelete = null"
       @confirm="remove(pendingDelete.id)"
     />
+
+    <ScheduleDialog
+      v-if="scheduling"
+      :body="draft"
+      @cancel="scheduling = false"
+      @schedule="scheduleDraft"
+    />
+
+    <!-- Both of these leave no trace in the conversation, so the interface has
+         to say the thing happened or somebody will do it again. -->
+    <p
+      v-if="scheduled"
+      class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
+      role="status"
+    >
+      Scheduled. It will send at the time you chose.
+    </p>
+
+    <p
+      v-if="reported"
+      class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
+      role="status"
+    >
+      Reported. A moderator will look at it.
+    </p>
 
     <ForwardDialog
       v-if="forwarding.length"
