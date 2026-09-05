@@ -76,9 +76,10 @@ const createAttachment = `-- name: CreateAttachment :one
 INSERT INTO attachments (
     id, storage_key, uploader_id, uploader_address, room_id,
     filename, content_type, size_bytes,
-    preview_key, preview_type, preview_width, preview_height, width, height
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height
+    preview_key, preview_type, preview_width, preview_height, width, height,
+    caption
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption
 `
 
 type CreateAttachmentParams struct {
@@ -96,6 +97,7 @@ type CreateAttachmentParams struct {
 	PreviewHeight   *int32
 	Width           *int32
 	Height          *int32
+	Caption         string
 }
 
 func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error) {
@@ -114,6 +116,7 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		arg.PreviewHeight,
 		arg.Width,
 		arg.Height,
+		arg.Caption,
 	)
 	var i Attachment
 	err := row.Scan(
@@ -133,6 +136,7 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		&i.PreviewHeight,
 		&i.Width,
 		&i.Height,
+		&i.Caption,
 	)
 	return i, err
 }
@@ -147,7 +151,7 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAttachment = `-- name: GetAttachment :one
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height FROM attachments WHERE id = $1
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption FROM attachments WHERE id = $1
 `
 
 func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error) {
@@ -170,12 +174,13 @@ func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, 
 		&i.PreviewHeight,
 		&i.Width,
 		&i.Height,
+		&i.Caption,
 	)
 	return i, err
 }
 
 const listAttachmentsForEvent = `-- name: ListAttachmentsForEvent :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption FROM attachments
 WHERE event_id = $1
 ORDER BY created_at
 `
@@ -206,6 +211,7 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 			&i.PreviewHeight,
 			&i.Width,
 			&i.Height,
+			&i.Caption,
 		); err != nil {
 			return nil, err
 		}
@@ -218,7 +224,7 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 }
 
 const listOrphanedAttachments = `-- name: ListOrphanedAttachments :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption FROM attachments
 WHERE event_id IS NULL AND created_at < $1
 ORDER BY created_at
 LIMIT $2
@@ -256,6 +262,7 @@ func (q *Queries) ListOrphanedAttachments(ctx context.Context, arg ListOrphanedA
 			&i.PreviewHeight,
 			&i.Width,
 			&i.Height,
+			&i.Caption,
 		); err != nil {
 			return nil, err
 		}
@@ -265,4 +272,26 @@ func (q *Queries) ListOrphanedAttachments(ctx context.Context, arg ListOrphanedA
 		return nil, err
 	}
 	return items, nil
+}
+
+const setAttachmentCaption = `-- name: SetAttachmentCaption :execrows
+UPDATE attachments
+SET caption = $3
+WHERE id = $1 AND uploader_id = $2 AND event_id IS NULL
+`
+
+type SetAttachmentCaptionParams struct {
+	ID         uuid.UUID
+	UploaderID *uuid.UUID
+	Caption    string
+}
+
+// Scoped to the uploader and to attachments not yet sent: a caption is written
+// while composing, and a message already sent is not edited this way.
+func (q *Queries) SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setAttachmentCaption, arg.ID, arg.UploaderID, arg.Caption)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

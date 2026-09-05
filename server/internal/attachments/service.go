@@ -41,6 +41,13 @@ type Attachment struct {
 	Size        int64
 	CreatedAt   time.Time
 
+	// Caption is what the sender wrote about this file.
+	//
+	// Per attachment rather than per message: sending four photographs with a
+	// line about each is the ordinary case, and one message body cannot say
+	// which line describes which picture.
+	Caption string
+
 	// Width and Height are the original's dimensions where they are known, so
 	// a client can reserve the right space before the image arrives rather
 	// than letting the conversation jump as attachments load.
@@ -347,6 +354,50 @@ func (s *Service) ForEvent(ctx context.Context, eventID string) ([]*Attachment, 
 // upload to their message, and an attachment cannot be moved once bound. It
 // reports how many were bound: a caller that asked for three and bound two has
 // been given an identifier that was not theirs to use.
+/*
+MaxCaption bounds a caption.
+
+Long enough for a sentence or two about a picture, short enough that the field
+cannot become a second message body — which matters because a caption is not
+searched, not moderated, and not subject to the message length limit.
+*/
+const MaxCaption = 1000
+
+// ErrCaptionNotYours is returned when captioning somebody else's upload, or
+// one already sent.
+var ErrCaptionNotYours = errors.New("that attachment is not yours to caption")
+
+/*
+Caption records what the sender wrote about one file.
+
+Only before the message is sent, and only the uploader's own: a caption is
+written while composing. Editing one after the fact would be editing a message,
+which goes through the message-editing path so that it is recorded as an edit.
+*/
+func (s *Service) Caption(
+	ctx context.Context,
+	id, uploaderID uuid.UUID,
+	caption string,
+) error {
+	if len([]rune(caption)) > MaxCaption {
+		caption = string([]rune(caption)[:MaxCaption])
+	}
+
+	affected, err := s.queries.SetAttachmentCaption(ctx, dbgen.SetAttachmentCaptionParams{
+		ID:         id,
+		UploaderID: &uploaderID,
+		Caption:    caption,
+	})
+	if err != nil {
+		return fmt.Errorf("attachments: writing a caption: %w", err)
+	}
+	if affected == 0 {
+		return ErrCaptionNotYours
+	}
+
+	return nil
+}
+
 func (s *Service) Bind(
 	ctx context.Context,
 	eventID string,
@@ -405,6 +456,7 @@ func fromRow(row dbgen.Attachment) *Attachment {
 		Filename:        row.Filename,
 		ContentType:     row.ContentType,
 		Size:            row.SizeBytes,
+		Caption:         row.Caption,
 	}
 	if row.EventID != nil {
 		attachment.EventID = *row.EventID

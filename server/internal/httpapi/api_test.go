@@ -22,6 +22,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
+	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
@@ -121,9 +122,10 @@ func newTestAPIConfigured(
 			attachments.NewService(pool, testStore(t), attachments.DefaultLimits(), logger),
 			adjust,
 		),
-		Search:   search.NewService(pool),
-		Notify:   notify.NewService(pool, logger),
-		Presence: presence.NewService(queries),
+		Search:     search.NewService(pool),
+		Notify:     notify.NewService(pool, logger),
+		Moderation: moderation.NewService(pool, logger),
+		Presence:   presence.NewService(queries),
 	}, logger)
 
 	t.Cleanup(func() {

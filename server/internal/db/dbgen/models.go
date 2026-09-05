@@ -28,6 +28,7 @@ type Attachment struct {
 	PreviewHeight   *int32
 	Width           *int32
 	Height          *int32
+	Caption         string
 }
 
 type AuditEntry struct {
@@ -110,6 +111,48 @@ type NotificationPreference struct {
 	UpdatedAt time.Time
 }
 
+type PinnedMessage struct {
+	RoomID          uuid.UUID
+	EventID         string
+	PinnedBy        *uuid.UUID
+	PinnedByAddress string
+	PinnedAt        time.Time
+}
+
+type PinnedRoom struct {
+	UserID   uuid.UUID
+	RoomID   uuid.UUID
+	Position int32
+	PinnedAt time.Time
+}
+
+type Reaction struct {
+	ID          uuid.UUID
+	EventID     string
+	RoomID      uuid.UUID
+	UserID      uuid.UUID
+	UserAddress string
+	Emoji       string
+	CreatedAt   time.Time
+}
+
+type Report struct {
+	ID              uuid.UUID
+	RoomID          *uuid.UUID
+	EventID         *string
+	SubjectAddress  string
+	ReporterID      *uuid.UUID
+	ReporterAddress string
+	Reason          string
+	Detail          string
+	ReportedBody    string
+	Status          string
+	ResolvedBy      *uuid.UUID
+	Resolution      string
+	CreatedAt       time.Time
+	ResolvedAt      *time.Time
+}
+
 type Role struct {
 	ID          uuid.UUID
 	Name        string
@@ -155,6 +198,20 @@ type RoomMember struct {
 type RoomSequence struct {
 	RoomID  uuid.UUID
 	NextSeq int64
+}
+
+type ScheduledMessage struct {
+	ID            uuid.UUID
+	RoomID        uuid.UUID
+	SenderID      uuid.UUID
+	SenderAddress string
+	Body          string
+	AttachmentIds []uuid.UUID
+	ThreadRootID  *string
+	SendAt        time.Time
+	CreatedAt     time.Time
+	SentEventID   *string
+	FailedReason  string
 }
 
 type SchemaVersion struct {

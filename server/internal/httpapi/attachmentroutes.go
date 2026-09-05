@@ -54,8 +54,11 @@ type attachmentResponse struct {
 	// Width and Height are the original's dimensions where known, so a client
 	// can reserve the right space and the conversation does not jump as
 	// attachments arrive.
-	Width      int    `json:"width,omitempty"`
-	Height     int    `json:"height,omitempty"`
+	Width  int `json:"width,omitempty"`
+	Height int `json:"height,omitempty"`
+	// Caption is what the sender wrote about this file, which is per
+	// attachment so several sent together can each say something different.
+	Caption    string `json:"caption,omitempty"`
 	UploadedBy string `json:"uploadedBy"`
 	UploadedAt string `json:"uploadedAt"`
 }
@@ -77,6 +80,7 @@ func attachmentResponseOf(attachment *attachments.Attachment) attachmentResponse
 		PreviewURL:  previewURL,
 		Width:       attachment.Width,
 		Height:      attachment.Height,
+		Caption:     attachment.Caption,
 		UploadedBy:  attachment.UploaderAddress,
 		UploadedAt:  attachment.CreatedAt.UTC().Format(time.RFC3339),
 	}
@@ -432,13 +436,25 @@ func parseAttachmentIDs(raw []string) ([]uuid.UUID, error) {
 // Decided on the server so every client — web, desktop, and anything a third
 // party writes — makes the same choice, and so a change of policy does not need
 // each of them updated.
+/*
+attachmentKind says how to present a file.
+
+Every attachment gets a kind, including ones that can only be downloaded.
+Returning "" for everything unrecognised meant a client could not tell a
+spreadsheet from an unknown blob, so an archive, a document and a stray binary
+all drew the same generic box with the same generic icon.
+
+Decided here rather than in each client, so every client makes the same choice
+— and so markdown, which has no magic bytes and is detected as plain text, is
+recognised once rather than guessed from a filename in three places.
+*/
 func attachmentKind(attachment *attachments.Attachment) string {
-	contentType := attachment.ContentType
+	contentType := strings.ToLower(attachment.ContentType)
 
 	switch {
 	case contentType == "image/svg+xml":
-		// Served as an opaque download, so not displayable at all.
-		return ""
+		// Served as an opaque download, so it is a file rather than an image.
+		return "file"
 	case strings.HasPrefix(contentType, "image/"):
 		return "image"
 	case strings.HasPrefix(contentType, "video/"):
@@ -451,8 +467,120 @@ func attachmentKind(attachment *attachments.Attachment) string {
 		if attachments.IsMarkdown(contentType, attachment.Filename) {
 			return "markdown"
 		}
+		if isCode(attachment.Filename) {
+			return "code"
+		}
 		return "text"
+	case isArchive(contentType, attachment.Filename):
+		return "archive"
+	case isDocument(contentType, attachment.Filename):
+		return "document"
 	default:
-		return ""
+		// Never empty: a client showing a download needs to know it is showing
+		// one, and "file" is a truthful answer where the others are guesses.
+		return "file"
 	}
+}
+
+// isArchive recognises the container formats people actually send.
+//
+// By extension as well as by type, because a zip and every format built on one
+// share a signature: an office document, a jar and an epub are all zip files,
+// and the type alone cannot separate them.
+func isArchive(contentType, filename string) bool {
+	switch contentType {
+	case "application/zip", "application/x-zip-compressed",
+		"application/x-tar", "application/gzip", "application/x-gzip",
+		"application/x-bzip2", "application/x-7z-compressed",
+		"application/vnd.rar", "application/x-rar-compressed",
+		"application/x-xz", "application/zstd":
+		return true
+	}
+
+	return hasSuffix(filename,
+		".zip", ".tar", ".gz", ".tgz", ".bz2", ".7z", ".rar", ".xz", ".zst")
+}
+
+// isDocument recognises the formats an office suite produces.
+func isDocument(contentType, filename string) bool {
+	switch contentType {
+	case "application/msword",
+		"application/vnd.ms-excel",
+		"application/vnd.ms-powerpoint",
+		"application/vnd.oasis.opendocument.text",
+		"application/vnd.oasis.opendocument.spreadsheet",
+		"application/vnd.oasis.opendocument.presentation",
+		"application/rtf", "application/epub+zip":
+		return true
+	}
+
+	if strings.HasPrefix(contentType, "application/vnd.openxmlformats-officedocument.") {
+		return true
+	}
+
+	return hasSuffix(filename,
+		".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+		".odt", ".ods", ".odp", ".rtf", ".epub")
+}
+
+// isCode marks a text file a client should show with a monospaced face.
+//
+// By extension only: source code is plain text to any content sniffer, and the
+// name is the only thing that says which language it is.
+func isCode(filename string) bool {
+	return hasSuffix(filename,
+		".go", ".ts", ".tsx", ".js", ".jsx", ".vue", ".py", ".rb", ".rs",
+		".java", ".kt", ".swift", ".c", ".h", ".cpp", ".hpp", ".cs", ".php",
+		".sh", ".bash", ".zsh", ".sql", ".yaml", ".yml", ".toml", ".json",
+		".xml", ".html", ".css", ".scss", ".ini", ".conf", ".dockerfile")
+}
+
+func hasSuffix(filename string, suffixes ...string) bool {
+	lowered := strings.ToLower(filename)
+	for _, suffix := range suffixes {
+		if strings.HasSuffix(lowered, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+type captionRequest struct {
+	Caption string `json:"caption"`
+}
+
+/*
+handleCaptionAttachment records what the sender wrote about one file.
+
+Per attachment rather than per message. Sending several pictures with a line
+about each is the ordinary case, and a message body cannot say which line goes
+with which picture.
+
+Only before the message is sent: after that, changing what was said is editing
+a message, which goes through the editing path so it is recorded as an edit.
+*/
+func (s *Server) handleCaptionAttachment(c *echo.Context) error {
+	user, _ := currentUser(c)
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such attachment")
+	}
+
+	var request captionRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	err = s.attachments.Caption(c.Request().Context(), id, user.ID, request.Caption)
+	if errors.Is(err, attachments.ErrCaptionNotYours) {
+		// Reported as missing rather than forbidden: whether somebody else's
+		// attachment exists is not this caller's to learn.
+		return echo.NewHTTPError(http.StatusNotFound, "no such attachment")
+	}
+	if err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }

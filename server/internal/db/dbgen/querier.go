@@ -12,6 +12,11 @@ import (
 )
 
 type Querier interface {
+	// Reacting twice with the same emoji is the same as reacting once.
+	//
+	// ON CONFLICT DO NOTHING rather than an error: a double click, or two devices
+	// racing, should leave one reaction rather than failing.
+	AddReaction(ctx context.Context, arg AddReactionParams) error
 	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) error
 	AppendAuditEntry(ctx context.Context, arg AppendAuditEntryParams) (AuditEntry, error)
 	AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error)
@@ -48,6 +53,11 @@ type Querier interface {
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
 	CountEventsSince(ctx context.Context, arg CountEventsSinceParams) (int64, error)
+	CountOpenReports(ctx context.Context) (int64, error)
+	CountReactionsForEvent(ctx context.Context, eventID string) (int64, error)
+	// How many reports somebody has filed recently, so a person cannot bury the
+	// queue under hundreds of them.
+	CountRecentReportsBy(ctx context.Context, arg CountRecentReportsByParams) (int64, error)
 	CountThreadReplies(ctx context.Context, threadRootID *string) (int64, error)
 	// Messages after the member's read position, excluding their own: a person's
 	// own messages are not unread to them.
@@ -66,8 +76,10 @@ type Querier interface {
 	// The conflict clause is what stops a redelivered or edited message notifying
 	// somebody twice.
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
+	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
+	CreateScheduledMessage(ctx context.Context, arg CreateScheduledMessageParams) (ScheduledMessage, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
@@ -76,6 +88,9 @@ type Querier interface {
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteRole(ctx context.Context, id uuid.UUID) error
+	// Scoped to the sender, and only while unsent: cancelling is the sender's to
+	// do, and a message already sent is a message, not a plan.
+	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
 	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
@@ -91,10 +106,12 @@ type Querier interface {
 	GetNotificationPreference(ctx context.Context, arg GetNotificationPreferenceParams) (GetNotificationPreferenceRow, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
+	GetReport(ctx context.Context, id uuid.UUID) (Report, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetRoleByName(ctx context.Context, name string) (Role, error)
 	GetRoomByID(ctx context.Context, id uuid.UUID) (Room, error)
 	GetRoomBySlug(ctx context.Context, slugFolded *string) (Room, error)
+	GetScheduledMessage(ctx context.Context, id uuid.UUID) (ScheduledMessage, error)
 	GetSchemaVersion(ctx context.Context) (GetSchemaVersionRow, error)
 	GetServerConfigValue(ctx context.Context, key string) (ServerConfig, error)
 	GetServerStatus(ctx context.Context, key string) (ServerStatus, error)
@@ -112,15 +129,42 @@ type Querier interface {
 	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
+	// What is ready to send.
+	//
+	// FOR UPDATE SKIP LOCKED so more than one server can run the delivery pass
+	// without sending the same message twice: whoever locks a row owns it, and the
+	// others move on rather than waiting.
+	ListDueScheduledMessages(ctx context.Context, limit int32) ([]ScheduledMessage, error)
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
 	ListNotificationPreferences(ctx context.Context, userID uuid.UUID) ([]ListNotificationPreferencesRow, error)
+	// The moderation queue: oldest first, so nothing waits indefinitely behind
+	// newer arrivals.
+	ListOpenReports(ctx context.Context, limit int32) ([]Report, error)
 	// Attachments that never became part of a message, oldest first.
 	ListOrphanedAttachments(ctx context.Context, arg ListOrphanedAttachmentsParams) ([]Attachment, error)
+	// Just the identifiers, so a timeline can mark which messages are pinned
+	// without fetching them a second time.
+	ListPinnedEventIDs(ctx context.Context, roomID uuid.UUID) ([]string, error)
+	// The pinned messages of a room, most recently pinned first, with the message
+	// itself so a client does not have to fetch each one.
+	//
+	// sqlc.embed keeps the event as a whole struct rather than flattening its
+	// columns alongside the pin's. Flattened, adding a column to events would
+	// silently stop it reaching this query's callers.
+	ListPinnedMessages(ctx context.Context, roomID uuid.UUID) ([]ListPinnedMessagesRow, error)
+	ListPinnedRooms(ctx context.Context, userID uuid.UUID) ([]ListPinnedRoomsRow, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
+	// Every reaction on a set of messages, for drawing a timeline.
+	//
+	// Returned as rows rather than counts so a client can show who reacted and
+	// whether the reader is among them, which is what makes a reaction button
+	// reflect its own state.
+	ListReactionsForEvents(ctx context.Context, eventIds []string) ([]ListReactionsForEventsRow, error)
 	// The most recent events, for opening a room.
 	ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEventsParams) ([]Event, error)
+	ListReportsForRoom(ctx context.Context, arg ListReportsForRoomParams) ([]Report, error)
 	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]RolePermission, error)
 	ListRoles(ctx context.Context) ([]Role, error)
 	ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]Role, error)
@@ -144,6 +188,8 @@ type Querier interface {
 	// undisclosed.
 	ListRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	ListRoomsUserIsIn(ctx context.Context, userID uuid.UUID) ([]Room, error)
+	// Somebody's own outstanding messages, soonest first.
+	ListScheduledMessagesForUser(ctx context.Context, senderID uuid.UUID) ([]ScheduledMessage, error)
 	ListServerConfig(ctx context.Context) ([]ServerConfig, error)
 	ListServerStatuses(ctx context.Context) ([]ServerStatus, error)
 	ListSessionsForUser(ctx context.Context, userID uuid.UUID) ([]Session, error)
@@ -163,15 +209,23 @@ type Querier interface {
 	// Reading a conversation on a phone must clear what a laptop is showing, which
 	// is why this is keyed on the room rather than on individual notifications.
 	MarkRoomNotificationsRead(ctx context.Context, arg MarkRoomNotificationsReadParams) error
+	MarkScheduledMessageFailed(ctx context.Context, arg MarkScheduledMessageFailedParams) error
+	MarkScheduledMessageSent(ctx context.Context, arg MarkScheduledMessageSentParams) error
 	// Allocates the next position in a room's total order.
 	//
 	// The UPDATE takes a row lock, so two concurrent writers serialise here rather
 	// than both reading the same maximum and colliding.
 	NextRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
+	// Pinning something already pinned updates who pinned it and when, rather than
+	// failing: the second person's intent is the current one.
+	PinMessage(ctx context.Context, arg PinMessageParams) error
+	// A person's own pinned conversation, which says nothing to anybody else.
+	PinRoom(ctx context.Context, arg PinRoomParams) error
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
 	// Removes content while leaving the event in place, so ordering and the
 	// surrounding events stay verifiable.
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
+	RemoveReaction(ctx context.Context, arg RemoveReactionParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	RemoveRolePermission(ctx context.Context, arg RemoveRolePermissionParams) error
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) error
@@ -180,6 +234,9 @@ type Querier interface {
 	// Clears presence for connections that ended without a clean close, which is
 	// what makes an ungraceful disconnect expire rather than persist.
 	ResetStalePresence(ctx context.Context, lastSeenAt time.Time) error
+	// Only an open report can be resolved, so two moderators acting at once do not
+	// both record an outcome.
+	ResolveReport(ctx context.Context, arg ResolveReportParams) (Report, error)
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
@@ -214,6 +271,9 @@ type Querier interface {
 	// Visibility is the authorisation: a private channel appears only to somebody
 	// already in it, so searching cannot be used to discover that one exists.
 	SearchRooms(ctx context.Context, arg SearchRoomsParams) ([]SearchRoomsRow, error)
+	// Scoped to the uploader and to attachments not yet sent: a caption is written
+	// while composing, and a message already sent is not edited this way.
+	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
@@ -232,6 +292,8 @@ type Querier interface {
 	TouchPresence(ctx context.Context, userID uuid.UUID) error
 	TouchSession(ctx context.Context, id uuid.UUID) error
 	UnindexMessage(ctx context.Context, eventID string) error
+	UnpinMessage(ctx context.Context, arg UnpinMessageParams) error
+	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
 }

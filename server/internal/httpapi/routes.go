@@ -53,6 +53,26 @@ func (s *Server) routes() {
 	// Counts for the whole timeline at once. Without this a client asks per
 	// message, which is one request per message drawn.
 	rooms.GET("/:id/threads", s.handleThreadSummaries)
+
+	// Reactions. Read for the whole timeline at once, for the same reason
+	// thread counts are: a request per message is a request per message drawn.
+	rooms.GET("/:id/reactions", s.handleRoomReactions)
+	rooms.PUT("/:id/messages/:eventId/reactions", s.handleReact)
+	rooms.DELETE("/:id/messages/:eventId/reactions", s.handleUnreact)
+
+	// Pinned messages. Pinning speaks for the room, so it takes a permission;
+	// reading what is pinned is part of reading the room.
+	rooms.GET("/:id/pins", s.handleListPinned)
+	rooms.PUT("/:id/messages/:eventId/pin", s.handlePinMessage,
+		requirePermission(authz.PermMessagePin))
+	rooms.DELETE("/:id/messages/:eventId/pin", s.handleUnpinMessage,
+		requirePermission(authz.PermMessagePin))
+
+	// Forwarding a message to another conversation.
+	rooms.POST("/:id/messages/:eventId/forward", s.handleForward)
+
+	// Messages written now and sent later.
+	rooms.POST("/:id/scheduled", s.handleScheduleMessage)
 	rooms.GET("/:id/threads/:eventId", s.handleThread)
 	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread)
 	rooms.POST("/:id/read", s.handleMarkRead)
@@ -66,6 +86,9 @@ func (s *Server) routes() {
 	s.echo.GET("/api/attachments/limits", s.handleAttachmentLimits, requireAuthentication)
 	s.echo.GET("/api/attachments/:id", s.handleDownloadAttachment, requireAuthentication)
 	s.echo.GET("/api/attachments/:id/preview", s.handleAttachmentPreview, requireAuthentication)
+	// A caption belongs to the file, so several sent together can each say
+	// something different.
+	s.echo.PUT("/api/attachments/:id/caption", s.handleCaptionAttachment, requireAuthentication)
 
 	// Notifications, and what a person wants to be told about.
 	me.GET("/notifications", s.handleListNotifications)
@@ -75,6 +98,28 @@ func (s *Server) routes() {
 
 	// Search. A GET, so a search is shareable and bookmarkable: the term is
 	// the caller's own words about their own conversations.
+	// A person's own pinned conversations, which is a bookmark rather than an
+	// announcement and so is kept per person.
+	s.echo.GET("/api/me/pins", s.handleListPinnedRooms, requireAuthentication)
+	s.echo.PUT("/api/me/pins/:id", s.handlePinRoom, requireAuthentication)
+	s.echo.DELETE("/api/me/pins/:id", s.handleUnpinRoom, requireAuthentication)
+
+	// Scheduled messages a person has outstanding, and cancelling one.
+	s.echo.GET("/api/me/scheduled", s.handleListScheduled, requireAuthentication)
+	s.echo.DELETE("/api/me/scheduled/:id", s.handleCancelScheduled, requireAuthentication)
+
+	// Reporting abuse. Filing is open to anybody signed in — requiring
+	// membership would stop somebody reporting what they saw before leaving —
+	// while the queue is for whoever moderates.
+	s.echo.GET("/api/reports/reasons", s.handleReportReasons, requireAuthentication)
+	s.echo.POST("/api/reports", s.handleReport, requireAuthentication)
+	s.echo.GET("/api/reports", s.handleListReports, requireAuthentication,
+		requirePermission(authz.PermModerationReview))
+	s.echo.GET("/api/reports/count", s.handleReportCount, requireAuthentication,
+		requirePermission(authz.PermModerationReview))
+	s.echo.POST("/api/reports/:id/resolve", s.handleResolveReport, requireAuthentication,
+		requirePermission(authz.PermModerationReview))
+
 	s.echo.GET("/api/search", s.handleSearch, requireAuthentication)
 	// One box, one question: messages, conversations and people together,
 	// rather than three requests resolving at different times.

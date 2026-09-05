@@ -2,8 +2,9 @@
 INSERT INTO attachments (
     id, storage_key, uploader_id, uploader_address, room_id,
     filename, content_type, size_bytes,
-    preview_key, preview_type, preview_width, preview_height, width, height
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    preview_key, preview_type, preview_width, preview_height, width, height,
+    caption
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING *;
 
 -- name: GetAttachment :one
@@ -46,3 +47,10 @@ LIMIT $2;
 -- once nothing references them.
 -- name: CountAttachmentsWithPreviewKey :one
 SELECT count(*) FROM attachments WHERE preview_key = $1;
+
+-- name: SetAttachmentCaption :execrows
+-- Scoped to the uploader and to attachments not yet sent: a caption is written
+-- while composing, and a message already sent is not edited this way.
+UPDATE attachments
+SET caption = $3
+WHERE id = $1 AND uploader_id = $2 AND event_id IS NULL;
