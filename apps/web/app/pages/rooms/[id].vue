@@ -1407,7 +1407,8 @@ watch(roomId, load, { immediate: true });
                     </form>
 
                     <template v-else>
-                      {{ message.removed ? "This message was removed" : message.body }}
+                      <template v-if="message.removed">This message was removed</template>
+                      <MessageBody v-else :body="message.body" />
                       <span
                         v-if="message.edited && !message.removed"
                         class="ml-1 align-baseline text-[0.6875rem] opacity-60"

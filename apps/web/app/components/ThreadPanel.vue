@@ -117,7 +117,7 @@ function when(value: string): string {
                 </time>
               </p>
               <Bubble :variant="thread.root.redacted ? 'redacted' : 'default'" class="max-w-full">
-                {{ bodyOf(thread.root) }}
+                <MessageBody :body="bodyOf(thread.root)" />
               </Bubble>
             </div>
           </div>
@@ -147,7 +147,7 @@ function when(value: string): string {
               "
               class="max-w-full"
             >
-              {{ bodyOf(reply) }}
+              <MessageBody :body="bodyOf(reply)" />
             </Bubble>
           </div>
         </article>
