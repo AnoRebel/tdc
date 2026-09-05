@@ -5,6 +5,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
+
+	"github.com/AnoRebel/tdc/server/internal/notify"
 )
 
 // pinnedResponse is a message a room has marked as important.
@@ -22,10 +24,20 @@ func (s *Server) handlePinMessage(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
-	if err := s.rooms.PinMessage(
-		c.Request().Context(), roomID, user.ID, eventIDParam(c),
-	); err != nil {
+	ctx := c.Request().Context()
+	eventID := eventIDParam(c)
+
+	if err := s.rooms.PinMessage(ctx, roomID, user.ID, eventID); err != nil {
 		return roomError(err)
+	}
+
+	// Whoever wrote it hears that the channel has singled it out.
+	if s.notify != nil {
+		if event, err := s.rooms.EventInRoom(ctx, roomID, eventID); err == nil && event.SenderID != nil {
+			s.notify.About(ctx, *event.SenderID, user.ID,
+				s.rooms.UserAddress(user.Username), roomID, eventID,
+				notify.ReasonPin, "")
+		}
 	}
 
 	return c.NoContent(http.StatusNoContent)

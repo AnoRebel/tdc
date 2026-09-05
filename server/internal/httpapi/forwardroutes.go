@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
@@ -53,7 +54,21 @@ func (s *Server) handleForward(c *echo.Context) error {
 		return roomError(err)
 	}
 
-	s.publishEvent(c.Request().Context(), event)
+	ctx := c.Request().Context()
+
+	// Whoever wrote it hears that it has been repeated elsewhere. Where it
+	// went is deliberately not said: the destination may be a room they cannot
+	// see, and naming it would disclose that the room exists.
+	if s.notify != nil {
+		if original, err := s.rooms.EventInRoom(ctx, fromRoomID, eventIDParam(c)); err == nil &&
+			original.SenderID != nil {
+			s.notify.About(ctx, *original.SenderID, user.ID,
+				s.rooms.UserAddress(user.Username), fromRoomID, original.ID,
+				notify.ReasonForward, "")
+		}
+	}
+
+	s.publishEvent(ctx, event)
 
 	return c.JSON(http.StatusCreated, messageResponseOf(event))
 }

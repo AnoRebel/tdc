@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
@@ -38,12 +39,26 @@ func (s *Server) handleReact(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	err = s.rooms.React(c.Request().Context(), roomID, user.ID, eventIDParam(c), request.Emoji)
+	ctx := c.Request().Context()
+	eventID := eventIDParam(c)
+
+	err = s.rooms.React(ctx, roomID, user.ID, eventID, request.Emoji)
 	if errors.Is(err, rooms.ErrNotAnEmoji) {
 		return echo.NewHTTPError(http.StatusBadRequest, "a reaction must be a single emoji")
 	}
 	if err != nil {
 		return roomError(err)
+	}
+
+	// Whoever wrote it hears about it. The emoji travels with the
+	// notification, so taking the reaction back later does not leave a
+	// notification that cannot explain itself.
+	if s.notify != nil {
+		if event, err := s.rooms.EventInRoom(ctx, roomID, eventID); err == nil && event.SenderID != nil {
+			s.notify.About(ctx, *event.SenderID, user.ID,
+				s.rooms.UserAddress(user.Username), roomID, eventID,
+				notify.ReasonReaction, request.Emoji)
+		}
 	}
 
 	return c.NoContent(http.StatusNoContent)

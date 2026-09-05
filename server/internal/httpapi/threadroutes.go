@@ -6,6 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
+
+	"github.com/AnoRebel/tdc/server/internal/notify"
 )
 
 type replyRequest struct {
@@ -67,6 +69,18 @@ func (s *Server) handleReplyInThread(c *echo.Context) error {
 	// message it announced has arrived.
 	if err := s.presence.StopTyping(ctx, roomID, user.ID); err != nil {
 		s.log.Error("cannot withdraw typing indication", "error", err)
+	}
+
+	// Whoever started the thread hears about a reply in it, which is the
+	// notification a threaded conversation lives on: without it a thread is
+	// only found by going back and looking.
+	if s.notify != nil && reply.ThreadRootID != nil {
+		if root, err := s.rooms.EventInRoom(ctx, roomID, *reply.ThreadRootID); err == nil &&
+			root.SenderID != nil {
+			s.notify.About(ctx, *root.SenderID, user.ID,
+				s.rooms.UserAddress(user.Username), roomID, reply.ID,
+				notify.ReasonReply, "")
+		}
 	}
 
 	s.publishEvent(ctx, reply)

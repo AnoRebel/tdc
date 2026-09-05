@@ -94,13 +94,15 @@ type MessageSearch struct {
 }
 
 type Notification struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	RoomID    uuid.UUID
-	EventID   string
-	Reason    string
-	ReadAt    *time.Time
-	CreatedAt time.Time
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	RoomID       uuid.UUID
+	EventID      string
+	Reason       string
+	ReadAt       *time.Time
+	CreatedAt    time.Time
+	ActorAddress string
+	Detail       string
 }
 
 type NotificationPreference struct {

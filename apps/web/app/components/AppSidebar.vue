@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
-import { Globe, Hash, Lock, Plus, Search, Server, Settings } from "lucide-vue-next";
+import type { Notification } from "@tdc/types";
+import { Bell, Globe, Hash, Lock, Plus, Search, Server, Settings } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
 import { Kbd } from "~/components/ui/kbd";
 
@@ -41,6 +42,36 @@ const peers = computed(() => props.servers);
  * The modifier this platform actually uses, so the hint is not a lie on one of
  * them. Guarded for the server render, where there is no navigator.
  */
+const notifications = useNotifications();
+const showNotifications = ref(false);
+const router = useRouter();
+
+/*
+ * The badge, refreshed on a timer.
+ *
+ * Only the count, not the list: a badge is checked constantly and the list
+ * only when somebody opens it, so fetching every notification to draw one
+ * digit would be the expensive way round.
+ *
+ * Thirty seconds because a notification arriving is not urgent — the live
+ * connection already delivers messages as they happen, and this is the
+ * fallback for everything that is not a message.
+ */
+onMounted(() => {
+  void notifications.refreshCount();
+
+  const timer = setInterval(() => void notifications.refreshCount(), 30_000);
+  onBeforeUnmount(() => clearInterval(timer));
+});
+
+/** Opens the message a notification is about. */
+async function goToNotification(notification: Notification) {
+  await router.push({
+    path: `/rooms/${notification.roomId}`,
+    query: { at: notification.eventId, jump: String(Date.now()) },
+  });
+}
+
 const shortcut = computed(() => {
   const mac = import.meta.client && /Mac|iP(hone|ad|od)/.test(navigator.platform);
   return mac ? "⌘K" : "Ctrl K";
@@ -217,7 +248,7 @@ function conversationName(room: Room): string {
       </button>
     </div>
 
-    <footer class="flex items-center gap-2 border-t p-2">
+    <footer class="relative flex items-center gap-2 border-t p-2">
       <Avatar :name="user?.displayName ?? 'You'" size="sm" online />
       <span class="min-w-0 flex-1">
         <span class="block truncate text-xs font-medium">{{ user?.displayName }}</span>
@@ -225,6 +256,29 @@ function conversationName(room: Room): string {
           {{ user?.address }}
         </span>
       </span>
+      <button
+        type="button"
+        class="btn btn-ghost relative size-7 px-0"
+        :aria-label="
+          notifications.unread.value
+            ? `Notifications, ${notifications.unread.value} unread`
+            : 'Notifications'
+        "
+        @click="showNotifications = !showNotifications"
+      >
+        <Bell class="size-3.5" />
+        <!-- A dot rather than a number past nine: the exact count stops
+             meaning anything, and a three-digit badge crowds the footer. -->
+        <span
+          v-if="notifications.unread.value"
+          class="absolute -top-0.5 -right-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.5625rem] font-semibold text-primary-foreground tabular-nums"
+        >
+          {{ notifications.unread.value > 9 ? "9+" : notifications.unread.value }}
+        </span>
+      </button>
+
+      <NotificationPanel v-model="showNotifications" @open="goToNotification" />
+
       <NuxtLink to="/settings" class="btn btn-ghost size-7 px-0" aria-label="Settings">
         <Settings class="size-3.5" />
       </NuxtLink>

@@ -75,6 +75,9 @@ type Querier interface {
 	//
 	// The conflict clause is what stops a redelivered or edited message notifying
 	// somebody twice.
+	// The conflict target matches the constraint: one per person, event, reason
+	// and actor. Two people reacting to the same message are two things worth
+	// hearing about; the same person reacting twice is one.
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
@@ -201,6 +204,11 @@ type Querier interface {
 	// Unread counts for every room a person is in, in one query rather than one
 	// per room.
 	ListUnreadCounts(ctx context.Context, userID uuid.UUID) ([]ListUnreadCountsRow, error)
+	// The actor comes from the notification rather than the event.
+	//
+	// For a message the two are the same, but for a reaction the event is the
+	// message that was reacted to — whose sender is usually the person being
+	// notified. Taking the actor from the event would say you reacted to yourself.
 	ListUnreadNotifications(ctx context.Context, arg ListUnreadNotificationsParams) ([]ListUnreadNotificationsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error

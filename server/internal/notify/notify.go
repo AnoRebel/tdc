@@ -42,6 +42,16 @@ const (
 	ReasonMention Reason = "mention"
 	ReasonDirect  Reason = "direct"
 	ReasonThread  Reason = "thread"
+	// ReasonReaction is somebody reacting to something you wrote.
+	ReasonReaction Reason = "reaction"
+	// ReasonReply is somebody replying in a thread you started.
+	ReasonReply Reason = "reply"
+	// ReasonJoin is somebody joining a conversation you are in.
+	ReasonJoin Reason = "join"
+	// ReasonForward is something you wrote being forwarded elsewhere.
+	ReasonForward Reason = "forward"
+	// ReasonPin is something you wrote being pinned.
+	ReasonPin Reason = "pin"
 )
 
 // Preference is the setting that applies to one conversation.
@@ -61,6 +71,14 @@ type Notification struct {
 	Reason  Reason
 	Sender  string
 	Preview string
+	// Actor is who did the thing. The same as Sender for a message, and
+	// different for everything else: a reaction's event is the message that
+	// was reacted to, whose sender is usually the person being notified.
+	Actor string
+	// Detail carries what the reason needs — the emoji, for a reaction. Kept
+	// on the notification rather than looked up, so a reaction that has since
+	// been taken back still explains the notification it raised.
+	Detail string
 }
 
 // Service raises and reads notifications.
@@ -235,14 +253,22 @@ func (s *Service) Unread(ctx context.Context, userID uuid.UUID, limit int32) ([]
 
 	notifications := make([]Notification, 0, len(rows))
 	for _, row := range rows {
-		notifications = append(notifications, Notification{
+		notification := Notification{
 			ID:      row.ID,
 			RoomID:  row.RoomID,
 			EventID: row.EventID,
 			Reason:  Reason(row.Reason),
 			Sender:  row.SenderAddress,
 			Preview: previewOf(row.Content),
-		})
+			Actor:   row.ActorAddress,
+			Detail:  row.Detail,
+		}
+		// Older notifications predate the actor column, and for a message the
+		// sender is the actor anyway.
+		if notification.Actor == "" {
+			notification.Actor = row.SenderAddress
+		}
+		notifications = append(notifications, notification)
 	}
 
 	return notifications, nil
@@ -330,4 +356,102 @@ func previewOf(content []byte) string {
 		return string([]rune(body)[:140]) + "…"
 	}
 	return body
+}
+
+/*
+About tells one person that something happened to something of theirs.
+
+Separate from ForMessage because the two answer different questions. ForMessage
+asks who in a room should hear about a message that arrived, and consults each
+person's level and mute. This is about a single person's own thing being acted
+on — their message reacted to, their thread replied in, their post pinned — and
+the only questions are whether they did it themselves and whether they have
+muted that conversation.
+
+Never notifies somebody about their own action. Reacting to your own message,
+replying in your own thread and pinning your own post are all ordinary, and a
+notification for any of them is noise.
+
+Failures are logged rather than returned: whatever caused this has already
+happened, and undoing a reaction because its notification could not be written
+would be a much worse outcome than a missed notification.
+*/
+func (s *Service) About(
+	ctx context.Context,
+	recipientID uuid.UUID,
+	actorID uuid.UUID,
+	actorAddress string,
+	roomID uuid.UUID,
+	eventID string,
+	reason Reason,
+	detail string,
+) {
+	if recipientID == actorID {
+		return
+	}
+
+	// Muting silences these too. Somebody who has muted a channel is asking
+	// not to be interrupted by it, and a reaction is an interruption.
+	if s.preferenceFor(ctx, recipientID, roomID).Muted {
+		return
+	}
+
+	err := s.queries.CreateNotification(ctx, dbgen.CreateNotificationParams{
+		ID:           uuid.New(),
+		UserID:       recipientID,
+		RoomID:       roomID,
+		EventID:      eventID,
+		Reason:       string(reason),
+		ActorAddress: actorAddress,
+		Detail:       detail,
+	})
+	if err != nil {
+		s.log.Error("cannot raise a notification",
+			"userId", recipientID, "eventId", eventID, "reason", reason, "error", err)
+	}
+}
+
+/*
+AboutRoom tells everybody in a conversation that something happened in it.
+
+Used for joining, which is about the room rather than about any one message.
+Whoever did it is skipped, and so is anybody who has the conversation muted or
+set to hear nothing — a busy channel where people come and go would otherwise
+be a stream of notifications about nothing anybody said.
+*/
+func (s *Service) AboutRoom(
+	ctx context.Context,
+	members []dbgen.ListRoomMembersRow,
+	actorID uuid.UUID,
+	actorAddress string,
+	roomID uuid.UUID,
+	eventID string,
+	reason Reason,
+) {
+	for _, member := range members {
+		if member.ID == actorID {
+			continue
+		}
+
+		// Only for people who asked to hear everything. Somebody on the
+		// default of mentions-only does not want to know that a person they
+		// have never spoken to joined a channel.
+		preference := s.preferenceFor(ctx, member.ID, roomID)
+		if preference.Muted || preference.Level != LevelAll {
+			continue
+		}
+
+		err := s.queries.CreateNotification(ctx, dbgen.CreateNotificationParams{
+			ID:           uuid.New(),
+			UserID:       member.ID,
+			RoomID:       roomID,
+			EventID:      eventID,
+			Reason:       string(reason),
+			ActorAddress: actorAddress,
+		})
+		if err != nil {
+			s.log.Error("cannot raise a notification",
+				"userId", member.ID, "eventId", eventID, "reason", reason, "error", err)
+		}
+	}
 }

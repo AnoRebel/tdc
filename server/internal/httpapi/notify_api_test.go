@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -206,5 +207,258 @@ func joinRoom(t *testing.T, handler http.Handler, token, roomID string) {
 	recorder := call(t, handler, http.MethodPost, "/api/rooms/"+roomID+"/join", nil, token)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("joining returned %d: %s", recorder.Code, truncate(recorder.Body.String()))
+	}
+}
+
+// notificationsWithActor is a notification including who caused it.
+type actorNotification struct {
+	Reason string `json:"reason"`
+	Actor  string `json:"actor"`
+	Detail string `json:"detail"`
+}
+
+func actorNotificationsFor(t *testing.T, handler http.Handler, token string) []actorNotification {
+	t.Helper()
+
+	recorder := call(t, handler, http.MethodGet, "/api/me/notifications", nil, token)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("listing notifications returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var hits []actorNotification
+	if err := json.Unmarshal(recorder.Body.Bytes(), &hits); err != nil {
+		t.Fatalf("decoding notifications: %v", err)
+	}
+	return hits
+}
+
+// TestReactingNotifiesTheAuthor covers the ordinary case.
+func TestReactingNotifiesTheAuthor(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+	eventID := sendMessage(t, handler, owner, roomID, "Nimemaliza ripoti")
+
+	other := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, other, roomID)
+
+	recorder := call(t, handler, http.MethodPut,
+		"/api/rooms/"+roomID+"/messages/"+eventID+"/reactions",
+		map[string]any{"emoji": "🎉"}, other)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("reacting returned %d: %s", recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	hits := actorNotificationsFor(t, handler, owner)
+	if len(hits) != 1 {
+		t.Fatalf("the author has %d notifications after being reacted to, expected 1", len(hits))
+	}
+	if hits[0].Reason != "reaction" {
+		t.Errorf("the reason is %q, expected reaction", hits[0].Reason)
+	}
+	// The emoji travels with it, so a reaction taken back later still leaves a
+	// notification that can explain itself.
+	if hits[0].Detail != "🎉" {
+		t.Errorf("the notification does not carry the emoji: %q", hits[0].Detail)
+	}
+	// The actor is the reactor, not the message's sender — which is the
+	// distinction that makes this notification make sense at all.
+	if !strings.Contains(hits[0].Actor, "amina") {
+		t.Errorf("the actor is %q, expected the person who reacted", hits[0].Actor)
+	}
+}
+
+/*
+TestTwoPeopleReactingRaisesTwoNotifications is the rule that forced the unique
+constraint to change.
+
+It used to be one notification per person per event, which is right while every
+notification is about a message arriving: an edit or a redelivery must not
+notify twice. It is wrong here — two people reacting are two things worth
+hearing about, and the second was silently dropped.
+*/
+func TestTwoPeopleReactingRaisesTwoNotifications(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+	eventID := sendMessage(t, handler, owner, roomID, "Tumefanikiwa")
+
+	for _, name := range []string{"amina", "juma"} {
+		token := registerAndSignIn(t, handler, name)
+		joinRoom(t, handler, token, roomID)
+
+		recorder := call(t, handler, http.MethodPut,
+			"/api/rooms/"+roomID+"/messages/"+eventID+"/reactions",
+			map[string]any{"emoji": "👏"}, token)
+		if recorder.Code != http.StatusNoContent {
+			t.Fatalf("%s reacting returned %d", name, recorder.Code)
+		}
+	}
+
+	hits := actorNotificationsFor(t, handler, owner)
+	if len(hits) != 2 {
+		t.Errorf("two people reacting raised %d notifications, expected 2", len(hits))
+	}
+}
+
+// TestReactingToYourOwnMessageIsSilent covers the rule no preference can turn
+// on.
+//
+// Reacting to your own message is ordinary, and a notification for it is noise
+// — the failure that teaches people to ignore notifications entirely.
+func TestReactingToYourOwnMessageIsSilent(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+	eventID := sendMessage(t, handler, owner, roomID, "Nadhani hii ni sawa")
+
+	recorder := call(t, handler, http.MethodPut,
+		"/api/rooms/"+roomID+"/messages/"+eventID+"/reactions",
+		map[string]any{"emoji": "👍"}, owner)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("reacting returned %d", recorder.Code)
+	}
+
+	if hits := actorNotificationsFor(t, handler, owner); len(hits) != 0 {
+		t.Errorf("reacting to your own message raised %d notifications", len(hits))
+	}
+}
+
+// TestReplyingNotifiesWhoeverStartedTheThread is the notification a threaded
+// conversation lives on: without it, a thread is only found by going back and
+// looking.
+func TestReplyingNotifiesWhoeverStartedTheThread(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+	rootID := sendMessage(t, handler, owner, roomID, "Nani anaweza kusaidia?")
+
+	other := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, other, roomID)
+
+	recorder := call(t, handler, http.MethodPost,
+		"/api/rooms/"+roomID+"/threads/"+rootID+"/replies",
+		map[string]any{"body": "Mimi ninaweza", "clientToken": "reply-1"}, other)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("replying returned %d: %s", recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	hits := actorNotificationsFor(t, handler, owner)
+	if len(hits) != 1 {
+		t.Fatalf("the thread's author has %d notifications, expected 1", len(hits))
+	}
+	if hits[0].Reason != "reply" {
+		t.Errorf("the reason is %q, expected reply", hits[0].Reason)
+	}
+}
+
+// TestPinningNotifiesTheAuthor tells somebody the channel has singled out what
+// they wrote.
+func TestPinningNotifiesTheAuthor(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	other := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, other, roomID)
+	eventID := sendMessage(t, handler, other, roomID, "Ratiba ya wiki")
+
+	// The owner completed setup, so they hold the pinning permission.
+	pinned := call(t, handler, http.MethodPut,
+		"/api/rooms/"+roomID+"/messages/"+eventID+"/pin", nil, owner)
+	if pinned.Code != http.StatusNoContent {
+		t.Fatalf("pinning returned %d: %s", pinned.Code, truncate(pinned.Body.String()))
+	}
+
+	hits := actorNotificationsFor(t, handler, other)
+	if len(hits) != 1 || hits[0].Reason != "pin" {
+		t.Errorf("the author has %+v, expected one pin notification", hits)
+	}
+}
+
+/*
+TestJoiningOnlyNotifiesPeopleWhoAskedForEverything keeps a busy channel usable.
+
+Somebody on the default of mentions-only does not want to know that a person
+they have never spoken to joined a channel. A server where every join notified
+everybody would be a stream of notifications about nothing anybody said.
+*/
+func TestJoiningOnlyNotifiesPeopleWhoAskedForEverything(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	// A second member on the default level.
+	quiet := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, quiet, roomID)
+
+	// The owner asks to hear everything about this conversation.
+	set := call(t, handler, http.MethodPut, "/api/me/preferences/notifications",
+		map[string]any{"level": "all", "muted": false, "room": roomID}, owner)
+	if set.Code != http.StatusNoContent {
+		t.Fatalf("setting a preference returned %d", set.Code)
+	}
+
+	// Somebody new joins.
+	newcomer := registerAndSignIn(t, handler, "juma")
+	joinRoom(t, handler, newcomer, roomID)
+
+	ownerHits := actorNotificationsFor(t, handler, owner)
+	joins := 0
+	for _, hit := range ownerHits {
+		if hit.Reason == "join" {
+			joins++
+		}
+	}
+	if joins != 1 {
+		t.Errorf("somebody who asked to hear everything got %d join notifications", joins)
+	}
+
+	// And the member on the default hears nothing about it.
+	for _, hit := range actorNotificationsFor(t, handler, quiet) {
+		if hit.Reason == "join" {
+			t.Error("a member on the default level was notified about somebody joining")
+		}
+	}
+}
+
+// TestMutingSilencesReactionsToo checks that muting means what it says.
+//
+// Somebody who mutes a channel is asking not to be interrupted by it, and a
+// reaction is an interruption.
+func TestMutingSilencesReactionsToo(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+	eventID := sendMessage(t, handler, owner, roomID, "Ujumbe")
+
+	muted := call(t, handler, http.MethodPut, "/api/me/preferences/notifications",
+		map[string]any{"level": "all", "muted": true, "room": roomID}, owner)
+	if muted.Code != http.StatusNoContent {
+		t.Fatalf("muting returned %d", muted.Code)
+	}
+
+	other := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, other, roomID)
+
+	recorder := call(t, handler, http.MethodPut,
+		"/api/rooms/"+roomID+"/messages/"+eventID+"/reactions",
+		map[string]any{"emoji": "👍"}, other)
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("reacting returned %d", recorder.Code)
+	}
+
+	for _, hit := range actorNotificationsFor(t, handler, owner) {
+		if hit.Reason == "reaction" {
+			t.Error("a muted channel raised a reaction notification")
+		}
 	}
 }

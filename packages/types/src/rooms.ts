@@ -270,3 +270,27 @@ export interface ThreadSummary {
   /** Milliseconds since the epoch, so a client can order by recent activity. */
   lastReplyAt: number;
 }
+
+/** Why somebody was notified. */
+export type NotificationReason =
+  "mention" | "direct" | "thread" | "reaction" | "reply" | "join" | "forward" | "pin";
+
+/** One thing somebody has been told about. */
+export interface Notification {
+  id: string;
+  roomId: string;
+  eventId: string;
+  reason: NotificationReason;
+  /** Who wrote the message this concerns. */
+  sender: string;
+  /** A short copy of that message. */
+  preview: string;
+  /**
+   * Who caused it. The same as the sender for a message, and different for
+   * everything else: a reaction's event is the message reacted to, whose
+   * sender is usually the person being notified.
+   */
+  actor: string;
+  /** What the reason needs — the emoji, for a reaction. */
+  detail?: string;
+}

@@ -16,11 +16,18 @@ type notificationResponse struct {
 	RoomID string `json:"roomId"`
 	// EventID lets a client jump to the message rather than only naming it.
 	EventID string `json:"eventId"`
-	// Reason is "mention", "direct" or "thread", so a client can phrase and
-	// group them differently rather than showing one undifferentiated list.
+	// Reason is why this was raised — "mention", "direct", "thread",
+	// "reaction", "reply", "join", "forward" or "pin" — so a client can phrase
+	// and group them rather than showing one undifferentiated list.
 	Reason  string `json:"reason"`
 	Sender  string `json:"sender"`
 	Preview string `json:"preview"`
+	// Actor is who did it. The same as Sender for a message, and different for
+	// everything else: a reaction's event is the message reacted to, whose
+	// sender is usually the person being notified.
+	Actor string `json:"actor"`
+	// Detail is what the reason needs — the emoji, for a reaction.
+	Detail string `json:"detail,omitempty"`
 }
 
 func (s *Server) handleListNotifications(c *echo.Context) error {
@@ -45,6 +52,8 @@ func (s *Server) handleListNotifications(c *echo.Context) error {
 			Reason:  string(n.Reason),
 			Sender:  n.Sender,
 			Preview: n.Preview,
+			Actor:   n.Actor,
+			Detail:  n.Detail,
 		})
 	}
 

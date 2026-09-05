@@ -30,12 +30,21 @@ DO UPDATE SET level = EXCLUDED.level, muted = EXCLUDED.muted, updated_at = now()
 -- The conflict clause is what stops a redelivered or edited message notifying
 -- somebody twice.
 -- name: CreateNotification :exec
-INSERT INTO notifications (id, user_id, room_id, event_id, reason)
-VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (user_id, event_id) DO NOTHING;
+-- The conflict target matches the constraint: one per person, event, reason
+-- and actor. Two people reacting to the same message are two things worth
+-- hearing about; the same person reacting twice is one.
+INSERT INTO notifications (id, user_id, room_id, event_id, reason, actor_address, detail)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (user_id, event_id, reason, actor_address) DO NOTHING;
 
 -- name: ListUnreadNotifications :many
+-- The actor comes from the notification rather than the event.
+--
+-- For a message the two are the same, but for a reaction the event is the
+-- message that was reacted to — whose sender is usually the person being
+-- notified. Taking the actor from the event would say you reacted to yourself.
 SELECT n.id, n.room_id, n.event_id, n.reason, n.created_at,
+       n.actor_address, n.detail,
        e.sender_address, e.content
 FROM notifications n
 JOIN events e ON e.id = n.event_id

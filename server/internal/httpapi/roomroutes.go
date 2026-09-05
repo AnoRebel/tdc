@@ -12,6 +12,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
@@ -189,6 +190,9 @@ func (s *Server) handleJoinRoom(c *echo.Context) error {
 	if err != nil {
 		return roomError(err)
 	}
+
+	s.notifyOfJoin(ctx, roomID, user)
+
 	return c.JSON(http.StatusOK, s.roomResponse(room, true))
 }
 
@@ -456,4 +460,37 @@ func (s *Server) notifyRecipients(
 	// level: somebody set to "mentions" should still hear from a person
 	// speaking to them privately.
 	s.notify.ForMessage(ctx, event, body, members, room.Kind == "direct")
+}
+
+/*
+notifyOfJoin tells a room's members that somebody has joined.
+
+Only the people who asked to hear everything about the conversation, which the
+notification service decides: on a busy channel where people come and go, this
+would otherwise be a stream of notifications about nothing anybody said.
+
+The join event is read back rather than returned from Join, so that adding this
+did not change a signature four other callers and their tests depend on.
+*/
+func (s *Server) notifyOfJoin(ctx context.Context, roomID uuid.UUID, user dbgen.User) {
+	if s.notify == nil {
+		return
+	}
+
+	// The newest event in the room is the join that was just appended. A
+	// message arriving in the same instant would make this point at the wrong
+	// event, which costs a notification that names the right person and links
+	// to a neighbouring message — not worth a transaction to prevent.
+	timeline, err := s.rooms.Timeline(ctx, roomID, user.ID, 1)
+	if err != nil || len(timeline) == 0 {
+		return
+	}
+
+	members, err := s.queries.ListRoomMembers(ctx, roomID)
+	if err != nil {
+		return
+	}
+
+	s.notify.AboutRoom(ctx, members, user.ID, s.rooms.UserAddress(user.Username),
+		roomID, timeline[len(timeline)-1].ID, notify.ReasonJoin)
 }
