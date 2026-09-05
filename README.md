@@ -72,6 +72,32 @@ no object store at all. The two S3 backends speak to the same stores and behave
 identically — the choice between them is preference, and changing it is one
 word.
 
+### Settings an operator changes while it runs
+
+These are policy rather than plumbing, so they live in the database and change
+without a restart — closing registration during a flood of spam accounts should
+not require a deployment. An administrator sets them through
+`/api/admin/settings`, and every change is recorded in the audit log.
+
+| Setting                    | Default | What it does                                                       |
+| -------------------------- | ------- | ------------------------------------------------------------------ |
+| `registration.policy`      | `open`  | `open`, `invitation`, `closed`, or `domain`.                       |
+| `registration.domains`     | —       | Email domains admitted under the `domain` policy, comma separated. |
+| `limits.max_users`         | `0`     | Maximum accounts, or 0 for no limit.                               |
+| `limits.max_channels`      | `0`     | Maximum channels, or 0 for no limit.                               |
+| `limits.max_storage_bytes` | `0`     | Maximum attachment storage, or 0 for no limit.                     |
+
+A policy change governs creating an account, never an existing one: somebody
+who registered while it was open keeps their account when it closes.
+
+Zero means no limit, and that is the default for all three — a server enforcing
+a number nobody chose would stop working for reasons its operator cannot see.
+`/api/admin/usage` reports what is being used against what is allowed, so a
+limit is visible before it starts refusing.
+
+The `invitation` policy currently refuses everybody, because invitations are
+not built yet. Choosing it today is choosing to close registration.
+
 ### Optional external services
 
 None of these are needed, and all but link previews are off by default. Each

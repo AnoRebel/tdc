@@ -58,6 +58,13 @@ type Querier interface {
 	// How many reports somebody has filed recently, so a person cannot bury the
 	// queue under hundreds of them.
 	CountRecentReportsBy(ctx context.Context, arg CountRecentReportsByParams) (int64, error)
+	// How many channels exist, for the operator's capacity limit.
+	//
+	// Direct conversations are excluded: they are created by people talking to
+	// each other rather than by anybody choosing to add a channel, and counting
+	// them would make the limit refuse conversations an operator never meant to
+	// cap.
+	CountRooms(ctx context.Context) (int64, error)
 	CountThreadReplies(ctx context.Context, threadRootID *string) (int64, error)
 	// Messages after the member's read position, excluding their own: a person's
 	// own messages are not unread to them.
@@ -314,6 +321,12 @@ type Querier interface {
 	StartTyping(ctx context.Context, arg StartTypingParams) error
 	StopTyping(ctx context.Context, arg StopTypingParams) error
 	SuspendUser(ctx context.Context, arg SuspendUserParams) error
+	// Storage in use, for the operator's capacity limit.
+	//
+	// Counted by distinct stored object rather than by attachment: the same file
+	// sent twice occupies one place, so charging it twice would refuse uploads
+	// against space that is not being used.
+	TotalAttachmentBytes(ctx context.Context) (int64, error)
 	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
 	TouchPresence(ctx context.Context, userID uuid.UUID) error
 	TouchSession(ctx context.Context, id uuid.UUID) error

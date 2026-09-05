@@ -35,6 +35,9 @@ const (
 	ActionUserSuspended  Action = "user.suspended"
 	ActionUserReinstated Action = "user.reinstated"
 
+	// Server configuration an operator changes while it runs.
+	ActionSettingChanged Action = "server.setting.changed"
+
 	ActionRoleCreated       Action = "role.created"
 	ActionRoleDeleted       Action = "role.deleted"
 	ActionRoleAssigned      Action = "role.assigned"

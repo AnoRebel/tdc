@@ -44,6 +44,23 @@ func (q *Queries) ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error 
 	return err
 }
 
+const countRooms = `-- name: CountRooms :one
+SELECT count(*) FROM rooms WHERE kind <> 'direct'
+`
+
+// How many channels exist, for the operator's capacity limit.
+//
+// Direct conversations are excluded: they are created by people talking to
+// each other rather than by anybody choosing to add a channel, and counting
+// them would make the limit refuse conversations an operator never meant to
+// cap.
+func (q *Queries) CountRooms(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countRooms)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createRoom = `-- name: CreateRoom :one
 INSERT INTO rooms (id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, message_ttl_seconds)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)

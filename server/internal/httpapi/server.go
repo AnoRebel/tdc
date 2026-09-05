@@ -27,6 +27,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
+	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
 
@@ -94,6 +95,7 @@ type Server struct {
 	notify      *notify.Service
 	moderation  *moderation.Service
 	gifs        *gifs.Service
+	settings    *settings.Service
 	queries     *dbgen.Queries
 	presence    *presence.Service
 	hub         *realtime.Hub
@@ -125,6 +127,7 @@ type Services struct {
 	Notify      *notify.Service
 	Moderation  *moderation.Service
 	GIFs        *gifs.Service
+	Settings    *settings.Service
 	Presence    *presence.Service
 }
 
@@ -156,6 +159,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		notify:      services.Notify,
 		moderation:  services.Moderation,
 		gifs:        services.GIFs,
+		settings:    services.Settings,
 		queries:     dbgen.New(pool),
 		presence:    services.Presence,
 		config:      cfg,

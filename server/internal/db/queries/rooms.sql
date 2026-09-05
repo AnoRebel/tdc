@@ -67,3 +67,12 @@ SELECT user_id FROM room_members WHERE room_id = $1;
 -- name: SetReadPosition :exec
 UPDATE room_members SET read_sequence = GREATEST(COALESCE(read_sequence, 0), $3)
 WHERE room_id = $1 AND user_id = $2;
+
+-- name: CountRooms :one
+-- How many channels exist, for the operator's capacity limit.
+--
+-- Direct conversations are excluded: they are created by people talking to
+-- each other rather than by anybody choosing to add a channel, and counting
+-- them would make the limit refuse conversations an operator never meant to
+-- cap.
+SELECT count(*) FROM rooms WHERE kind <> 'direct';

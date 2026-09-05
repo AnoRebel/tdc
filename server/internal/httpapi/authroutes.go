@@ -50,6 +50,9 @@ type registerRequest struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
 	DisplayName string `json:"displayName"`
+	// Invitation is the code or token somebody was given, under a policy that
+	// requires one.
+	Invitation string `json:"invitation,omitempty"`
 }
 
 // userResponse is the public shape of an account.
@@ -101,6 +104,17 @@ func (s *Server) handleRegister(c *echo.Context) error {
 	var request registerRequest
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	// The operator's policy, checked before anything is created. Existing
+	// accounts are untouched by a policy change; this governs making one.
+	if err := s.mayRegister(ctx, request.Email, request.Invitation); err != nil {
+		return policyRefusal(err)
+	}
+
+	// A server at its limit refuses cleanly rather than part way through.
+	if err := s.withinUserLimit(ctx); err != nil {
+		return err
 	}
 
 	user, err := s.identity.CreateUser(ctx, identity.NewUser{

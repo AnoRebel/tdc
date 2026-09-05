@@ -32,6 +32,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
+	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/AnoRebel/tdc/server/internal/storage"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
@@ -149,6 +150,9 @@ func run() error {
 		Search:      search.NewService(pool),
 		Notify:      notify.NewService(pool, log),
 		Moderation:  moderation.NewService(pool, log),
+		// Policy an operator changes while the server runs, as distinct from
+		// the configuration file that decides how the process is wired.
+		Settings: settings.NewService(pool, log),
 		// Off unless an operator configured a provider and a key. Searches are
 		// proxied through this server, so the key stays here and the provider
 		// sees one server rather than everybody using it.

@@ -163,6 +163,18 @@ func (s *Server) routes() {
 	admin.GET("/audit", s.handleReadAudit,
 		requirePermission(authz.PermServerViewAudit))
 
+	// Policy an operator changes while the server runs: who may register, how
+	// much this server will hold.
+	admin.GET("/settings", s.handleListSettings,
+		requirePermission(authz.PermServerConfigure))
+	admin.PUT("/settings/:key", s.handleSetSetting,
+		requirePermission(authz.PermServerConfigure))
+
+	// The other half of a limit: what is being used against what is allowed,
+	// so an operator sees it coming rather than discovering it from a refusal.
+	admin.GET("/usage", s.handleUsage,
+		requirePermission(authz.PermServerConfigure))
+
 	// Registered last: the catch-all serving the web application must not
 	// shadow an endpoint above it.
 	s.mountWebApp(s.config.WebRoot)

@@ -27,6 +27,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
+	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/AnoRebel/tdc/server/internal/storage"
 )
 
@@ -102,6 +103,10 @@ func newTestAPIConfigured(
 		defer cleanCancel()
 		for _, statement := range []string{
 			"DELETE FROM audit_entries", "DELETE FROM rooms", "DELETE FROM users", "DELETE FROM roles",
+			// Settings are global rather than owned by a user or a room, so
+			// unlike everything else here they survive into the next test and
+			// silently change its policy.
+			"DELETE FROM server_config",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)
@@ -148,6 +153,7 @@ func newTestAPIConfigured(
 		Search:     search.NewService(pool),
 		Notify:     notify.NewService(pool, logger),
 		Moderation: moderation.NewService(pool, logger),
+		Settings:   settings.NewService(pool, logger),
 		Presence:   presence.NewService(queries),
 	}, logger)
 

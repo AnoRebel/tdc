@@ -138,6 +138,14 @@ func (s *Server) handleUploadAttachment(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request carried no file")
 	}
 
+	// Checked against the declared size before a byte is stored, so the limit
+	// is a limit rather than a threshold that is always slightly exceeded.
+	// The size is the multipart header's, which the service verifies as it
+	// reads — this is the cheap refusal, not the authoritative one.
+	if err := s.withinStorageLimit(ctx, file.Size); err != nil {
+		return err
+	}
+
 	body, err := file.Open()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the uploaded file could not be read")

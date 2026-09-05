@@ -112,9 +112,9 @@ Goal: notifications and search, so the product works when you are not looking at
 
 Goal: a server an operator can actually run, configure, and moderate.
 
-- [ ] 7.1 Implement server identity with an operator-set canonical address not inferred from headers; verify a mismatched host header does not change reported identity (`platform/server-config`)
-- [ ] 7.2 Implement capacity limits for users, channels, and storage with usage reporting; verify each refuses cleanly without partial application (`platform/server-config`)
-- [ ] 7.3 Implement registration policy — open, invitation-only, closed, domain restriction; verify existing accounts are unaffected by a policy change (`platform/server-config`)
+- [x] 7.1 Implement server identity with an operator-set canonical address not inferred from headers; verify a mismatched host header does not change reported identity (`platform/server-config`)
+- [x] 7.2 Implement capacity limits for users, channels, and storage with usage reporting; verify each refuses cleanly without partial application (`platform/server-config`)
+- [x] 7.3 Implement registration policy — open, invitation-only, closed, domain restriction; verify existing accounts are unaffected by a policy change (`platform/server-config`)
 - [ ] 7.4 Implement default language and branding applied without a rebuild; verify branding cannot hide the connected server's address (`platform/server-config`)
 - [ ] 7.5 Implement the feature-toggle framework with runtime evaluation and capability advertisement; verify a disabled capability rejects requests and is absent from the advertised set (`platform/foundation`, `platform/server-config`)
 - [ ] 7.6 Implement effective-configuration inspection with secret redaction and self-lockout prevention; verify a change removing the actor's own administration is refused or confirmed (`platform/server-config`)

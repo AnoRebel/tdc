@@ -301,3 +301,20 @@ func (q *Queries) SetAttachmentCaption(ctx context.Context, arg SetAttachmentCap
 	}
 	return result.RowsAffected(), nil
 }
+
+const totalAttachmentBytes = `-- name: TotalAttachmentBytes :one
+SELECT COALESCE(SUM(size_bytes), 0)::bigint
+FROM (SELECT DISTINCT ON (storage_key) storage_key, size_bytes FROM attachments) AS unique_objects
+`
+
+// Storage in use, for the operator's capacity limit.
+//
+// Counted by distinct stored object rather than by attachment: the same file
+// sent twice occupies one place, so charging it twice would refuse uploads
+// against space that is not being used.
+func (q *Queries) TotalAttachmentBytes(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, totalAttachmentBytes)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}

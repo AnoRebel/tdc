@@ -54,3 +54,12 @@ SELECT count(*) FROM attachments WHERE preview_key = $1;
 UPDATE attachments
 SET caption = $3
 WHERE id = $1 AND uploader_id = $2 AND event_id IS NULL;
+
+-- name: TotalAttachmentBytes :one
+-- Storage in use, for the operator's capacity limit.
+--
+-- Counted by distinct stored object rather than by attachment: the same file
+-- sent twice occupies one place, so charging it twice would refuse uploads
+-- against space that is not being used.
+SELECT COALESCE(SUM(size_bytes), 0)::bigint
+FROM (SELECT DISTINCT ON (storage_key) storage_key, size_bytes FROM attachments) AS unique_objects;

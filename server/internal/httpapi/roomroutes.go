@@ -141,6 +141,11 @@ func (s *Server) handleCreateRoom(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
+	// A server at its channel limit refuses before creating anything.
+	if err := s.withinChannelLimit(ctx); err != nil {
+		return err
+	}
+
 	room, err := s.rooms.Create(ctx, rooms.NewRoom{
 		Slug:       request.Slug,
 		Name:       request.Name,
