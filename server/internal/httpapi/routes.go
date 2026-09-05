@@ -54,6 +54,14 @@ func (s *Server) routes() {
 	// message, which is one request per message drawn.
 	rooms.GET("/:id/threads", s.handleThreadSummaries)
 
+	// Channel bans, confined to the channel they name.
+	rooms.GET("/:id/bans", s.handleListChannelBans,
+		requirePermission(authz.PermModerationRestrict))
+	rooms.POST("/:id/bans", s.handleBanFromChannel,
+		requirePermission(authz.PermModerationRestrict))
+	rooms.DELETE("/:id/bans/:userId", s.handleLiftChannelBan,
+		requirePermission(authz.PermModerationRestrict))
+
 	// Invitations to a channel. Issuing takes the invite permission, since an
 	// invitation admits somebody to a conversation and that is the channel's
 	// decision rather than any member's.
@@ -110,6 +118,16 @@ func (s *Server) routes() {
 	// Dismissing everything unread in one conversation, which is what a
 	// grouped notification entry stands for.
 	me.POST("/notifications/rooms/:id/read", s.handleDismissRoomNotifications)
+
+	// Blocking, which is a personal boundary rather than an exercise of
+	// authority: no permission, and never disclosed to the person blocked.
+	me.GET("/blocks", s.handleListBlocked)
+	me.POST("/blocks", s.handleBlock)
+	me.DELETE("/blocks/:id", s.handleUnblock)
+
+	// Who may open a conversation with this person.
+	me.GET("/privacy", s.handleGetPrivacy)
+	me.PUT("/privacy", s.handleSetPrivacy)
 
 	s.echo.GET("/api/me/pins", s.handleListPinnedRooms, requireAuthentication)
 	s.echo.PUT("/api/me/pins/:id", s.handlePinRoom, requireAuthentication)

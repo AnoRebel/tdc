@@ -187,6 +187,13 @@ func (s *Server) handleJoinRoom(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
+	// A ban keeps somebody out of the channel it names, and only that one:
+	// every other membership they hold is untouched.
+	if s.moderation != nil && s.moderation.IsBanned(ctx, roomID, user.ID) {
+		return echo.NewHTTPError(http.StatusForbidden,
+			"you are banned from this channel")
+	}
+
 	if err := s.rooms.Join(ctx, roomID, user.ID); err != nil {
 		return roomError(err)
 	}
@@ -253,6 +260,13 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	// A ban or a posting restriction stops a message before it is accepted.
+	// Both are separate from membership: somebody restricted is still in the
+	// channel and still reading it.
+	if err := s.mayPost(ctx, roomID, user.ID); err != nil {
+		return err
 	}
 
 	var request sendMessageRequest

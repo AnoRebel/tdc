@@ -24,6 +24,7 @@ import {
   SendHorizontal,
   Smile,
   Trash2,
+  UserX,
 } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
 import { Bubble } from "~/components/ui/bubble";
@@ -160,6 +161,54 @@ useHead({
 
 /** How many messages are unread in this conversation. */
 const unreadHere = ref(0);
+
+const api = useApi();
+const personal = usePersonalModeration();
+
+/** Who is about to be blocked, while the confirmation is up. */
+const blocking = ref<{ sender: string } | null>(null);
+
+/*
+ * Blocks somebody by their address.
+ *
+ * Their identifier is found through search rather than carried on the message,
+ * which names people by address so a federated sender reads the same as a
+ * local one.
+ */
+async function blockSender(sender: string) {
+  const username = shortName(sender);
+  blocking.value = null;
+
+  try {
+    const found = await api.get<{ people: { id: string; username: string }[] }>(
+      `/api/search/everything?q=${encodeURIComponent(username)}&messages=false`,
+    );
+
+    const person = found.people.find(
+      (candidate: { id: string; username: string }) => candidate.username === username,
+    );
+    if (!person) {
+      error.value = "Could not find that person to block.";
+      return;
+    }
+
+    await personal.block(person.id);
+    blocked.value = true;
+  } catch {
+    error.value = "Could not block that person.";
+  }
+}
+
+/*
+ * Said once, briefly.
+ *
+ * Blocking has no visible effect in the conversation — that is the point — so
+ * without a word nothing would confirm it happened.
+ */
+const blocked = ref(false);
+watch(blocked, (done) => {
+  if (done) setTimeout(() => (blocked.value = false), 4000);
+});
 
 const showPinned = ref(false);
 const attaching = ref(false);
@@ -832,6 +881,7 @@ async function saveEdit(messageId: string) {
 function menuFor(
   message: { id: string; body: string; removed: boolean },
   mine: boolean,
+  sender: string,
 ): MenuItem[] {
   const items: MenuItem[] = [];
 
@@ -876,6 +926,17 @@ function menuFor(
       icon: Flag,
       action: () => {
         reporting.value = { id: message.id, body: message.body };
+      },
+    });
+
+    // Blocking the person, which is a personal boundary rather than a report:
+    // nobody is told, least of all them.
+    items.push({
+      label: `Block ${shortName(sender)}`,
+      icon: UserX,
+      destructive: true,
+      action: () => {
+        blocking.value = { sender };
       },
     });
   }
@@ -1174,7 +1235,7 @@ watch(roomId, load, { immediate: true });
                 :id="`message-${message.id}`"
                 :key="message.id"
                 :mine="group.mine"
-                v-bind="contextMenu.handlers(() => menuFor(message, group.mine))"
+                v-bind="contextMenu.handlers(() => menuFor(message, group.mine, group.sender))"
               >
                 <!-- Actions sit outside the bubble, on the side away from the
                      edge, and appear only on the row being pointed at. -->
@@ -1195,7 +1256,7 @@ watch(roomId, load, { immediate: true });
                       contextMenu.show(
                         ($event.currentTarget as HTMLElement).getBoundingClientRect().left,
                         ($event.currentTarget as HTMLElement).getBoundingClientRect().bottom,
-                        menuFor(message, group.mine),
+                        menuFor(message, group.mine, group.sender),
                       )
                     "
                   >
@@ -1489,6 +1550,23 @@ watch(roomId, load, { immediate: true });
       @cancel="pendingDelete = null"
       @confirm="remove(pendingDelete.id)"
     />
+
+    <ConfirmDialog
+      v-if="blocking"
+      title="Block this person?"
+      :detail="`${shortName(blocking.sender)} will not be able to start a conversation with you. They are not told.`"
+      confirm-label="Block"
+      @cancel="blocking = null"
+      @confirm="blockSender(blocking.sender)"
+    />
+
+    <p
+      v-if="blocked"
+      class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
+      role="status"
+    >
+      Blocked. They are not told.
+    </p>
 
     <ScheduleDialog
       v-if="scheduling"

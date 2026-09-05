@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ServerStatus, Session } from "@tdc/types";
 import { isApiError } from "@tdc/types";
-import { ArrowLeft, LogOut, Monitor, ScrollText } from "lucide-vue-next";
+import { ArrowLeft, LogOut, Monitor, ScrollText, ShieldCheck, UserX } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
 
 /** Account settings: identity, status, signed-in devices. */
@@ -9,6 +9,36 @@ import { Avatar } from "~/components/ui/avatar";
 definePageMeta({ middleware: "auth", layout: "app" });
 
 useHead({ title: "Settings" });
+
+const personal = usePersonalModeration();
+
+/*
+ * Three settings rather than two.
+ *
+ * "Anyone" and "nobody" leave out the case most people actually want, which is
+ * that colleagues can reach them and strangers cannot.
+ */
+const directMessageOptions = [
+  {
+    value: "anyone" as const,
+    label: "Anyone",
+    detail: "Anybody on this server can start a conversation with you.",
+  },
+  {
+    value: "shared" as const,
+    label: "People I share a channel with",
+    detail: "Colleagues can reach you; people you have never met cannot.",
+  },
+  {
+    value: "nobody" as const,
+    label: "Nobody",
+    detail:
+      "No new conversations. Moderators can still reach you, so that nobody " +
+      "is beyond contact by the people responsible for this server.",
+  },
+];
+
+onMounted(() => void personal.refresh());
 
 const { user, can, signOut, listSessions, revokeSession } = useAuth();
 const api = useApi();
@@ -189,6 +219,75 @@ function deviceName(userAgent: string): string {
               @click="endSession(session.id)"
             >
               {{ busy === session.id ? "Ending" : "End session" }}
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+          <ShieldCheck class="size-4" />
+          Privacy
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Who may start a conversation with you. Existing conversations are unaffected by narrowing
+          this.
+        </p>
+
+        <div class="mt-3 space-y-1">
+          <label
+            v-for="option in directMessageOptions"
+            :key="option.value"
+            class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+          >
+            <input
+              type="radio"
+              :value="option.value"
+              :checked="personal.directMessages.value === option.value"
+              class="mt-0.5 cursor-pointer accent-primary"
+              @change="personal.setDirectMessages(option.value)"
+            />
+            <span class="min-w-0">
+              <span class="block text-sm font-medium">{{ option.label }}</span>
+              <span class="block text-xs text-muted-foreground">{{ option.detail }}</span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+          <UserX class="size-4" />
+          Blocked
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          People you have blocked cannot start a conversation with you. They are not told, and this
+          list is yours alone.
+        </p>
+
+        <p v-if="!personal.blocked.value.length" class="mt-3 text-xs text-muted-foreground">
+          You have not blocked anybody.
+        </p>
+
+        <ul v-else class="mt-3 space-y-1">
+          <li
+            v-for="person in personal.blocked.value"
+            :key="person.id"
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5"
+          >
+            <Avatar :name="person.username" size="sm" />
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-medium">{{ person.displayName }}</span>
+              <span class="block truncate text-xs text-muted-foreground">
+                @{{ person.username }}
+              </span>
+            </span>
+            <button
+              type="button"
+              class="btn btn-ghost h-7 px-2 text-xs"
+              @click="personal.unblock(person.id)"
+            >
+              Unblock
             </button>
           </li>
         </ul>

@@ -121,6 +121,22 @@ func (s *Server) handleOpenDirect(c *echo.Context) error {
 			"a direct conversation needs at least one other person")
 	}
 
+	/*
+		Whether each person accepts a conversation from this one.
+
+		The refusal says only that it cannot be opened. It must not say which
+		rule applied: "they have blocked you" and "they accept messages only
+		from colleagues" are different disclosures, and the first is one the
+		blocked person must never receive.
+
+		A moderator is exempt, so that somebody cannot put themselves beyond
+		contact by the people responsible for the server.
+	*/
+	if s.moderation != nil && !s.mayContactAll(ctx, user, participants) {
+		return echo.NewHTTPError(http.StatusForbidden,
+			"that conversation cannot be opened")
+	}
+
 	room, err := s.rooms.OpenDirect(ctx, participants)
 	if err != nil {
 		return roomError(err)

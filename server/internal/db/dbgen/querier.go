@@ -30,6 +30,10 @@ type Querier interface {
 	// person cannot claim another's upload, and an attachment cannot be moved
 	// between messages after the fact.
 	AttachToEvent(ctx context.Context, arg AttachToEventParams) (int64, error)
+	// Re-banning somebody already banned updates the terms rather than failing:
+	// a moderator extending a ban means the new terms, not an error.
+	BanFromChannel(ctx context.Context, arg BanFromChannelParams) error
+	BlockUser(ctx context.Context, arg BlockUserParams) error
 	// A status with an expiry reverts on its own, so a temporary one needs no
 	// later action from the person who set it.
 	ClearExpiredStatuses(ctx context.Context) error
@@ -98,6 +102,9 @@ type Querier interface {
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredSessions(ctx context.Context) error
+	// Housekeeping only. The expiry is already honoured on read, so this removes
+	// rows rather than changing any answer.
+	DeleteLapsedBans(ctx context.Context) (int64, error)
 	DeleteRole(ctx context.Context, id uuid.UUID) error
 	// Scoped to the sender, and only while unsent: cancelling is the sender's to
 	// do, and a message already sent is a message, not a plan.
@@ -109,6 +116,7 @@ type Querier interface {
 	FindInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
+	GetDirectMessagePolicy(ctx context.Context, userID uuid.UUID) (string, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
 	// The preference that applies to one conversation.
@@ -132,15 +140,31 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
+	HasBlocked(ctx context.Context, arg HasBlockedParams) (bool, error)
 	HasUsedInvitation(ctx context.Context, arg HasUsedInvitationParams) (bool, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
+	// Asked before joining and before posting.
+	//
+	// The expiry is evaluated here rather than by a sweep, so a temporary ban
+	// lifts at its moment rather than whenever a background job next runs.
+	IsBannedFromChannel(ctx context.Context, arg IsBannedFromChannelParams) (bool, error)
+	// A restriction on this channel, or one on the whole server.
+	//
+	// Both are checked in one query: asking twice would mean two round trips on
+	// the path every message takes.
+	IsPostingRestricted(ctx context.Context, arg IsPostingRestrictedParams) (bool, error)
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
+	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
+	LiftPostingRestriction(ctx context.Context, arg LiftPostingRestrictionParams) (int64, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
 	ListAttachmentsForEvent(ctx context.Context, eventID *string) ([]Attachment, error)
 	// Filters are optional: a NULL argument matches everything, so one query
 	// serves the whole administrative view rather than one per filter combination.
 	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)
+	// Who somebody has blocked, which only they can see.
+	ListBlocked(ctx context.Context, blockerID uuid.UUID) ([]ListBlockedRow, error)
+	ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]ListChannelBansRow, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	// What is ready to send.
@@ -176,6 +200,7 @@ type Querier interface {
 	// silently stop it reaching this query's callers.
 	ListPinnedMessages(ctx context.Context, roomID uuid.UUID) ([]ListPinnedMessagesRow, error)
 	ListPinnedRooms(ctx context.Context, userID uuid.UUID) ([]ListPinnedRoomsRow, error)
+	ListPostingRestrictions(ctx context.Context, limit int32) ([]ListPostingRestrictionsRow, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
 	// Every reaction on a set of messages, for drawing a timeline.
 	//
@@ -293,6 +318,7 @@ type Querier interface {
 	// both record an outcome.
 	ResolveReport(ctx context.Context, arg ResolveReportParams) (Report, error)
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
+	RestrictPosting(ctx context.Context, arg RestrictPostingParams) (PostingRestriction, error)
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
 	// Revoking is idempotent in effect but recorded once: a second revocation
 	// leaves the first one's timestamp, which is when it actually stopped working.
@@ -332,6 +358,7 @@ type Querier interface {
 	// Scoped to the uploader and to attachments not yet sent: a caption is written
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
+	SetDirectMessagePolicy(ctx context.Context, arg SetDirectMessagePolicyParams) error
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
@@ -343,6 +370,12 @@ type Querier interface {
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
 	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
 	SetTypingPreference(ctx context.Context, arg SetTypingPreferenceParams) error
+	// Whether two people are in any channel together, for the 'shared' policy.
+	//
+	// Direct conversations are excluded: two people already in a direct
+	// conversation share a room by definition, which would make 'shared' mean
+	// 'anyone who has ever written to me'.
+	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error
 	StopTyping(ctx context.Context, arg StopTypingParams) error
 	SuspendUser(ctx context.Context, arg SuspendUserParams) error
@@ -355,6 +388,7 @@ type Querier interface {
 	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
 	TouchPresence(ctx context.Context, userID uuid.UUID) error
 	TouchSession(ctx context.Context, id uuid.UUID) error
+	UnblockUser(ctx context.Context, arg UnblockUserParams) error
 	UnindexMessage(ctx context.Context, eventID string) error
 	UnpinMessage(ctx context.Context, arg UnpinMessageParams) error
 	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error

@@ -35,6 +35,14 @@ const (
 	ActionUserSuspended  Action = "user.suspended"
 	ActionUserReinstated Action = "user.reinstated"
 
+	// Moderation. A block is deliberately absent: it is a personal boundary
+	// rather than an exercise of authority, and a log a moderator reads should
+	// not turn it into one.
+	ActionChannelBan        Action = "channel.ban"
+	ActionChannelBanLifted  Action = "channel.ban.lifted"
+	ActionPostingRestricted Action = "posting.restricted"
+	ActionRestrictionLifted Action = "posting.restriction.lifted"
+
 	// Invitations: who issued one, who accepted it, and who withdrew it. The
 	// secret itself is never recorded — a log holding working invitations
 	// would be a second place they leak from.

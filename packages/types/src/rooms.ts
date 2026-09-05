@@ -331,3 +331,25 @@ export interface GifSearchResults {
   provider: string;
   results: GifResult[];
 }
+
+/** Somebody kept out of one channel. */
+export interface ChannelBan {
+  userId: string;
+  username: string;
+  bannedBy: string;
+  reason: string;
+  /** Absent means permanent. */
+  expiresAt?: string;
+  createdAt: string;
+}
+
+/** Somebody the reader has blocked, which only they can see. */
+export interface BlockedPerson {
+  id: string;
+  username: string;
+  displayName: string;
+  blockedAt: string;
+}
+
+/** Who may open a direct conversation with somebody. */
+export type DirectMessagePolicy = "anyone" | "shared" | "nobody";

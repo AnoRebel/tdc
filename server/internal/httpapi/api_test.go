@@ -108,6 +108,8 @@ func newTestAPIConfigured(
 			// unlike everything else here they survive into the next test and
 			// silently change its policy.
 			"DELETE FROM server_config", "DELETE FROM invitations",
+			"DELETE FROM channel_bans", "DELETE FROM posting_restrictions",
+			"DELETE FROM user_blocks", "DELETE FROM user_privacy",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)

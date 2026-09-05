@@ -45,6 +45,16 @@ type AuditEntry struct {
 	Detail     []byte
 }
 
+type ChannelBan struct {
+	RoomID          uuid.UUID
+	UserID          uuid.UUID
+	BannedBy        *uuid.UUID
+	BannedByAddress string
+	Reason          string
+	ExpiresAt       *time.Time
+	CreatedAt       time.Time
+}
+
 type Credential struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -149,6 +159,19 @@ type PinnedRoom struct {
 	RoomID   uuid.UUID
 	Position int32
 	PinnedAt time.Time
+}
+
+type PostingRestriction struct {
+	ID                  uuid.UUID
+	UserID              uuid.UUID
+	RoomID              *uuid.UUID
+	RestrictedBy        *uuid.UUID
+	RestrictedByAddress string
+	Reason              string
+	ExpiresAt           *time.Time
+	CreatedAt           time.Time
+	LiftedAt            *time.Time
+	LiftedBy            *uuid.UUID
 }
 
 type Reaction struct {
@@ -301,6 +324,12 @@ type User struct {
 	LinkPreviewsEnabled   bool
 }
 
+type UserBlock struct {
+	BlockerID uuid.UUID
+	BlockedID uuid.UUID
+	CreatedAt time.Time
+}
+
 type UserPresence struct {
 	UserID          uuid.UUID
 	Connections     int32
@@ -310,6 +339,12 @@ type UserPresence struct {
 	Invisible       bool
 	LastSeenAt      time.Time
 	UpdatedAt       time.Time
+}
+
+type UserPrivacy struct {
+	UserID         uuid.UUID
+	DirectMessages string
+	UpdatedAt      time.Time
 }
 
 type UserRole struct {
