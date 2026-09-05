@@ -516,6 +516,10 @@ async function load() {
     // Subscribing from the last sequence means a reconnection replays exactly
     // what was missed rather than repeating what is already shown.
     live.subscribe(roomId.value, messages.value.at(-1)?.sequence);
+
+    // Suppresses notifications for this conversation while it is on screen:
+    // one about a message just watched arrive is pure interruption.
+    live.viewing(roomId.value);
     void refreshThreadCounts();
     void reactions.refresh();
     void pins.refresh();
@@ -872,6 +876,29 @@ async function togglePin(messageId: string) {
       : "Could not pin that message.";
   }
 }
+
+/*
+ * Stops claiming to be watching when the window is not in front.
+ *
+ * A tab left open on a conversation is not somebody reading it. Without this,
+ * a laptop open on one channel would silently swallow its notifications for as
+ * long as it stayed open.
+ */
+function onVisibilityChange() {
+  live.viewing(document.hidden ? null : roomId.value);
+}
+
+onMounted(() => {
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("blur", () => live.viewing(null));
+  window.addEventListener("focus", onVisibilityChange);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+  // Leaving the page is no longer watching anything.
+  live.viewing(null);
+});
 
 /** Adds or removes one of the reader's own reactions. */
 function react(messageId: string, emoji: string) {

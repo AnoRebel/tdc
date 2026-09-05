@@ -38,6 +38,9 @@ export function useLiveConnection(handlers: LiveHandlers) {
   // What the connection is watching, and how far each room has been read, so
   // a reconnection can resubscribe and ask for exactly what it missed.
   const subscribed = new Set<string>();
+
+  // The room currently on screen, restored on reconnection.
+  let watching: string | null = null;
   const lastSequence = new Map<string, number>();
 
   const apiBase = useRuntimeConfig().public.apiBase;
@@ -68,6 +71,10 @@ export function useLiveConnection(handlers: LiveHandlers) {
       state.value = "connected";
       // Resubscribe to everything, telling the server how far each room was
       // read so it can replay the gap.
+      if (watching) {
+        send({ action: "viewing", room: watching });
+      }
+
       if (subscribed.size > 0) {
         send({
           action: "subscribe",
@@ -184,5 +191,22 @@ export function useLiveConnection(handlers: LiveHandlers) {
   onMounted(connect);
   onBeforeUnmount(close);
 
-  return { state: readonly(state), subscribe, unsubscribe, markRead, close };
+  /*
+   * Tells the server which conversation is on screen.
+   *
+   * Notifications for it are suppressed while it is: one about a message you
+   * just watched arrive is the interruption that teaches people to switch
+   * notifications off. Passing null means looking at none, which is what a
+   * window losing focus sends — somebody who has tabbed away should hear
+   * about it again.
+   *
+   * Remembered so a reconnection restores it, or a dropped connection would
+   * silently start notifying about the conversation still on screen.
+   */
+  function viewing(roomId: string | null) {
+    watching = roomId;
+    send({ action: "viewing", room: roomId ?? "" });
+  }
+
+  return { state: readonly(state), subscribe, unsubscribe, markRead, viewing, close };
 }

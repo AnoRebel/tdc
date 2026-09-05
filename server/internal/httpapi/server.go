@@ -162,6 +162,18 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		}
 		s.realtime = realtime.NewServer(s.hub, roomReplayer{rooms: services.Rooms, attachments: services.Attachments},
 			lifecycle, cfg.Keepalive, log)
+
+		// Wired here rather than at construction because the hub is built
+		// here: notifications are suppressed while somebody is looking at the
+		// conversation, which only the live connections know, and while their
+		// status says not to interrupt them.
+		if services.Notify != nil {
+			var silencing notify.Silencing
+			if services.Presence != nil {
+				silencing = services.Presence
+			}
+			services.Notify.WithSuppression(s.hub, silencing)
+		}
 	}
 
 	if len(cfg.AllowedOrigins) > 0 {

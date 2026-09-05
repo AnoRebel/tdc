@@ -81,14 +81,82 @@ type Notification struct {
 	Detail string
 }
 
+/*
+Watching reports whether somebody has a conversation on screen right now.
+
+An interface rather than a direct dependency on the live connection hub,
+because notify has no business knowing what a WebSocket is — and because a
+server without live connections should still notify rather than fail.
+*/
+type Watching interface {
+	IsWatching(userID, roomID uuid.UUID) bool
+}
+
+/*
+Silencing reports whether somebody's status says not to interrupt them.
+
+Statuses are the operator's to define, and each carries a flag saying whether
+it suppresses notifications — "in a meeting" does, "away" might not. Reading it
+here is what makes that flag mean anything.
+*/
+type Silencing interface {
+	SuppressesNotifications(ctx context.Context, userID uuid.UUID) bool
+}
+
 // Service raises and reads notifications.
 type Service struct {
 	queries *dbgen.Queries
 	log     *slog.Logger
+
+	// Both optional: a server with neither still notifies, which is what makes
+	// them safe to leave unset in a test or a minimal deployment.
+	watching  Watching
+	silencing Silencing
 }
 
 func NewService(pool *db.Pool, log *slog.Logger) *Service {
 	return &Service{queries: dbgen.New(pool), log: log}
+}
+
+/*
+WithSuppression adds the two reasons a notification is not raised despite being
+wanted: the person is looking at the conversation, or their status says not to
+interrupt them.
+
+Separate from NewService so that a caller without a live connection hub — a
+test, or a server built before this existed — still gets a working service.
+*/
+func (s *Service) WithSuppression(watching Watching, silencing Silencing) *Service {
+	s.watching = watching
+	s.silencing = silencing
+	return s
+}
+
+/*
+suppressed reports whether a notification should be withheld despite being
+wanted.
+
+Checked after the preference, not before: the preference decides whether
+somebody wants to hear about this at all, and this decides whether now is the
+moment. Both have to say yes.
+
+Unread state is untouched either way. Somebody who was looking at a channel has
+read what arrived; somebody whose status silenced it has not, and the badge is
+what tells them so when they come back.
+*/
+func (s *Service) suppressed(ctx context.Context, userID, roomID uuid.UUID) bool {
+	// Watching it. A notification for a message somebody just watched arrive
+	// is the interruption that teaches people to switch notifications off.
+	if s.watching != nil && s.watching.IsWatching(userID, roomID) {
+		return true
+	}
+
+	// Their status says not to interrupt.
+	if s.silencing != nil && s.silencing.SuppressesNotifications(ctx, userID) {
+		return true
+	}
+
+	return false
 }
 
 /*
@@ -154,6 +222,12 @@ func (s *Service) ForMessage(
 		reason, wanted := s.reasonFor(
 			ctx, member.ID, member.Username, event.RoomID, mentioned, directRoom)
 		if !wanted {
+			continue
+		}
+
+		// Wanted, but not now: they are looking at the conversation, or their
+		// status says not to interrupt. Unread state is untouched either way.
+		if s.suppressed(ctx, member.ID, event.RoomID) {
 			continue
 		}
 
@@ -396,6 +470,10 @@ func (s *Service) About(
 		return
 	}
 
+	if s.suppressed(ctx, recipientID, roomID) {
+		return
+	}
+
 	err := s.queries.CreateNotification(ctx, dbgen.CreateNotificationParams{
 		ID:           uuid.New(),
 		UserID:       recipientID,
@@ -441,6 +519,10 @@ func (s *Service) AboutRoom(
 			continue
 		}
 
+		if s.suppressed(ctx, member.ID, roomID) {
+			continue
+		}
+
 		err := s.queries.CreateNotification(ctx, dbgen.CreateNotificationParams{
 			ID:           uuid.New(),
 			UserID:       member.ID,
@@ -454,4 +536,13 @@ func (s *Service) AboutRoom(
 				"userId", member.ID, "eventId", eventID, "reason", reason, "error", err)
 		}
 	}
+}
+
+// SuppressedForTest exposes the suppression decision to this package's tests.
+//
+// Exported for testing only. The decision is worth testing on its own: it is
+// the difference between a notification somebody wanted and one that arrives
+// while they are already reading the message.
+func SuppressedForTest(s *Service, ctx context.Context, userID, roomID uuid.UUID) bool {
+	return s.suppressed(ctx, userID, roomID)
 }

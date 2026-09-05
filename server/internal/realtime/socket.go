@@ -21,6 +21,9 @@ type clientMessage struct {
 	// Since is the last sequence the client holds for each room, so the server
 	// can replay exactly what was missed.
 	Since map[string]int64 `json:"since,omitempty"`
+	// Room is the one this client currently has on screen, for the viewing
+	// action. Empty means it is looking at none.
+	Room string `json:"room,omitempty"`
 }
 
 // Client actions.
@@ -28,6 +31,9 @@ const (
 	actionSubscribe   = "subscribe"
 	actionUnsubscribe = "unsubscribe"
 	actionPing        = "ping"
+	// actionViewing tells the server which room this client has on screen, so
+	// notifications for it can be suppressed while somebody is looking at it.
+	actionViewing = "viewing"
 )
 
 // maxClientMessageBytes bounds one client message.
@@ -171,6 +177,8 @@ func (s *Server) readLoop(ctx context.Context, socket *websocket.Conn, conn *Con
 			s.handleUnsubscribe(conn, message)
 		case actionPing:
 			s.hub.SendTo(conn, Frame{Type: FramePong})
+		case actionViewing:
+			s.handleViewing(conn, message)
 		default:
 			s.sendError(conn, "unknown action "+message.Action)
 		}
@@ -213,6 +221,31 @@ func (s *Server) handleSubscribe(ctx context.Context, conn *Connection, message 
 			s.replay(ctx, conn, roomID, since)
 		}
 	}
+}
+
+/*
+handleViewing records which room this client has on screen.
+
+No authorisation check: saying you are looking at a room grants nothing. The
+only effect is to suppress your own notifications for it, so the worst a
+dishonest client achieves is silencing itself.
+
+An empty room means looking at none, which is what a client sends when its
+window loses focus — a person who has tabbed away should be notified again.
+*/
+func (s *Server) handleViewing(conn *Connection, message clientMessage) {
+	if message.Room == "" {
+		conn.Viewing(nil)
+		return
+	}
+
+	roomID, err := uuid.Parse(message.Room)
+	if err != nil {
+		s.sendError(conn, "not a valid room identifier: "+message.Room)
+		return
+	}
+
+	conn.Viewing(&roomID)
 }
 
 // replay sends the events a client missed, or tells it to resynchronise.

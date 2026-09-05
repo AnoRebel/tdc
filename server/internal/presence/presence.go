@@ -307,3 +307,23 @@ func (s *Service) Sweep(ctx context.Context) error {
 	}
 	return nil
 }
+
+/*
+SuppressesNotifications reports whether somebody's current status says not to
+interrupt them.
+
+Statuses are the operator's to define, and each carries this flag: "in a
+meeting" suppresses, "away" may not. Without something reading it, the flag is
+a column nobody consults.
+
+A status that cannot be read suppresses nothing. Silence is the failure that
+loses a message somebody was waiting for, so the safe direction here is to
+notify.
+*/
+func (s *Service) SuppressesNotifications(ctx context.Context, userID uuid.UUID) bool {
+	presence, err := s.Of(ctx, userID)
+	if err != nil {
+		return false
+	}
+	return presence.SuppressesNotifications
+}

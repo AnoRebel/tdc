@@ -462,3 +462,43 @@ func TestMutingSilencesReactionsToo(t *testing.T) {
 		}
 	}
 }
+
+/*
+TestSuppressionLeavesUnreadStateAlone is what makes suppression safe.
+
+Suppressing a notification says "not now", not "this never happened". Somebody
+whose status silenced a message, or who was looking at another device, still
+needs the badge to tell them the conversation moved on — otherwise silence and
+nothing-happened become indistinguishable, and a message is genuinely lost.
+*/
+func TestSuppressionLeavesUnreadStateAlone(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	other := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, other, roomID)
+
+	// Muting is the suppression this harness can exercise directly; watching
+	// and status are covered in the notify package's own tests. All three take
+	// the same path, and the guarantee under test is the same: unread state is
+	// untouched by any of them.
+	muted := call(t, handler, http.MethodPut, "/api/me/preferences/notifications",
+		map[string]any{"level": "all", "muted": true, "room": roomID}, other)
+	if muted.Code != http.StatusNoContent {
+		t.Fatalf("muting returned %d", muted.Code)
+	}
+
+	sendMessage(t, handler, owner, roomID, "Habari @amina, tazama hii")
+
+	if hits := notificationsFor(t, handler, other); len(hits) != 0 {
+		t.Errorf("a suppressed notification was raised anyway: %+v", hits)
+	}
+
+	unread := decode(t, call(t, handler, http.MethodGet, "/api/me/unread", nil, other))
+	if count, _ := unread[roomID].(float64); count == 0 {
+		t.Error("suppressing the notification also cleared the unread count; " +
+			"the conversation must still read as having moved on")
+	}
+}

@@ -65,6 +65,19 @@ type Connection struct {
 	// room the person belongs to.
 	subscribed map[uuid.UUID]bool
 
+	/*
+		viewing is the one room this client currently has on screen.
+
+		Distinct from subscribed, which is every room it wants events for: a
+		client subscribes to several and looks at one. Notifying somebody about
+		a message they are watching arrive is the interruption that teaches
+		people to switch notifications off, so this is what suppression needs.
+
+		Nil when the window is not focused, so a client left open in a
+		background tab notifies normally.
+	*/
+	viewing *uuid.UUID
+
 	closeOnce sync.Once
 	closed    chan struct{}
 }
@@ -111,6 +124,25 @@ func (c *Connection) Unsubscribe(roomIDs ...uuid.UUID) {
 	for _, id := range roomIDs {
 		delete(c.subscribed, id)
 	}
+}
+
+/*
+Viewing records which room this client has on screen, if any.
+
+A nil room means it is looking at nothing — the window is in the background, or
+the person is on a settings page. Either way, notifications resume.
+*/
+func (c *Connection) Viewing(roomID *uuid.UUID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.viewing = roomID
+}
+
+// IsViewing reports whether this connection has a room on screen.
+func (c *Connection) IsViewing(roomID uuid.UUID) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.viewing != nil && *c.viewing == roomID
 }
 
 // SubscribedTo reports whether this connection wants a room's events.
@@ -205,6 +237,25 @@ func (h *Hub) Remove(conn *Connection) {
 	}
 
 	conn.Close()
+}
+
+/*
+IsWatching reports whether somebody has a room on screen on any device.
+
+Any rather than all: somebody reading a channel on their phone does not need it
+raised on their laptop too. Every connection is checked because a person may
+have several, and one of them looking is enough.
+*/
+func (h *Hub) IsWatching(userID, roomID uuid.UUID) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for _, conn := range h.byUser[userID] {
+		if conn.IsViewing(roomID) {
+			return true
+		}
+	}
+	return false
 }
 
 // Count reports how many connections are open, for diagnostics.
