@@ -49,7 +49,18 @@ onMounted(async () => {
   const element = menu.value;
   if (!element) return;
 
-  const { width, height } = element.getBoundingClientRect();
+  /*
+   * offsetWidth/offsetHeight rather than getBoundingClientRect.
+   *
+   * The menu opens with a zoom-in animation, and a bounding rect reports the
+   * box as it is currently drawn — mid-animation, that is 95% of the real
+   * size. Clamping against a height that is too small lets a menu opened near
+   * the bottom of the window overhang it once the animation finishes, which is
+   * exactly the case this function exists for. Offset dimensions ignore
+   * transforms and give the settled size straight away.
+   */
+  const width = element.offsetWidth;
+  const height = element.offsetHeight;
   const margin = 8;
 
   const left = Math.min(props.x, window.innerWidth - width - margin);

@@ -109,6 +109,9 @@ func newTestAPIConfigured(
 			// silently change its policy.
 			"DELETE FROM server_config", "DELETE FROM invitations",
 			"DELETE FROM channel_bans", "DELETE FROM posting_restrictions",
+			// Reports outlive the message they are about and are not owned by a
+			// room or a user, so unlike most rows they survive into the next test.
+			"DELETE FROM reports",
 			"DELETE FROM user_blocks", "DELETE FROM user_privacy",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {

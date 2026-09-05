@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ShieldOff, UserX } from "lucide-vue-next";
+import { ShieldOff } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
 
 /**

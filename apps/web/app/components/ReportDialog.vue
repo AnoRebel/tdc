@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Flag } from "lucide-vue-next";
+import { reportReasonLabel } from "~/lib/reports";
 
 /**
  * Reporting something to a moderator.
@@ -21,17 +22,6 @@ const api = useApi();
 const reasons = ref<string[]>([]);
 const reason = ref("");
 const detail = ref("");
-
-/** Plain wording for each reason, since the server's names are identifiers. */
-const wording: Record<string, string> = {
-  spam: "Spam or advertising",
-  harassment: "Harassment or bullying",
-  hate: "Hate speech",
-  violence: "Violence or threats",
-  sexual: "Sexual content",
-  illegal: "Something illegal",
-  other: "Something else",
-};
 
 onMounted(async () => {
   try {
@@ -92,7 +82,7 @@ function submit() {
                 :value="option"
                 class="cursor-pointer accent-primary"
               />
-              {{ wording[option] ?? option }}
+              {{ reportReasonLabel(option) }}
             </label>
           </div>
         </fieldset>

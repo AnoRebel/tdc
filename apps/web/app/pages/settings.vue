@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ServerStatus, Session } from "@tdc/types";
 import { isApiError } from "@tdc/types";
-import { ArrowLeft, LogOut, Monitor, ScrollText, ShieldCheck, UserX } from "lucide-vue-next";
+import { ArrowLeft, Flag, LogOut, Monitor, ScrollText, ShieldCheck, UserX } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
 
 /** Account settings: identity, status, signed-in devices. */
@@ -293,12 +293,20 @@ function deviceName(userAgent: string): string {
         </ul>
       </section>
 
-      <section v-if="can('server.audit.read')">
+      <section v-if="can('server.audit.read') || can('moderation.review')">
         <h2 class="text-sm font-semibold">Administration</h2>
-        <NuxtLink to="/audit" class="btn btn-outline mt-3">
-          <ScrollText class="size-3.5" />
-          View the audit log
-        </NuxtLink>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <NuxtLink v-if="can('moderation.review')" to="/reports" class="btn btn-outline">
+            <Flag class="size-3.5" />
+            Reports
+            <!-- The count is fetched by the queue itself; a badge here would
+                 mean every settings visit reads the moderation queue. -->
+          </NuxtLink>
+          <NuxtLink v-if="can('server.audit.read')" to="/audit" class="btn btn-outline">
+            <ScrollText class="size-3.5" />
+            View the audit log
+          </NuxtLink>
+        </div>
       </section>
 
       <section class="border-t pt-6">

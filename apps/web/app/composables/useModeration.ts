@@ -1,4 +1,4 @@
-import type { BlockedPerson, ChannelBan, DirectMessagePolicy } from "@tdc/types";
+import type { BlockedPerson, ChannelBan, DirectMessagePolicy, Report } from "@tdc/types";
 
 /**
  * Blocking and privacy, which belong to the person rather than to a moderator.
@@ -89,4 +89,70 @@ export function useChannelBans(roomId: Ref<string>) {
   }
 
   return { bans, failed, refresh, ban, lift };
+}
+
+/**
+ * The moderation queue.
+ *
+ * Reading this needs the review permission, so most people never see it. The
+ * reporter's identity is in what comes back, and it is here — behind that
+ * permission — that it appears at all: the reported party has no endpoint that
+ * returns it, and nothing they can read names who complained.
+ */
+export function useReportQueue() {
+  const api = useApi();
+
+  const reports = ref<Report[]>([]);
+  const open = ref(0);
+  const failed = ref(false);
+  const loading = ref(false);
+
+  async function refresh() {
+    loading.value = true;
+    try {
+      reports.value = await api.get<Report[]>("/api/reports?limit=100");
+      open.value = reports.value.length;
+      failed.value = false;
+    } catch {
+      reports.value = [];
+      failed.value = true;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /**
+   * Counts what is waiting without reading it.
+   *
+   * The badge is refreshed often; the queue itself is not, and fetching every
+   * report to show a number would pull reported text into memory on a screen
+   * that only ever displays a count.
+   */
+  async function count() {
+    try {
+      const result = await api.get<{ open: number }>("/api/reports/count");
+      open.value = result.open;
+      failed.value = false;
+    } catch {
+      failed.value = true;
+    }
+  }
+
+  /*
+   * Resolving and dismissing are the same call with a different outcome
+   * recorded, and both leave the queue. Kept as two functions because a
+   * boolean argument at the call site reads as neither.
+   */
+
+  async function resolve(id: string, resolution: string) {
+    await api.post(`/api/reports/${id}/resolve`, { dismissed: false, resolution });
+    await refresh();
+  }
+
+  async function dismiss(id: string, resolution: string) {
+    await api.post(`/api/reports/${id}/resolve`, { dismissed: true, resolution });
+    await refresh();
+  }
+
+  return { reports, open, failed, loading, refresh, count, resolve, dismiss };
 }

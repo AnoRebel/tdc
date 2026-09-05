@@ -632,3 +632,177 @@ func TestCaptionsArePerAttachment(t *testing.T) {
 		}
 	}
 }
+
+/*
+TestTheReportedPartyNeverLearnsWhoReportedThem is the rule 7.9 turns on.
+
+Somebody who learns who reported them retaliates against that person, which
+teaches everybody else not to report. The reporter's identity appears only in
+the moderation queue, behind a permission — and nowhere the reported party can
+reach.
+*/
+func TestTheReportedPartyNeverLearnsWhoReportedThem(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	reporter := registerAndSignIn(t, handler, "mtoa-taarifa")
+	joinRoom(t, handler, reporter, roomID)
+
+	reported := registerAndSignIn(t, handler, "mshtakiwa")
+	joinRoom(t, handler, reported, roomID)
+
+	eventID := sendMessage(t, handler, reported, roomID, "Maneno yasiyofaa")
+
+	filed := call(t, handler, http.MethodPost, "/api/reports", map[string]any{
+		"room":    roomID,
+		"eventId": eventID,
+		"reason":  "harassment",
+		"detail":  "Ameniudhi mara kwa mara",
+	}, reporter)
+	if filed.Code != http.StatusCreated {
+		t.Fatalf("filing returned %d: %s", filed.Code, truncate(filed.Body.String()))
+	}
+
+	// The reported party cannot read the queue at all.
+	queue := call(t, handler, http.MethodGet, "/api/reports", nil, reported)
+	if queue.Code == http.StatusOK {
+		t.Fatal("the reported party could read the moderation queue")
+	}
+
+	// Nor can the reporter, who has no more authority than anybody else —
+	// which is what stops the queue being a way to see who else has reported.
+	reporterQueue := call(t, handler, http.MethodGet, "/api/reports", nil, reporter)
+	if reporterQueue.Code == http.StatusOK {
+		t.Error("the reporter could read the moderation queue")
+	}
+
+	// And the filing response itself names nobody: it is returned to the
+	// reporter, who knows who they are, but it must not carry their identity
+	// into anything that might be shown elsewhere.
+	if strings.Contains(filed.Body.String(), "mtoa-taarifa") {
+		t.Errorf("the filing response carried the reporter's identity: %s",
+			truncate(filed.Body.String()))
+	}
+
+	// A moderator does see it, which is the whole point of recording it.
+	moderatorView := call(t, handler, http.MethodGet, "/api/reports", nil, owner)
+	if moderatorView.Code != http.StatusOK {
+		t.Fatalf("a moderator could not read the queue: %d", moderatorView.Code)
+	}
+	if !strings.Contains(moderatorView.Body.String(), "mtoa-taarifa") {
+		t.Error("a moderator cannot see who reported, which is what makes a " +
+			"report actionable")
+	}
+}
+
+/*
+TestReportingIsRateLimited stops one person burying the queue.
+
+Reporting has to be easy, so the allowance is deliberately generous — far above
+what anybody encountering real problems files, and low enough that a script
+cannot make the queue unusable.
+*/
+func TestReportingIsRateLimited(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	reporter := registerAndSignIn(t, handler, "mkorofi")
+	joinRoom(t, handler, reporter, roomID)
+
+	refused := false
+	for range 30 {
+		recorder := call(t, handler, http.MethodPost, "/api/reports", map[string]any{
+			"room":    roomID,
+			"subject": "founder@tdc.test",
+			"reason":  "spam",
+		}, reporter)
+
+		if recorder.Code == http.StatusTooManyRequests {
+			refused = true
+			break
+		}
+	}
+
+	if !refused {
+		t.Error("thirty reports from one person were all accepted; the queue " +
+			"can be buried")
+	}
+}
+
+/*
+TestResolvingRecordsTheOutcome is what makes a queue a queue rather than a
+list.
+
+A report nobody can mark as handled is a report every moderator looks at again.
+Resolving records what was decided and takes it out of the queue.
+*/
+func TestResolvingRecordsTheOutcome(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	reporter := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, reporter, roomID)
+
+	call(t, handler, http.MethodPost, "/api/reports", map[string]any{
+		"room":    roomID,
+		"subject": "founder@tdc.test",
+		"reason":  "spam",
+	}, reporter)
+
+	open := decodeReports(t, call(t, handler, http.MethodGet, "/api/reports", nil, owner))
+	if len(open) != 1 {
+		t.Fatalf("expected one open report, got %d", len(open))
+	}
+
+	resolved := call(t, handler, http.MethodPost,
+		"/api/reports/"+open[0].ID+"/resolve",
+		map[string]any{"resolution": "Nimezungumza naye"}, owner)
+	if resolved.Code != http.StatusOK {
+		t.Fatalf("resolving returned %d: %s", resolved.Code, truncate(resolved.Body.String()))
+	}
+
+	// Out of the queue.
+	remaining := decodeReports(t, call(t, handler, http.MethodGet, "/api/reports", nil, owner))
+	if len(remaining) != 0 {
+		t.Errorf("%d reports remain in the queue after resolving", len(remaining))
+	}
+
+	// And resolving it again is refused, so two moderators acting at once do
+	// not both record an outcome.
+	twice := call(t, handler, http.MethodPost,
+		"/api/reports/"+open[0].ID+"/resolve",
+		map[string]any{"resolution": "Na mimi pia"}, owner)
+	if twice.Code == http.StatusOK {
+		t.Error("a report was resolved twice; two moderators could both record " +
+			"an outcome for the same thing")
+	}
+}
+
+type queuedReport struct {
+	ID           string `json:"id"`
+	Reason       string `json:"reason"`
+	Reporter     string `json:"reporter"`
+	Subject      string `json:"subject"`
+	ReportedBody string `json:"reportedBody"`
+}
+
+func decodeReports(t *testing.T, recorder *httptest.ResponseRecorder) []queuedReport {
+	t.Helper()
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("reading the queue returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var reports []queuedReport
+	if err := json.Unmarshal(recorder.Body.Bytes(), &reports); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+	return reports
+}
