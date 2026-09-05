@@ -3,8 +3,8 @@ INSERT INTO attachments (
     id, storage_key, uploader_id, uploader_address, room_id,
     filename, content_type, size_bytes,
     preview_key, preview_type, preview_width, preview_height, width, height,
-    caption
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    caption, animated
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING *;
 
 -- name: GetAttachment :one

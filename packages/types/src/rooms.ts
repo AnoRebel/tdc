@@ -127,6 +127,12 @@ export interface Attachment {
    */
   caption?: string;
   /**
+   * Whether the image moves. An animation has no still preview, because a
+   * thumbnail is a frozen first frame and showing it in place of the
+   * animation removes the only thing about a GIF that matters.
+   */
+  animated?: boolean;
+  /**
    * How to display it. Decided by the server so every client agrees, and so
    * markdown — which has no magic bytes and is detected as plain text — is
    * recognised once rather than by each client guessing from a filename.

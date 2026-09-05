@@ -20,6 +20,20 @@ var (
 	testPNG = []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 'I', 'H', 'D', 'R'}
 	testELF = []byte{0x7F, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0x3E, 0}
 	testSVG = []byte(`<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`)
+
+	// A two-frame animated GIF, written out by hand so the test does not
+	// depend on an image library being present. Its Netscape block is what
+	// makes it loop, and the two image descriptors are what make it animated.
+	testAnimatedGIF = []byte{
+		0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0xF0, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x21, 0xFF, 0x0B, 0x4E, 0x45,
+		0x54, 0x53, 0x43, 0x41, 0x50, 0x45, 0x32, 0x2E, 0x30, 0x03, 0x01, 0x00,
+		0x00, 0x00, 0x21, 0xF9, 0x04, 0x00, 0x32, 0x00, 0x00, 0x00, 0x2C, 0x00,
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x00,
+		0x00, 0x21, 0xF9, 0x04, 0x00, 0x32, 0x00, 0x00, 0x00, 0x2C, 0x00, 0x00,
+		0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00,
+		0x3B,
+	}
 )
 
 // uploadFile posts a file to a room the way a browser would.
@@ -817,4 +831,96 @@ func TestNoScannerMeansNoRequirement(t *testing.T) {
 	if recorder := uploadFile(t, handler, token, roomID, "picha.png", testPNG); recorder.Code != http.StatusCreated {
 		t.Fatalf("an upload failed with no scanner configured: %d", recorder.Code)
 	}
+}
+
+/*
+TestAnimatedGifKeepsAnimating is the point of treating GIFs as attachments at
+all.
+
+A thumbnail is a static PNG, and the timeline shows the thumbnail when one
+exists — so an animated GIF arrived as a frozen first frame. A GIF that does
+not move is not a GIF, and somebody sending one has sent the one thing about it
+that matters and had it removed.
+*/
+func TestAnimatedGifKeepsAnimating(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "reaction.gif", testAnimatedGIF)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d: %s", recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var uploaded struct {
+		ID          string `json:"id"`
+		Kind        string `json:"kind"`
+		ContentType string `json:"contentType"`
+		PreviewURL  string `json:"previewUrl"`
+		Animated    bool   `json:"animated"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decoding the upload: %v", err)
+	}
+
+	if uploaded.ContentType != "image/gif" {
+		t.Errorf("the type is %q, expected image/gif", uploaded.ContentType)
+	}
+	if !uploaded.Animated {
+		t.Error("an animated GIF is not reported as animated")
+	}
+
+	// The client decides what to show from this: a still preview is right for
+	// a photograph and wrong for a GIF, and only the server knows which this
+	// is without downloading the whole file.
+	if uploaded.PreviewURL != "" {
+		t.Errorf("an animated GIF was given a still preview at %q, which would "+
+			"be shown in place of the animation", uploaded.PreviewURL)
+	}
+}
+
+// TestStillImageKeepsItsPreview checks the change above did not throw away
+// previews for the images that should have them.
+//
+// A photograph is the case previews exist for: showing the full file in a
+// timeline would download megabytes to draw a thumbnail.
+func TestStillImageKeepsItsPreview(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+
+	recorder := uploadFile(t, handler, token, roomID, "photo.png", realPNG(t))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("upload returned %d: %s", recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var uploaded struct {
+		PreviewURL string `json:"previewUrl"`
+		Animated   bool   `json:"animated"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decoding the upload: %v", err)
+	}
+
+	if uploaded.Animated {
+		t.Error("a still image is reported as animated")
+	}
+	if uploaded.PreviewURL == "" {
+		t.Error("a still image lost its preview")
+	}
+}
+
+// realPNG builds a small but genuine PNG, since the shared testPNG fixture is
+// only a header and cannot be decoded into a preview.
+func realPNG(t *testing.T) []byte {
+	t.Helper()
+
+	image := image.NewRGBA(image.Rect(0, 0, 8, 8))
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, image); err != nil {
+		t.Fatalf("building a test image: %v", err)
+	}
+	return buffer.Bytes()
 }

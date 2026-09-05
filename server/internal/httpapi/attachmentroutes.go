@@ -56,6 +56,9 @@ type attachmentResponse struct {
 	// attachments arrive.
 	Width  int `json:"width,omitempty"`
 	Height int `json:"height,omitempty"`
+	// Animated says the image moves, so a client shows the file itself rather
+	// than the still preview of its first frame.
+	Animated bool `json:"animated,omitempty"`
 	// Caption is what the sender wrote about this file, which is per
 	// attachment so several sent together can each say something different.
 	Caption    string `json:"caption,omitempty"`
@@ -81,6 +84,7 @@ func attachmentResponseOf(attachment *attachments.Attachment) attachmentResponse
 		Width:       attachment.Width,
 		Height:      attachment.Height,
 		Caption:     attachment.Caption,
+		Animated:    attachment.Animated,
 		UploadedBy:  attachment.UploaderAddress,
 		UploadedAt:  attachment.CreatedAt.UTC().Format(time.RFC3339),
 	}

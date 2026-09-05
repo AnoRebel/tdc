@@ -29,6 +29,7 @@ type Attachment struct {
 	Width           *int32
 	Height          *int32
 	Caption         string
+	Animated        bool
 }
 
 type AuditEntry struct {

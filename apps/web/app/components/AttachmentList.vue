@@ -63,10 +63,45 @@ function previewStyle(attachment: Attachment) {
 
 <template>
   <div v-if="attachments.length" class="mt-1.5 flex flex-wrap gap-2">
-    <template v-for="attachment in attachments" :key="attachment.id">
+    <!-- Each attachment and its own caption travel together, so several sent
+         at once each carry their own line rather than sharing the message
+         body — which cannot say which line describes which picture. -->
+    <div
+      v-for="attachment in attachments"
+      :key="attachment.id"
+      class="flex max-w-full flex-col gap-1"
+    >
+      <!-- An animation, played where it sits. It has no still preview by
+           design: a thumbnail is a frozen first frame, and showing that in
+           place of the animation removes the only thing about a GIF that
+           matters. -->
+      <button
+        v-if="attachment.animated"
+        type="button"
+        class="group/att relative overflow-hidden rounded-lg border bg-surface-sunken transition hover:border-border-strong"
+        :style="previewStyle(attachment)"
+        :title="attachment.filename"
+        @click="open(attachment)"
+      >
+        <img
+          :src="mediaUrl(attachment.url)"
+          :alt="attachment.caption || attachment.filename"
+          loading="lazy"
+          decoding="async"
+          class="size-full object-cover"
+        />
+        <!-- Said plainly, because an animation that has not started loading
+             looks like a still image that failed to load. -->
+        <span
+          class="absolute top-1 left-1 rounded bg-black/60 px-1 py-0.5 text-[0.5625rem] font-semibold tracking-wide text-white uppercase"
+        >
+          GIF
+        </span>
+      </button>
+
       <!-- An image with a preview: shown, and opened at full size on demand. -->
       <button
-        v-if="attachment.previewUrl"
+        v-else-if="attachment.previewUrl"
         type="button"
         class="group/att relative overflow-hidden rounded-lg border bg-surface-sunken transition hover:border-border-strong"
         :style="previewStyle(attachment)"
@@ -150,7 +185,11 @@ function previewStyle(attachment: Attachment) {
         </span>
         <Download class="size-3.5 shrink-0 text-muted-foreground" />
       </a>
-    </template>
+
+      <p v-if="attachment.caption" class="max-w-full text-xs text-muted-foreground">
+        {{ attachment.caption }}
+      </p>
+    </div>
 
     <AttachmentViewer
       v-if="viewing !== null"

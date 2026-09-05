@@ -41,6 +41,10 @@ type Attachment struct {
 	Size        int64
 	CreatedAt   time.Time
 
+	// Animated says the image moves, so a client shows the file itself rather
+	// than a still preview of its first frame.
+	Animated bool
+
 	// Caption is what the sender wrote about this file.
 	//
 	// Per attachment rather than per message: sending four photographs with a
@@ -198,7 +202,13 @@ func (s *Service) Upload(
 	// A preview is a convenience, so a failure to make one must not fail the
 	// upload: the file is still perfectly usable without it, and a malformed
 	// image is exactly the case where generation is expected to fail.
-	preview := s.makePreview(ctx, spooled, contentType)
+	// Decided from the file's own structure, once, rather than on every read.
+	animated := false
+	if _, err := spooled.Seek(0, io.SeekStart); err == nil {
+		animated = IsAnimated(spooled, contentType)
+	}
+
+	preview := s.makePreview(ctx, spooled, contentType, animated)
 
 	record, err := s.queries.CreateAttachment(ctx, dbgen.CreateAttachmentParams{
 		ID:              uuid.New(),
@@ -215,6 +225,7 @@ func (s *Service) Upload(
 		PreviewHeight:   preview.height,
 		Width:           preview.sourceWidth,
 		Height:          preview.sourceHeight,
+		Animated:        animated,
 	})
 	if err != nil {
 		// The bytes are already stored. Leaving them costs a little disk until
@@ -457,6 +468,7 @@ func fromRow(row dbgen.Attachment) *Attachment {
 		ContentType:     row.ContentType,
 		Size:            row.SizeBytes,
 		Caption:         row.Caption,
+		Animated:        row.Animated,
 	}
 	if row.EventID != nil {
 		attachment.EventID = *row.EventID
@@ -502,7 +514,12 @@ type previewResult struct {
 // could not be made would turn a cosmetic problem into a lost file — and a
 // malformed image, which is precisely where generation fails, is also precisely
 // where someone most wants the original preserved for inspection.
-func (s *Service) makePreview(ctx context.Context, spooled *os.File, contentType string) previewResult {
+func (s *Service) makePreview(
+	ctx context.Context,
+	spooled *os.File,
+	contentType string,
+	animated bool,
+) previewResult {
 	var result previewResult
 
 	if !CanThumbnail(contentType) {
@@ -518,6 +535,13 @@ func (s *Service) makePreview(ctx context.Context, spooled *os.File, contentType
 	if config, _, err := image.DecodeConfig(spooled); err == nil {
 		width, height := int32(config.Width), int32(config.Height)
 		result.sourceWidth, result.sourceHeight = &width, &height
+	}
+
+	// An animation gets dimensions but no preview. A thumbnail is a still
+	// frame, and a timeline showing it in place of the animation removes the
+	// one thing about a GIF that matters.
+	if animated {
+		return result
 	}
 
 	if _, err := spooled.Seek(0, io.SeekStart); err != nil {

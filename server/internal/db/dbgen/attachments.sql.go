@@ -77,9 +77,9 @@ INSERT INTO attachments (
     id, storage_key, uploader_id, uploader_address, room_id,
     filename, content_type, size_bytes,
     preview_key, preview_type, preview_width, preview_height, width, height,
-    caption
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption
+    caption, animated
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated
 `
 
 type CreateAttachmentParams struct {
@@ -98,6 +98,7 @@ type CreateAttachmentParams struct {
 	Width           *int32
 	Height          *int32
 	Caption         string
+	Animated        bool
 }
 
 func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error) {
@@ -117,6 +118,7 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		arg.Width,
 		arg.Height,
 		arg.Caption,
+		arg.Animated,
 	)
 	var i Attachment
 	err := row.Scan(
@@ -137,6 +139,7 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		&i.Width,
 		&i.Height,
 		&i.Caption,
+		&i.Animated,
 	)
 	return i, err
 }
@@ -151,7 +154,7 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAttachment = `-- name: GetAttachment :one
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption FROM attachments WHERE id = $1
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated FROM attachments WHERE id = $1
 `
 
 func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error) {
@@ -175,12 +178,13 @@ func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, 
 		&i.Width,
 		&i.Height,
 		&i.Caption,
+		&i.Animated,
 	)
 	return i, err
 }
 
 const listAttachmentsForEvent = `-- name: ListAttachmentsForEvent :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated FROM attachments
 WHERE event_id = $1
 ORDER BY created_at
 `
@@ -212,6 +216,7 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 			&i.Width,
 			&i.Height,
 			&i.Caption,
+			&i.Animated,
 		); err != nil {
 			return nil, err
 		}
@@ -224,7 +229,7 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 }
 
 const listOrphanedAttachments = `-- name: ListOrphanedAttachments :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated FROM attachments
 WHERE event_id IS NULL AND created_at < $1
 ORDER BY created_at
 LIMIT $2
@@ -263,6 +268,7 @@ func (q *Queries) ListOrphanedAttachments(ctx context.Context, arg ListOrphanedA
 			&i.Width,
 			&i.Height,
 			&i.Caption,
+			&i.Animated,
 		); err != nil {
 			return nil, err
 		}
