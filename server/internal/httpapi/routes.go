@@ -100,6 +100,10 @@ func (s *Server) routes() {
 	// the caller's own words about their own conversations.
 	// A person's own pinned conversations, which is a bookmark rather than an
 	// announcement and so is kept per person.
+	// Dismissing everything unread in one conversation, which is what a
+	// grouped notification entry stands for.
+	me.POST("/notifications/rooms/:id/read", s.handleDismissRoomNotifications)
+
 	s.echo.GET("/api/me/pins", s.handleListPinnedRooms, requireAuthentication)
 	s.echo.PUT("/api/me/pins/:id", s.handlePinRoom, requireAuthentication)
 	s.echo.DELETE("/api/me/pins/:id", s.handleUnpinRoom, requireAuthentication)

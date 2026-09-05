@@ -182,6 +182,81 @@ func (q *Queries) ListUnreadNotifications(ctx context.Context, arg ListUnreadNot
 	return items, nil
 }
 
+const listUnreadNotificationsGrouped = `-- name: ListUnreadNotificationsGrouped :many
+SELECT DISTINCT ON (n.room_id)
+       n.id, n.room_id, n.event_id, n.reason, n.created_at,
+       n.actor_address, n.detail,
+       e.sender_address, e.content,
+       (SELECT count(*) FROM notifications g
+         WHERE g.user_id = n.user_id AND g.room_id = n.room_id AND g.read_at IS NULL
+       )::bigint AS group_count,
+       (SELECT count(DISTINCT g.actor_address) FROM notifications g
+         WHERE g.user_id = n.user_id AND g.room_id = n.room_id AND g.read_at IS NULL
+       )::bigint AS actor_count
+FROM notifications n
+JOIN events e ON e.id = n.event_id
+WHERE n.user_id = $1 AND n.read_at IS NULL
+ORDER BY n.room_id, n.created_at DESC
+`
+
+type ListUnreadNotificationsGroupedRow struct {
+	ID            uuid.UUID
+	RoomID        uuid.UUID
+	EventID       string
+	Reason        string
+	CreatedAt     time.Time
+	ActorAddress  string
+	Detail        string
+	SenderAddress string
+	Content       []byte
+	GroupCount    int64
+	ActorCount    int64
+}
+
+// One entry per conversation, standing for everything unread in it.
+//
+// Ten messages in a busy channel is one thing worth knowing about, not ten:
+// a list showing each separately buries every other conversation under the
+// noisiest one, which is the failure that makes people stop reading the list.
+//
+// Grouped at read time rather than by writing fewer rows, because each
+// notification must stay individually dismissible — reading one message should
+// withdraw its own notification, not the group's.
+//
+// DISTINCT ON takes the newest per room, and the counts describe what it
+// stands for: how many, and how many people are involved.
+func (q *Queries) ListUnreadNotificationsGrouped(ctx context.Context, userID uuid.UUID) ([]ListUnreadNotificationsGroupedRow, error) {
+	rows, err := q.db.Query(ctx, listUnreadNotificationsGrouped, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUnreadNotificationsGroupedRow{}
+	for rows.Next() {
+		var i ListUnreadNotificationsGroupedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RoomID,
+			&i.EventID,
+			&i.Reason,
+			&i.CreatedAt,
+			&i.ActorAddress,
+			&i.Detail,
+			&i.SenderAddress,
+			&i.Content,
+			&i.GroupCount,
+			&i.ActorCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markNotificationRead = `-- name: MarkNotificationRead :exec
 UPDATE notifications SET read_at = now()
 WHERE id = $1 AND user_id = $2 AND read_at IS NULL
@@ -213,6 +288,25 @@ type MarkRoomNotificationsReadParams struct {
 // is why this is keyed on the room rather than on individual notifications.
 func (q *Queries) MarkRoomNotificationsRead(ctx context.Context, arg MarkRoomNotificationsReadParams) error {
 	_, err := q.db.Exec(ctx, markRoomNotificationsRead, arg.UserID, arg.RoomID)
+	return err
+}
+
+const markRoomNotificationsReadForUser = `-- name: MarkRoomNotificationsReadForUser :exec
+UPDATE notifications SET read_at = now()
+WHERE user_id = $1 AND room_id = $2 AND read_at IS NULL
+`
+
+type MarkRoomNotificationsReadForUserParams struct {
+	UserID uuid.UUID
+	RoomID uuid.UUID
+}
+
+// Dismisses everything unread in one conversation.
+//
+// What a grouped entry needs: dismissing the summary must dismiss what it
+// stood for, or the group reappears the moment the list is redrawn.
+func (q *Queries) MarkRoomNotificationsReadForUser(ctx context.Context, arg MarkRoomNotificationsReadForUserParams) error {
+	_, err := q.db.Exec(ctx, markRoomNotificationsReadForUser, arg.UserID, arg.RoomID)
 	return err
 }
 

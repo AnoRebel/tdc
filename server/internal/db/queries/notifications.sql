@@ -66,3 +66,39 @@ WHERE id = $1 AND user_id = $2 AND read_at IS NULL;
 -- name: MarkRoomNotificationsRead :exec
 UPDATE notifications SET read_at = now()
 WHERE user_id = $1 AND room_id = $2 AND read_at IS NULL;
+
+-- name: ListUnreadNotificationsGrouped :many
+-- One entry per conversation, standing for everything unread in it.
+--
+-- Ten messages in a busy channel is one thing worth knowing about, not ten:
+-- a list showing each separately buries every other conversation under the
+-- noisiest one, which is the failure that makes people stop reading the list.
+--
+-- Grouped at read time rather than by writing fewer rows, because each
+-- notification must stay individually dismissible — reading one message should
+-- withdraw its own notification, not the group's.
+--
+-- DISTINCT ON takes the newest per room, and the counts describe what it
+-- stands for: how many, and how many people are involved.
+SELECT DISTINCT ON (n.room_id)
+       n.id, n.room_id, n.event_id, n.reason, n.created_at,
+       n.actor_address, n.detail,
+       e.sender_address, e.content,
+       (SELECT count(*) FROM notifications g
+         WHERE g.user_id = n.user_id AND g.room_id = n.room_id AND g.read_at IS NULL
+       )::bigint AS group_count,
+       (SELECT count(DISTINCT g.actor_address) FROM notifications g
+         WHERE g.user_id = n.user_id AND g.room_id = n.room_id AND g.read_at IS NULL
+       )::bigint AS actor_count
+FROM notifications n
+JOIN events e ON e.id = n.event_id
+WHERE n.user_id = $1 AND n.read_at IS NULL
+ORDER BY n.room_id, n.created_at DESC;
+
+-- name: MarkRoomNotificationsReadForUser :exec
+-- Dismisses everything unread in one conversation.
+--
+-- What a grouped entry needs: dismissing the summary must dismiss what it
+-- stood for, or the group reappears the moment the list is redrawn.
+UPDATE notifications SET read_at = now()
+WHERE user_id = $1 AND room_id = $2 AND read_at IS NULL;

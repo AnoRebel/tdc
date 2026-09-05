@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -79,6 +80,19 @@ type Notification struct {
 	// on the notification rather than looked up, so a reaction that has since
 	// been taken back still explains the notification it raised.
 	Detail string
+
+	/*
+		Count is how many unread notifications this one stands for.
+
+		One when a notification is its own entry, more when it summarises a
+		conversation: ten messages in a busy channel is one thing worth knowing
+		about, not ten, and listing each separately buries every other
+		conversation under the noisiest one.
+	*/
+	Count int64
+	// Actors is how many different people are behind that count, which is what
+	// separates "five from Amina" from "five people replied".
+	Actors int64
 }
 
 /*
@@ -346,6 +360,65 @@ func (s *Service) Unread(ctx context.Context, userID uuid.UUID, limit int32) ([]
 	}
 
 	return notifications, nil
+}
+
+/*
+Grouped returns one entry per conversation rather than one per message.
+
+What a notification list should show: a burst in a busy channel is one thing to
+know about. Each underlying notification stays individually dismissible, so
+reading one message withdraws its own — the grouping is how they are presented,
+not how they are stored.
+*/
+func (s *Service) Grouped(ctx context.Context, userID uuid.UUID) ([]Notification, error) {
+	rows, err := s.queries.ListUnreadNotificationsGrouped(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("notify: reading grouped notifications: %w", err)
+	}
+
+	notifications := make([]Notification, 0, len(rows))
+	for _, row := range rows {
+		notification := Notification{
+			ID:      row.ID,
+			RoomID:  row.RoomID,
+			EventID: row.EventID,
+			Reason:  Reason(row.Reason),
+			Sender:  row.SenderAddress,
+			Preview: previewOf(row.Content),
+			Actor:   row.ActorAddress,
+			Detail:  row.Detail,
+			Count:   row.GroupCount,
+			Actors:  row.ActorCount,
+		}
+		if notification.Actor == "" {
+			notification.Actor = row.SenderAddress
+		}
+		notifications = append(notifications, notification)
+	}
+
+	// Newest first across conversations. The query orders by room so that
+	// DISTINCT ON can pick each room's newest, which is not the order to show.
+	sort.Slice(notifications, func(a, b int) bool {
+		return rows[a].CreatedAt.After(rows[b].CreatedAt)
+	})
+
+	return notifications, nil
+}
+
+/*
+DismissRoom withdraws everything unread in one conversation.
+
+What dismissing a grouped entry means: the summary stands for several
+notifications, and clearing it has to clear what it stood for or the group
+reappears the moment the list is redrawn.
+*/
+func (s *Service) DismissRoom(ctx context.Context, userID, roomID uuid.UUID) error {
+	err := s.queries.MarkRoomNotificationsReadForUser(ctx,
+		dbgen.MarkRoomNotificationsReadForUserParams{UserID: userID, RoomID: roomID})
+	if err != nil {
+		return fmt.Errorf("notify: dismissing a conversation's notifications: %w", err)
+	}
+	return nil
 }
 
 // UnreadCount is the number for a badge.

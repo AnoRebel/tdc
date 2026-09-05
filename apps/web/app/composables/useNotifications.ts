@@ -39,6 +39,30 @@ export function useNotifications() {
     }
   }
 
+  /**
+   * Dismisses everything unread in one conversation.
+   *
+   * What a grouped entry stands for: clearing the summary has to clear what it
+   * summarised, or the group reappears the moment the list is redrawn.
+   */
+  async function dismissRoom(roomId: string) {
+    const before = items.value;
+    const dismissed = before.filter((item) => item.roomId === roomId);
+
+    items.value = before.filter((item) => item.roomId !== roomId);
+    unread.value = Math.max(
+      0,
+      unread.value - dismissed.reduce((total, item) => total + (item.count ?? 1), 0),
+    );
+
+    try {
+      await api.post(`/api/me/notifications/rooms/${roomId}/read`);
+    } catch {
+      items.value = before;
+      void refreshCount();
+    }
+  }
+
   async function markRead(id: string) {
     // Removed before the server confirms, because dismissing something you
     // have just read should not wait on a round trip.
@@ -54,7 +78,7 @@ export function useNotifications() {
     }
   }
 
-  return { items, unread, refresh, refreshCount, markRead };
+  return { items, unread, refresh, refreshCount, markRead, dismissRoom };
 }
 
 /**
@@ -66,6 +90,18 @@ export function useNotifications() {
  */
 export function describeNotification(notification: Notification): string {
   const who = shortNameOf(notification.actor);
+
+  /*
+   * A group is described by what it stands for rather than by its newest
+   * member. "Amina and 4 others" says what happened; "Amina mentioned you",
+   * shown once for five notifications, does not.
+   */
+  const count = notification.count ?? 1;
+  if (count > 1) {
+    const others = (notification.actors ?? 1) - 1;
+    const people = others > 0 ? `${who} and ${others} other${others === 1 ? "" : "s"}` : who;
+    return `${people} — ${count} new`;
+  }
 
   switch (notification.reason) {
     case "mention":

@@ -28,17 +28,42 @@ type notificationResponse struct {
 	Actor string `json:"actor"`
 	// Detail is what the reason needs — the emoji, for a reaction.
 	Detail string `json:"detail,omitempty"`
+	// Count is how many unread notifications this entry stands for, when the
+	// list is grouped. One means it stands only for itself.
+	Count int64 `json:"count,omitempty"`
+	// Actors is how many different people are behind that count, which
+	// separates "five from Amina" from "five people replied".
+	Actors int64 `json:"actors,omitempty"`
 }
 
+/*
+handleListNotifications returns what somebody has not yet seen.
+
+Grouped by conversation unless asked otherwise: ten messages in a busy channel
+is one thing worth knowing about, and listing each separately buries every
+other conversation under the noisiest one — which is what makes people stop
+reading the list at all.
+
+The ungrouped form stays available, because a client showing a conversation's
+own history wants every entry rather than a summary of them.
+*/
 func (s *Server) handleListNotifications(c *echo.Context) error {
 	user, _ := currentUser(c)
+	ctx := c.Request().Context()
 
 	limit := 0
 	if raw := c.QueryParam("limit"); raw != "" {
 		limit, _ = strconv.Atoi(raw)
 	}
 
-	notifications, err := s.notify.Unread(c.Request().Context(), user.ID, int32(limit))
+	var notifications []notify.Notification
+	var err error
+
+	if c.QueryParam("grouped") == "false" {
+		notifications, err = s.notify.Unread(ctx, user.ID, int32(limit))
+	} else {
+		notifications, err = s.notify.Grouped(ctx, user.ID)
+	}
 	if err != nil {
 		return err
 	}
@@ -54,10 +79,36 @@ func (s *Server) handleListNotifications(c *echo.Context) error {
 			Preview: n.Preview,
 			Actor:   n.Actor,
 			Detail:  n.Detail,
+			Count:   n.Count,
+			Actors:  n.Actors,
 		})
 	}
 
 	return c.JSON(http.StatusOK, response)
+}
+
+/*
+handleDismissRoomNotifications withdraws everything unread in a conversation.
+
+What dismissing a grouped entry means. The summary stands for several
+notifications, so clearing it has to clear what it stood for — otherwise the
+group reappears the moment the list is redrawn.
+*/
+func (s *Server) handleDismissRoomNotifications(c *echo.Context) error {
+	user, _ := currentUser(c)
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	// Scoped to this person, so an identifier belonging to a conversation they
+	// are not in dismisses nothing rather than somebody else's notifications.
+	if err := s.notify.DismissRoom(c.Request().Context(), user.ID, roomID); err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }
 
 func (s *Server) handleNotificationCount(c *echo.Context) error {

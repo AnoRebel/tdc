@@ -24,7 +24,7 @@ const open = defineModel<boolean>({ default: false });
 
 const emit = defineEmits<{ open: [notification: Notification] }>();
 
-const { items, unread, refresh, markRead } = useNotifications();
+const { items, unread, refresh, markRead, dismissRoom } = useNotifications();
 
 watch(open, (isOpen) => {
   if (isOpen) void refresh();
@@ -46,9 +46,20 @@ function iconFor(notification: Notification) {
   return icons[notification.reason] ?? Bell;
 }
 
-/** Opens what the notification is about, and dismisses it on the way. */
+/*
+ * Opens what the notification is about, and dismisses it on the way.
+ *
+ * A grouped entry dismisses the whole conversation, since that is what it
+ * stood for: dismissing only its newest member would leave the group in place
+ * with one fewer behind it.
+ */
 function go(notification: Notification) {
-  void markRead(notification.id);
+  if ((notification.count ?? 1) > 1) {
+    void dismissRoom(notification.roomId);
+  } else {
+    void markRead(notification.id);
+  }
+
   open.value = false;
   emit("open", notification);
 }

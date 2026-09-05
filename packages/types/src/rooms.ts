@@ -299,6 +299,16 @@ export interface Notification {
   actor: string;
   /** What the reason needs — the emoji, for a reaction. */
   detail?: string;
+  /**
+   * How many unread notifications this entry stands for. One means it stands
+   * only for itself; more means it summarises a conversation.
+   */
+  count?: number;
+  /**
+   * How many different people are behind that count, which separates "five
+   * from Amina" from "five people replied".
+   */
+  actors?: number;
 }
 
 /** One GIF from a third-party library. */

@@ -210,6 +210,19 @@ type Querier interface {
 	// message that was reacted to — whose sender is usually the person being
 	// notified. Taking the actor from the event would say you reacted to yourself.
 	ListUnreadNotifications(ctx context.Context, arg ListUnreadNotificationsParams) ([]ListUnreadNotificationsRow, error)
+	// One entry per conversation, standing for everything unread in it.
+	//
+	// Ten messages in a busy channel is one thing worth knowing about, not ten:
+	// a list showing each separately buries every other conversation under the
+	// noisiest one, which is the failure that makes people stop reading the list.
+	//
+	// Grouped at read time rather than by writing fewer rows, because each
+	// notification must stay individually dismissible — reading one message should
+	// withdraw its own notification, not the group's.
+	//
+	// DISTINCT ON takes the newest per room, and the counts describe what it
+	// stands for: how many, and how many people are involved.
+	ListUnreadNotificationsGrouped(ctx context.Context, userID uuid.UUID) ([]ListUnreadNotificationsGroupedRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
 	// Withdraws notifications for messages read elsewhere.
@@ -217,6 +230,11 @@ type Querier interface {
 	// Reading a conversation on a phone must clear what a laptop is showing, which
 	// is why this is keyed on the room rather than on individual notifications.
 	MarkRoomNotificationsRead(ctx context.Context, arg MarkRoomNotificationsReadParams) error
+	// Dismisses everything unread in one conversation.
+	//
+	// What a grouped entry needs: dismissing the summary must dismiss what it
+	// stood for, or the group reappears the moment the list is redrawn.
+	MarkRoomNotificationsReadForUser(ctx context.Context, arg MarkRoomNotificationsReadForUserParams) error
 	MarkScheduledMessageFailed(ctx context.Context, arg MarkScheduledMessageFailedParams) error
 	MarkScheduledMessageSent(ctx context.Context, arg MarkScheduledMessageSentParams) error
 	// Allocates the next position in a room's total order.

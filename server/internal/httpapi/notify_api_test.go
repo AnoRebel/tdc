@@ -2,6 +2,7 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -298,9 +299,37 @@ func TestTwoPeopleReactingRaisesTwoNotifications(t *testing.T) {
 		}
 	}
 
-	hits := actorNotificationsFor(t, handler, owner)
+	/*
+		Read ungrouped, because the point here is that both were recorded.
+
+		The default listing groups by conversation, so two reactions to the
+		same message arrive as one entry standing for two — which is the right
+		presentation and the wrong thing to assert on when what is under test
+		is that neither was dropped.
+	*/
+	recorder := call(t, handler, http.MethodGet,
+		"/api/me/notifications?grouped=false", nil, owner)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("listing returned %d", recorder.Code)
+	}
+
+	var hits []actorNotification
+	if err := json.Unmarshal(recorder.Body.Bytes(), &hits); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
 	if len(hits) != 2 {
 		t.Errorf("two people reacting raised %d notifications, expected 2", len(hits))
+	}
+
+	// And grouped, they are one entry naming two people — which is what makes
+	// a busy message one thing to look at rather than a list of its own.
+	grouped := groupedFor(t, handler, owner)
+	if len(grouped) != 1 {
+		t.Fatalf("grouped, two reactions produced %d entries, expected one", len(grouped))
+	}
+	if grouped[0].Count != 2 || grouped[0].Actors != 2 {
+		t.Errorf("the grouped entry stands for %d from %d people, expected 2 from 2",
+			grouped[0].Count, grouped[0].Actors)
 	}
 }
 
@@ -500,5 +529,169 @@ func TestSuppressionLeavesUnreadStateAlone(t *testing.T) {
 	if count, _ := unread[roomID].(float64); count == 0 {
 		t.Error("suppressing the notification also cleared the unread count; " +
 			"the conversation must still read as having moved on")
+	}
+}
+
+// groupedNotification is a notification entry that may stand for several.
+type groupedNotification struct {
+	ID     string `json:"id"`
+	RoomID string `json:"roomId"`
+	Reason string `json:"reason"`
+	Actor  string `json:"actor"`
+	Count  int64  `json:"count"`
+	Actors int64  `json:"actors"`
+}
+
+func groupedFor(t *testing.T, handler http.Handler, token string) []groupedNotification {
+	t.Helper()
+
+	recorder := call(t, handler, http.MethodGet, "/api/me/notifications", nil, token)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("listing notifications returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var hits []groupedNotification
+	if err := json.Unmarshal(recorder.Body.Bytes(), &hits); err != nil {
+		t.Fatalf("decoding notifications: %v", err)
+	}
+	return hits
+}
+
+/*
+TestABurstIsOneEntry is what 6.4 asks for.
+
+Ten messages in a busy channel is one thing worth knowing about, not ten. A
+list showing each separately buries every other conversation under the noisiest
+one, which is the failure that makes people stop reading the list at all.
+*/
+func TestABurstIsOneEntry(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	other := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, other, roomID)
+
+	for i := range 6 {
+		sendMessage(t, handler, owner, roomID,
+			fmt.Sprintf("Habari @amina, ujumbe wa %d", i))
+	}
+
+	hits := groupedFor(t, handler, other)
+	if len(hits) != 1 {
+		t.Fatalf("a burst of six produced %d entries, expected one", len(hits))
+	}
+	if hits[0].Count != 6 {
+		t.Errorf("the entry stands for %d notifications, expected 6", hits[0].Count)
+	}
+	// One person sent them all, which is what separates "six from Amina" from
+	// "six people replied".
+	if hits[0].Actors != 1 {
+		t.Errorf("the entry names %d actors, expected 1", hits[0].Actors)
+	}
+
+	// The badge still counts every one: grouping is presentation, not a
+	// decision that five of them did not happen.
+	counted := decode(t, call(t, handler, http.MethodGet, "/api/me/notifications/count", nil, other))
+	if count, _ := counted["unread"].(float64); count != 6 {
+		t.Errorf("the badge shows %v, expected 6", counted["unread"])
+	}
+}
+
+// TestSeparateConversationsStaySeparate keeps grouping from hiding things.
+//
+// Grouping by conversation must not become grouping everything: two channels
+// with activity are two things to know about.
+func TestSeparateConversationsStaySeparate(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	other := registerAndSignIn(t, handler, "amina")
+
+	for _, slug := range []string{"general", "random"} {
+		roomID := makeRoom(t, handler, owner, slug, "public")
+		joinRoom(t, handler, other, roomID)
+		sendMessage(t, handler, owner, roomID, "Habari @amina from "+slug)
+		sendMessage(t, handler, owner, roomID, "Na tena @amina from "+slug)
+	}
+
+	hits := groupedFor(t, handler, other)
+	if len(hits) != 2 {
+		t.Errorf("two conversations produced %d entries, expected two", len(hits))
+	}
+	for _, hit := range hits {
+		if hit.Count != 2 {
+			t.Errorf("an entry stands for %d, expected 2", hit.Count)
+		}
+	}
+}
+
+/*
+TestDismissingAGroupDismissesWhatItStoodFor is what makes the grouping usable.
+
+The entry summarises several notifications. Clearing it has to clear all of
+them, or the group reappears the moment the list is redrawn and nothing can be
+dismissed at all.
+*/
+func TestDismissingAGroupDismissesWhatItStoodFor(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	other := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, other, roomID)
+
+	for i := range 4 {
+		sendMessage(t, handler, owner, roomID, fmt.Sprintf("Habari @amina %d", i))
+	}
+
+	dismissed := call(t, handler, http.MethodPost,
+		"/api/me/notifications/rooms/"+roomID+"/read", nil, other)
+	if dismissed.Code != http.StatusNoContent {
+		t.Fatalf("dismissing returned %d: %s", dismissed.Code, truncate(dismissed.Body.String()))
+	}
+
+	if hits := groupedFor(t, handler, other); len(hits) != 0 {
+		t.Errorf("%d entries remain after dismissing the group", len(hits))
+	}
+
+	counted := decode(t, call(t, handler, http.MethodGet, "/api/me/notifications/count", nil, other))
+	if count, _ := counted["unread"].(float64); count != 0 {
+		t.Errorf("the badge shows %v after dismissing the group, expected 0", counted["unread"])
+	}
+}
+
+// TestUngroupedListingIsStillAvailable keeps the detailed view usable.
+//
+// A client showing one conversation's history wants every entry rather than a
+// summary of them.
+func TestUngroupedListingIsStillAvailable(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	other := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, other, roomID)
+
+	for i := range 3 {
+		sendMessage(t, handler, owner, roomID, fmt.Sprintf("Habari @amina %d", i))
+	}
+
+	recorder := call(t, handler, http.MethodGet,
+		"/api/me/notifications?grouped=false", nil, other)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("listing returned %d", recorder.Code)
+	}
+
+	var hits []groupedNotification
+	if err := json.Unmarshal(recorder.Body.Bytes(), &hits); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+	if len(hits) != 3 {
+		t.Errorf("the ungrouped listing returned %d entries, expected 3", len(hits))
 	}
 }
