@@ -104,7 +104,7 @@ Goal: notifications and search, so the product works when you are not looking at
 - [x] 6.8 Implement `pg_trgm` fuzzy and prefix matching for autocomplete; verify prefix queries return results `websearch_to_tsquery` alone cannot
 - [x] 6.9 Enforce authorization on all search results; verify search never returns messages from channels the user cannot read
 - [x] 6.10 Build the web notification and search interface; verify both are usable end to end
-- [ ] **MILESTONE 6** — Demonstrate: a mention raises an in-app notification, muting silences it while unread state still updates, and searching returns matching messages ranked by recency with results from private channels correctly excluded. Tag `v0.6.0-dev`.
+- [x] **MILESTONE 6** — Demonstrate: a mention raises an in-app notification, muting silences it while unread state still updates, and searching returns matching messages ranked by recency with results from private channels correctly excluded. Tag `v0.6.0-dev`.
 
 - [ ] 6.10a Implement per-person disclosure settings and a member list that omits withheld details server-side rather than sending them to be hidden; verify a non-member cannot enumerate a private channel's members and that moderator access to withheld details is audited (`messaging/channels`, `platform/audit-log`)
 
