@@ -112,16 +112,32 @@ name that resolves to a private address is refused even if it resolved
 differently a moment earlier. An operator who would rather the server made no
 such request sets this to `false`.
 
-**GIF search** — not implemented
+**GIF search** — `gifs.provider` and `gifs.api_key`
 
-Sending a GIF works: it uploads like any other file, animates in the
-conversation, and is deduplicated by content. Searching a library of them does
-not, because every such library (Giphy, Tenor) requires an account and an API
-key, which conflicts with the constraint above.
+Off by default, and the only option here that costs an account. Set the
+provider to `tenor` or `giphy` and supply your own key with them, and a GIF tab
+appears in the emoji picker.
 
-If it is added, it will be off by default, configured with an operator's own
-key, and proxied through this server so that viewers are not tracked by the
-provider.
+| Setting               | Default   | What it does                                                           |
+| --------------------- | --------- | ---------------------------------------------------------------------- |
+| `gifs.provider`       | —         | `tenor`, `giphy`, or empty for no search.                              |
+| `gifs.api_key`        | —         | Your own key with that provider.                                       |
+| `gifs.content_filter` | strictest | Tenor: `off`, `low`, `medium`, `high`. Giphy: `g`, `pg`, `pg-13`, `r`. |
+| `gifs.timeout`        | `5s`      | Bounds a search.                                                       |
+
+Setting one without the other is refused at startup rather than silently
+leaving the feature off, because half a configuration is somebody who meant to
+switch it on.
+
+Searches are proxied through this server. The key stays here, and the provider
+sees one server rather than an address and a request per keystroke for
+everybody using it. A chosen GIF is uploaded as an ordinary attachment, so it
+is stored here, deduplicated by content, and still readable when the provider
+takes it down.
+
+Without it, sending a GIF still works — it uploads like any other file and
+animates in the conversation. Only searching a library from inside the app is
+missing.
 
 ### Federation
 

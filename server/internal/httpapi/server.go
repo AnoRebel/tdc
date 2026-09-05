@@ -18,6 +18,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/gifs"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
@@ -91,6 +92,7 @@ type Server struct {
 	search      *search.Service
 	notify      *notify.Service
 	moderation  *moderation.Service
+	gifs        *gifs.Service
 	queries     *dbgen.Queries
 	presence    *presence.Service
 	hub         *realtime.Hub
@@ -113,6 +115,7 @@ type Services struct {
 	Search      *search.Service
 	Notify      *notify.Service
 	Moderation  *moderation.Service
+	GIFs        *gifs.Service
 	Presence    *presence.Service
 }
 
@@ -143,6 +146,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		search:      services.Search,
 		notify:      services.Notify,
 		moderation:  services.Moderation,
+		gifs:        services.GIFs,
 		queries:     dbgen.New(pool),
 		presence:    services.Presence,
 		config:      cfg,

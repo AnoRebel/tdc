@@ -120,6 +120,11 @@ func (s *Server) routes() {
 	s.echo.POST("/api/reports/:id/resolve", s.handleResolveReport, requireAuthentication,
 		requirePermission(authz.PermModerationReview))
 
+	// Searching a third-party GIF library, when an operator has configured
+	// one. Authenticated, so this server is not an open proxy to somebody
+	// else's API on the operator's key.
+	s.echo.GET("/api/gifs", s.handleSearchGifs, requireAuthentication)
+
 	s.echo.GET("/api/search", s.handleSearch, requireAuthentication)
 	// One box, one question: messages, conversations and people together,
 	// rather than three requests resolving at different times.
@@ -212,6 +217,26 @@ type serverInfoResponse struct {
 	DefaultLanguage  string   `json:"defaultLanguage"`
 }
 
+/*
+capabilities lists the optional features this server actually offers.
+
+Advertised rather than assumed, because every one of these depends on an
+operator's choice: a client that offered GIF search on a server without a
+provider would show a control that always fails.
+*/
+func (s *Server) capabilities() []string {
+	capabilities := []string{}
+
+	if s.gifs != nil && s.gifs.Enabled() {
+		capabilities = append(capabilities, "gif-search")
+	}
+	if s.unfurl != nil && s.unfurl.Enabled() {
+		capabilities = append(capabilities, "link-previews")
+	}
+
+	return capabilities
+}
+
 func (s *Server) handleServerInfo(c *echo.Context) error {
 	return c.JSON(http.StatusOK, serverInfoResponse{
 		Name:             s.config.ServerName,
@@ -221,8 +246,9 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		// Federation is not implemented, so no protocol version is advertised.
 		ProtocolVersions: []string{},
 		// Optional capabilities are advertised as they are built, so a client
-		// adapts to what this server actually offers.
-		Capabilities:    []string{},
+		// adapts to what this server actually offers rather than presenting a
+		// control that cannot work.
+		Capabilities:    s.capabilities(),
 		DefaultLanguage: s.config.DefaultLanguage,
 	})
 }

@@ -55,7 +55,10 @@ export type Capability =
   | "web-push"
   | "disposable-chats"
   | "directory"
-  | "projects";
+  | "projects"
+  // Searching a third-party GIF library, which needs an operator's own API
+  // key with that provider. Absent on a server that has not configured one.
+  | "gif-search";
 
 /** Health of a running server, for operators and uptime checks. */
 export interface HealthStatus {

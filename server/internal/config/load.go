@@ -206,6 +206,13 @@ func Load(path string) (Config, error) {
 	cfg.Attachments.ScannerTimeout = l.duration("attachments.scanner_timeout", d.Attachments.ScannerTimeout)
 	cfg.Attachments.ScannerFailOpen = l.boolean("attachments.scanner_fail_open", d.Attachments.ScannerFailOpen)
 	cfg.Attachments.LinkPreviews = l.boolean("attachments.link_previews", d.Attachments.LinkPreviews)
+
+	// Empty unless an operator sets both, which is what keeps searching off by
+	// default and this server free of anybody else's account.
+	cfg.GIFs.Provider = l.str("gifs.provider", d.GIFs.Provider)
+	cfg.GIFs.APIKey = l.str("gifs.api_key", d.GIFs.APIKey)
+	cfg.GIFs.ContentFilter = l.str("gifs.content_filter", d.GIFs.ContentFilter)
+	cfg.GIFs.Timeout = l.duration("gifs.timeout", d.GIFs.Timeout)
 	cfg.Attachments.MediaSidecarAddress = l.str("attachments.media_sidecar_address", d.Attachments.MediaSidecarAddress)
 	cfg.Attachments.MediaSidecarTimeout = l.duration("attachments.media_sidecar_timeout", d.Attachments.MediaSidecarTimeout)
 
@@ -237,6 +244,26 @@ func (c Config) validate() []Problem {
 
 	if strings.TrimSpace(c.Server.Name) == "" {
 		add("server.name", "must not be empty")
+	}
+
+	/*
+		Half a GIF configuration is refused at startup.
+
+		A provider without a key, or a key without a provider, is somebody who
+		meant to switch this on. Silently leaving it off would look like the
+		feature is broken rather than unconfigured, and it is far cheaper to
+		say so here than to have somebody discover it from an empty picker.
+	*/
+	provider := strings.TrimSpace(c.GIFs.Provider)
+	key := strings.TrimSpace(c.GIFs.APIKey)
+
+	switch {
+	case provider == "" && key != "":
+		add("gifs.provider", `is required when a key is set: "tenor" or "giphy"`)
+	case provider != "" && key == "":
+		add("gifs.api_key", "is required when a provider is set")
+	case provider != "" && provider != "tenor" && provider != "giphy":
+		add("gifs.provider", `must be "tenor" or "giphy"`)
 	}
 
 	switch backend := strings.TrimSpace(c.Storage.Backend); backend {

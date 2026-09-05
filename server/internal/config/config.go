@@ -18,6 +18,7 @@ type Config struct {
 	Storage     StorageConfig
 	Attachments AttachmentsConfig
 	Log         LogConfig
+	GIFs        GIFsConfig
 }
 
 // AttachmentsConfig configures what happens to an uploaded file.
@@ -50,6 +51,30 @@ type AttachmentsConfig struct {
 	// would rather their server never made an outbound request on a member's
 	// behalf can turn it off for everyone.
 	LinkPreviews bool
+}
+
+/*
+GIFsConfig configures searching a third-party GIF library.
+
+Off unless a provider and a key are both set, and it stays off in every
+default. Every library worth searching requires an account and an API key,
+which conflicts with running this server at no cost and with no external
+accounts — so searching is something an operator opts into, knowing what it
+costs.
+
+Sending a GIF as an attachment needs none of this and works regardless.
+*/
+type GIFsConfig struct {
+	// Provider is "tenor", "giphy", or empty for no search.
+	Provider string
+	// APIKey is the operator's own key with that provider.
+	APIKey string
+	// ContentFilter bounds what a search returns. Empty means the strictest
+	// each provider offers, which is the right default for a search box in a
+	// shared conversation.
+	ContentFilter string
+	// Timeout bounds a search.
+	Timeout time.Duration
 }
 
 // StorageConfig says where uploaded files are kept.
@@ -212,6 +237,14 @@ func Default() Config {
 			MediaSidecarAddress: "",
 			MediaSidecarTimeout: 30 * time.Second,
 		},
+		GIFs: GIFsConfig{
+			// Off: searching requires somebody else's account, and this server
+			// must work without one.
+			Provider: "",
+			APIKey:   "",
+			Timeout:  5 * time.Second,
+		},
+
 		Log: LogConfig{
 			Level:  "info",
 			Format: "json",

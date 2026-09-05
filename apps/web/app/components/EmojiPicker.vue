@@ -12,13 +12,27 @@ import { emojiGroups, searchEmoji } from "~/lib/emoji";
  * here come from the reader's own system font.
  */
 
-const emit = defineEmits<{ pick: [emoji: string] }>();
+const emit = defineEmits<{ pick: [emoji: string]; gif: [url: string] }>();
 
 const open = defineModel<boolean>({ default: false });
 
 const query = ref("");
 const active = ref(0);
 const field = ref<HTMLInputElement>();
+
+/*
+ * Which library is being browsed.
+ *
+ * The GIF tab appears only when this server offers search — an operator has to
+ * configure a provider and their own key — so a control that cannot work is
+ * never shown.
+ */
+const tab = ref<"emoji" | "gifs">("emoji");
+const gifs = useGifs();
+
+watch(tab, (chosen) => {
+  if (chosen === "gifs") void gifs.run(query.value);
+});
 
 const results = computed(() => searchEmoji(query.value));
 const searching = computed(() => query.value.trim().length > 0);
@@ -37,6 +51,17 @@ function choose(emoji: string) {
   emit("pick", emoji);
   open.value = false;
 }
+
+/** Sends a GIF by its URL, which the composer turns into an attachment. */
+function chooseGif(url: string) {
+  emit("gif", url);
+  open.value = false;
+}
+
+// Typing searches whichever library is showing.
+watch(query, (text) => {
+  if (tab.value === "gifs") gifs.search(text);
+});
 
 function onKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") {
@@ -70,6 +95,25 @@ watch(results, () => {
 
 <template>
   <div v-if="open" class="w-72 rounded-xl border border-border bg-card p-2 shadow-xl">
+    <!-- Only when the server has a provider configured: a tab for a feature
+         that cannot work reads as broken rather than absent. -->
+    <div v-if="gifs.available.value" class="mb-2 flex gap-1">
+      <button
+        v-for="option in ['emoji', 'gifs'] as const"
+        :key="option"
+        type="button"
+        class="flex-1 cursor-pointer rounded-md px-2 py-1 text-xs font-medium transition-colors"
+        :class="
+          tab === option
+            ? 'bg-accent text-accent-foreground'
+            : 'text-muted-foreground hover:bg-accent/50'
+        "
+        @click="tab = option"
+      >
+        {{ option === "emoji" ? "Emoji" : "GIFs" }}
+      </button>
+    </div>
+
     <div class="relative mb-2">
       <Search
         class="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -78,16 +122,56 @@ watch(results, () => {
         ref="field"
         v-model="query"
         type="text"
-        placeholder="Search emoji"
+        :placeholder="tab === 'gifs' ? 'Search GIFs' : 'Search emoji'"
         class="input h-8 pl-7 text-xs"
-        aria-label="Search emoji"
+        :aria-label="tab === 'gifs' ? 'Search GIFs' : 'Search emoji'"
         autocomplete="off"
         @keydown="onKeydown"
       />
     </div>
 
     <div class="max-h-64 overflow-y-auto">
-      <template v-if="searching">
+      <!-- GIFs, when that tab is showing. -->
+      <template v-if="tab === 'gifs'">
+        <p v-if="gifs.failed.value" class="px-2 py-6 text-center text-xs text-muted-foreground">
+          The GIF library could not be reached.
+        </p>
+        <p
+          v-else-if="!gifs.results.value.length && !gifs.searching.value"
+          class="px-2 py-6 text-center text-xs text-muted-foreground"
+        >
+          Nothing to show.
+        </p>
+        <div v-else class="grid grid-cols-2 gap-1">
+          <button
+            v-for="gif in gifs.results.value"
+            :key="gif.id"
+            type="button"
+            class="cursor-pointer overflow-hidden rounded-md border border-transparent transition hover:border-border-strong"
+            :title="gif.description"
+            @click="chooseGif(gif.url)"
+          >
+            <!-- The preview rather than the full animation: a grid of
+                 full-size GIFs would be several megabytes. -->
+            <img
+              :src="gif.previewUrl"
+              :alt="gif.description"
+              loading="lazy"
+              class="h-24 w-full object-cover"
+            />
+          </button>
+        </div>
+
+        <!-- Both providers require naming them. -->
+        <p
+          v-if="gifs.provider.value"
+          class="pt-2 text-center text-[0.625rem] text-muted-foreground"
+        >
+          Powered by {{ gifs.provider.value === "tenor" ? "Tenor" : "GIPHY" }}
+        </p>
+      </template>
+
+      <template v-else-if="searching">
         <p v-if="!results.length" class="px-2 py-6 text-center text-xs text-muted-foreground">
           Nothing matches &ldquo;{{ query.trim() }}&rdquo;.
         </p>

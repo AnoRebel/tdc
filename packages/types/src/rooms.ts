@@ -300,3 +300,24 @@ export interface Notification {
   /** What the reason needs — the emoji, for a reaction. */
   detail?: string;
 }
+
+/** One GIF from a third-party library. */
+export interface GifResult {
+  id: string;
+  /** The provider's alt text, which is what makes a result usable by
+   * somebody who cannot see it. */
+  description: string;
+  /** The full-size animation. */
+  url: string;
+  /** A smaller version for the picker grid, where a dozen full-size
+   * animations at once would be megabytes. */
+  previewUrl: string;
+  width?: number;
+  height?: number;
+}
+
+/** A page of GIF results, with the provider both libraries require naming. */
+export interface GifSearchResults {
+  provider: string;
+  results: GifResult[];
+}

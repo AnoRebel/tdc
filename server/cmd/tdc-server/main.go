@@ -24,6 +24,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
+	"github.com/AnoRebel/tdc/server/internal/gifs"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
@@ -148,6 +149,18 @@ func run() error {
 		Search:      search.NewService(pool),
 		Notify:      notify.NewService(pool, log),
 		Moderation:  moderation.NewService(pool, log),
+		// Off unless an operator configured a provider and a key. Searches are
+		// proxied through this server, so the key stays here and the provider
+		// sees one server rather than everybody using it.
+		GIFs: gifs.NewService(gifs.Settings{
+			Provider:      gifs.Provider(cfg.GIFs.Provider),
+			APIKey:        cfg.GIFs.APIKey,
+			ContentFilter: cfg.GIFs.ContentFilter,
+			Timeout:       cfg.GIFs.Timeout,
+			// The same dialer that guards link previews: a provider hostname
+			// should never resolve to a private address, and the day one does
+			// is the day this matters.
+		}, unfurl.DialContext, log),
 		Unfurl: unfurl.NewService(memoryCache,
 			unfurl.Settings{Enabled: cfg.Attachments.LinkPreviews}, log),
 		Presence: presenceService,

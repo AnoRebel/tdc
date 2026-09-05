@@ -223,6 +223,38 @@ function insertEmoji(emoji: string) {
   });
 }
 
+/*
+attachGif uploads a chosen GIF as an ordinary attachment.
+
+Fetched here and uploaded rather than sent as a link, so the GIF behaves like
+everything else: stored on this server, content-addressed and deduplicated,
+readable to somebody with no route to the provider, and still there when the
+provider takes it down or blocks the reader's country.
+
+The fetch is the browser's rather than the server's. The URL comes from a
+provider this server just called, so it is not arbitrary — but a server-side
+fetch of a URL a third party supplied is a request worth not making.
+*/
+async function attachGif(url: string) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(String(response.status));
+
+    const blob = await response.blob();
+
+    // Named from the URL where possible, since the filename is what a reader
+    // sees if the image itself will not display.
+    const name = url.split("/").pop()?.split("?")[0] || "animation.gif";
+    const file = new File([blob], name.endsWith(".gif") ? name : `${name}.gif`, {
+      type: blob.type || "image/gif",
+    });
+
+    await uploads.upload(roomId.value, file);
+  } catch {
+    error.value = "Could not attach that GIF.";
+  }
+}
+
 /** Writes a caption on one uploaded file, before the message is sent. */
 async function captionAttachment(attachmentId: string, caption: string) {
   try {
@@ -1330,7 +1362,7 @@ watch(roomId, load, { immediate: true });
             </button>
 
             <div v-if="choosingEmoji" class="absolute bottom-full left-0 z-20 mb-1">
-              <EmojiPicker v-model="choosingEmoji" @pick="insertEmoji" />
+              <EmojiPicker v-model="choosingEmoji" @pick="insertEmoji" @gif="attachGif" />
             </div>
           </div>
 
