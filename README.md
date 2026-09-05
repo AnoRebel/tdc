@@ -188,6 +188,12 @@ even a line saying it is private, because a preview is generated for anybody
 holding the link including somebody with no account here: naming one would
 confirm it exists.
 
+An invitation link previews as an invitation to the server and nothing more. It
+never names the channel — an invitation posted into a group chat is previewed
+for everybody in it, not only for the person being invited — and it previews
+identically whether it is valid, revoked or invented, so nobody can test
+invitations by pasting them somewhere that renders previews.
+
 ### Federation
 
 Off. Servers do not yet exchange events. The groundwork is in place — every

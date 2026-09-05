@@ -53,6 +53,9 @@ func (s *Server) socialMetaFor(ctx context.Context, urlPath string) *socialMeta 
 	case len(segments) == 2 && segments[0] == "rooms":
 		return s.roomMeta(ctx, segments[1])
 
+	case len(segments) == 2 && segments[0] == "invite":
+		return s.inviteMeta(ctx, segments[1])
+
 	case urlPath == "/" || urlPath == "":
 		// The server itself, which is the link somebody shares to invite
 		// people to it at all.
@@ -111,6 +114,38 @@ func (s *Server) roomMeta(ctx context.Context, raw string) *socialMeta {
 		Description: description,
 		URL:         s.canonicalURL("/rooms/" + roomID.String()),
 		Kind:        "website",
+	}
+}
+
+/*
+inviteMeta describes an invitation link, without disclosing anything.
+
+An invitation is posted into a chat application, which fetches the link to
+preview it — so whatever this returns is shown to everybody in that
+conversation, not only to the person being invited.
+
+That rules out naming the channel. An invitation to a private channel would
+otherwise announce its existence and its name to a room full of people who were
+not invited, which is exactly what a private channel is not.
+
+It also rules out saying whether the invitation is valid. A preview that read
+"expired" for an expired one and "join" for a working one would let anybody
+test invitations by pasting them and reading the preview — the same oracle the
+redemption endpoint refuses to be, reached another way.
+
+So every invitation link, valid or not, to a public channel or a private one,
+previews identically: the server's name and an invitation to join it. The
+secret in the URL is never looked up at all.
+*/
+func (s *Server) inviteMeta(_ context.Context, _ string) *socialMeta {
+	return &socialMeta{
+		Title:       "You have been invited to " + s.config.ServerName,
+		Description: "Open this link to accept the invitation.",
+		// Deliberately without the invitation itself: a canonical URL is
+		// copied and republished by whatever renders the preview, and a
+		// bearer credential should not be spread by being previewed.
+		URL:  s.canonicalURL("/"),
+		Kind: "website",
 	}
 }
 

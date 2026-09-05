@@ -179,3 +179,88 @@ func TestTheShellStillWorks(t *testing.T) {
 		t.Errorf("the shell has %d head tags after insertion", strings.Count(body, "<head>"))
 	}
 }
+
+/*
+TestInvitationLinksPreviewWithoutDisclosing is the rule that keeps an
+invitation private while still previewing.
+
+An invitation is posted into a chat application, which fetches the link to
+preview it. Whatever comes back is shown to everybody in that conversation —
+not only to the person being invited.
+
+So it must not name the channel: an invitation to a private one would otherwise
+announce its existence and its name to a room full of people who were not
+invited. And it must not say whether the invitation is valid, or anybody could
+test invitations by pasting them and reading the preview.
+*/
+func TestInvitationLinksPreviewWithoutDisclosing(t *testing.T) {
+	handler := newTestAPIWithWebRoot(t, webRoot(t))
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "bodi-ya-siri", "private")
+
+	issued := issueInvitation(t, handler, owner, roomID, nil)
+
+	// Fetched the way a chat application previews a link: no session.
+	recorder := call(t, handler, http.MethodGet, "/invite/"+issued.Token, nil, "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("previewing an invitation returned %d", recorder.Code)
+	}
+
+	body := recorder.Body.String()
+
+	// It previews as something rather than a blank box.
+	if !strings.Contains(body, `property="og:title"`) {
+		t.Errorf("an invitation link produced no preview:\n%s", truncate(body))
+	}
+
+	// But names nothing about where it leads.
+	if strings.Contains(body, "bodi-ya-siri") {
+		t.Error("an invitation preview named the private channel it admits somebody to")
+	}
+
+	// And the secret is not echoed into the page for whoever renders it.
+	if strings.Contains(body, issued.Token) {
+		t.Error("an invitation preview repeated the invitation's own secret")
+	}
+}
+
+/*
+TestValidAndInvalidInvitationsPreviewAlike closes the oracle a preview would
+otherwise open.
+
+If a working invitation previewed differently from a revoked one, anybody could
+test invitations by pasting them somewhere that renders previews — reaching the
+same oracle the redemption endpoint refuses to be, by another route.
+*/
+func TestValidAndInvalidInvitationsPreviewAlike(t *testing.T) {
+	handler := newTestAPIWithWebRoot(t, webRoot(t))
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "wageni", "private")
+
+	working := issueInvitation(t, handler, owner, roomID, nil)
+
+	revoked := issueInvitation(t, handler, owner, roomID, nil)
+	if r := call(t, handler, http.MethodDelete, "/api/invitations/"+revoked.ID, nil, owner); r.Code != http.StatusNoContent {
+		t.Fatalf("revoking returned %d", r.Code)
+	}
+
+	previews := map[string]string{}
+	for name, token := range map[string]string{
+		"working":       working.Token,
+		"revoked":       revoked.Token,
+		"never existed": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	} {
+		recorder := call(t, handler, http.MethodGet, "/invite/"+token, nil, "")
+		previews[name] = recorder.Body.String()
+	}
+
+	if previews["working"] != previews["revoked"] {
+		t.Error("a working invitation previews differently from a revoked one, " +
+			"which lets anybody test invitations by previewing them")
+	}
+	if previews["working"] != previews["never existed"] {
+		t.Error("a real invitation previews differently from one that never existed")
+	}
+}
