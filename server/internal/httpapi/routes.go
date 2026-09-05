@@ -153,6 +153,10 @@ func (s *Server) routes() {
 		requirePermission(authz.PermRoleManage))
 	admin.GET("/audit", s.handleReadAudit,
 		requirePermission(authz.PermServerViewAudit))
+
+	// Registered last: the catch-all serving the web application must not
+	// shadow an endpoint above it.
+	s.mountWebApp(s.config.WebRoot)
 }
 
 // healthResponse reports whether the server can serve requests.

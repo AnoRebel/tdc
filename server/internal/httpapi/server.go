@@ -45,6 +45,9 @@ type Config struct {
 	// exists for local development and must stay off in production, where
 	// error text can disclose internals to an unauthenticated caller.
 	ExposeInternalErrors bool
+	// WebRoot is the directory holding the built web application, served from
+	// this same origin. Empty in development.
+	WebRoot string
 
 	// ServerName is the operator-chosen display name.
 	ServerName string

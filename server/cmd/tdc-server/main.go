@@ -165,6 +165,7 @@ func run() error {
 		IdleTimeout:          cfg.Server.IdleTimeout,
 		ShutdownTimeout:      cfg.Server.ShutdownTimeout,
 		ExposeInternalErrors: cfg.Server.ExposeInternalErrors,
+		WebRoot:              cfg.Server.WebRoot,
 		ServerName:           cfg.Server.Name,
 		ServerDescription:    cfg.Server.Description,
 		CanonicalAddress:     cfg.Server.CanonicalAddress,

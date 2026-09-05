@@ -104,6 +104,16 @@ type ServerConfig struct {
 	IdleTimeout     time.Duration
 	ShutdownTimeout time.Duration
 
+	// WebRoot is the directory holding the built web application.
+	//
+	// Served from the same origin as the API, which is what keeps the session
+	// cookie first-party: a browser treats a cookie from a different host as
+	// third-party and, under SameSite=Lax, declines to send it back.
+	//
+	// Empty in development, where the application runs from its own dev
+	// server and reaches the API across origins.
+	WebRoot string
+
 	// ExposeInternalErrors includes internal error detail in responses. For
 	// local development only: error text can disclose internals to an
 	// unauthenticated caller.
@@ -170,9 +180,12 @@ func Default() Config {
 			IdleTimeout:          120 * time.Second,
 			ShutdownTimeout:      20 * time.Second,
 			ExposeInternalErrors: false,
-			SecureCookies:        true,
-			SessionLifetime:      30 * 24 * time.Hour,
-			Keepalive:            45 * time.Second,
+			// The image puts the built application here. Empty on a
+			// development machine, where the app runs from its own server.
+			WebRoot:         "/usr/share/tdc/web",
+			SecureCookies:   true,
+			SessionLifetime: 30 * 24 * time.Hour,
+			Keepalive:       45 * time.Second,
 		},
 		Database: DatabaseConfig{
 			URL:             "",

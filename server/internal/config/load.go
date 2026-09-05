@@ -179,6 +179,7 @@ func Load(path string) (Config, error) {
 	cfg.Server.IdleTimeout = l.duration("server.idle_timeout", d.Server.IdleTimeout)
 	cfg.Server.ShutdownTimeout = l.duration("server.shutdown_timeout", d.Server.ShutdownTimeout)
 	cfg.Server.ExposeInternalErrors = l.boolean("server.expose_internal_errors", d.Server.ExposeInternalErrors)
+	cfg.Server.WebRoot = l.str("server.web_root", d.Server.WebRoot)
 	cfg.Server.AllowedOrigins = l.list("server.allowed_origins")
 	cfg.Server.SecureCookies = l.boolean("server.secure_cookies", d.Server.SecureCookies)
 	cfg.Server.SessionLifetime = l.duration("server.session_lifetime", d.Server.SessionLifetime)

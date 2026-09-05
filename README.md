@@ -21,27 +21,30 @@ the open, rather than discovered when something stops working.
 
 ## Running it
 
-The server and its database:
-
 ```sh
 docker compose up -d
 ```
 
-That brings up the API on port 8080 and Postgres behind it. The database
-schema, the attachment store and the server's signing key are all created on
-first start; there is nothing to prepare beforehand.
+That is the whole product on <http://localhost:8080>: the web application and
+the API on one port, with Postgres behind them. The database schema, the
+attachment store and the server's signing key are created on first start, so
+there is nothing to prepare beforehand.
 
-The web app is not yet packaged into the compose file, so it runs from source:
+One origin is deliberate rather than convenient. The session cookie is HttpOnly
+and SameSite=Lax; served from a different host, a browser treats it as
+third-party and declines to send it back. It also means no CORS preflight on
+every request, and one port to expose.
+
+For development, the web application runs from its own server with hot
+reloading:
 
 ```sh
 bun install
 bun run --cwd apps/web dev
 ```
 
-It serves on port 3000 and talks to the API on 8080, which is what the
-`TDC_SERVER_ALLOWED_ORIGINS` line in `compose.yaml` permits. A single-origin
-deployment, where the built app is served by the same host as the API, will not
-need it.
+That serves on port 3000 and reaches the API on 8080 — two origins, which is
+what the `TDC_SERVER_ALLOWED_ORIGINS` line in `compose.yaml` allows for.
 
 Opening the app on a server with no accounts leads to first-run setup, which
 creates the administrator. That route closes as soon as an account exists, so

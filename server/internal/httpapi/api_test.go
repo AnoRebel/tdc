@@ -54,6 +54,28 @@ func newTestAPIWithScanner(t *testing.T, address string, failOpen bool) http.Han
 	})
 }
 
+// webRootForTest is set by newTestAPIWithWebRoot for the handler it builds.
+//
+// A package-level value rather than another parameter, because threading one
+// through would change four call sites for a case only these tests need.
+var webRootForTest string
+
+/*
+newTestAPIWithWebRoot builds a handler that also serves a web application.
+
+Used by the tests covering static serving, where the question is how file
+requests and API requests share one origin.
+*/
+func newTestAPIWithWebRoot(t *testing.T, root string) http.Handler {
+	t.Helper()
+
+	previous := webRootForTest
+	webRootForTest = root
+	t.Cleanup(func() { webRootForTest = previous })
+
+	return newTestAPIConfigured(t, nil)
+}
+
 func newTestAPIConfigured(
 	t *testing.T,
 	origins []string,
@@ -105,6 +127,7 @@ func newTestAPIConfigured(
 		ServerName:      "Test Server",
 		DefaultLanguage: "en",
 		SessionLifetime: time.Hour,
+		WebRoot:         webRootForTest,
 		// Off so the test client's cookie jar behaves as a browser would over
 		// plain HTTP.
 		SecureCookies:  false,

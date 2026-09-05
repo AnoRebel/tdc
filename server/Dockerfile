@@ -1,3 +1,29 @@
+# Build the web application.
+#
+# A separate stage so its toolchain never reaches the final image: the result
+# is a directory of static files, and nothing about Bun or Node is needed to
+# serve them.
+FROM oven/bun:1-alpine AS web
+
+WORKDIR /src
+
+# The workspace's manifests first, so an install is cached independently of
+# source changes.
+COPY package.json bun.lock ./
+COPY apps/web/package.json apps/web/
+COPY packages/types/package.json packages/types/
+# --ignore-scripts because postinstall installs git hooks, which is a
+# developer convenience that needs git and has no meaning in an image.
+RUN bun install --frozen-lockfile --ignore-scripts
+
+COPY packages/ packages/
+COPY apps/web/ apps/web/
+
+# Generated rather than built: the application is client-rendered, so this
+# produces static files with no server of its own — which is what lets the Go
+# server serve them from the same origin as the API.
+RUN cd apps/web && bun run generate
+
 # Build the server.
 #
 # Built from the repository root so the build context includes the VERSION
@@ -44,6 +70,12 @@ RUN apk add --no-cache ca-certificates tzdata \
     && chown -R tdc:tdc /var/lib/tdc
 
 COPY --from=build /out/tdc-server /usr/local/bin/tdc-server
+
+# The web application, served by the server from this same origin. Same origin
+# is what keeps the session cookie first-party: served from another host, a
+# browser treats it as third-party and, under SameSite=Lax, declines to send it
+# back.
+COPY --from=web /src/apps/web/.output/public /usr/share/tdc/web
 
 # Runs unprivileged: the server needs no root capability, and an unprivileged
 # container limits what a compromise reaches.
