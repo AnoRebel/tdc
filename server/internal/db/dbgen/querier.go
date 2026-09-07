@@ -53,6 +53,12 @@ type Querier interface {
 	// Counts what still points at a stored object, so the bytes are only removed
 	// once nothing references them.
 	CountAttachmentsWithStorageKey(ctx context.Context, storageKey string) (int64, error)
+	// How much a retention pass would remove, and the span it covers.
+	//
+	// Read before deleting so the entry recording the removal can say what went:
+	// "entries older than a year were removed" is not an account of anything, and
+	// afterwards there is nothing left to count.
+	CountAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (CountAuditEntriesBeforeRow, error)
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
@@ -130,6 +136,13 @@ type Querier interface {
 	// Redacts rather than deletes, as retention does: the event stays so the
 	// sequence has no holes and the placeholder shows something was there.
 	ExpireMessagesByLifetime(ctx context.Context, batchSize int32) ([]ExpireMessagesByLifetimeRow, error)
+	// The log in order, for export.
+	//
+	// Ascending by id and paged by the last id seen rather than by offset: an
+	// export of a large log walks it in batches, and OFFSET makes each batch
+	// re-scan everything before it. The id is the order entries were written, so
+	// an export is the log as it happened.
+	ExportAuditEntries(ctx context.Context, arg ExportAuditEntriesParams) ([]AuditEntry, error)
 	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)

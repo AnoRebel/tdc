@@ -17,3 +17,30 @@ LIMIT $1 OFFSET $2;
 
 -- name: DeleteAuditEntriesBefore :execrows
 DELETE FROM audit_entries WHERE occurred_at < $1;
+
+-- name: ExportAuditEntries :many
+-- The log in order, for export.
+--
+-- Ascending by id and paged by the last id seen rather than by offset: an
+-- export of a large log walks it in batches, and OFFSET makes each batch
+-- re-scan everything before it. The id is the order entries were written, so
+-- an export is the log as it happened.
+SELECT * FROM audit_entries
+WHERE id > @after::bigint
+  AND (sqlc.narg('since')::timestamptz IS NULL OR occurred_at >= sqlc.narg('since')::timestamptz)
+  AND (sqlc.narg('until')::timestamptz IS NULL OR occurred_at <= sqlc.narg('until')::timestamptz)
+ORDER BY id
+LIMIT $1;
+
+-- name: CountAuditEntriesBefore :one
+-- How much a retention pass would remove, and the span it covers.
+--
+-- Read before deleting so the entry recording the removal can say what went:
+-- "entries older than a year were removed" is not an account of anything, and
+-- afterwards there is nothing left to count.
+SELECT
+    COUNT(*) AS entries,
+    MIN(occurred_at) AS earliest,
+    MAX(occurred_at) AS latest
+FROM audit_entries
+WHERE occurred_at < $1;

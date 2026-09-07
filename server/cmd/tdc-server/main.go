@@ -148,16 +148,18 @@ func run() error {
 	attachmentService := newAttachmentService(pool, objectStore, cfg, log)
 	moderationService := moderation.NewService(pool, log)
 	settingsService := settings.NewService(pool, log)
+	auditRecorder := audit.NewRecorder(queries, log)
 
 	// Content past its retention period, removed on the same principle as
 	// lapsed presence: a policy nothing enforces is a policy that misleads the
 	// people it was disclosed to.
-	go expirePeriodically(ctx, moderationService, settingsService, attachmentService, log)
+	go expirePeriodically(ctx, moderationService, settingsService,
+		attachmentService, auditRecorder, log)
 
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
-		Audit:    audit.NewRecorder(queries, log),
+		Audit:    auditRecorder,
 		Limiter:  cache.NewLimiter(memoryCache),
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
@@ -387,6 +389,7 @@ func expirePeriodically(
 	moderationService *moderation.Service,
 	settingsService *settings.Service,
 	attachmentService *attachments.Service,
+	auditRecorder *audit.Recorder,
 	log *slog.Logger,
 ) {
 	ticker := time.NewTicker(retentionInterval)
@@ -437,6 +440,27 @@ func expirePeriodically(
 			}
 			if byLifetime > 0 {
 				log.Info("expired messages by their own lifetime", "messages", byLifetime)
+			}
+
+			/*
+				Audit entries past their own retention, which is a separate
+				policy from the one governing messages.
+
+				Kept indefinitely unless an operator says otherwise: a log that
+				quietly discarded its own history would be one where the answer
+				to a question depends on how promptly somebody thought to ask.
+			*/
+			auditDays := settingsService.Int(ctx, settings.AuditRetentionDays)
+			if auditDays > 0 {
+				pruned, err := auditRecorder.Prune(ctx,
+					time.Duration(auditDays)*24*time.Hour)
+				if err != nil && ctx.Err() == nil {
+					log.Error("pruning the audit log failed",
+						slog.String("error", err.Error()))
+				}
+				if pruned > 0 {
+					log.Info("pruned audit entries", "entries", pruned)
+				}
 			}
 		}
 	}

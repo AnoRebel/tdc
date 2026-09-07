@@ -2,6 +2,7 @@ package audit_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -289,6 +290,137 @@ func (failingStore) AppendAuditEntry(context.Context, dbgen.AppendAuditEntryPara
 func (failingStore) ListAuditEntries(context.Context, dbgen.ListAuditEntriesParams) ([]dbgen.AuditEntry, error) {
 	return nil, errors.New("database unavailable")
 }
+func (failingStore) CountAuditEntriesBefore(context.Context, time.Time) (dbgen.CountAuditEntriesBeforeRow, error) {
+	return dbgen.CountAuditEntriesBeforeRow{}, errors.New("database unavailable")
+}
+func (failingStore) ExportAuditEntries(context.Context, dbgen.ExportAuditEntriesParams) ([]dbgen.AuditEntry, error) {
+	return nil, errors.New("database unavailable")
+}
 func (failingStore) DeleteAuditEntriesBefore(context.Context, time.Time) (int64, error) {
 	return 0, errors.New("database unavailable")
+}
+
+/*
+TestPruningRecordsWhatItRemoved is the rule that keeps a gap in the log
+explained.
+
+A log that silently loses its oldest entries is a log whose gaps are
+indistinguishable from entries that were never written — which is the one thing
+an audit log must not be. The entry recording a removal has to say how much
+went and what period it covered, or it explains nothing: "entries older than a
+year were removed" is not an account of anything.
+*/
+func TestPruningRecordsWhatItRemoved(t *testing.T) {
+	ctx := context.Background()
+	recorder, _ := newTestRecorder(t)
+
+	// Something old enough to be pruned.
+	if err := recorder.Record(ctx, audit.Entry{
+		ActorLabel: "amina", Action: audit.ActionConfigChanged,
+	}); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+	backdateAuditEntries(t, 400*24*time.Hour)
+
+	removed, err := recorder.Prune(ctx, 30*24*time.Hour)
+	if err != nil {
+		t.Fatalf("Prune: %v", err)
+	}
+	if removed == 0 {
+		t.Fatal("nothing was pruned although an entry was old enough")
+	}
+
+	entries, err := recorder.List(ctx, audit.Query{Limit: 20})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+
+	found := false
+	for _, entry := range entries {
+		if audit.Action(entry.Action) != audit.ActionAuditPruned {
+			continue
+		}
+		found = true
+
+		var detail map[string]any
+		if err := json.Unmarshal(entry.Detail, &detail); err != nil {
+			t.Fatalf("decoding the detail: %v", err)
+		}
+
+		if detail["removed"] == nil {
+			t.Error("the entry does not say how many were removed")
+		}
+		/*
+			The span, which is what makes the gap legible. Without it a reader
+			knows only that something went, which is what they knew from the
+			gap itself.
+		*/
+		if detail["earliest"] == nil || detail["latest"] == nil {
+			t.Errorf("the entry does not say what period the gap covers: %v", detail)
+		}
+	}
+
+	if !found {
+		t.Error("pruning the audit log left no record of itself, so the gap " +
+			"it made is unexplained")
+	}
+}
+
+// TestPruningNothingRecordsNothing keeps the log from filling with entries
+// about passes that removed nothing.
+func TestPruningNothingRecordsNothing(t *testing.T) {
+	ctx := context.Background()
+	recorder, _ := newTestRecorder(t)
+
+	if err := recorder.Record(ctx, audit.Entry{
+		ActorLabel: "amina", Action: audit.ActionConfigChanged,
+	}); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	// Nothing is old enough.
+	if removed, err := recorder.Prune(ctx, 365*24*time.Hour); err != nil || removed != 0 {
+		t.Fatalf("Prune removed %d, err %v", removed, err)
+	}
+
+	entries, err := recorder.List(ctx, audit.Query{Limit: 20})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, entry := range entries {
+		if audit.Action(entry.Action) == audit.ActionAuditPruned {
+			t.Error("a pass that removed nothing recorded that it had")
+		}
+	}
+}
+
+/*
+backdateAuditEntries moves every entry into the past.
+
+A test cannot wait a year for an entry to become prunable, and making the
+retention configurable down to milliseconds would test a path production never
+takes. Moving the clock on the rows is the honest alternative.
+
+Opens its own connection to the same database the recorder uses, since the
+recorder holds its pool privately and a second one behaves identically for a
+statement like this.
+*/
+func backdateAuditEntries(t *testing.T, age time.Duration) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	pool, err := db.Open(ctx, db.Config{URL: dbtest.URL(t, "audit")}, logger)
+	if err != nil {
+		t.Fatalf("opening the test database: %v", err)
+	}
+	defer pool.Close()
+
+	if _, err := pool.Exec(ctx,
+		`UPDATE audit_entries SET occurred_at = occurred_at - $1::interval`,
+		age.String()); err != nil {
+		t.Fatalf("backdating audit entries: %v", err)
+	}
 }

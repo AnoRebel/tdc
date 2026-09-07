@@ -57,6 +57,33 @@ func (q *Queries) AppendAuditEntry(ctx context.Context, arg AppendAuditEntryPara
 	return i, err
 }
 
+const countAuditEntriesBefore = `-- name: CountAuditEntriesBefore :one
+SELECT
+    COUNT(*) AS entries,
+    MIN(occurred_at) AS earliest,
+    MAX(occurred_at) AS latest
+FROM audit_entries
+WHERE occurred_at < $1
+`
+
+type CountAuditEntriesBeforeRow struct {
+	Entries  int64
+	Earliest interface{}
+	Latest   interface{}
+}
+
+// How much a retention pass would remove, and the span it covers.
+//
+// Read before deleting so the entry recording the removal can say what went:
+// "entries older than a year were removed" is not an account of anything, and
+// afterwards there is nothing left to count.
+func (q *Queries) CountAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (CountAuditEntriesBeforeRow, error) {
+	row := q.db.QueryRow(ctx, countAuditEntriesBefore, occurredAt)
+	var i CountAuditEntriesBeforeRow
+	err := row.Scan(&i.Entries, &i.Earliest, &i.Latest)
+	return i, err
+}
+
 const deleteAuditEntriesBefore = `-- name: DeleteAuditEntriesBefore :execrows
 DELETE FROM audit_entries WHERE occurred_at < $1
 `
@@ -67,6 +94,64 @@ func (q *Queries) DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const exportAuditEntries = `-- name: ExportAuditEntries :many
+SELECT id, occurred_at, actor_id, actor_label, action, target_kind, target_id, source_ip, user_agent, detail FROM audit_entries
+WHERE id > $2::bigint
+  AND ($3::timestamptz IS NULL OR occurred_at >= $3::timestamptz)
+  AND ($4::timestamptz IS NULL OR occurred_at <= $4::timestamptz)
+ORDER BY id
+LIMIT $1
+`
+
+type ExportAuditEntriesParams struct {
+	Limit int32
+	After int64
+	Since *time.Time
+	Until *time.Time
+}
+
+// The log in order, for export.
+//
+// Ascending by id and paged by the last id seen rather than by offset: an
+// export of a large log walks it in batches, and OFFSET makes each batch
+// re-scan everything before it. The id is the order entries were written, so
+// an export is the log as it happened.
+func (q *Queries) ExportAuditEntries(ctx context.Context, arg ExportAuditEntriesParams) ([]AuditEntry, error) {
+	rows, err := q.db.Query(ctx, exportAuditEntries,
+		arg.Limit,
+		arg.After,
+		arg.Since,
+		arg.Until,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AuditEntry{}
+	for rows.Next() {
+		var i AuditEntry
+		if err := rows.Scan(
+			&i.ID,
+			&i.OccurredAt,
+			&i.ActorID,
+			&i.ActorLabel,
+			&i.Action,
+			&i.TargetKind,
+			&i.TargetID,
+			&i.SourceIp,
+			&i.UserAgent,
+			&i.Detail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAuditEntries = `-- name: ListAuditEntries :many

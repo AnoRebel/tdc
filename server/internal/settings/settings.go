@@ -108,6 +108,18 @@ const (
 		period overrides this one.
 	*/
 	RetentionSeconds Key = "moderation.retention_seconds"
+
+	/*
+		AuditRetentionDays is how long audit entries are kept, or zero to keep
+		them indefinitely.
+
+		Zero by default, and deliberately so. An audit log exists to answer
+		questions asked long after the fact, and a server that quietly
+		discarded its own history would be one where the answer depends on how
+		promptly somebody thought to look. An operator with a legal obligation
+		to discard it can set one.
+	*/
+	AuditRetentionDays Key = "audit.retention_days"
 )
 
 // definition describes one setting: how to validate it, and what it means when
@@ -170,6 +182,11 @@ var definitions = map[Key]definition{
 			}
 			return nil
 		},
+	},
+	AuditRetentionDays: {
+		fallback:    "0",
+		description: "How long audit entries are kept, in days. 0 keeps them indefinitely.",
+		validate:    nonNegative,
 	},
 	RetentionSeconds: {
 		fallback:    "0",

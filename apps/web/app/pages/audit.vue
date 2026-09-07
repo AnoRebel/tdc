@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
-import { ArrowLeft, ShieldAlert } from "lucide-vue-next";
+import { ArrowLeft, Download, ShieldAlert } from "lucide-vue-next";
 
 /**
  * The audit log.
@@ -41,6 +41,15 @@ try {
   }
 }
 
+/*
+ * Where the export lives.
+ *
+ * A plain link rather than a fetch: the browser streams it straight to a file,
+ * where fetching would hold the whole log in memory to hand it back — which is
+ * the thing the newline-delimited format exists to avoid.
+ */
+const exportUrl = computed(() => `${useRuntimeConfig().public.apiBase}/api/admin/audit/export`);
+
 function when(value: string): string {
   return new Date(value).toLocaleString();
 }
@@ -56,6 +65,13 @@ function when(value: string): string {
       <span v-if="!error" class="tabular ml-auto text-xs text-muted-foreground">
         {{ entries.length }} most recent
       </span>
+
+      <!-- The whole log, not the page above it. Kept beside the listing
+           because an operator who wants a copy is usually looking at it. -->
+      <a v-if="!error" :href="exportUrl" download="audit-log.ndjson" class="btn btn-outline">
+        <Download class="size-3.5" />
+        Export
+      </a>
     </header>
 
     <div class="max-w-4xl px-4 py-6">

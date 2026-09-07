@@ -244,6 +244,11 @@ func (s *Server) routes() {
 	// governs both what is advertised and what is accepted.
 	// The startup configuration, read-only: these come from the environment or
 	// the configuration file and cannot change without a restart.
+	// The whole log, as newline-delimited JSON. Separate from reading a page
+	// of it because taking a copy is a different act.
+	admin.GET("/audit/export", s.handleExportAudit,
+		requirePermission(authz.PermServerViewAudit))
+
 	admin.GET("/configuration", s.handleInspectConfiguration,
 		requirePermission(authz.PermServerConfigure))
 

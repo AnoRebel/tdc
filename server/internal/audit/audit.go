@@ -76,6 +76,14 @@ const (
 	// same trail deletion gets.
 	ActionMessageLifetimeSet Action = "message.lifetime_set"
 
+	// ActionAuditPruned records the log removing its own oldest entries, so a
+	// gap in it is explained rather than merely present.
+	ActionAuditPruned Action = "server.audit.pruned"
+
+	// ActionAuditExported records somebody taking a copy of the whole log,
+	// which is more worth accounting for than reading a page of it.
+	ActionAuditExported Action = "server.audit.exported"
+
 	ActionRoleCreated       Action = "role.created"
 	ActionRoleDeleted       Action = "role.deleted"
 	ActionRoleAssigned      Action = "role.assigned"
@@ -117,6 +125,10 @@ type Store interface {
 	AppendAuditEntry(ctx context.Context, arg dbgen.AppendAuditEntryParams) (dbgen.AuditEntry, error)
 	ListAuditEntries(ctx context.Context, arg dbgen.ListAuditEntriesParams) ([]dbgen.AuditEntry, error)
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
+	// Reading the span before removing it is what lets the entry recording a
+	// removal say what the gap covers.
+	CountAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (dbgen.CountAuditEntriesBeforeRow, error)
+	ExportAuditEntries(ctx context.Context, arg dbgen.ExportAuditEntriesParams) ([]dbgen.AuditEntry, error)
 }
 
 // Recorder appends entries to the audit log.
@@ -255,23 +267,106 @@ func (r *Recorder) Prune(ctx context.Context, retention time.Duration) (int64, e
 	}
 
 	cutoff := time.Now().Add(-retention)
+
+	/*
+		Measured before it is removed.
+
+		The entry that records the removal has to say what went, and afterwards
+		there is nothing left to count. "Entries older than a year were
+		removed" is not an account of anything — a reader finding a gap needs
+		to know how many entries it holds and what period it spans, or the gap
+		is exactly as unexplained as it would have been with no entry at all.
+	*/
+	span, err := r.store.CountAuditEntriesBefore(ctx, cutoff)
+	if err != nil {
+		return 0, fmt.Errorf("measure audit entries to prune: %w", err)
+	}
+
 	removed, err := r.store.DeleteAuditEntriesBefore(ctx, cutoff)
 	if err != nil {
 		return 0, fmt.Errorf("prune audit entries: %w", err)
 	}
 
 	if removed > 0 {
+		detail := map[string]any{
+			"removed": removed,
+			"before":  cutoff.Format(time.RFC3339),
+		}
+		// The span the gap covers, so a reader can tell what is missing rather
+		// than only that something is.
+		if earliest, ok := asTime(span.Earliest); ok {
+			detail["earliest"] = earliest.Format(time.RFC3339)
+		}
+		if latest, ok := asTime(span.Latest); ok {
+			detail["latest"] = latest.Format(time.RFC3339)
+		}
+
 		if err := r.Record(ctx, Entry{
 			ActorLabel: "system",
-			Action:     "server.audit.pruned",
-			Detail: map[string]any{
-				"removed": removed,
-				"before":  cutoff.Format(time.RFC3339),
-			},
+			Action:     ActionAuditPruned,
+			Detail:     detail,
 		}); err != nil {
 			return removed, err
 		}
 	}
 
 	return removed, nil
+}
+
+/*
+Export walks the whole log in order, oldest first.
+
+Paged by the last identifier seen rather than by offset: an export of a large
+log walks it in batches, and OFFSET makes each batch re-scan everything before
+it. The identifier is the order entries were written, so an export is the log
+as it happened.
+
+Returns the entries and the identifier to continue from, which is zero when
+there are no more.
+*/
+func (r *Recorder) Export(ctx context.Context, after int64, limit int32, query Query) ([]dbgen.AuditEntry, int64, error) {
+	if limit <= 0 || limit > 5000 {
+		limit = 1000
+	}
+
+	entries, err := r.store.ExportAuditEntries(ctx, dbgen.ExportAuditEntriesParams{
+		Limit: limit,
+		After: after,
+		Since: query.Since,
+		Until: query.Until,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("export audit entries: %w", err)
+	}
+
+	if len(entries) < int(limit) {
+		// The last page. Zero rather than the last identifier, so a caller
+		// looping until it is zero terminates rather than asking once more for
+		// nothing.
+		return entries, 0, nil
+	}
+	return entries, entries[len(entries)-1].ID, nil
+}
+
+/*
+asTime reads a value sqlc could not give a concrete type.
+
+MIN and MAX over a nullable column come back as interface{}, because the
+generator cannot tell from the query alone that they are timestamps. Asserting
+here rather than changing the query keeps the SQL saying what it means, and a
+value that is not a time is treated as absent — which for an aggregate over no
+rows is exactly what it is.
+*/
+func asTime(value any) (time.Time, bool) {
+	switch typed := value.(type) {
+	case time.Time:
+		return typed, true
+	case *time.Time:
+		if typed == nil {
+			return time.Time{}, false
+		}
+		return *typed, true
+	default:
+		return time.Time{}, false
+	}
 }
