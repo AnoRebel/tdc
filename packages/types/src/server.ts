@@ -54,11 +54,19 @@ export type Capability =
   | "link-previews"
   | "web-push"
   | "disposable-chats"
-  | "directory"
   | "projects"
   // Searching a third-party GIF library, which needs an operator's own API
   // key with that provider. Absent on a server that has not configured one.
-  | "gif-search";
+  | "gif-search"
+  // Listing public channels to somebody who has not joined them. A server run
+  // for one organisation may want every channel found only by invitation.
+  | "public-directory"
+  // Issuing invitation links and codes.
+  | "invitations"
+  // Writing a message now and sending it later.
+  | "scheduled-messages"
+  // Uploading files and images.
+  | "attachments";
 
 /** Health of a running server, for operators and uptime checks. */
 export interface HealthStatus {
@@ -105,4 +113,26 @@ export interface ConnectedServer {
   reachable: boolean;
   /** How many of its rooms this person may browse, when it publishes any. */
   publishedRoomCount?: number;
+}
+
+/**
+ * A capability toggle as an administrator sees it.
+ *
+ * Distinct from Capability, which is what a server advertises to everybody.
+ * This is the operator's view: what the switch is set to, what it would be if
+ * they had not touched it, and whether it can work at all.
+ */
+export interface FeatureToggle {
+  name: Capability;
+  description: string;
+  /** What the operator has chosen, or the default if they have not. */
+  enabled: boolean;
+  /** What this feature is when nobody has chosen. */
+  default: boolean;
+  /**
+   * False when a feature is switched on but cannot work — GIF search with no
+   * provider configured, say. The toggle is intent; this is whether the intent
+   * can be honoured.
+   */
+  available: boolean;
 }

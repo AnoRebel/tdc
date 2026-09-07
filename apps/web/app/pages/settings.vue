@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import type { ServerStatus, Session } from "@tdc/types";
 import { isApiError } from "@tdc/types";
-import { ArrowLeft, Flag, LogOut, Monitor, ScrollText, ShieldCheck, UserX } from "lucide-vue-next";
+import {
+  ArrowLeft,
+  Flag,
+  LogOut,
+  Monitor,
+  ScrollText,
+  ShieldCheck,
+  SlidersHorizontal,
+  UserX,
+} from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
 
 /** Account settings: identity, status, signed-in devices. */
@@ -293,9 +302,15 @@ function deviceName(userAgent: string): string {
         </ul>
       </section>
 
-      <section v-if="can('server.audit.read') || can('moderation.review')">
+      <section
+        v-if="can('server.audit.read') || can('moderation.review') || can('server.configure')"
+      >
         <h2 class="text-sm font-semibold">Administration</h2>
         <div class="mt-3 flex flex-wrap gap-2">
+          <NuxtLink v-if="can('server.configure')" to="/admin" class="btn btn-outline">
+            <SlidersHorizontal class="size-3.5" />
+            Server settings
+          </NuxtLink>
           <NuxtLink v-if="can('moderation.review')" to="/reports" class="btn btn-outline">
             <Flag class="size-3.5" />
             Reports

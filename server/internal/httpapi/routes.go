@@ -1,12 +1,14 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
+	"github.com/AnoRebel/tdc/server/internal/settings"
 )
 
 // routes mounts the endpoints available before any capability is configured.
@@ -67,7 +69,8 @@ func (s *Server) routes() {
 	// decision rather than any member's.
 	rooms.GET("/:id/invitations", s.handleListChannelInvitations)
 	rooms.POST("/:id/invitations", s.handleIssueChannelInvitation,
-		requirePermission(authz.PermChannelInvite))
+		requirePermission(authz.PermChannelInvite),
+		s.requireFeature(settings.FeatureInvitations))
 
 	// Reactions. Read for the whole timeline at once, for the same reason
 	// thread counts are: a request per message is a request per message drawn.
@@ -87,7 +90,8 @@ func (s *Server) routes() {
 	rooms.POST("/:id/messages/:eventId/forward", s.handleForward)
 
 	// Messages written now and sent later.
-	rooms.POST("/:id/scheduled", s.handleScheduleMessage)
+	rooms.POST("/:id/scheduled", s.handleScheduleMessage,
+		s.requireFeature(settings.FeatureScheduledMessages))
 	rooms.GET("/:id/threads/:eventId", s.handleThread)
 	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread)
 	rooms.POST("/:id/read", s.handleMarkRead)
@@ -97,7 +101,10 @@ func (s *Server) routes() {
 
 	// Attachments. Uploaded to a room before the message that carries them, so
 	// a refusal costs only the upload and a failed send does not lose the file.
-	rooms.POST("/:id/attachments", s.handleUploadAttachment)
+	// Only uploading is gated. Turning attachments off should stop new files
+	// arriving, not hide the ones people already sent and still refer to.
+	rooms.POST("/:id/attachments", s.handleUploadAttachment,
+		s.requireFeature(settings.FeatureAttachments))
 	s.echo.GET("/api/attachments/limits", s.handleAttachmentLimits, requireAuthentication)
 	s.echo.GET("/api/attachments/:id", s.handleDownloadAttachment, requireAuthentication)
 	s.echo.GET("/api/attachments/:id/preview", s.handleAttachmentPreview, requireAuthentication)
@@ -154,11 +161,17 @@ func (s *Server) routes() {
 	// else's API on the operator's key.
 	// Redeeming an invitation. Authenticated: an invitation admits an account
 	// to something, so there has to be an account.
-	s.echo.POST("/api/invitations/redeem", s.handleRedeemInvitation, requireAuthentication)
+	// Redeeming is gated alongside issuing: turning invitations off leaves
+	// outstanding ones unusable, which is the point of the switch rather than
+	// an oversight — an operator reaching for it wants the flow stopped now,
+	// not once the last issued link expires.
+	s.echo.POST("/api/invitations/redeem", s.handleRedeemInvitation, requireAuthentication,
+		s.requireFeature(settings.FeatureInvitations))
 	s.echo.DELETE("/api/invitations/:id", s.handleRevokeInvitation, requireAuthentication,
 		requirePermission(authz.PermChannelInvite))
 
-	s.echo.GET("/api/gifs", s.handleSearchGifs, requireAuthentication)
+	s.echo.GET("/api/gifs", s.handleSearchGifs, requireAuthentication,
+		s.requireFeature(settings.FeatureGifSearch))
 
 	s.echo.GET("/api/search", s.handleSearch, requireAuthentication)
 	// One box, one question: messages, conversations and people together,
@@ -167,7 +180,8 @@ func (s *Server) routes() {
 
 	// Link previews. A POST because the link is private: a query string ends
 	// up in access logs, proxy logs and browser history, and a body does not.
-	s.echo.POST("/api/previews", s.handlePreviewLink, requireAuthentication)
+	s.echo.POST("/api/previews", s.handlePreviewLink, requireAuthentication,
+		s.requireFeature(settings.FeatureLinkPreviews))
 	me.PUT("/preferences/link-previews", s.handleSetPreviewPreference)
 
 	// Direct conversations, which are found by their participants rather than
@@ -199,7 +213,8 @@ func (s *Server) routes() {
 	admin.GET("/invitations", s.handleListServerInvitations,
 		requirePermission(authz.PermUserInvite))
 	admin.POST("/invitations", s.handleIssueServerInvitation,
-		requirePermission(authz.PermUserInvite))
+		requirePermission(authz.PermUserInvite),
+		s.requireFeature(settings.FeatureInvitations))
 
 	// Suspension, which is server-wide where a ban is confined to a channel.
 	admin.POST("/users/:id/suspend", s.handleSuspendUser,
@@ -212,6 +227,14 @@ func (s *Server) routes() {
 	admin.GET("/settings", s.handleListSettings,
 		requirePermission(authz.PermServerConfigure))
 	admin.PUT("/settings/:key", s.handleSetSetting,
+		requirePermission(authz.PermServerConfigure))
+
+	// Feature toggles. Listed and changed separately from settings because a
+	// toggle is on or off where a setting is free text, and because one
+	// governs both what is advertised and what is accepted.
+	admin.GET("/features", s.handleListFeatures,
+		requirePermission(authz.PermServerConfigure))
+	admin.PUT("/features/:feature", s.handleSetFeature,
 		requirePermission(authz.PermServerConfigure))
 
 	// The other half of a limit: what is being used against what is allowed,
@@ -283,15 +306,36 @@ capabilities lists the optional features this server actually offers.
 Advertised rather than assumed, because every one of these depends on an
 operator's choice: a client that offered GIF search on a server without a
 provider would show a control that always fails.
-*/
-func (s *Server) capabilities() []string {
-	capabilities := []string{}
 
-	if s.gifs != nil && s.gifs.Enabled() {
-		capabilities = append(capabilities, "gif-search")
+Read from the feature toggles — the same values requireFeature enforces on. A
+capability in this list is therefore one the server will actually accept
+requests for, and one absent from it will be refused. Two separate lists would
+drift, and the direction they drift in is the dangerous one: a feature
+advertised as off that still works.
+
+A toggle is necessary but not sufficient. GIF search and link previews also
+need something configured — a provider, a fetcher — and a server with the
+toggle on but no provider would advertise a control that always fails. So both
+must hold.
+*/
+func (s *Server) capabilities(ctx context.Context) []string {
+	if s.settings == nil {
+		return []string{}
 	}
-	if s.unfurl != nil && s.unfurl.Enabled() {
-		capabilities = append(capabilities, "link-previews")
+
+	capabilities := []string{}
+	for _, feature := range s.settings.EnabledSet(ctx) {
+		switch settings.Feature(feature) {
+		case settings.FeatureGifSearch:
+			if s.gifs == nil || !s.gifs.Enabled() {
+				continue
+			}
+		case settings.FeatureLinkPreviews:
+			if s.unfurl == nil || !s.unfurl.Enabled() {
+				continue
+			}
+		}
+		capabilities = append(capabilities, feature)
 	}
 
 	return capabilities
@@ -308,7 +352,7 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		// Optional capabilities are advertised as they are built, so a client
 		// adapts to what this server actually offers rather than presenting a
 		// control that cannot work.
-		Capabilities:    s.capabilities(),
+		Capabilities:    s.capabilities(c.Request().Context()),
 		DefaultLanguage: s.config.DefaultLanguage,
 	})
 }

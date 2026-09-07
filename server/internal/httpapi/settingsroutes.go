@@ -94,3 +94,96 @@ func (s *Server) handleSetSetting(c *echo.Context) error {
 
 	return c.NoContent(http.StatusNoContent)
 }
+
+type featureResponse struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Enabled     bool   `json:"enabled"`
+	// Default is what this feature is when nobody has chosen, so an operator
+	// can tell a deliberate change from an inherited one.
+	Default bool `json:"default"`
+	// Available is false when a feature is switched on but cannot work — GIF
+	// search with no provider configured, say. The toggle is the operator's
+	// intent; this is whether the intent can be honoured, and a settings page
+	// that showed only the first would report a working feature that is not.
+	Available bool `json:"available"`
+}
+
+func (s *Server) handleListFeatures(c *echo.Context) error {
+	ctx := c.Request().Context()
+
+	response := make([]featureResponse, 0, len(settings.Features()))
+	for _, feature := range settings.Features() {
+		description, byDefault, _ := settings.DescribeFeature(feature)
+
+		response = append(response, featureResponse{
+			Name:        string(feature),
+			Description: description,
+			Enabled:     s.settings.Enabled(ctx, feature),
+			Default:     byDefault,
+			Available:   s.featureAvailable(feature),
+		})
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+/*
+featureAvailable reports whether a feature could work if switched on.
+
+Everything a server does by itself is always available. The two that reach
+another service are available only once an operator has configured one, which
+is why the toggle alone does not decide what is advertised.
+*/
+func (s *Server) featureAvailable(feature settings.Feature) bool {
+	switch feature {
+	case settings.FeatureGifSearch:
+		return s.gifs != nil && s.gifs.Enabled()
+	case settings.FeatureLinkPreviews:
+		return s.unfurl != nil && s.unfurl.Enabled()
+	default:
+		return true
+	}
+}
+
+type setFeatureRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+func (s *Server) handleSetFeature(c *echo.Context) error {
+	user, _ := currentUser(c)
+
+	var request setFeatureRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	feature := settings.Feature(c.Param("feature"))
+
+	err := s.settings.SetFeature(c.Request().Context(), feature, request.Enabled,
+		s.rooms.UserAddress(user.Username))
+
+	switch {
+	case errors.Is(err, settings.ErrUnknownFeature):
+		return echo.NewHTTPError(http.StatusNotFound, "this server has no such feature")
+	case err != nil:
+		return err
+	}
+
+	// Turning a capability off for everybody is a change somebody will later
+	// need to account for, in both directions.
+	if err := s.audit.Record(c.Request().Context(), audit.Entry{
+		ActorID:    &user.ID,
+		ActorLabel: user.Username,
+		Action:     audit.ActionSettingChanged,
+		TargetKind: "feature",
+		TargetID:   string(feature),
+		SourceIP:   requestIP(c),
+		UserAgent:  c.Request().UserAgent(),
+		Detail:     map[string]any{"enabled": request.Enabled},
+	}); err != nil {
+		s.log.Error("cannot record a feature change", "feature", feature, "error", err)
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}

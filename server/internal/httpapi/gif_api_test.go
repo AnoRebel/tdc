@@ -13,6 +13,12 @@ A server must work with no account anywhere. With nothing configured — which i
 every default — searching has to be unavailable rather than failing some other
 way, so that a client can tell the difference between "not offered here" and
 "broken".
+
+404 rather than the 503 this expected before feature toggles existed. The
+feature defaults off, so on a fresh server this endpoint is not offered at all,
+and that is what /api/server says too: the refusal and the advertisement agree.
+503 would mean the capability exists here and is temporarily unwell, which
+would be a different and untrue thing to tell a client.
 */
 func TestGifSearchIsUnavailableByDefault(t *testing.T) {
 	handler := newTestAPI(t)
@@ -20,9 +26,35 @@ func TestGifSearchIsUnavailableByDefault(t *testing.T) {
 
 	recorder := call(t, handler, http.MethodGet, "/api/gifs?q=cat", nil, token)
 
-	if recorder.Code != http.StatusServiceUnavailable {
-		t.Errorf("searching gifs returned %d, expected 503 with nothing configured",
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("searching gifs returned %d, expected 404 with nothing configured",
 			recorder.Code)
+	}
+
+	// And the server does not claim to offer it.
+	if lists(advertised(t, handler), "gif-search") {
+		t.Error("gif search is advertised on a server with nothing configured")
+	}
+}
+
+/*
+TestGifSearchStaysUnavailableWhenSwitchedOnWithoutAProvider separates the two
+reasons it can be off.
+
+An operator who turns the toggle on has said what they want; without a provider
+the server still cannot do it. The endpoint must refuse either way rather than
+reaching for a provider that is not there.
+*/
+func TestGifSearchStaysUnavailableWhenSwitchedOnWithoutAProvider(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	setFeature(t, handler, owner, "gif-search", true)
+
+	recorder := call(t, handler, http.MethodGet, "/api/gifs?q=cat", nil, owner)
+	if recorder.Code == http.StatusOK {
+		t.Errorf("gif search succeeded with no provider configured: %s",
+			truncate(recorder.Body.String()))
 	}
 }
 

@@ -334,3 +334,28 @@ func optional(value string) *string {
 	}
 	return &value
 }
+
+/*
+raw reads a stored value by key, without requiring a definition.
+
+Get deliberately refuses a key it has no definition for, which is what stops a
+typo looking like a setting. Feature toggles are stored in the same table but
+are not settings — they are validated by name against their own list — so they
+need a reader that does not consult the definitions map.
+
+Returns the empty string when nothing is stored, leaving the caller to decide
+what absence means; for a feature that is its default.
+*/
+func (s *Service) raw(ctx context.Context, key Key) string {
+	if value, ok := s.cached(key); ok {
+		return value
+	}
+
+	if err := s.refresh(ctx); err != nil {
+		s.log.Warn("cannot read settings, using defaults", "error", err)
+		return ""
+	}
+
+	value, _ := s.cached(key)
+	return value
+}
