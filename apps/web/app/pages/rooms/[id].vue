@@ -199,6 +199,26 @@ const navigationOpen = inject<Ref<boolean>>("navigationOpen", ref(false));
 const composerFocus = inject<Ref<(() => void) | null>>("composerFocus", ref(null));
 const threadOpen = inject<Ref<(() => void) | null>>("threadOpen", ref(null));
 
+/*
+ * Touch gestures over the conversation.
+ *
+ * Each is a shortcut for somebody who knows it and never the only way to reach
+ * something: the channel list, the reply button and the refresh on reconnect
+ * all still work. An interaction nobody can discover should not be the only
+ * route to anything.
+ */
+const moveChannel = inject<(direction: number) => void>("moveChannel", () => {});
+
+useConversationSwipes(timelineElement, {
+  // Swiping a message opens a reply to it, which is what the reply action in
+  // its own menu does.
+  reply: (messageId) => openThread(messageId),
+  previous: () => moveChannel(-1),
+  next: () => moveChannel(1),
+});
+
+const pull = usePullToRefresh(timelineElement, () => load());
+
 onMounted(() => {
   composerFocus.value = () => composer.value?.focus();
 
@@ -1486,6 +1506,18 @@ watch(roomId, load, { immediate: true });
         {{ error }}
       </p>
 
+      <!-- What a pull is doing, so the gesture is not silent. A pull with no
+           feedback reads as the page failing to scroll. -->
+      <div
+        v-if="pull.distance.value > 0 || pull.refreshing.value"
+        class="flex shrink-0 items-center justify-center gap-2 overflow-hidden text-xs text-muted-foreground transition-[height]"
+        :style="{ height: `${pull.refreshing.value ? 32 : Math.min(pull.distance.value, 48)}px` }"
+        aria-live="polite"
+      >
+        <Spinner v-if="pull.refreshing.value" class="size-3.5" />
+        <span>{{ pull.refreshing.value ? "Refreshing" : "Pull to refresh" }}</span>
+      </div>
+
       <div ref="timelineElement" class="flex-1 overflow-y-auto px-4 py-4">
         <!-- Shaped like the messages it stands in for, so the layout does not
              jump when the real thing arrives. -->
@@ -1536,6 +1568,7 @@ watch(roomId, load, { immediate: true });
                 :id="`message-${message.id}`"
                 :key="message.id"
                 :mine="group.mine"
+                :data-message-id="message.id"
                 v-bind="contextMenu.handlers(() => menuFor(message, group.mine, group.sender))"
               >
                 <!-- Actions sit outside the bubble, on the side away from the

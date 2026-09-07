@@ -199,6 +199,15 @@ const threadOpen = ref<(() => void) | null>(null);
 provide("composerFocus", composerFocus);
 provide("threadOpen", threadOpen);
 
+/*
+ * Moving between channels, shared with whatever asks.
+ *
+ * The keyboard and a swipe do the same thing, so they call the same function:
+ * two implementations of "next channel" would eventually disagree about what
+ * next means.
+ */
+provide("moveChannel", moveChannel);
+
 // Available to pages that change room state, so the sidebar stays current.
 provide("refreshRooms", refresh);
 // Lets the sidebar's search box open the palette rather than owning a second,
