@@ -98,6 +98,16 @@ const (
 		rather than protection.
 	*/
 	ObscureSensitiveMedia Key = "moderation.obscure_sensitive_media"
+
+	/*
+		RetentionSeconds is how long messages are kept server-wide, or zero to
+		keep them indefinitely.
+
+		Zero by default, which is what makes this safe to ship switched on: a
+		server nobody has configured deletes nothing. A channel with its own
+		period overrides this one.
+	*/
+	RetentionSeconds Key = "moderation.retention_seconds"
 )
 
 // definition describes one setting: how to validate it, and what it means when
@@ -160,6 +170,11 @@ var definitions = map[Key]definition{
 			}
 			return nil
 		},
+	},
+	RetentionSeconds: {
+		fallback:    "0",
+		description: "How long messages are kept, in seconds. 0 keeps them indefinitely.",
+		validate:    nonNegative,
 	},
 	ObscureSensitiveMedia: {
 		fallback:    "true",

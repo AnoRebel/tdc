@@ -234,6 +234,53 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 	return items, nil
 }
 
+const listAttachmentsForEvents = `-- name: ListAttachmentsForEvents :many
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments WHERE event_id = ANY($1::text[])
+`
+
+// The files carried by a set of messages, so expiring the messages can remove
+// them too.
+func (q *Queries) ListAttachmentsForEvents(ctx context.Context, eventIds []string) ([]Attachment, error) {
+	rows, err := q.db.Query(ctx, listAttachmentsForEvents, eventIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Attachment{}
+	for rows.Next() {
+		var i Attachment
+		if err := rows.Scan(
+			&i.ID,
+			&i.StorageKey,
+			&i.UploaderID,
+			&i.UploaderAddress,
+			&i.RoomID,
+			&i.EventID,
+			&i.Filename,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.CreatedAt,
+			&i.PreviewKey,
+			&i.PreviewType,
+			&i.PreviewWidth,
+			&i.PreviewHeight,
+			&i.Width,
+			&i.Height,
+			&i.Caption,
+			&i.Animated,
+			&i.SensitiveBy,
+			&i.SensitiveSource,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrphanedAttachments = `-- name: ListOrphanedAttachments :many
 SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments
 WHERE event_id IS NULL AND created_at < $1

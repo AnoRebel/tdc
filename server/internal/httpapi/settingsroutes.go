@@ -3,6 +3,8 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v5"
 
@@ -96,10 +98,27 @@ func (s *Server) handleSetSetting(c *echo.Context) error {
 		recorded = map[string]any{"from": "redacted", "to": "redacted"}
 	}
 
+	/*
+		Shortening retention is recorded as its own action.
+
+		A retention change is not like other settings: shortening it makes
+		existing content eligible for removal, which is destruction rather than
+		configuration. Recording it as a plain setting change would leave it
+		indistinguishable in the log from lengthening one, and somebody asking
+		later why a year of messages vanished needs to find this entry rather
+		than reconstruct it from two numbers.
+
+		Both values are already in the detail, so what this adds is the name.
+	*/
+	action := audit.ActionSettingChanged
+	if key == settings.RetentionSeconds && shortensRetention(previous, request.Value) {
+		action = audit.ActionRetentionShortened
+	}
+
 	if err := s.audit.Record(c.Request().Context(), audit.Entry{
 		ActorID:    &user.ID,
 		ActorLabel: user.Username,
-		Action:     audit.ActionSettingChanged,
+		Action:     action,
 		TargetKind: "setting",
 		TargetID:   string(key),
 		SourceIP:   requestIP(c),
@@ -252,4 +271,33 @@ func (s *Server) handleInspectConfiguration(c *echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, configurationResponse{Values: values, Warnings: warnings})
+}
+
+/*
+shortensRetention reports whether a change makes existing content eligible for
+removal.
+
+Zero means keep everything, so moving away from it always shortens however
+large the new number is, and moving to it never does. Both are the cases a
+plain numeric comparison gets backwards.
+*/
+func shortensRetention(previous, next string) bool {
+	before, err := strconv.ParseInt(strings.TrimSpace(previous), 10, 64)
+	if err != nil {
+		before = 0
+	}
+	after, err := strconv.ParseInt(strings.TrimSpace(next), 10, 64)
+	if err != nil {
+		return false
+	}
+
+	if after == 0 {
+		// Keeping everything from now on removes nothing.
+		return false
+	}
+	if before == 0 {
+		// Any period at all, where there was none, makes old content eligible.
+		return true
+	}
+	return after < before
 }

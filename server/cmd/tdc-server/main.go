@@ -15,6 +15,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/google/uuid"
+
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -140,6 +142,18 @@ func run() error {
 	}
 	defer objectStore.Close()
 
+	// Named, because the background worker that removes expired content needs
+	// the same instances the request handlers use rather than second ones with
+	// their own caches.
+	attachmentService := newAttachmentService(pool, objectStore, cfg, log)
+	moderationService := moderation.NewService(pool, log)
+	settingsService := settings.NewService(pool, log)
+
+	// Content past its retention period, removed on the same principle as
+	// lapsed presence: a policy nothing enforces is a policy that misleads the
+	// people it was disclosed to.
+	go expirePeriodically(ctx, moderationService, settingsService, attachmentService, log)
+
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
@@ -147,13 +161,13 @@ func run() error {
 		Limiter:  cache.NewLimiter(memoryCache),
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
-		Attachments: newAttachmentService(pool, objectStore, cfg, log),
+		Attachments: attachmentService,
 		Search:      search.NewService(pool),
 		Notify:      notify.NewService(pool, log),
-		Moderation:  moderation.NewService(pool, log),
+		Moderation:  moderationService,
 		// Policy an operator changes while the server runs, as distinct from
 		// the configuration file that decides how the process is wired.
-		Settings:    settings.NewService(pool, log),
+		Settings:    settingsService,
 		Invitations: invitations.NewService(pool, log),
 		// Off unless an operator configured a provider and a key. Searches are
 		// proxied through this server, so the key stays here and the provider
@@ -344,6 +358,67 @@ func deliverScheduledPeriodically(
 			}
 			if sent > 0 {
 				log.Info("sent scheduled messages", "count", sent)
+			}
+		}
+	}
+}
+
+/*
+retentionInterval is how often content past its retention period is removed.
+
+Every few minutes rather than every few seconds. A retention period is measured
+in days or weeks, so the difference between removing something now and removing
+it in five minutes is not one anybody can perceive — and a pass that finds
+nothing still costs a query.
+*/
+const retentionInterval = 5 * time.Minute
+
+// retentionBatch bounds one pass.
+//
+// A server that has run with no policy and then gets one has everything it has
+// ever held to expire at once. Draining it over successive passes keeps each
+// one short rather than holding locks for however long the whole backlog takes.
+const retentionBatch = 200
+
+// expirePeriodically removes content past its retention period, until the
+// context ends.
+func expirePeriodically(
+	ctx context.Context,
+	moderationService *moderation.Service,
+	settingsService *settings.Service,
+	attachmentService *attachments.Service,
+	log *slog.Logger,
+) {
+	ticker := time.NewTicker(retentionInterval)
+	defer ticker.Stop()
+
+	removeAttachments := func(ctx context.Context, ids []uuid.UUID) error {
+		for _, id := range ids {
+			if err := attachmentService.Delete(ctx, id); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// Read each pass rather than held, so an operator's change takes
+			// effect without a restart.
+			defaultSeconds := int32(settingsService.Int(ctx, settings.RetentionSeconds))
+
+			removed, err := moderationService.ExpireDue(
+				ctx, defaultSeconds, retentionBatch, removeAttachments)
+			if err != nil && ctx.Err() == nil {
+				// Logged rather than fatal: a failed pass means content goes
+				// on the next one, not that the server cannot serve.
+				log.Error("expiring content failed", slog.String("error", err.Error()))
+			}
+			if removed > 0 {
+				log.Info("expired content past its retention period", "messages", removed)
 			}
 		}
 	}

@@ -12,8 +12,10 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
+	"github.com/AnoRebel/tdc/server/internal/settings"
 )
 
 // roomResponse is the public shape of a room.
@@ -30,24 +32,49 @@ type roomResponse struct {
 	// Member says whether the requester is in this room, so a client can
 	// distinguish a room it can read from one it must join first.
 	Member bool `json:"member"`
+
+	/*
+		RetentionSeconds is how long messages here are kept, or absent when
+		they are kept indefinitely.
+
+		Disclosed to everybody who can see the channel, because a conversation
+		that quietly deletes itself is one people say things in they would not
+		have said knowing. Somebody deciding what to write is entitled to know
+		how long it lasts.
+	*/
+	RetentionSeconds int32 `json:"retentionSeconds,omitempty"`
+	// RetentionFromChannel says this channel sets its own period rather than
+	// inheriting the server's, which are different things to be told.
+	RetentionFromChannel bool `json:"retentionFromChannel,omitempty"`
 }
 
+/*
+roomResponse describes a channel to a client.
+
+Reads the server's retention default rather than taking it as an argument. The
+settings service caches, so this costs nothing on the common path, and
+threading it through six call sites would put a parameter nobody reads at every
+one of them.
+*/
 func (s *Server) roomResponse(room dbgen.Room, member bool) roomResponse {
+	policy := moderation.PolicyFor(room.MessageTtlSeconds, s.retentionDefault())
 	slug := ""
 	if room.Slug != nil {
 		slug = *room.Slug
 	}
 
 	return roomResponse{
-		ID:         room.ID.String(),
-		Slug:       slug,
-		Name:       room.Name,
-		Topic:      room.Topic,
-		Kind:       room.Kind,
-		Visibility: room.Visibility,
-		Address:    s.rooms.RoomAddress(room),
-		Archived:   room.ArchivedAt != nil,
-		Member:     member,
+		ID:                   room.ID.String(),
+		RetentionSeconds:     policy.Seconds,
+		RetentionFromChannel: policy.FromChannel,
+		Slug:                 slug,
+		Name:                 room.Name,
+		Topic:                room.Topic,
+		Kind:                 room.Kind,
+		Visibility:           room.Visibility,
+		Address:              s.rooms.RoomAddress(room),
+		Archived:             room.ArchivedAt != nil,
+		Member:               member,
 	}
 }
 
@@ -102,6 +129,17 @@ type createRoomRequest struct {
 	Name       string `json:"name"`
 	Topic      string `json:"topic"`
 	Visibility string `json:"visibility"`
+	/*
+		MessageTTLSeconds keeps this channel's messages for a fixed period,
+		overriding the server's own.
+
+		Set at creation rather than changed afterwards, deliberately for now:
+		shortening a period destroys content, and doing that to a channel
+		people are already using needs the same recorded action the server-wide
+		setting has. A channel created with a period discloses it from the
+		start, so nobody says anything in it under a different expectation.
+	*/
+	MessageTTLSeconds *int32 `json:"messageTtlSeconds,omitempty"`
 }
 
 func (s *Server) handleListRooms(c *echo.Context) error {
@@ -147,11 +185,12 @@ func (s *Server) handleCreateRoom(c *echo.Context) error {
 	}
 
 	room, err := s.rooms.Create(ctx, rooms.NewRoom{
-		Slug:       request.Slug,
-		Name:       request.Name,
-		Topic:      request.Topic,
-		Visibility: request.Visibility,
-		CreatedBy:  user.ID,
+		Slug:              request.Slug,
+		Name:              request.Name,
+		Topic:             request.Topic,
+		Visibility:        request.Visibility,
+		CreatedBy:         user.ID,
+		MessageTTLSeconds: request.MessageTTLSeconds,
 	})
 	if err != nil {
 		return roomError(err)
@@ -555,4 +594,19 @@ func (s *Server) notifyOfJoin(ctx context.Context, roomID uuid.UUID, user dbgen.
 
 	s.notify.AboutRoom(ctx, members, user.ID, s.rooms.UserAddress(user.Username),
 		roomID, timeline[len(timeline)-1].ID, notify.ReasonJoin)
+}
+
+/*
+retentionDefault is the server-wide retention period in seconds, or zero for
+none.
+
+Zero when the setting cannot be read, which keeps content rather than removing
+it. Failing towards deletion because a settings query timed out would be
+unrecoverable in a way failing towards keeping never is.
+*/
+func (s *Server) retentionDefault() int32 {
+	if s.settings == nil {
+		return 0
+	}
+	return int32(s.settings.Int(context.Background(), settings.RetentionSeconds))
 }

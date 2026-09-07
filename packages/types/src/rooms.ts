@@ -18,6 +18,21 @@ export interface Room {
    * being a member, but posting requires joining.
    */
   member: boolean;
+  /**
+   * How long messages here are kept, in seconds. Absent when they are kept
+   * indefinitely.
+   *
+   * Disclosed to everybody who can see the channel: a conversation that
+   * quietly deletes itself is one people say things in they would not have
+   * said knowing.
+   */
+  retentionSeconds?: number;
+  /**
+   * Whether this channel sets its own period rather than inheriting the
+   * server's. Different things to be told: one is a decision about this
+   * conversation, the other about everything.
+   */
+  retentionFromChannel?: boolean;
 }
 
 /** Someone in a room. */

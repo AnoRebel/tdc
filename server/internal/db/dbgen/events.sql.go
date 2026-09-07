@@ -102,6 +102,72 @@ func (q *Queries) DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt
 	return err
 }
 
+const expireEvents = `-- name: ExpireEvents :many
+WITH due AS (
+    SELECT e.id
+    FROM events e
+    JOIN rooms r ON r.id = e.room_id
+    WHERE e.redacted_at IS NULL
+      AND e.type IN ('message.sent', 'message.edited')
+      AND COALESCE(r.message_ttl_seconds, $1::int) > 0
+      AND e.created_at < (
+          EXTRACT(EPOCH FROM NOW()) * 1000
+          - COALESCE(r.message_ttl_seconds, $1::int)::bigint * 1000
+      )
+    ORDER BY e.created_at
+    LIMIT $2::int
+)
+UPDATE events
+SET content = '{}'::jsonb, redacted_at = NOW()
+FROM due
+WHERE events.id = due.id
+RETURNING events.id, events.room_id
+`
+
+type ExpireEventsParams struct {
+	DefaultSeconds int32
+	BatchSize      int32
+}
+
+type ExpireEventsRow struct {
+	ID     string
+	RoomID uuid.UUID
+}
+
+// Redacts messages past their channel's retention period.
+//
+// The channel's own period where it has one, and the server's default
+// otherwise: @default_seconds is 0 when the operator has set none, and the
+// comparison then admits nothing, which is how "no policy" means "keep
+// everything" without a separate branch.
+//
+// Returns what was expired so the caller can remove the attachments too. A
+// message whose text went while its photographs stayed would be a retention
+// policy that did not retain anything less.
+//
+// Only message events. A channel that lost its own creation and membership
+// history would be a channel nobody could audit, and those carry no content
+// worth expiring.
+func (q *Queries) ExpireEvents(ctx context.Context, arg ExpireEventsParams) ([]ExpireEventsRow, error) {
+	rows, err := q.db.Query(ctx, expireEvents, arg.DefaultSeconds, arg.BatchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ExpireEventsRow{}
+	for rows.Next() {
+		var i ExpireEventsRow
+		if err := rows.Scan(&i.ID, &i.RoomID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findIdempotentSubmission = `-- name: FindIdempotentSubmission :one
 SELECT event_id FROM event_idempotency
 WHERE sender_id = $1 AND client_token = $2

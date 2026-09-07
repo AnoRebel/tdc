@@ -60,6 +60,17 @@ const (
 	ActionMediaMarked   Action = "media.marked_sensitive"
 	ActionMediaUnmarked Action = "media.unmarked_sensitive"
 
+	/*
+		ActionRetentionShortened records a change that makes existing content
+		eligible for removal.
+
+		Distinct from an ordinary setting change because it destroys rather
+		than configures. Somebody asking why a year of messages vanished should
+		find this entry, not have to infer it from two numbers in a generic
+		one.
+	*/
+	ActionRetentionShortened Action = "server.retention.shortened"
+
 	ActionRoleCreated       Action = "role.created"
 	ActionRoleDeleted       Action = "role.deleted"
 	ActionRoleAssigned      Action = "role.assigned"

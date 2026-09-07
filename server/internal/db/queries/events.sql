@@ -58,3 +58,38 @@ WHERE sender_id = $1 AND client_token = $2;
 
 -- name: DeleteExpiredIdempotencyRecords :exec
 DELETE FROM event_idempotency WHERE created_at < $1;
+
+-- name: ExpireEvents :many
+-- Redacts messages past their channel's retention period.
+--
+-- The channel's own period where it has one, and the server's default
+-- otherwise: @default_seconds is 0 when the operator has set none, and the
+-- comparison then admits nothing, which is how "no policy" means "keep
+-- everything" without a separate branch.
+--
+-- Returns what was expired so the caller can remove the attachments too. A
+-- message whose text went while its photographs stayed would be a retention
+-- policy that did not retain anything less.
+--
+-- Only message events. A channel that lost its own creation and membership
+-- history would be a channel nobody could audit, and those carry no content
+-- worth expiring.
+WITH due AS (
+    SELECT e.id
+    FROM events e
+    JOIN rooms r ON r.id = e.room_id
+    WHERE e.redacted_at IS NULL
+      AND e.type IN ('message.sent', 'message.edited')
+      AND COALESCE(r.message_ttl_seconds, @default_seconds::int) > 0
+      AND e.created_at < (
+          EXTRACT(EPOCH FROM NOW()) * 1000
+          - COALESCE(r.message_ttl_seconds, @default_seconds::int)::bigint * 1000
+      )
+    ORDER BY e.created_at
+    LIMIT @batch_size::int
+)
+UPDATE events
+SET content = '{}'::jsonb, redacted_at = NOW()
+FROM due
+WHERE events.id = due.id
+RETURNING events.id, events.room_id;

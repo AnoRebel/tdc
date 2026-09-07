@@ -110,6 +110,21 @@ type Querier interface {
 	// do, and a message already sent is a message, not a plan.
 	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
+	// Redacts messages past their channel's retention period.
+	//
+	// The channel's own period where it has one, and the server's default
+	// otherwise: @default_seconds is 0 when the operator has set none, and the
+	// comparison then admits nothing, which is how "no policy" means "keep
+	// everything" without a separate branch.
+	//
+	// Returns what was expired so the caller can remove the attachments too. A
+	// message whose text went while its photographs stayed would be a retention
+	// policy that did not retain anything less.
+	//
+	// Only message events. A channel that lost its own creation and membership
+	// history would be a channel nobody could audit, and those carry no content
+	// worth expiring.
+	ExpireEvents(ctx context.Context, arg ExpireEventsParams) ([]ExpireEventsRow, error)
 	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)
@@ -159,6 +174,9 @@ type Querier interface {
 	LiftPostingRestriction(ctx context.Context, arg LiftPostingRestrictionParams) (int64, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
 	ListAttachmentsForEvent(ctx context.Context, eventID *string) ([]Attachment, error)
+	// The files carried by a set of messages, so expiring the messages can remove
+	// them too.
+	ListAttachmentsForEvents(ctx context.Context, eventIds []string) ([]Attachment, error)
 	// Filters are optional: a NULL argument matches everything, so one query
 	// serves the whole administrative view rather than one per filter combination.
 	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)

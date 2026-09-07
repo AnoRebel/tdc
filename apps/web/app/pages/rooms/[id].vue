@@ -1071,6 +1071,33 @@ async function setSensitive(files: { id: string }[], sensitive: boolean) {
   await load();
 }
 
+/*
+ * How long messages here last, in words rather than seconds.
+ *
+ * Rounded to the unit somebody thinks in: "7 days" rather than "604800
+ * seconds". Empty when nothing expires, so the header says nothing rather than
+ * saying "kept forever" — the absence of a warning is the ordinary case and
+ * should not need reading.
+ */
+const retentionLabel = computed(() => {
+  const seconds = room.value?.retentionSeconds ?? 0;
+  if (seconds <= 0) return "";
+
+  const units: [number, string][] = [
+    [86400, "day"],
+    [3600, "hour"],
+    [60, "minute"],
+  ];
+
+  for (const [size, name] of units) {
+    if (seconds >= size) {
+      const count = Math.round(seconds / size);
+      return `Kept ${count} ${name}${count === 1 ? "" : "s"}`;
+    }
+  }
+  return `Kept ${seconds} seconds`;
+});
+
 async function togglePin(messageId: string) {
   try {
     if (pins.pinnedIds.value.has(messageId)) {
@@ -1197,6 +1224,22 @@ watch(roomId, load, { immediate: true });
         </div>
 
         <div class="ml-auto flex shrink-0 items-center gap-3 text-xs">
+          <!-- The retention policy, said where somebody about to type can see
+               it. A conversation that quietly deletes itself is one people say
+               things in they would not have said knowing. -->
+          <span
+            v-if="retentionLabel"
+            class="flex items-center gap-1.5 text-muted-foreground"
+            :title="
+              room?.retentionFromChannel
+                ? 'This channel keeps messages for a set time.'
+                : 'This server keeps messages for a set time.'
+            "
+          >
+            <Clock class="size-3.5" />
+            <span>{{ retentionLabel }}</span>
+          </span>
+
           <span
             v-if="onlineCount > 0"
             class="flex items-center gap-1.5 text-muted-foreground"

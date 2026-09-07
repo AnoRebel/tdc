@@ -92,3 +92,8 @@ WHERE id = $1
     -- An uploader may lift their own, and an automatic one on their own file.
     OR (uploader_id = @actor_id::uuid AND sensitive_source <> 'moderator')
   );
+
+-- name: ListAttachmentsForEvents :many
+-- The files carried by a set of messages, so expiring the messages can remove
+-- them too.
+SELECT * FROM attachments WHERE event_id = ANY(@event_ids::text[]);
