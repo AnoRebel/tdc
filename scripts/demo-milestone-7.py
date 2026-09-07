@@ -18,9 +18,7 @@ import time
 import urllib.error
 import urllib.request
 
-# Port 8080 on this machine is held by an unrelated process, so the
-# demonstration server publishes on 8081.
-API = "http://localhost:8081"
+API = "http://localhost:8080"
 PASSWORD = "kilimanjaro-2026-tdc"
 
 passed, failed = [], []

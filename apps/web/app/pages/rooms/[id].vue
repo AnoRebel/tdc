@@ -26,6 +26,7 @@ import {
   Image as ImageIcon,
   Lock,
   Maximize2,
+  Menu,
   MessageSquareText,
   MoreVertical,
   Music,
@@ -176,6 +177,16 @@ useHead({
 const unreadHere = ref(0);
 
 const api = useApi();
+
+/*
+ * The layout's drawer, on a narrow screen.
+ *
+ * Injected rather than passed: the drawer belongs to the layout, and the
+ * button that opens it is in this page's own header. A fallback ref keeps this
+ * page usable outside that layout — a test rendering it alone should not need
+ * to provide one.
+ */
+const navigationOpen = inject<Ref<boolean>>("navigationOpen", ref(false));
 const personal = usePersonalModeration();
 
 /** Who is about to be blocked, while the confirmation is up. */
@@ -1289,7 +1300,19 @@ watch(roomId, load, { immediate: true });
 <template>
   <div class="flex min-h-0 flex-1">
     <section class="flex min-w-0 flex-1 flex-col">
-      <header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+      <header class="flex h-12 shrink-0 items-center gap-3 border-b px-3 md:px-4">
+        <!-- Only where the sidebar is a drawer. On a wide screen the channel
+             list is already visible and a button to reveal it would do
+             nothing. -->
+        <button
+          type="button"
+          class="btn btn-ghost size-8 shrink-0 px-0 md:hidden"
+          aria-label="Channels"
+          @click="navigationOpen = true"
+        >
+          <Menu class="size-4" />
+        </button>
+
         <component
           :is="room?.visibility === 'private' ? Lock : Hash"
           class="size-4 shrink-0 text-muted-foreground"

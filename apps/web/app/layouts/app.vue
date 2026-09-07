@@ -19,6 +19,25 @@ const rooms = ref<Room[]>([]);
 const direct = ref<Room[]>([]);
 const unread = ref<UnreadCounts>({});
 const servers = ref<ConnectedServer[]>([]);
+/*
+ * Whether the channel list is showing on a narrow screen.
+ *
+ * Provided rather than passed down, because what opens it is a button in a
+ * page's own header — the layout owns the drawer, and threading a prop and an
+ * event through every page to reach one button would be worse than a value
+ * they can ask for.
+ */
+const navigationOpen = ref(false);
+provide("navigationOpen", navigationOpen);
+
+// Closed on every navigation: a drawer still covering the conversation
+// somebody just chose is a drawer they have to dismiss twice.
+const route = useRoute();
+watch(
+  () => route.fullPath,
+  () => (navigationOpen.value = false),
+);
+
 const creating = ref(false);
 const newSlug = ref("");
 
@@ -152,6 +171,16 @@ provide("openSearch", () => {
 
 <template>
   <div class="flex h-dvh overflow-hidden bg-background">
+    <!--
+      The sidebar is a column beside the conversation on a wide screen and a
+      drawer over it on a narrow one.
+
+      One component in both cases rather than two that drift: what changes is
+      where it sits, which is a matter of layout, not of what a sidebar is. On
+      a phone it slides in over the conversation because 240 pixels of a
+      390-pixel screen is most of the screen — beside the messages there would
+      be room for about four words a line.
+    -->
     <AppSidebar
       :rooms="joined"
       :direct="direct"
@@ -159,8 +188,24 @@ provide("openSearch", () => {
       :unread="unread"
       :can-create="can('channel.create')"
       :servers="servers"
+      class="max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:transition-transform max-md:duration-200"
+      :class="navigationOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'"
       @create="creating = true"
       @search="searching = true"
+    />
+
+    <!--
+      The backdrop that dismisses the drawer.
+
+      Only on a narrow screen, and only while it is open: on a wide one the
+      sidebar is part of the layout and there is nothing to dismiss.
+    -->
+    <button
+      v-if="navigationOpen"
+      type="button"
+      class="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm md:hidden"
+      aria-label="Close the channel list"
+      @click="navigationOpen = false"
     />
 
     <main class="flex min-w-0 flex-1 flex-col">
