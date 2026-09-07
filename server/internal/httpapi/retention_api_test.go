@@ -416,8 +416,9 @@ func makeRoomWithTTL(t *testing.T, handler http.Handler, token, slug string, sec
 
 // auditEntry is one row of the audit log as the API returns it.
 type auditEntry struct {
-	Action string `json:"action"`
-	Detail string `json:"detail"`
+	Action   string `json:"action"`
+	TargetID string `json:"targetId"`
+	Detail   string `json:"detail"`
 }
 
 func decodeAudit(t *testing.T, recorder *httptest.ResponseRecorder) []auditEntry {

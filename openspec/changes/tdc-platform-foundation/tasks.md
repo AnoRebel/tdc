@@ -132,7 +132,7 @@ Goal: a server an operator can actually run, configure, and moderate.
 - [x] 7.14 Implement audit retention, export, and recording of expiry; verify export round-trips and expiry itself produces an entry (`platform/audit-log`)
 - [x] 7.14a Implement server visibility — public, limited, private — enforced server-side on peer discovery and room browsing; verify a limited server is not returned to an unlisted requester, a private server is not discoverable at all, and a private room on a public server stays undiscoverable (`federation/protocol`)
 - [x] 7.15 Build the web administration and moderation interface; verify an administrator can perform every action above without using the API directly
-- [ ] **MILESTONE 7** — Demonstrate: an operator configures limits and registration policy, a moderator removes a message and suspends a user, a filtered word is blocked, a disposable chat expires, and every one of those actions appears in the audit log. Tag `v0.7.0-dev`.
+- [x] **MILESTONE 7** — Demonstrate: an operator configures limits and registration policy, a moderator removes a message and suspends a user, a filtered word is blocked, a disposable chat expires, and every one of those actions appears in the audit log. Tag `v0.7.0-dev`.
 
 ## 8. Phase 8 — It works on a phone
 

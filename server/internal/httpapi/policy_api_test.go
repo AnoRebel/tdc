@@ -605,3 +605,86 @@ func decodePeople(t *testing.T, recorder *httptest.ResponseRecorder) []listedPer
 	}
 	return people
 }
+
+/*
+TestAModeratorRemovingAMessageIsRecorded is what the milestone demonstration
+caught missing.
+
+A moderator deleting somebody else's message is an exercise of authority, and
+the whole purpose of the audit log is that such things can be accounted for
+afterwards. Message deletion had every other consequence — the placeholder, the
+attachments, the search index — and left no record of who did it.
+*/
+func TestAModeratorRemovingAMessageIsRecorded(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	author := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, author, roomID)
+
+	eventID := sendMessage(t, handler, author, roomID, "Ujumbe wangu")
+
+	removed := call(t, handler, http.MethodDelete,
+		"/api/rooms/"+roomID+"/messages/"+eventID, nil, owner)
+	if removed.Code >= 400 {
+		t.Fatalf("removing returned %d: %s", removed.Code, truncate(removed.Body.String()))
+	}
+
+	entries := decodeAudit(t, call(t, handler, http.MethodGet,
+		"/api/admin/audit?limit=20", nil, owner))
+
+	found := false
+	for _, entry := range entries {
+		if entry.Action != "message.removed" {
+			continue
+		}
+		found = true
+
+		// The message is named; its text is not. An audit entry carrying the
+		// content would put back exactly what the deletion removed.
+		if entry.TargetID != eventID {
+			t.Errorf("the entry names %q, expected the removed message", entry.TargetID)
+		}
+		if strings.Contains(entry.Detail, "Ujumbe wangu") {
+			t.Errorf("the entry carries the deleted text: %s", entry.Detail)
+		}
+	}
+
+	if !found {
+		t.Error("a moderator removed a message and the log says nothing about it")
+	}
+}
+
+/*
+TestRemovingYourOwnMessageIsNotRecordedAsModeration keeps the log legible.
+
+Deleting what you wrote is ordinary use of the application. Recording every one
+would bury the deletions that were an exercise of authority, which are the ones
+anybody reading the log is looking for.
+*/
+func TestRemovingYourOwnMessageIsNotRecordedAsModeration(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	// The owner removes their own message, holding every permission.
+	eventID := sendMessage(t, handler, owner, roomID, "Ujumbe wangu mwenyewe")
+
+	removed := call(t, handler, http.MethodDelete,
+		"/api/rooms/"+roomID+"/messages/"+eventID, nil, owner)
+	if removed.Code >= 400 {
+		t.Fatalf("removing returned %d", removed.Code)
+	}
+
+	entries := decodeAudit(t, call(t, handler, http.MethodGet,
+		"/api/admin/audit?limit=20", nil, owner))
+
+	for _, entry := range entries {
+		if entry.Action == "message.removed" {
+			t.Error("somebody removing their own message was recorded as moderation")
+		}
+	}
+}

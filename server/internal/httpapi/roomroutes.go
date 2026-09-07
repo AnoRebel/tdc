@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
@@ -543,6 +544,35 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 			s.log.Error("cannot remove a deleted message from the search index",
 				"eventId", eventIDParam(c), "error", err)
 		}
+	}
+
+	/*
+		Recorded when it was a moderator's doing, not when somebody removed
+		their own message.
+
+		Deleting what you wrote is ordinary use of the application; recording
+		every one would bury the deletions that were an exercise of authority,
+		which are the ones anybody reading the log is looking for. The author
+		is recorded rather than the text — the whole point of a deletion is
+		that the text is gone, and an audit entry carrying it would put it back.
+	*/
+	/*
+		byModerator comes from the deletion event, which the service has
+		already decided.
+
+		Not re-derived here: the event returned is the deletion, whose sender
+		is whoever performed it — so comparing its sender to the actor is
+		always true and would record nothing. The service knows whether the
+		target was theirs, and says so in the event it wrote.
+	*/
+	var deletion struct {
+		Redacts     string `json:"redacts"`
+		ByModerator bool   `json:"byModerator"`
+	}
+	_ = json.Unmarshal(event.Content, &deletion)
+
+	if deletion.ByModerator {
+		s.recordModeration(c, user, audit.ActionMessageRemoved, "event", deletion.Redacts, nil)
 	}
 
 	s.publishEvent(ctx, event)

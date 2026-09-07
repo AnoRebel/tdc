@@ -76,6 +76,17 @@ const (
 	// same trail deletion gets.
 	ActionMessageLifetimeSet Action = "message.lifetime_set"
 
+	/*
+		ActionMessageRemoved records a moderator deleting somebody else's
+		message.
+
+		Only a moderator's deletions. Somebody removing their own message is
+		ordinary use of the application, and recording every one of those would
+		bury the deletions that were an exercise of authority — which are the
+		ones anybody reviewing the log is looking for.
+	*/
+	ActionMessageRemoved Action = "message.removed"
+
 	// ActionAuditPruned records the log removing its own oldest entries, so a
 	// gap in it is explained rather than merely present.
 	ActionAuditPruned Action = "server.audit.pruned"
