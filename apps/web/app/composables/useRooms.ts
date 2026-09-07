@@ -28,6 +28,10 @@ export function useRooms() {
     name?: string;
     topic?: string;
     visibility?: "public" | "private";
+    /** "disposable" makes a chat whose messages the server removes. */
+    kind?: "channel" | "disposable";
+    /** How long messages last, in seconds. Required for a disposable chat. */
+    messageTtlSeconds?: number;
   }): Promise<Room> {
     return api.post<Room>("/api/rooms", details);
   }

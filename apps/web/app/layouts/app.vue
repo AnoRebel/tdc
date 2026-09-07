@@ -21,6 +21,24 @@ const unread = ref<UnreadCounts>({});
 const servers = ref<ConnectedServer[]>([]);
 const creating = ref(false);
 const newSlug = ref("");
+
+/*
+ * A disposable chat, whose messages the server removes after a chosen time.
+ *
+ * The lifetime is fixed when the room is made and disclosed to everybody in
+ * it, so nobody says anything under a different expectation. Offered as
+ * presets rather than a number: somebody choosing this is thinking "a day",
+ * not "86400 seconds".
+ */
+const newDisposable = ref(false);
+const newLifetime = ref(86400);
+
+const lifetimeChoices = [
+  { seconds: 3600, label: "An hour" },
+  { seconds: 86400, label: "A day" },
+  { seconds: 604800, label: "A week" },
+  { seconds: 2592000, label: "A month" },
+];
 const slugInput = ref<HTMLInputElement | null>(null);
 const createError = ref<string | null>(null);
 
@@ -82,8 +100,13 @@ async function createRoom() {
 
   createError.value = null;
   try {
-    const room = await roomsApi.create({ slug, name: slug });
+    const room = await roomsApi.create(
+      newDisposable.value
+        ? { slug, name: slug, kind: "disposable", messageTtlSeconds: newLifetime.value }
+        : { slug, name: slug },
+    );
     newSlug.value = "";
+    newDisposable.value = false;
     creating.value = false;
     await refresh();
     await router.push(`/rooms/${room.id}`);
@@ -158,7 +181,9 @@ provide("openSearch", () => {
         v-if="creating"
         class="fixed inset-y-0 right-0 z-20 w-80 border-l bg-surface p-4 shadow-lg"
       >
-        <h2 class="text-sm font-semibold">New channel</h2>
+        <h2 class="text-sm font-semibold">
+          {{ newDisposable ? "New disposable chat" : "New channel" }}
+        </h2>
         <p class="mt-1 text-xs text-muted-foreground">
           The name becomes the channel's address, so people on other servers can reach it.
         </p>
@@ -177,6 +202,32 @@ provide("openSearch", () => {
             <p class="mt-1 text-[0.6875rem] text-muted-foreground">
               Letters, digits, underscore, dot and hyphen.
             </p>
+          </div>
+
+          <label class="flex cursor-pointer items-start gap-2">
+            <input v-model="newDisposable" type="checkbox" class="mt-0.5 accent-primary" />
+            <span class="min-w-0">
+              <span class="block text-xs font-medium">Disposable</span>
+              <span class="block text-[0.6875rem] text-muted-foreground">
+                Messages are removed after a set time. Everyone in the chat is told before they
+                post.
+              </span>
+            </span>
+          </label>
+
+          <div v-if="newDisposable">
+            <label for="channel-lifetime" class="mb-1 block text-xs font-medium">
+              Messages last
+            </label>
+            <select id="channel-lifetime" v-model.number="newLifetime" class="input">
+              <option
+                v-for="choice in lifetimeChoices"
+                :key="choice.seconds"
+                :value="choice.seconds"
+              >
+                {{ choice.label }}
+              </option>
+            </select>
           </div>
 
           <p v-if="createError" class="text-xs text-destructive" role="alert">

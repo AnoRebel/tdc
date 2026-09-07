@@ -140,6 +140,15 @@ type createRoomRequest struct {
 		start, so nobody says anything in it under a different expectation.
 	*/
 	MessageTTLSeconds *int32 `json:"messageTtlSeconds,omitempty"`
+	/*
+		Kind is "channel" or "disposable". Empty means a channel.
+
+		A disposable chat is a room whose messages the server removes after a
+		lifetime chosen when it is made. It is a kind rather than a flag
+		because the distinction changes what the room is for, and a client
+		listing rooms should be able to say so without inspecting a number.
+	*/
+	Kind string `json:"kind,omitempty"`
 }
 
 func (s *Server) handleListRooms(c *echo.Context) error {
@@ -184,7 +193,26 @@ func (s *Server) handleCreateRoom(c *echo.Context) error {
 		return err
 	}
 
+	/*
+		A disposable chat must say how long its messages live.
+
+		Without a lifetime it is an ordinary channel wearing a label, and every
+		participant would have been shown a promise the room does not keep. The
+		lifetime is disclosed before anybody posts precisely so that it means
+		something.
+	*/
+	if request.Kind == "disposable" {
+		if request.MessageTTLSeconds == nil || *request.MessageTTLSeconds <= 0 {
+			return echo.NewHTTPError(http.StatusBadRequest,
+				"a disposable chat needs to say how long its messages last")
+		}
+	}
+	if request.Kind != "" && request.Kind != "channel" && request.Kind != "disposable" {
+		return echo.NewHTTPError(http.StatusBadRequest, "that is not a kind of room")
+	}
+
 	room, err := s.rooms.Create(ctx, rooms.NewRoom{
+		Kind:              request.Kind,
 		Slug:              request.Slug,
 		Name:              request.Name,
 		Topic:             request.Topic,
