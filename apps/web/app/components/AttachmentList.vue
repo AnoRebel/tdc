@@ -40,6 +40,21 @@ function reveal(attachment: Attachment) {
   revealed.value = new Set(revealed.value).add(attachment.id);
 }
 
+/**
+ * Where to fetch an attachment's preview.
+ *
+ * The server serves a placeholder for anything marked sensitive unless asked
+ * otherwise, so revealing means fetching again with the parameter — not
+ * removing a blur from something already downloaded. That is the whole point:
+ * until this runs, the detail has not left the server.
+ */
+function previewSource(attachment: Attachment): string {
+  const url = mediaUrl(attachment.previewUrl);
+  if (!attachment.sensitive || covered(attachment)) return url;
+
+  return `${url}${url.includes("?") ? "&" : "?"}reveal=1`;
+}
+
 /** Attachments the viewer can display, so arrows move between those only. */
 const viewable = computed(() => props.attachments.filter((attachment) => attachment.renderable));
 
@@ -101,16 +116,41 @@ function previewStyle(attachment: Attachment) {
       <button
         v-if="covered(attachment)"
         type="button"
-        class="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed bg-surface-sunken px-6 py-8 text-center transition hover:border-border-strong hover:bg-surface"
+        class="group/cover relative overflow-hidden rounded-lg border border-dashed bg-surface-sunken transition hover:border-border-strong"
         :style="previewStyle(attachment)"
         @click="reveal(attachment)"
       >
-        <!-- shrink-0: the cover is a flex column with a height fixed by the
-             image's aspect ratio, so without it the icon is the child that
-             gets squeezed to nothing. -->
-        <EyeOff class="size-5 shrink-0 text-muted-foreground" />
-        <span class="text-xs font-medium">Marked sensitive</span>
-        <span class="text-[0.6875rem] text-muted-foreground">Click to show</span>
+        <!--
+          What arrives here is already obscured by the server: the image
+          reduced to a handful of pixels and scaled back up, with the detail
+          averaged away rather than hidden. The CSS blur on top is presentation
+          — it softens the blocks into something that looks deliberate — and
+          removing it in the developer tools reveals only the placeholder,
+          because the detail was never sent.
+
+          scale-110 hides the transparent edge a blur leaves at the border of
+          its own element.
+        -->
+        <img
+          v-if="attachment.previewUrl"
+          :src="mediaUrl(attachment.previewUrl)"
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          class="size-full scale-110 object-cover blur-md"
+        />
+
+        <span
+          class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-background/45 px-4 text-center"
+        >
+          <!-- shrink-0: the label is a flex column inside a box whose height
+               comes from the image's aspect ratio, so without it the icon is
+               the child squeezed to nothing. -->
+          <EyeOff class="size-5 shrink-0 drop-shadow" />
+          <span class="text-xs font-medium drop-shadow">Marked sensitive</span>
+          <span class="text-[0.6875rem] opacity-80 drop-shadow">Click to show</span>
+        </span>
       </button>
 
       <template v-else>
@@ -152,7 +192,7 @@ function previewStyle(attachment: Attachment) {
           @click="open(attachment)"
         >
           <img
-            :src="mediaUrl(attachment.previewUrl)"
+            :src="previewSource(attachment)"
             :alt="attachment.filename"
             loading="lazy"
             decoding="async"

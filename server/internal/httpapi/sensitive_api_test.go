@@ -1,9 +1,14 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -333,4 +338,201 @@ func TestMarkingIsNotAccessControl(t *testing.T) {
 		t.Errorf("a marked file became unfetchable (%d); marking covers media, "+
 			"it does not restrict who may read the room", fetched.Code)
 	}
+}
+
+/*
+TestSensitiveMediaIsObscuredByTheServer is the reason this is not a CSS blur.
+
+A client asked to draw a real image out of focus has been handed the real
+image: the blur comes off in the developer tools, and the file is in the cache
+regardless. What the server sends for marked media has to be something the
+detail cannot be recovered from.
+*/
+func TestSensitiveMediaIsObscuredByTheServer(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	attachmentID := uploadImage(t, handler, owner, roomID, "picha.png")
+	markSensitive(t, handler, owner, attachmentID, true)
+
+	covered := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview", nil, owner)
+	if covered.Code != http.StatusOK {
+		t.Fatalf("fetching a covered preview returned %d: %s",
+			covered.Code, truncate(covered.Body.String()))
+	}
+
+	revealed := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview?reveal=1", nil, owner)
+	if revealed.Code != http.StatusOK {
+		t.Fatalf("revealing returned %d", revealed.Code)
+	}
+
+	// Different bytes: the covered response is not the preview.
+	if bytes.Equal(covered.Body.Bytes(), revealed.Body.Bytes()) {
+		t.Error("the covered response is the real preview, so obscuring it is " +
+			"left to the client and comes off in the developer tools")
+	}
+}
+
+/*
+TestAnUnmarkedImageIsNotObscured keeps the cost where it belongs.
+
+Every image in every conversation goes through this handler. Obscuring one
+nobody marked would be a decode and a re-encode on the common path, for
+nothing.
+*/
+func TestAnUnmarkedImageIsNotObscured(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	attachmentID := uploadImage(t, handler, owner, roomID, "picha.png")
+
+	plain := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview", nil, owner)
+	revealed := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview?reveal=1", nil, owner)
+
+	if !bytes.Equal(plain.Body.Bytes(), revealed.Body.Bytes()) {
+		t.Error("an unmarked image was obscured")
+	}
+}
+
+/*
+TestObscuringFollowsTheOperatorsPolicy covers the server that has turned it
+off.
+
+The mark is still recorded — somebody said this needs covering — but a server
+whose operator decided not to cover anything serves it plainly. The two are
+separate decisions and both are honoured.
+*/
+func TestObscuringFollowsTheOperatorsPolicy(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	attachmentID := uploadImage(t, handler, owner, roomID, "picha.png")
+	markSensitive(t, handler, owner, attachmentID, true)
+
+	setSetting(t, handler, owner, "moderation.obscure_sensitive_media", "false")
+
+	plain := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview", nil, owner)
+	revealed := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview?reveal=1", nil, owner)
+
+	if !bytes.Equal(plain.Body.Bytes(), revealed.Body.Bytes()) {
+		t.Error("media was obscured on a server whose operator turned obscuring off")
+	}
+}
+
+/*
+TestAnObscuredPlaceholderIsNotCached is what keeps a lifted mark from being
+undone by a cache.
+
+A stored placeholder would keep being served after a moderator uncovered
+something, and a preview cached before a mark was applied would keep being
+served after it. Both are wrong; the second is the expensive one.
+*/
+func TestAnObscuredPlaceholderIsNotCached(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	attachmentID := uploadImage(t, handler, owner, roomID, "picha.png")
+	markSensitive(t, handler, owner, attachmentID, true)
+
+	covered := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview", nil, owner)
+
+	if cache := covered.Header().Get("Cache-Control"); !strings.Contains(cache, "no-store") {
+		t.Errorf("a placeholder has Cache-Control %q, expected no-store", cache)
+	}
+}
+
+/*
+TestMarkingAfterTheFactObscuresWhatWasAlreadySent covers the ordinary
+moderation case.
+
+Somebody posts something, a moderator marks it. The image was already in the
+conversation and already fetched by whoever was watching — but from the mark
+onwards it must arrive covered, or marking would only ever work in advance.
+*/
+func TestMarkingAfterTheFactObscuresWhatWasAlreadySent(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	member := registerAndSignIn(t, handler, "amina")
+	joinRoom(t, handler, member, roomID)
+
+	attachmentID := uploadImage(t, handler, member, roomID, "picha.png")
+
+	before := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview", nil, owner)
+
+	markSensitive(t, handler, owner, attachmentID, true)
+
+	after := call(t, handler, http.MethodGet,
+		"/api/attachments/"+attachmentID+"/preview", nil, owner)
+
+	if bytes.Equal(before.Body.Bytes(), after.Body.Bytes()) {
+		t.Error("marking something already sent did not change what is served")
+	}
+}
+
+/*
+uploadImage sends a real PNG, so the server detects an image and makes a
+preview.
+
+Generated rather than a fixture on disk: a placeholder is made by averaging
+pixels, and a test that fed it a file whose contents nobody can see from here
+would be a test nobody can reason about.
+*/
+func uploadImage(t *testing.T, handler http.Handler, token, roomID, filename string) string {
+	t.Helper()
+
+	// A checkerboard, for the same reason the generator's own tests use one:
+	// it is the hardest case for a reduction to preserve, so a placeholder
+	// that differs from it differs for the right reason.
+	img := image.NewRGBA(image.Rect(0, 0, 160, 120))
+	for y := range 120 {
+		for x := range 160 {
+			shade := color.RGBA{R: 20, G: 20, B: 20, A: 255}
+			if (x/4+y/4)%2 == 0 {
+				shade = color.RGBA{R: 235, G: 235, B: 235, A: 255}
+			}
+			img.Set(x, y, shade)
+		}
+	}
+
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, img); err != nil {
+		t.Fatalf("encoding a test image: %v", err)
+	}
+
+	recorder := uploadFile(t, handler, token, roomID, filename, encoded.Bytes())
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("uploading an image returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var uploaded struct {
+		ID         string `json:"id"`
+		PreviewURL string `json:"previewUrl"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &uploaded); err != nil {
+		t.Fatalf("decoding the upload: %v", err)
+	}
+	if uploaded.PreviewURL == "" {
+		t.Fatal("the uploaded image has no preview, so there is nothing to obscure")
+	}
+	return uploaded.ID
 }

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -423,6 +424,28 @@ func (s *Server) handleAttachmentPreview(c *echo.Context) error {
 		return roomError(err)
 	}
 
+	/*
+		Media marked sensitive is served obscured unless the viewer asks for
+		it, and the obscuring happens here rather than in the client.
+
+		A CSS blur would hand the browser the real image and ask it to draw it
+		out of focus — undone in one click of the developer tools, and sitting
+		in the cache in full regardless. What goes over the wire instead is a
+		placeholder with the detail averaged out of it, which cannot be
+		recovered because it was never sent.
+
+		?reveal=1 is what a viewer's click sends. It is not a security boundary
+		and does not pretend to be one: anybody entitled to read this room may
+		fetch the real preview, exactly as they always could. What it buys is
+		that the detail does not arrive unless somebody asked, which is what
+		obscuring is for.
+	*/
+	if attachment.Sensitive() &&
+		s.obscureSensitiveMedia(ctx) &&
+		c.QueryParam("reveal") == "" {
+		return s.streamObscured(c, ctx, attachment)
+	}
+
 	reader, err := s.attachments.OpenPreview(ctx, attachment)
 	if err != nil {
 		return attachmentError(err)
@@ -697,4 +720,52 @@ func (s *Server) handleMarkSensitive(c *echo.Context) error {
 		return attachmentError(err)
 	}
 	return c.JSON(http.StatusOK, attachmentResponseOf(updated))
+}
+
+/*
+streamObscured serves the placeholder shown in place of sensitive media.
+
+Generated per request rather than stored. A stored one would be a second file
+to keep in step with the first, to reclaim when the attachment goes, and to
+regenerate whenever a mark changes — where generating it costs a decode of an
+image that is already only a few kilobytes.
+
+A failure falls back to refusing rather than to the real preview. Serving the
+image because the placeholder could not be made would defeat the marking in
+precisely the circumstances nobody is watching.
+*/
+func (s *Server) streamObscured(
+	c *echo.Context,
+	ctx context.Context,
+	attachment *attachments.Attachment,
+) error {
+	reader, err := s.attachments.OpenPreview(ctx, attachment)
+	if err != nil {
+		return attachmentError(err)
+	}
+	defer reader.Close()
+
+	obscured, err := attachments.GenerateObscured(reader)
+	if err != nil {
+		s.log.Error("cannot obscure sensitive media",
+			"attachment", attachment.ID, "error", err)
+		return echo.NewHTTPError(http.StatusUnprocessableEntity,
+			"this media cannot be shown")
+	}
+
+	header := c.Response().Header()
+	header.Set("X-Content-Type-Options", "nosniff")
+	header.Set("Content-Security-Policy", "default-src 'none'; sandbox; frame-ancestors 'none'")
+	header.Set("X-Frame-Options", "DENY")
+	/*
+		Not cached, unlike the preview it stands in for.
+
+		A cached placeholder would still be served after a moderator lifted the
+		mark, and — worse in the other direction — a preview cached before a
+		mark was applied would keep being served after it. Sensitive media is
+		the case where a stale answer is the expensive one.
+	*/
+	header.Set("Cache-Control", "no-store")
+
+	return c.Blob(http.StatusOK, "image/png", obscured)
 }
