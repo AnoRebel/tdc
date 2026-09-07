@@ -187,6 +187,35 @@ const api = useApi();
  * to provide one.
  */
 const navigationOpen = inject<Ref<boolean>>("navigationOpen", ref(false));
+
+/*
+ * What the keyboard can do to a conversation.
+ *
+ * Registered with the layout, which owns the bindings: only this page knows
+ * where the message box is or which message is last, and only the layout knows
+ * that a key was pressed. A page that is not a conversation registers nothing
+ * and the keys do nothing, which is the right outcome rather than an error.
+ */
+const composerFocus = inject<Ref<(() => void) | null>>("composerFocus", ref(null));
+const threadOpen = inject<Ref<(() => void) | null>>("threadOpen", ref(null));
+
+onMounted(() => {
+  composerFocus.value = () => composer.value?.focus();
+
+  // The most recent message with something to reply to. Opening a thread on
+  // nothing would be a key that appears broken.
+  threadOpen.value = () => {
+    const last = [...visible.value].reverse().find((message) => !message.removed);
+    if (last) openThread(last.id);
+  };
+});
+
+// Cleared on leaving, so the keys do nothing rather than reaching into a
+// conversation that is no longer on screen.
+onUnmounted(() => {
+  composerFocus.value = null;
+  threadOpen.value = null;
+});
 const personal = usePersonalModeration();
 
 /** Who is about to be blocked, while the confirmation is up. */

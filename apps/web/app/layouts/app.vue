@@ -143,22 +143,61 @@ async function createRoom() {
 
 const searching = ref(false);
 
-/**
- * Opens search on the platform's own shortcut.
+const showingShortcuts = ref(false);
+
+/*
+ * The keyboard, bound once for the whole application.
  *
- * Command on a Mac, Control elsewhere, which is what every application these
- * people already use binds it to. Slash is not bound: this application has a
- * message box on most screens, and stealing a printable character from it
- * would be worse than having one shortcut.
+ * Here rather than in each page because a shortcut that worked on one screen
+ * and not another would be one nobody relies on. What the conversation itself
+ * needs — focusing the message box, opening a thread — is provided by the page
+ * currently showing, which is the only thing that knows what "the last
+ * message" means.
  */
-function onShortcut(event: KeyboardEvent) {
-  if (event.key !== "k" || !(event.metaKey || event.ctrlKey)) return;
-  event.preventDefault();
-  searching.value = !searching.value;
+useShortcuts({
+  search: () => (searching.value = !searching.value),
+  reference: () => (showingShortcuts.value = !showingShortcuts.value),
+
+  // Switching channel is search with the channels already in front of you;
+  // there is no second palette to write.
+  switchChannel: () => (searching.value = true),
+
+  previousChannel: () => moveChannel(-1),
+  nextChannel: () => moveChannel(1),
+
+  composer: () => composerFocus.value?.(),
+  thread: () => threadOpen.value?.(),
+});
+
+/*
+ * Moving between channels in the order the sidebar shows them.
+ *
+ * The joined ones only: stepping into a channel somebody has not joined would
+ * be joining it by accident, which is not what an arrow key should do.
+ */
+function moveChannel(direction: number) {
+  const rooms = joined.value;
+  if (!rooms.length) return;
+
+  const current = rooms.findIndex((room) => route.params.id === room.id);
+  // From anywhere else, the first channel — a person pressing this from
+  // settings means "take me to a conversation".
+  const next = current < 0 ? 0 : (current + direction + rooms.length) % rooms.length;
+
+  void router.push(`/rooms/${rooms[next]!.id}`);
 }
 
-onMounted(() => window.addEventListener("keydown", onShortcut));
-onBeforeUnmount(() => window.removeEventListener("keydown", onShortcut));
+/*
+ * What the conversation can do, registered by whichever page is showing.
+ *
+ * Refs rather than an event: the layout has to call these, and a page that is
+ * not a conversation simply never sets them — pressing the key then does
+ * nothing, which is the right outcome.
+ */
+const composerFocus = ref<(() => void) | null>(null);
+const threadOpen = ref<(() => void) | null>(null);
+provide("composerFocus", composerFocus);
+provide("threadOpen", threadOpen);
 
 // Available to pages that change room state, so the sidebar stays current.
 provide("refreshRooms", refresh);
@@ -213,6 +252,8 @@ provide("openSearch", () => {
     </main>
 
     <SearchPalette v-model="searching" />
+
+    <ShortcutReference v-model="showingShortcuts" />
 
     <!-- Creating a channel is a small, focused task, so it is a slide-over
          rather than a modal that dims the whole application. -->
