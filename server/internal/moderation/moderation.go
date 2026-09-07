@@ -287,3 +287,59 @@ func truncate(value string, limit int) string {
 	}
 	return string(runes[:limit])
 }
+
+/*
+FileAutomatically records a report the server raised itself.
+
+Separate from File because the two differ in ways that matter. There is no
+reporter, so the per-reporter rate limit does not apply and would divide by
+nobody if it did. And the reason a filter matched is not a person's judgement:
+it is a fact about the text, which is why the detail says which words hit
+rather than what somebody thought of them.
+
+The queue is shared with people's own reports on purpose. A separate queue for
+automatic flags is a queue somebody stops reading, and then the filter is
+decorative.
+*/
+func (s *Service) FileAutomatically(ctx context.Context, filing Filing) (Report, error) {
+	if !knownReason(filing.Reason) {
+		return Report{}, ErrUnknownReason
+	}
+
+	detail := strings.TrimSpace(filing.Detail)
+	if len([]rune(detail)) > maxDetail {
+		detail = string([]rune(detail)[:maxDetail])
+	}
+
+	row, err := s.queries.CreateReport(ctx, dbgen.CreateReportParams{
+		ID:      uuid.New(),
+		RoomID:  filing.RoomID,
+		EventID: optional(filing.EventID),
+		// A nil reporter is what marks this as the server's own doing. The
+		// column is nullable for exactly this.
+		ReporterID:      nil,
+		ReporterAddress: AutomaticReporter,
+		SubjectAddress:  filing.Subject,
+		Reason:          string(filing.Reason),
+		Detail:          detail,
+		ReportedBody:    truncate(filing.ReportedBody, 4000),
+	})
+	if err != nil {
+		return Report{}, fmt.Errorf("moderation: filing an automatic report: %w", err)
+	}
+
+	s.log.Info("content filter flagged a message",
+		"reportId", row.ID, "subject", row.SubjectAddress)
+
+	return reportOf(row), nil
+}
+
+/*
+AutomaticReporter is what stands in for a reporter when the server raised the
+report itself.
+
+A recognisable label rather than an empty string, so a moderator reading the
+queue can tell "the filter caught this" from "somebody reported this" — which
+changes how much weight the report deserves.
+*/
+const AutomaticReporter = "content filter"

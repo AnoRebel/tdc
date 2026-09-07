@@ -286,9 +286,29 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		}
 	}
 
-	event, err := s.rooms.SendMessage(ctx, roomID, user.ID, request.Body, request.ClientToken)
+	/*
+		The operator's content filter, applied before the message is accepted.
+
+		Blocking returns here, so a refused message is never stored. Masking
+		changes what is stored, which is why this runs before SendMessage
+		rather than after: a message stored and then edited would have existed
+		unmasked, and anything watching the timeline would have seen it.
+	*/
+	filtered, err := s.applyContentFilter(ctx, request.Body)
+	if err != nil {
+		return err
+	}
+
+	event, err := s.rooms.SendMessage(ctx, roomID, user.ID, filtered.Body, request.ClientToken)
 	if err != nil {
 		return roomError(err)
+	}
+
+	// Delivered first, then queued for review: a moderation queue that could
+	// not accept an entry must not turn a successful send into an error.
+	if filtered.Flagged {
+		s.flagForReview(c, roomID, event.ID,
+			s.rooms.UserAddress(user.Username), filtered.Matched, filtered.Body)
 	}
 
 	// Bound after the event exists, since the binding names it. Scoped to this
@@ -338,9 +358,21 @@ func (s *Server) handleEditMessage(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	event, err := s.rooms.EditMessage(ctx, roomID, user.ID, eventIDParam(c), request.Body)
+	// Edits are filtered too. Without this the filter is trivially walked
+	// around: send something harmless, then edit it into anything.
+	filtered, err := s.applyContentFilter(ctx, request.Body)
+	if err != nil {
+		return err
+	}
+
+	event, err := s.rooms.EditMessage(ctx, roomID, user.ID, eventIDParam(c), filtered.Body)
 	if err != nil {
 		return roomError(err)
+	}
+
+	if filtered.Flagged {
+		s.flagForReview(c, roomID, event.ID,
+			s.rooms.UserAddress(user.Username), filtered.Matched, filtered.Body)
 	}
 
 	s.publishEvent(ctx, event)

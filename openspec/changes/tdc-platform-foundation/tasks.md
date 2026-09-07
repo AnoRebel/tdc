@@ -118,7 +118,7 @@ Goal: a server an operator can actually run, configure, and moderate.
 - [ ] 7.4 Implement default language and branding applied without a rebuild; verify branding cannot hide the connected server's address (`platform/server-config`)
 - [x] 7.5 Implement the feature-toggle framework with runtime evaluation and capability advertisement; verify a disabled capability rejects requests and is absent from the advertised set (`platform/foundation`, `platform/server-config`)
 - [x] 7.6 Implement effective-configuration inspection with secret redaction and self-lockout prevention; verify a change removing the actor's own administration is refused or confirmed (`platform/server-config`)
-- [ ] 7.7 Implement content filters with block, flag, and mask actions, disabled by default; verify each behaves as configured and needs no external service (`platform/moderation`)
+- [x] 7.7 Implement content filters with block, flag, and mask actions, disabled by default; verify each behaves as configured and needs no external service (`platform/moderation`)
 - [ ] 7.8 Implement sensitive-media marking and obscuring; verify marked media is obscured until revealed and user marking works without a classifier (`platform/moderation`)
 - [x] 7.9 Implement reporting with reporter non-disclosure and rate limiting, and the moderation queue with context and recorded outcomes; verify the reported party never learns who reported them (`platform/moderation`)
 - [x] 7.10 Implement moderator actions — message removal, channel removal, suspension, posting restriction — audited and reversible; verify suspension invalidates sessions and temporary restrictions expire automatically (`platform/moderation`)

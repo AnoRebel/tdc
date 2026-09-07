@@ -59,10 +59,22 @@ func (s *Server) handleReplyInThread(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
+	// A reply is a message, and a filter that stopped at the top level would
+	// leave every thread unfiltered.
+	filtered, err := s.applyContentFilter(ctx, request.Body)
+	if err != nil {
+		return err
+	}
+
 	reply, err := s.rooms.ReplyInThread(ctx, roomID, user.ID,
-		eventIDParam(c), request.Body, request.ClientToken)
+		eventIDParam(c), filtered.Body, request.ClientToken)
 	if err != nil {
 		return roomError(err)
+	}
+
+	if filtered.Flagged {
+		s.flagForReview(c, roomID, reply.ID,
+			s.rooms.UserAddress(user.Username), filtered.Matched, filtered.Body)
 	}
 
 	// Sending clears any typing indication, so it does not linger after the

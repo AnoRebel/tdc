@@ -120,9 +120,26 @@ func (s *Server) handleScheduleMessage(c *echo.Context) error {
 		attachmentIDs = append(attachmentIDs, id)
 	}
 
+	/*
+		Filtered when it is scheduled rather than when it is sent.
+
+		Blocking has to refuse while somebody is here to be told: a message
+		accepted now and silently dropped in an hour is a message its author
+		believes was sent. Masking applies now for the same reason — what they
+		scheduled is what they can see they scheduled.
+
+		The cost is that a word added to the list afterwards does not catch
+		what is already queued. That is the right trade: the alternative
+		refuses a message with nobody to tell.
+	*/
+	filtered, err := s.applyContentFilter(c.Request().Context(), request.Body)
+	if err != nil {
+		return err
+	}
+
 	scheduled, err := s.rooms.Schedule(
 		c.Request().Context(), roomID, user.ID,
-		request.Body, attachmentIDs, request.ThreadRoot, sendAt)
+		filtered.Body, attachmentIDs, request.ThreadRoot, sendAt)
 
 	switch {
 	case errors.Is(err, rooms.ErrScheduledInThePast):

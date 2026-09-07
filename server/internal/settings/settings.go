@@ -30,6 +30,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/moderation"
 )
 
 // ErrUnknownSetting is returned for a key this server does not define.
@@ -66,6 +67,23 @@ const (
 	MaxChannels Key = "limits.max_channels"
 	// MaxStorageBytes bounds total attachment storage.
 	MaxStorageBytes Key = "limits.max_storage_bytes"
+
+	/*
+		FilterWords is the operator's own list of words to act on, comma
+		separated. Empty — the default — is filtering switched off, which makes
+		"disabled by default" the absence of configuration rather than a
+		separate switch to forget.
+	*/
+	FilterWords Key = "filter.words"
+	/*
+		FilterAction is what happens to a message that matches: "flag", "mask"
+		or "block".
+
+		Flagging by default. A word list cannot tell a slur from a discussion
+		of one, so the filter decides what a human is shown rather than
+		deciding on its own.
+	*/
+	FilterAction Key = "filter.action"
 )
 
 // definition describes one setting: how to validate it, and what it means when
@@ -108,6 +126,23 @@ var definitions = map[Key]definition{
 					return fmt.Errorf("%w: %q should be a bare domain like example.com",
 						ErrInvalidValue, domain)
 				}
+			}
+			return nil
+		},
+	},
+	FilterWords: {
+		fallback:    "",
+		description: "Words to act on, comma separated. Empty means no filtering.",
+		// No validation beyond what the filter itself does. Entries are matched
+		// literally rather than as patterns, so there is no input here that can
+		// be malformed — only a list an operator may regret.
+	},
+	FilterAction: {
+		fallback:    "flag",
+		description: `What happens to a matching message: "flag", "mask" or "block".`,
+		validate: func(value string) error {
+			if !moderation.KnownAction(moderation.Action(value)) {
+				return fmt.Errorf(`%w: expected "flag", "mask" or "block"`, ErrInvalidValue)
 			}
 			return nil
 		},

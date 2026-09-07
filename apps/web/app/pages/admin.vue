@@ -54,7 +54,35 @@ const groups = computed(() => {
 const groupTitles: Record<string, string> = {
   registration: "Who may join",
   limits: "Capacity",
+  filter: "Content filter",
 };
+
+/*
+ * Settings whose values come from a fixed set get a menu rather than a text
+ * box.
+ *
+ * The server validates either way, so this is not what makes a wrong value
+ * impossible — it is what stops an operator discovering the valid values by
+ * being refused. The lists match the server's own; a value it accepts that is
+ * missing here would simply not be offered, which is a smaller failure than
+ * offering one it refuses.
+ */
+const choices: Record<string, { value: string; label: string }[]> = {
+  "registration.policy": [
+    { value: "open", label: "Anybody may register" },
+    { value: "invitation", label: "Only with an invitation" },
+    { value: "closed", label: "Nobody — the operator creates accounts" },
+    { value: "domain", label: "Only these email domains" },
+  ],
+  "filter.action": [
+    { value: "flag", label: "Deliver it, and show a moderator" },
+    { value: "mask", label: "Deliver it with the words replaced" },
+    { value: "block", label: "Refuse the message" },
+  ],
+};
+
+/** Settings better typed into a box than a line. */
+const multiline = new Set(["filter.words", "registration.domains"]);
 
 /** The last segment of a key, as a label. */
 function settingLabel(key: string): string {
@@ -249,7 +277,35 @@ function bytes(value: number): string {
                 {{ settingLabel(setting.key) }}
               </label>
               <p class="mt-0.5 text-xs text-muted-foreground">{{ setting.description }}</p>
+              <select
+                v-if="choices[setting.key]"
+                :id="setting.key"
+                :value="setting.value"
+                class="input mt-1.5"
+                :disabled="saving === setting.key"
+                @change="save(setting.key, ($event.target as HTMLSelectElement).value)"
+              >
+                <option
+                  v-for="choice in choices[setting.key]"
+                  :key="choice.value"
+                  :value="choice.value"
+                >
+                  {{ choice.label }}
+                </option>
+              </select>
+
+              <textarea
+                v-else-if="multiline.has(setting.key)"
+                :id="setting.key"
+                :value="setting.value"
+                rows="3"
+                class="input mt-1.5 h-auto py-2"
+                :disabled="saving === setting.key"
+                @change="save(setting.key, ($event.target as HTMLTextAreaElement).value)"
+              />
+
               <input
+                v-else
                 :id="setting.key"
                 :value="setting.value"
                 class="input mt-1.5"
