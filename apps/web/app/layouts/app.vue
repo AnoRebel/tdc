@@ -251,7 +251,11 @@ provide("openSearch", () => {
       <slot />
     </main>
 
-    <SearchPalette v-model="searching" />
+    <SearchPalette
+      v-model="searching"
+      @shortcuts="showingShortcuts = true"
+      @create-channel="creating = true"
+    />
 
     <ShortcutReference v-model="showingShortcuts" />
 

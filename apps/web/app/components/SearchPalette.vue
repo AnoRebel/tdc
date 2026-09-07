@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PersonHit, RoomHit } from "@tdc/types";
+import type { Command } from "~/composables/useCommands";
 import { Hash, Lock, MessageSquare, Search, User } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
 import { Kbd } from "~/components/ui/kbd";
@@ -16,6 +17,13 @@ import { Spinner } from "~/components/ui/spinner";
 const open = defineModel<boolean>({ default: false });
 
 const { query, results, searching, failed, total, isEmpty, search, clear } = useSearch();
+
+const emit = defineEmits<{ shortcuts: []; createChannel: [] }>();
+
+const { matching } = useCommands({
+  openShortcuts: () => emit("shortcuts"),
+  createChannel: () => emit("createChannel"),
+});
 const rooms = useRooms();
 const router = useRouter();
 
@@ -32,11 +40,27 @@ const joining = ref<string>();
  * palette feel unreliable.
  */
 type Entry =
+  | { kind: "command"; command: Command }
   | { kind: "room"; room: RoomHit }
   | { kind: "person"; person: PersonHit }
   | { kind: "message"; index: number };
 
+/*
+ * Commands share this box rather than having one of their own.
+ *
+ * Two palettes on adjacent shortcuts is two things to learn and a decision to
+ * make before typing — and the decision is one nobody wants to make, because
+ * "take me to the audit log" and "find the audit log" are the same intention.
+ * One box answers both.
+ *
+ * Commands come first: they are matched locally and appear as somebody types,
+ * where search results arrive after a round trip. Putting them below would
+ * mean the list reordering under the selection as the answer arrives.
+ */
+const commands = computed(() => matching(query.value));
+
 const entries = computed<Entry[]>(() => [
+  ...commands.value.map((command) => ({ kind: "command" as const, command })),
   ...results.value.rooms.map((room) => ({ kind: "room" as const, room })),
   ...results.value.people.map((person) => ({ kind: "person" as const, person })),
   ...results.value.messages.map((_, index) => ({ kind: "message" as const, index })),
@@ -69,6 +93,14 @@ function move(delta: number) {
 
 async function choose(entry: Entry | undefined) {
   if (!entry) return;
+
+  if (entry.kind === "command") {
+    // Closed first: a command that navigates would otherwise leave the palette
+    // covering wherever it went.
+    open.value = false;
+    await entry.command.run();
+    return;
+  }
 
   if (entry.kind === "room") {
     await openRoom(entry.room);
@@ -155,7 +187,16 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 /** The index a section's first row occupies in the flattened list. */
-const peopleFrom = computed(() => results.value.rooms.length);
+/*
+ * Where each section begins in the flattened list.
+ *
+ * Every one derives from the section before it, including the first — which
+ * used to be implicitly zero, so adding a section above it silently put two
+ * rows under the same index and highlighted both.
+ */
+const commandsFrom = computed(() => 0);
+const roomsFrom = computed(() => commandsFrom.value + commands.value.length);
+const peopleFrom = computed(() => roomsFrom.value + results.value.rooms.length);
 const messagesFrom = computed(() => peopleFrom.value + results.value.people.length);
 
 function iconFor(room: RoomHit) {
@@ -204,7 +245,36 @@ function iconFor(room: RoomHit) {
           </div>
 
           <div class="max-h-[60vh] overflow-y-auto p-1.5">
-            <p v-if="!query.trim()" class="px-2 py-8 text-center text-xs text-muted-foreground">
+            <!--
+              Commands, which are matched here rather than on the server and so
+              are shown before anything has been typed. That is what makes the
+              palette browsable: somebody who cannot remember what it can do
+              opens it and reads.
+            -->
+            <section v-if="commands.length">
+              <h2
+                class="px-2 pt-1.5 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
+              >
+                Actions
+              </h2>
+              <button
+                v-for="(command, index) in commands"
+                :key="command.id"
+                type="button"
+                class="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors"
+                :class="active === commandsFrom + index ? 'bg-accent' : 'hover:bg-accent/60'"
+                @click="choose({ kind: 'command', command })"
+                @mousemove="active = commandsFrom + index"
+              >
+                <component :is="command.icon" class="size-4 shrink-0 text-muted-foreground" />
+                <span class="min-w-0 flex-1 truncate text-sm">{{ command.label }}</span>
+              </button>
+            </section>
+
+            <p
+              v-if="!query.trim() && !commands.length"
+              class="px-2 py-8 text-center text-xs text-muted-foreground"
+            >
               Find a channel, somebody to talk to, or something that was said.
             </p>
 
@@ -212,7 +282,12 @@ function iconFor(room: RoomHit) {
               The search could not be completed. Try again.
             </p>
 
-            <p v-else-if="isEmpty" class="px-2 py-8 text-center text-xs text-muted-foreground">
+            <!-- Only when the commands found nothing either: a query matching
+                 an action but no message has not come up empty. -->
+            <p
+              v-else-if="isEmpty && !commands.length"
+              class="px-2 py-8 text-center text-xs text-muted-foreground"
+            >
               Nothing matches &ldquo;{{ query.trim() }}&rdquo;.
             </p>
 
@@ -228,9 +303,9 @@ function iconFor(room: RoomHit) {
                   :key="room.id"
                   type="button"
                   class="palette-row"
-                  :data-active="active === index"
+                  :data-active="active === roomsFrom + index"
                   @click="choose({ kind: 'room', room })"
-                  @mousemove="active = index"
+                  @mousemove="active = roomsFrom + index"
                 >
                   <component :is="iconFor(room)" class="size-4 shrink-0 text-muted-foreground" />
                   <span class="truncate font-medium">{{ room.name }}</span>
