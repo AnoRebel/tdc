@@ -21,6 +21,18 @@ var (
 	// take effect at, such as server administration attached to a channel.
 	ErrScopeNotAllowed = errors.New("permission cannot be granted at this scope")
 
+	/*
+		ErrWouldLockYourselfOut reports a change that would remove the actor's
+		own ability to administer the server.
+
+		Distinct from ErrLastAdministrator, which protects the server. This
+		protects the person making the change: the server stays administered,
+		but they can no longer reach it, and getting back in means asking
+		somebody else. Confirmable rather than refused outright, because
+		stepping down is a legitimate thing to do.
+	*/
+	ErrWouldLockYourselfOut = errors.New("this would remove your own ability to administer this server")
+
 	// ErrLastAdministrator reports a change that would leave the server with
 	// nobody able to administer it.
 	ErrLastAdministrator = errors.New("this would leave the server with no administrator")
@@ -70,17 +82,26 @@ func (s *Service) PermissionsFor(ctx context.Context, userID uuid.UUID) (Permiss
 	return Resolve(grants), nil
 }
 
-// SetRolePermission grants or denies a permission on a role.
-//
-// The permission must exist and must be grantable at the scope given, so an
-// unusable grant is refused at the point it is written rather than stored and
-// ignored at evaluation.
+/*
+SetRolePermission grants or denies a permission on a role.
+
+The permission must exist and must be grantable at the scope given, so an
+unusable grant is refused at the point it is written rather than stored and
+ignored at evaluation.
+
+Withdrawing an administrative permission is checked twice: that somebody is
+left able to administer the server, and that the person making the change is
+not removing it from a role they hold themselves. actor is who is making the
+change; confirmed lets them proceed anyway, having been told.
+*/
 func (s *Service) SetRolePermission(
 	ctx context.Context,
 	roleID uuid.UUID,
 	permission Permission,
 	channelID *uuid.UUID,
 	granted bool,
+	actor uuid.UUID,
+	confirmed bool,
 ) error {
 	definition, known := Lookup(permission)
 	if !known {
@@ -101,6 +122,18 @@ func (s *Service) SetRolePermission(
 	if !granted && channelID == nil && definition.Administrative {
 		if err := s.ensureAdministratorRemains(ctx, permission, roleID); err != nil {
 			return err
+		}
+
+		// And could strand the person making the change, which the check above
+		// does not catch: the server stays administered by everybody else.
+		if !confirmed {
+			held, err := s.userHoldsRole(ctx, actor, roleID)
+			if err != nil {
+				return err
+			}
+			if held {
+				return ErrWouldLockYourselfOut
+			}
 		}
 	}
 
@@ -128,11 +161,31 @@ func (s *Service) AssignRole(ctx context.Context, userID, roleID uuid.UUID, gran
 	return nil
 }
 
-// RemoveRole takes a role away from a user.
-//
-// Refused when it would remove the last account able to administer the server:
-// a server with no administrator cannot be recovered through the application.
-func (s *Service) RemoveRole(ctx context.Context, userID, roleID uuid.UUID) error {
+/*
+RemoveRole takes a role away from a user.
+
+Refused in two cases, which protect different things.
+
+The first is leaving the server with no administrator at all: a server nobody
+can administer cannot be recovered through the application, only through the
+database.
+
+The second is somebody removing their own administration. That leaves the
+server perfectly well administered by other people and the actor locked out of
+it — recoverable, but only by asking one of them, and not at all if there is
+nobody to ask in practice. Somebody who genuinely means to step down passes
+confirmed, which is a deliberate act rather than a click that did more than it
+appeared to.
+
+actor is who is making the change, which is not always the person losing the
+role.
+*/
+func (s *Service) RemoveRole(
+	ctx context.Context,
+	userID, roleID uuid.UUID,
+	actor uuid.UUID,
+	confirmed bool,
+) error {
 	confers, err := s.roleConfersAdministration(ctx, roleID)
 	if err != nil {
 		return err
@@ -145,6 +198,10 @@ func (s *Service) RemoveRole(ctx context.Context, userID, roleID uuid.UUID) erro
 		}
 		if remaining <= 1 {
 			return ErrLastAdministrator
+		}
+
+		if userID == actor && !confirmed {
+			return ErrWouldLockYourselfOut
 		}
 	}
 
@@ -233,6 +290,23 @@ func (s *Service) roleConfersAdministration(ctx context.Context, roleID uuid.UUI
 	return false, nil
 }
 
+// userHoldsRole reports whether somebody currently holds a role.
+//
+// Used to tell a change that costs the actor their own access from one that
+// costs somebody else theirs.
+func (s *Service) userHoldsRole(ctx context.Context, userID, roleID uuid.UUID) (bool, error) {
+	roles, err := s.store.ListRolesForUser(ctx, userID)
+	if err != nil {
+		return false, fmt.Errorf("list roles for user: %w", err)
+	}
+	for _, role := range roles {
+		if role.ID == roleID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *Service) administratorCount(ctx context.Context) (int64, error) {
 	count, err := s.store.CountUsersWithPermission(ctx, string(PermServerAdminister))
 	if err != nil {
@@ -272,7 +346,11 @@ func (s *Service) EnsureRole(
 	}
 
 	for _, permission := range permissions {
-		if err := s.SetRolePermission(ctx, role.ID, permission, nil, true); err != nil {
+		// Granting, not withdrawing, and during setup where there is no actor
+		// — neither lockout check can apply.
+		if err := s.SetRolePermission(
+			ctx, role.ID, permission, nil, true, uuid.Nil, false,
+		); err != nil {
 			return dbgen.Role{}, err
 		}
 	}

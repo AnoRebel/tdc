@@ -359,3 +359,14 @@ func (s *Service) raw(ctx context.Context, key Key) string {
 	value, _ := s.cached(key)
 	return value
 }
+
+// IsSecret reports whether a setting's value must be redacted wherever it is
+// displayed, logged or exported.
+//
+// Exported so that callers outside this package — the audit log, in
+// particular — can avoid recording a credential rather than having to know
+// which keys are sensitive.
+func IsSecret(key Key) bool {
+	definition, known := definitions[key]
+	return known && definition.secret
+}

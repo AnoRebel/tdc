@@ -17,6 +17,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
 	"github.com/AnoRebel/tdc/server/internal/cache"
+	"github.com/AnoRebel/tdc/server/internal/config"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/gifs"
@@ -77,6 +78,22 @@ type Config struct {
 	// because the right interval depends on what sits between the client and
 	// the server, and because a phone on metered data pays for each one.
 	Keepalive time.Duration
+
+	/*
+		EffectiveConfiguration is the startup configuration as it was resolved,
+		each value carrying whether it came from a default, the file or the
+		environment.
+
+		Passed in already described rather than handing this package the whole
+		config: what an administrator inspects is a list of keys, values and
+		origins, and the API layer has no other use for the configuration
+		machinery. Secrets are redacted before they arrive here, so there is no
+		path by which this package could serve one even by mistake.
+	*/
+	EffectiveConfiguration []config.Setting
+	// ConfigurationWarnings are settings that are valid but unsafe to run with,
+	// so an operator is told rather than silently running an exposed server.
+	ConfigurationWarnings []string
 }
 
 // Server owns the HTTP listener and the routes mounted on it.

@@ -232,6 +232,11 @@ func (s *Server) routes() {
 	// Feature toggles. Listed and changed separately from settings because a
 	// toggle is on or off where a setting is free text, and because one
 	// governs both what is advertised and what is accepted.
+	// The startup configuration, read-only: these come from the environment or
+	// the configuration file and cannot change without a restart.
+	admin.GET("/configuration", s.handleInspectConfiguration,
+		requirePermission(authz.PermServerConfigure))
+
 	admin.GET("/features", s.handleListFeatures,
 		requirePermission(authz.PermServerConfigure))
 	admin.PUT("/features/:feature", s.handleSetFeature,

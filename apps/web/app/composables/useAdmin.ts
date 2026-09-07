@@ -8,6 +8,21 @@ export interface ServerSetting {
   fallback: string;
 }
 
+/**
+ * One startup configuration value, as resolved.
+ *
+ * Read-only: these come from the environment or the configuration file and
+ * cannot change without a restart.
+ */
+export interface ConfigurationValue {
+  key: string;
+  value: string;
+  /** "default", "file" or "environment". */
+  source: string;
+  /** True when the value shown is a redaction rather than the real one. */
+  secret: boolean;
+}
+
 /** What a server currently holds against what it will allow. */
 export interface Usage {
   users: { used: number; limit: number };
@@ -29,25 +44,32 @@ export function useServerAdmin() {
   const settings = ref<ServerSetting[]>([]);
   const features = ref<FeatureToggle[]>([]);
   const usage = ref<Usage | null>(null);
+  const configuration = ref<ConfigurationValue[]>([]);
+  const warnings = ref<string[]>([]);
   const failed = ref(false);
   const loading = ref(false);
 
   async function refresh() {
     loading.value = true;
     try {
-      const [loadedSettings, loadedFeatures, loadedUsage] = await Promise.all([
+      const [loadedSettings, loadedFeatures, loadedUsage, loadedConfiguration] = await Promise.all([
         api.get<ServerSetting[]>("/api/admin/settings"),
         api.get<FeatureToggle[]>("/api/admin/features"),
         api.get<Usage>("/api/admin/usage"),
+        api.get<{ values: ConfigurationValue[]; warnings: string[] }>("/api/admin/configuration"),
       ]);
       settings.value = loadedSettings;
       features.value = loadedFeatures;
       usage.value = loadedUsage;
+      configuration.value = loadedConfiguration.values;
+      warnings.value = loadedConfiguration.warnings;
       failed.value = false;
     } catch {
       settings.value = [];
       features.value = [];
       usage.value = null;
+      configuration.value = [];
+      warnings.value = [];
       failed.value = true;
     } finally {
       loading.value = false;
@@ -86,5 +108,16 @@ export function useServerAdmin() {
     }
   }
 
-  return { settings, features, usage, failed, loading, refresh, setSetting, setFeature };
+  return {
+    settings,
+    features,
+    usage,
+    configuration,
+    warnings,
+    failed,
+    loading,
+    refresh,
+    setSetting,
+    setFeature,
+  };
 }

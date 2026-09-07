@@ -16,6 +16,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/cache"
+	"github.com/AnoRebel/tdc/server/internal/config"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/dbtest"
@@ -130,15 +131,23 @@ func newTestAPIConfigured(
 	}
 
 	server := httpapi.New(httpapi.Config{
-		Address:         "127.0.0.1:0",
-		ReadTimeout:     5 * time.Second,
-		WriteTimeout:    5 * time.Second,
-		IdleTimeout:     10 * time.Second,
-		ShutdownTimeout: 2 * time.Second,
-		ServerName:      "Test Server",
-		DefaultLanguage: "en",
-		SessionLifetime: time.Hour,
-		WebRoot:         webRootForTest,
+		// Described from the same loader the real server uses, so the
+		// inspection endpoint is exercised against real shapes — sources,
+		// redaction and all — rather than a fixture that agrees with itself.
+		//
+		// Carrying a credential deliberately: the default configuration has an
+		// empty database URL, and a redaction test against a value with no
+		// password in it passes whether redaction runs or not.
+		EffectiveConfiguration: configurationForTest(),
+		Address:                "127.0.0.1:0",
+		ReadTimeout:            5 * time.Second,
+		WriteTimeout:           5 * time.Second,
+		IdleTimeout:            10 * time.Second,
+		ShutdownTimeout:        2 * time.Second,
+		ServerName:             "Test Server",
+		DefaultLanguage:        "en",
+		SessionLifetime:        time.Hour,
+		WebRoot:                webRootForTest,
 		// Off so the test client's cookie jar behaves as a browser would over
 		// plain HTTP.
 		SecureCookies:  false,
@@ -610,3 +619,16 @@ func (h settledHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handler.ServeHTTP(w, r)
 	h.server.WaitForBackground()
 }
+
+// configurationForTest is a configuration shaped like a real deployment's,
+// including a secret that must never appear in what the server serves.
+func configurationForTest() []config.Setting {
+	cfg := config.Default()
+	cfg.Database.URL = "postgres://tdc:" + secretInTestConfig +
+		"@db.example.test:5432/tdc?sslmode=require"
+	return cfg.Describe("")
+}
+
+// secretInTestConfig is the password the configuration view must never
+// disclose. Named so a test asserting its absence says what it is looking for.
+const secretInTestConfig = "a-password-that-must-not-leak"

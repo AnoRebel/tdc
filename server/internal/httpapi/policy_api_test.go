@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -302,5 +303,176 @@ func TestSettingsNeedPermission(t *testing.T) {
 			t.Errorf("%s %s succeeded without the configure permission",
 				probe.method, probe.path)
 		}
+	}
+}
+
+/*
+TestASettingChangeRecordsBothValues is what makes the audit log usable rather
+than merely present.
+
+"Somebody set the registration policy to closed" leaves a reader unable to tell
+a real change from a re-application of what was already there, and unable to
+put it back without guessing what it had been.
+*/
+func TestASettingChangeRecordsBothValues(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	// Open by default, so there is a previous value worth recording.
+	setSetting(t, handler, owner, "registration.policy", "closed")
+
+	recorder := call(t, handler, http.MethodGet, "/api/admin/audit?limit=20", nil, owner)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("reading the audit log returned %d", recorder.Code)
+	}
+
+	// The endpoint returns detail as the raw JSON it was stored as, so this
+	// decodes it in two steps rather than assuming a shape the API does not
+	// promise.
+	var entries []struct {
+		Action string `json:"action"`
+		Detail string `json:"detail"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &entries); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+
+	found := false
+	for _, entry := range entries {
+		if entry.Detail == "" {
+			continue
+		}
+
+		var detail struct {
+			From string `json:"from"`
+			To   string `json:"to"`
+		}
+		if err := json.Unmarshal([]byte(entry.Detail), &detail); err != nil {
+			continue
+		}
+
+		if detail.From == "open" && detail.To == "closed" {
+			found = true
+		}
+	}
+
+	if !found {
+		t.Errorf("no audit entry recorded the change from open to closed: %s",
+			truncate(recorder.Body.String()))
+	}
+}
+
+/*
+TestConfigurationIsInspectableWithItsSources is the other half of 7.6.
+
+An operator debugging a deployment needs to know whether a value was chosen or
+merely defaulted — the usual confusion being a variable set in the wrong place,
+which looks identical to one not set at all until the source is shown.
+*/
+func TestConfigurationIsInspectableWithItsSources(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	recorder := call(t, handler, http.MethodGet, "/api/admin/configuration", nil, owner)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("inspecting configuration returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var response struct {
+		Values []struct {
+			Key    string `json:"key"`
+			Value  string `json:"value"`
+			Source string `json:"source"`
+			Secret bool   `json:"secret"`
+		} `json:"values"`
+		Warnings []string `json:"warnings"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+
+	if len(response.Values) == 0 {
+		t.Fatal("no configuration was returned")
+	}
+
+	for _, value := range response.Values {
+		switch value.Source {
+		case "default", "file", "environment":
+		default:
+			t.Errorf("%s has source %q, expected default, file or environment",
+				value.Key, value.Source)
+		}
+	}
+}
+
+/*
+TestConfigurationNeverDisclosesASecret is the rule that lets this be shown at
+all.
+
+The database URL carries a password. An administrator inspecting configuration
+needs to confirm the host and database name, so the value keeps its shape and
+loses the password rather than being replaced wholesale — but the password
+itself must not appear, here or anywhere this response is copied to.
+*/
+func TestConfigurationNeverDisclosesASecret(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	recorder := call(t, handler, http.MethodGet, "/api/admin/configuration", nil, owner)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("inspecting configuration returned %d", recorder.Code)
+	}
+
+	body := recorder.Body.String()
+
+	// The password the test configuration carries. If redaction is working it
+	// is absent however the URL is otherwise displayed.
+	if strings.Contains(body, secretInTestConfig) {
+		t.Errorf("the database password appears in the configuration view: %s",
+			truncate(body))
+	}
+
+	// And the rest of the URL survives, because an operator checking
+	// configuration needs to confirm the host and database name — replacing
+	// the whole value would defeat the point of showing it.
+	if !strings.Contains(body, "db.example.test") {
+		t.Error("the database host was redacted along with the password, " +
+			"leaving nothing to check")
+	}
+
+	var response struct {
+		Values []struct {
+			Key    string `json:"key"`
+			Secret bool   `json:"secret"`
+		} `json:"values"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+
+	marked := false
+	for _, value := range response.Values {
+		if value.Key == "database.url" && value.Secret {
+			marked = true
+		}
+	}
+	if !marked {
+		t.Error("the database URL is not marked secret, so a reader cannot " +
+			"tell a redacted value from a real one")
+	}
+}
+
+// TestConfigurationNeedsPermission keeps a deployment's shape out of ordinary
+// hands.
+func TestConfigurationNeedsPermission(t *testing.T) {
+	handler := newTestAPI(t)
+	completeSetup(t, handler)
+
+	ordinary := registerAndSignIn(t, handler, "amina")
+
+	recorder := call(t, handler, http.MethodGet, "/api/admin/configuration", nil, ordinary)
+	if recorder.Code == http.StatusOK {
+		t.Error("an ordinary account could inspect the server's configuration")
 	}
 }

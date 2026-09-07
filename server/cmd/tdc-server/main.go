@@ -178,21 +178,26 @@ func run() error {
 	go deliverScheduledPeriodically(ctx, services.Rooms, services.Attachments, log)
 
 	server := httpapi.New(httpapi.Config{
-		Address:              cfg.Server.Address,
-		ReadTimeout:          cfg.Server.ReadTimeout,
-		WriteTimeout:         cfg.Server.WriteTimeout,
-		IdleTimeout:          cfg.Server.IdleTimeout,
-		ShutdownTimeout:      cfg.Server.ShutdownTimeout,
-		ExposeInternalErrors: cfg.Server.ExposeInternalErrors,
-		WebRoot:              cfg.Server.WebRoot,
-		ServerName:           cfg.Server.Name,
-		ServerDescription:    cfg.Server.Description,
-		CanonicalAddress:     cfg.Server.CanonicalAddress,
-		DefaultLanguage:      cfg.Server.DefaultLanguage,
-		AllowedOrigins:       cfg.Server.AllowedOrigins,
-		SecureCookies:        cfg.Server.SecureCookies,
-		SessionLifetime:      cfg.Server.SessionLifetime,
-		Keepalive:            cfg.Server.Keepalive,
+		// Described once at startup: the values cannot change without a
+		// restart, so re-resolving them per request would report the same
+		// thing after paying to look it up.
+		EffectiveConfiguration: cfg.Describe(*configPath),
+		ConfigurationWarnings:  cfg.Warnings(),
+		Address:                cfg.Server.Address,
+		ReadTimeout:            cfg.Server.ReadTimeout,
+		WriteTimeout:           cfg.Server.WriteTimeout,
+		IdleTimeout:            cfg.Server.IdleTimeout,
+		ShutdownTimeout:        cfg.Server.ShutdownTimeout,
+		ExposeInternalErrors:   cfg.Server.ExposeInternalErrors,
+		WebRoot:                cfg.Server.WebRoot,
+		ServerName:             cfg.Server.Name,
+		ServerDescription:      cfg.Server.Description,
+		CanonicalAddress:       cfg.Server.CanonicalAddress,
+		DefaultLanguage:        cfg.Server.DefaultLanguage,
+		AllowedOrigins:         cfg.Server.AllowedOrigins,
+		SecureCookies:          cfg.Server.SecureCookies,
+		SessionLifetime:        cfg.Server.SessionLifetime,
+		Keepalive:              cfg.Server.Keepalive,
 	}, pool, services, log)
 
 	return server.Run(ctx)

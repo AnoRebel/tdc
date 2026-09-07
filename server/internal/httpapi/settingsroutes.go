@@ -58,6 +58,12 @@ func (s *Server) handleSetSetting(c *echo.Context) error {
 
 	key := settings.Key(c.Param("key"))
 
+	// Read before writing, so the audit entry can record what the value was as
+	// well as what it became. "Somebody changed the registration policy" does
+	// not answer "why did registration stop working on Tuesday"; knowing it
+	// went from open to closed does.
+	previous := s.settings.Get(c.Request().Context(), key)
+
 	err := s.settings.Set(c.Request().Context(), key, request.Value,
 		s.rooms.UserAddress(user.Username))
 
@@ -76,9 +82,20 @@ func (s *Server) handleSetSetting(c *echo.Context) error {
 		Recorded, because changing who may register or how much a server holds
 		is exactly the sort of change somebody later needs to account for.
 
-		The value is included: "somebody changed the registration policy" is
-		not an answer to "why did registration stop working on Tuesday".
+		Both values, not just the new one. A log saying a setting became
+		"closed" leaves the reader unable to tell a deliberate change from a
+		re-application of what was already there, and unable to put it back
+		without guessing.
+
+		A secret's values are not recorded even here. The audit log is read by
+		more people than the settings page and is exported; a credential that
+		reached it would outlive the rotation that was supposed to retire it.
 	*/
+	recorded := map[string]any{"from": previous, "to": request.Value}
+	if settings.IsSecret(key) {
+		recorded = map[string]any{"from": "redacted", "to": "redacted"}
+	}
+
 	if err := s.audit.Record(c.Request().Context(), audit.Entry{
 		ActorID:    &user.ID,
 		ActorLabel: user.Username,
@@ -87,7 +104,7 @@ func (s *Server) handleSetSetting(c *echo.Context) error {
 		TargetID:   string(key),
 		SourceIP:   requestIP(c),
 		UserAgent:  c.Request().UserAgent(),
-		Detail:     map[string]any{"value": request.Value},
+		Detail:     recorded,
 	}); err != nil {
 		s.log.Error("cannot record a setting change", "key", key, "error", err)
 	}
@@ -186,4 +203,53 @@ func (s *Server) handleSetFeature(c *echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+type configurationValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	// Source is "default", "file" or "environment". An operator debugging a
+	// deployment needs to know whether a value was chosen or merely inherited
+	// — the usual confusion being a variable set in the wrong place, which
+	// looks identical to one not set at all until the source is shown.
+	Source string `json:"source"`
+	// Secret marks a value that was redacted before it left the server, so the
+	// reader knows they are looking at a placeholder rather than the value.
+	Secret bool `json:"secret"`
+}
+
+type configurationResponse struct {
+	Values []configurationValue `json:"values"`
+	// Warnings are settings that are valid but unsafe to run with.
+	Warnings []string `json:"warnings"`
+}
+
+/*
+handleInspectConfiguration shows the startup configuration as it was resolved.
+
+Distinct from the settings endpoint above, and deliberately read-only. These
+values come from the environment or the configuration file and cannot change
+without a restart; showing them beside a control that implied otherwise would
+be worse than not showing them at all.
+
+Redaction happens when the configuration is described, before it reaches this
+package, so a credential has no path to this response even by mistake.
+*/
+func (s *Server) handleInspectConfiguration(c *echo.Context) error {
+	values := make([]configurationValue, 0, len(s.config.EffectiveConfiguration))
+	for _, setting := range s.config.EffectiveConfiguration {
+		values = append(values, configurationValue{
+			Key:    setting.Key,
+			Value:  setting.Value,
+			Source: setting.Source,
+			Secret: setting.Secret,
+		})
+	}
+
+	warnings := s.config.ConfigurationWarnings
+	if warnings == nil {
+		warnings = []string{}
+	}
+
+	return c.JSON(http.StatusOK, configurationResponse{Values: values, Warnings: warnings})
 }

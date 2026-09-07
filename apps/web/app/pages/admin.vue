@@ -221,6 +221,25 @@ function bytes(value: number): string {
           </ul>
         </section>
 
+        <!-- Unsafe-but-valid settings, said plainly and near the top: an
+             operator who has to scroll past the whole configuration to find
+             out their server exposes internal errors will not find out. -->
+        <section v-if="admin.warnings.value.length">
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-warning">
+            <TriangleAlert class="size-4" />
+            Worth checking
+          </h2>
+          <ul class="mt-3 space-y-1.5">
+            <li
+              v-for="warning in admin.warnings.value"
+              :key="warning"
+              class="rounded-lg border border-warning/30 bg-warning/8 px-3 py-2 text-sm"
+            >
+              {{ warning }}
+            </li>
+          </ul>
+        </section>
+
         <section v-for="group in groups" :key="group.prefix">
           <h2 class="text-sm font-semibold">{{ group.title }}</h2>
 
@@ -238,6 +257,66 @@ function bytes(value: number): string {
                 @change="save(setting.key, ($event.target as HTMLInputElement).value)"
               />
             </div>
+          </div>
+        </section>
+
+        <section v-if="admin.configuration.value.length">
+          <h2 class="text-sm font-semibold">How this server was started</h2>
+          <p class="mt-0.5 text-xs text-muted-foreground">
+            Read-only. These come from the environment or the configuration file and need a restart
+            to change. The source says whether a value was chosen or merely inherited.
+          </p>
+
+          <div class="mt-3 overflow-x-auto rounded-lg border bg-surface">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b text-left">
+                  <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
+                    Setting
+                  </th>
+                  <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
+                    Value
+                  </th>
+                  <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
+                    From
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="value in admin.configuration.value"
+                  :key="value.key"
+                  class="border-b transition last:border-0 hover:bg-surface-sunken"
+                >
+                  <td class="px-3 py-2 font-mono text-xs whitespace-nowrap">{{ value.key }}</td>
+                  <td class="px-3 py-2">
+                    <span v-if="value.value" class="font-mono text-xs break-all">
+                      {{ value.value }}
+                    </span>
+                    <span v-else class="text-xs text-muted-foreground">not set</span>
+                    <span
+                      v-if="value.secret"
+                      class="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
+                    >
+                      redacted
+                    </span>
+                  </td>
+                  <td class="px-3 py-2">
+                    <!-- A defaulted value is the quiet case and reads as such;
+                         one that was actually chosen stands out, which is what
+                         somebody scanning this column is looking for. -->
+                    <span
+                      class="text-xs"
+                      :class="
+                        value.source === 'default' ? 'text-muted-foreground' : 'text-foreground'
+                      "
+                    >
+                      {{ value.source }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
       </template>
