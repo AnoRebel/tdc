@@ -51,6 +51,9 @@ func (s *Server) routes() {
 	rooms.GET("/:id/timeline", s.handleRoomTimeline)
 	rooms.POST("/:id/messages", s.handleSendMessage)
 	rooms.PATCH("/:id/messages/:eventId", s.handleEditMessage)
+	// When a message expires. Its sender's to set, or a moderator's, and only
+	// ever shorter than it already is.
+	rooms.PUT("/:id/messages/:eventId/lifetime", s.handleSetMessageLifetime)
 	rooms.DELETE("/:id/messages/:eventId", s.handleDeleteMessage)
 	// Counts for the whole timeline at once. Without this a client asks per
 	// message, which is one request per message drawn.
@@ -152,6 +155,8 @@ func (s *Server) routes() {
 	// Reporting abuse. Filing is open to anybody signed in — requiring
 	// membership would stop somebody reporting what they saw before leaving —
 	// while the queue is for whoever moderates.
+	s.echo.GET("/api/messages/lifetime-kinds", s.handleLifetimeKinds, requireAuthentication)
+
 	s.echo.GET("/api/reports/reasons", s.handleReportReasons, requireAuthentication)
 	s.echo.POST("/api/reports", s.handleReport, requireAuthentication)
 	s.echo.GET("/api/reports", s.handleListReports, requireAuthentication,

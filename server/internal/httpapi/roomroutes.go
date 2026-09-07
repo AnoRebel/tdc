@@ -90,6 +90,32 @@ type messageResponse struct {
 	Attachments []attachmentResponse `json:"attachments,omitempty"`
 	SentAt      time.Time            `json:"sentAt"`
 	Redacted    bool                 `json:"redacted"`
+
+	/*
+		Lifetime describes when this message will be removed, when its sender
+		gave it one.
+
+		Disclosed while the message is still readable, so nobody is surprised
+		by its removal — somebody who would rather not have this conversation
+		on a timer can see that it is on one before they answer.
+	*/
+	Lifetime *lifetimeResponse `json:"lifetime,omitempty"`
+}
+
+// lifetimeResponse is a message's expiry as a reader needs to understand it.
+type lifetimeResponse struct {
+	// Kind is "after_sending", "once_seen" or "after_seeing".
+	Kind string `json:"kind"`
+	// Seconds is the duration for the kinds that use one.
+	Seconds int32 `json:"seconds,omitempty"`
+	/*
+		ExpiresAt is when it goes, absent while that is not yet known.
+
+		A seen-based lifetime has no expiry until people have read the message,
+		and a client showing a countdown from nothing would be inventing one.
+		Absent means "when everybody has read it", which the kind already says.
+	*/
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 }
 
 func messageResponseOf(event dbgen.Event) messageResponse {
@@ -304,9 +330,43 @@ func (s *Server) handleRoomTimeline(c *echo.Context) error {
 	}
 
 	response := make([]messageResponse, 0, len(timeline))
+	eventIDs := make([]string, 0, len(timeline))
 	for _, event := range timeline {
 		response = append(response, s.withAttachments(ctx, messageResponseOf(event)))
+		if event.RedactedAt == nil {
+			eventIDs = append(eventIDs, event.ID)
+		}
 	}
+
+	// Lifetimes, so a reader can see what is on a timer before they answer it.
+	// One query for the page rather than one per message.
+	if s.moderation != nil && len(eventIDs) > 0 {
+		lifetimes, err := s.moderation.LifetimesFor(ctx, eventIDs)
+		if err != nil {
+			return err
+		}
+		for i, message := range response {
+			if lifetime, ok := lifetimes[message.ID]; ok {
+				resolved := lifetimeResponseOf(lifetime)
+				response[i].Lifetime = &resolved
+			}
+		}
+
+		/*
+			Reading a message starts the clock on anything that expires after
+			seeing.
+
+			Detached from the request: recording that somebody looked must not
+			be able to fail their reading of the conversation, and the sweep
+			that acts on it runs minutes later regardless.
+		*/
+		s.inBackground(ctx, "record message views", func(ctx context.Context) {
+			if err := s.moderation.RecordViews(ctx, user.ID, eventIDs); err != nil {
+				s.log.Error("cannot record message views", "error", err)
+			}
+		})
+	}
+
 	return c.JSON(http.StatusOK, response)
 }
 

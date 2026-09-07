@@ -420,6 +420,24 @@ func expirePeriodically(
 			if removed > 0 {
 				log.Info("expired content past its retention period", "messages", removed)
 			}
+
+			/*
+				Messages carrying their own lifetime, on the same pass.
+
+				Separate from retention because the two answer to different
+				policies — one the operator's, one the sender's — and a message
+				can be subject to both. Running them together means one timer
+				rather than two doing the same kind of work.
+			*/
+			byLifetime, err := moderationService.ExpireLifetimes(
+				ctx, retentionBatch, removeAttachments)
+			if err != nil && ctx.Err() == nil {
+				log.Error("expiring messages by lifetime failed",
+					slog.String("error", err.Error()))
+			}
+			if byLifetime > 0 {
+				log.Info("expired messages by their own lifetime", "messages", byLifetime)
+			}
 		}
 	}
 }

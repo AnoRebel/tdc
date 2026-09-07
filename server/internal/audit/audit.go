@@ -71,6 +71,11 @@ const (
 	*/
 	ActionRetentionShortened Action = "server.retention.shortened"
 
+	// ActionMessageLifetimeSet records a moderator putting an expiry on
+	// somebody else's message, which is deletion on a delay and deserves the
+	// same trail deletion gets.
+	ActionMessageLifetimeSet Action = "message.lifetime_set"
+
 	ActionRoleCreated       Action = "role.created"
 	ActionRoleDeleted       Action = "role.deleted"
 	ActionRoleAssigned      Action = "role.assigned"

@@ -118,6 +118,16 @@ type InvitationUse struct {
 	UsedAt       time.Time
 }
 
+type MessageLifetime struct {
+	EventID   string
+	RoomID    uuid.UUID
+	SenderID  *uuid.UUID
+	Kind      string
+	Seconds   *int32
+	ExpiresAt *time.Time
+	CreatedAt time.Time
+}
+
 type MessageSearch struct {
 	EventID       string
 	RoomID        uuid.UUID
@@ -126,6 +136,12 @@ type MessageSearch struct {
 	Body          string
 	SentAt        int64
 	SearchVector  interface{}
+}
+
+type MessageView struct {
+	EventID  string
+	ViewerID uuid.UUID
+	SeenAt   time.Time
 }
 
 type Notification struct {

@@ -125,6 +125,11 @@ type Querier interface {
 	// history would be a channel nobody could audit, and those carry no content
 	// worth expiring.
 	ExpireEvents(ctx context.Context, arg ExpireEventsParams) ([]ExpireEventsRow, error)
+	// Redacts messages whose lifetime has run out.
+	//
+	// Redacts rather than deletes, as retention does: the event stays so the
+	// sequence has no holes and the placeholder shows something was there.
+	ExpireMessagesByLifetime(ctx context.Context, batchSize int32) ([]ExpireMessagesByLifetimeRow, error)
 	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)
@@ -134,6 +139,7 @@ type Querier interface {
 	GetDirectMessagePolicy(ctx context.Context, userID uuid.UUID) (string, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
+	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
 	// The preference that applies to one conversation.
 	//
 	// The room's own row when there is one, the person's global default
@@ -201,6 +207,9 @@ type Querier interface {
 	// Includes revoked and expired ones: somebody auditing what was issued needs
 	// to see what has been withdrawn, not only what still works.
 	ListInvitationsForRoom(ctx context.Context, arg ListInvitationsForRoomParams) ([]Invitation, error)
+	// The lifetimes carried by a page of messages, so a timeline can disclose them
+	// without a query per message.
+	ListLifetimesForEvents(ctx context.Context, eventIds []string) ([]MessageLifetime, error)
 	ListNotificationPreferences(ctx context.Context, userID uuid.UUID) ([]ListNotificationPreferencesRow, error)
 	// The moderation queue: oldest first, so nothing waits indefinitely behind
 	// newer arrivals.
@@ -327,6 +336,11 @@ type Querier interface {
 	// Who accepted, for the audit trail. ON CONFLICT DO NOTHING because somebody
 	// accepting twice is one person, not two.
 	RecordInvitationUser(ctx context.Context, arg RecordInvitationUserParams) error
+	// Notes that somebody has seen a message that expires after seeing.
+	//
+	// First view only: the clock starts when they first read it, and a second
+	// look does not restart it.
+	RecordMessageView(ctx context.Context, arg RecordMessageViewParams) error
 	// Removes content while leaving the event in place, so ordering and the
 	// surrounding events stay verifiable.
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
@@ -339,6 +353,8 @@ type Querier interface {
 	// Clears presence for connections that ended without a clean close, which is
 	// what makes an ungraceful disconnect expire rather than persist.
 	ResetStalePresence(ctx context.Context, lastSeenAt time.Time) error
+	ResolveAfterSeeingLifetimes(ctx context.Context) error
+	ResolveOnceSeenLifetimes(ctx context.Context) error
 	// Only an open report can be resolved, so two moderators acting at once do not
 	// both record an outcome.
 	ResolveReport(ctx context.Context, arg ResolveReportParams) (Report, error)
@@ -387,6 +403,11 @@ type Querier interface {
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
+	// Gives a message a lifetime, or replaces one it already has.
+	//
+	// expires_at is supplied by the caller for 'after_sending', which knows it at
+	// once, and left null for the seen-based kinds until reading decides it.
+	SetMessageLifetime(ctx context.Context, arg SetMessageLifetimeParams) (MessageLifetime, error)
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.

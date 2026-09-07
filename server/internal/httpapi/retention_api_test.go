@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/dbtest"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
@@ -344,12 +345,20 @@ func newTestAPIWithServices(t *testing.T) (http.Handler, testServices) {
 	}
 	t.Cleanup(pool.Close)
 
-	return handler, testServices{Moderation: moderation.NewService(pool, logger), pool: pool}
+	return handler, testServices{
+		Moderation: moderation.NewService(pool, logger),
+		// The same store the handler uses, so a test can check that expiring a
+		// message really removed its files rather than only unlinking them.
+		Attachments: attachments.NewService(
+			pool, testStore(t), attachments.DefaultLimits(), logger),
+		pool: pool,
+	}
 }
 
 type testServices struct {
-	Moderation *moderation.Service
-	pool       *db.Pool
+	Moderation  *moderation.Service
+	Attachments *attachments.Service
+	pool        *db.Pool
 }
 
 /*
