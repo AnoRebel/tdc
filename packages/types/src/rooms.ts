@@ -61,6 +61,8 @@ export interface Message {
    * so the conversation does not appear never to have contained it.
    */
   redacted: boolean;
+  /** When this message will be removed, where it has been given a lifetime. */
+  lifetime?: MessageLifetime;
 }
 
 /** The payload of an event, by type. */
@@ -220,6 +222,33 @@ export interface ScheduledMessage {
   threadRoot?: string;
   /** Milliseconds since the epoch. */
   sendAt: number;
+}
+
+/**
+ * When a message will be removed, where its sender gave it a lifetime.
+ *
+ * Disclosed while the message is still readable, so nobody is surprised by its
+ * removal and somebody who would rather not answer a message on a timer can
+ * see that it is on one.
+ */
+export interface MessageLifetime {
+  /**
+   * How the lifetime is reckoned.
+   *
+   * "after_sending" — a fixed time from when it was sent.
+   * "once_seen" — as soon as every other participant has read it.
+   * "after_seeing" — a window each recipient gets from their own first
+   * reading, expiring when the last of those runs out.
+   */
+  kind: "after_sending" | "once_seen" | "after_seeing";
+  /** The duration in seconds, for the kinds that use one. */
+  seconds?: number;
+  /**
+   * When it goes, absent while that is not yet known — a seen-based lifetime
+   * has no expiry until people have read the message, and a countdown from
+   * nothing would be invented.
+   */
+  expiresAt?: string;
 }
 
 /** Why something was reported. */

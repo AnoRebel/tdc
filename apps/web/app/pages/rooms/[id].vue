@@ -3,6 +3,7 @@ import type {
   Attachment,
   LiveEventPayload,
   Message,
+  MessageLifetime,
   Presence,
   Room,
   TypingPerson,
@@ -17,6 +18,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Timer,
   FileText,
   Flag,
   Forward,
@@ -115,6 +117,7 @@ const selecting = computed(() => selected.value.size > 0);
 /** What is being forwarded, or reported, while the dialog is open. */
 const forwarding = ref<string[]>([]);
 const reporting = ref<{ id: string; body: string } | null>(null);
+const expiring = ref<{ id: string; current?: MessageLifetime } | null>(null);
 
 function toggleSelected(messageId: string) {
   const next = new Set(selected.value);
@@ -927,7 +930,13 @@ async function saveEdit(messageId: string) {
  * they have already decided.
  */
 function menuFor(
-  message: { id: string; body: string; removed: boolean; attachments?: Attachment[] },
+  message: {
+    id: string;
+    body: string;
+    removed: boolean;
+    attachments?: Attachment[];
+    lifetime?: MessageLifetime;
+  },
   mine: boolean,
   sender: string,
 ): MenuItem[] {
@@ -963,6 +972,23 @@ function menuFor(
       label: "Select",
       icon: CheckSquare,
       action: () => toggleSelected(message.id),
+    });
+  }
+
+  /*
+   * When this message expires.
+   *
+   * Its sender's to set, or a moderator's on anybody's. Offered only while the
+   * message is readable: putting a lifetime on something already gone would
+   * do nothing, and offering it would suggest otherwise.
+   */
+  if ((mine || can("moderation.review")) && !message.removed) {
+    items.push({
+      label: message.lifetime ? "Change when it expires" : "Expire this message",
+      icon: Timer,
+      action: () => {
+        expiring.value = { id: message.id, current: message.lifetime };
+      },
     });
   }
 
@@ -1064,6 +1090,61 @@ function menuFor(
  * three. Failures are per file too: three succeeding and one being refused is
  * a real outcome, and treating it as total failure would hide the three.
  */
+/**
+ * Gives a message a lifetime, or shortens the one it has.
+ *
+ * The server refuses anything longer, and says so — which is reported rather
+ * than swallowed, because somebody who tried to extend one needs to know it
+ * did not happen.
+ */
+/**
+ * How long a message has left, in words.
+ *
+ * A seen-based lifetime has no expiry until people have read it, so it says
+ * what it is waiting for rather than counting down from nothing.
+ */
+function lifetimeLabel(lifetime: MessageLifetime): string {
+  if (!lifetime.expiresAt) {
+    return lifetime.kind === "once_seen" ? "Goes when read" : "Goes after reading";
+  }
+
+  const remaining = new Date(lifetime.expiresAt).getTime() - Date.now();
+  if (remaining <= 0) return "Going";
+
+  const minutes = Math.round(remaining / 60000);
+  if (minutes < 60) return `${minutes}m left`;
+
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h left`;
+
+  return `${Math.round(hours / 24)}d left`;
+}
+
+/** The whole rule, for somebody who wants to know exactly what happens. */
+function lifetimeExplanation(lifetime: MessageLifetime): string {
+  switch (lifetime.kind) {
+    case "once_seen":
+      return "This message goes once everybody has read it.";
+    case "after_seeing":
+      return "This message goes a set time after each person first reads it.";
+    default:
+      return "This message goes a set time after it was sent.";
+  }
+}
+
+async function setLifetime(messageId: string, lifetime: { kind: string; seconds?: number }) {
+  expiring.value = null;
+  try {
+    await api.put(
+      `/api/rooms/${roomId.value}/messages/${encodeURIComponent(messageId)}/lifetime`,
+      lifetime,
+    );
+    await load();
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : "That expiry was not accepted.";
+  }
+}
+
 async function setSensitive(files: { id: string }[], sensitive: boolean) {
   await Promise.allSettled(
     files.map((file) => api.put(`/api/attachments/${file.id}/sensitive`, { sensitive })),
@@ -1514,6 +1595,17 @@ watch(roomId, load, { immediate: true });
                       >
                         edited
                       </span>
+                      <!-- Said on the message itself rather than on hover:
+                           somebody deciding whether to answer needs to know it
+                           is on a timer without going looking. -->
+                      <span
+                        v-if="message.lifetime && !message.removed"
+                        class="ml-1 inline-flex items-center gap-0.5 align-baseline text-[0.6875rem] opacity-70"
+                        :title="lifetimeExplanation(message.lifetime)"
+                      >
+                        <Timer class="size-2.5" />
+                        {{ lifetimeLabel(message.lifetime) }}
+                      </span>
                     </template>
                   </Bubble>
 
@@ -1782,6 +1874,13 @@ watch(roomId, load, { immediate: true });
       :body="reporting.body"
       @cancel="reporting = null"
       @report="submitReport"
+    />
+
+    <LifetimeDialog
+      v-if="expiring"
+      :current="expiring.current"
+      @cancel="expiring = null"
+      @choose="(lifetime) => setLifetime(expiring!.id, lifetime)"
     />
 
     <ThreadPanel
