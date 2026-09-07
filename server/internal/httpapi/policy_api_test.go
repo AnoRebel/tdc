@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -475,4 +476,132 @@ func TestConfigurationNeedsPermission(t *testing.T) {
 	if recorder.Code == http.StatusOK {
 		t.Error("an ordinary account could inspect the server's configuration")
 	}
+}
+
+/*
+TestThePeopleListNeverCarriesEmailAddresses is the disclosure boundary on the
+administrative view of accounts.
+
+An administrator suspending somebody does not need to read their address to do
+it, and a list that carried every address would be one screenshot away from
+being a mailing list somebody else has. What is here is what a moderator needs
+to act on, and nothing else.
+*/
+func TestThePeopleListNeverCarriesEmailAddresses(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	// Somebody with an address worth not disclosing.
+	if code := tryRegister(t, handler, map[string]any{
+		"username": "amina", "email": "amina@tdc.or.tz", "password": testPassword,
+	}); code != http.StatusCreated {
+		t.Fatalf("registering returned %d", code)
+	}
+
+	recorder := call(t, handler, http.MethodGet, "/api/admin/users", nil, owner)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("listing people returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	if strings.Contains(recorder.Body.String(), "amina@tdc.or.tz") {
+		t.Errorf("the people list carries email addresses: %s",
+			truncate(recorder.Body.String()))
+	}
+
+	// And it does carry what a moderator acts on.
+	if !strings.Contains(recorder.Body.String(), "amina") {
+		t.Error("the people list does not name the person at all")
+	}
+}
+
+/*
+TestSuspensionIsVisibleInThePeopleList is what makes the list actionable.
+
+Somebody reviewing a suspension needs to see that it exists, when it lifts and
+why — a list showing only names would send them to the audit log to find out
+who is suspended.
+*/
+func TestSuspensionIsVisibleInThePeopleList(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	member := registerAndSignIn(t, handler, "amina")
+	_ = member
+
+	people := decodePeople(t, call(t, handler, http.MethodGet, "/api/admin/users", nil, owner))
+
+	var target string
+	for _, person := range people {
+		if person.Username == "amina" {
+			target = person.ID
+			if person.Suspended {
+				t.Fatal("somebody was suspended before anybody suspended them")
+			}
+		}
+	}
+	if target == "" {
+		t.Fatal("the new account is not in the list")
+	}
+
+	suspended := call(t, handler, http.MethodPost, "/api/admin/users/"+target+"/suspend",
+		map[string]any{"reason": "Matusi", "hours": 24}, owner)
+	if suspended.Code != http.StatusNoContent {
+		t.Fatalf("suspending returned %d: %s",
+			suspended.Code, truncate(suspended.Body.String()))
+	}
+
+	after := decodePeople(t, call(t, handler, http.MethodGet, "/api/admin/users", nil, owner))
+	for _, person := range after {
+		if person.Username != "amina" {
+			continue
+		}
+		if !person.Suspended {
+			t.Error("a suspended account is not shown as suspended")
+		}
+		if person.SuspendedUntil == "" {
+			t.Error("a temporary suspension does not say when it lifts")
+		}
+		if person.SuspensionNote != "Matusi" {
+			t.Errorf("the reason is %q, so nobody reviewing it can see why",
+				person.SuspensionNote)
+		}
+	}
+}
+
+// TestThePeopleListNeedsPermission keeps the account list out of ordinary
+// hands.
+func TestThePeopleListNeedsPermission(t *testing.T) {
+	handler := newTestAPI(t)
+	completeSetup(t, handler)
+
+	ordinary := registerAndSignIn(t, handler, "amina")
+
+	recorder := call(t, handler, http.MethodGet, "/api/admin/users", nil, ordinary)
+	if recorder.Code == http.StatusOK {
+		t.Error("an ordinary account read the list of everybody on the server")
+	}
+}
+
+type listedPerson struct {
+	ID             string `json:"id"`
+	Username       string `json:"username"`
+	Suspended      bool   `json:"suspended"`
+	SuspendedUntil string `json:"suspendedUntil"`
+	SuspensionNote string `json:"suspensionNote"`
+}
+
+func decodePeople(t *testing.T, recorder *httptest.ResponseRecorder) []listedPerson {
+	t.Helper()
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("listing people returned %d: %s",
+			recorder.Code, truncate(recorder.Body.String()))
+	}
+
+	var people []listedPerson
+	if err := json.Unmarshal(recorder.Body.Bytes(), &people); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+	return people
 }

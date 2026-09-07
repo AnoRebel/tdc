@@ -9,6 +9,7 @@ import {
   ScrollText,
   ShieldCheck,
   SlidersHorizontal,
+  Users,
   UserX,
 } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
@@ -303,13 +304,27 @@ function deviceName(userAgent: string): string {
       </section>
 
       <section
-        v-if="can('server.audit.read') || can('moderation.review') || can('server.configure')"
+        v-if="
+          can('server.audit.read') ||
+          can('moderation.review') ||
+          can('server.configure') ||
+          can('user.suspend') ||
+          can('user.invite')
+        "
       >
         <h2 class="text-sm font-semibold">Administration</h2>
         <div class="mt-3 flex flex-wrap gap-2">
           <NuxtLink v-if="can('server.configure')" to="/admin" class="btn btn-outline">
             <SlidersHorizontal class="size-3.5" />
             Server settings
+          </NuxtLink>
+          <NuxtLink
+            v-if="can('user.suspend') || can('user.invite')"
+            to="/people"
+            class="btn btn-outline"
+          >
+            <Users class="size-3.5" />
+            People
           </NuxtLink>
           <NuxtLink v-if="can('moderation.review')" to="/reports" class="btn btn-outline">
             <Flag class="size-3.5" />
