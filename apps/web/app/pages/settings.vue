@@ -6,9 +6,11 @@ import {
   Flag,
   LogOut,
   Monitor,
+  Moon,
   ScrollText,
   ShieldCheck,
   SlidersHorizontal,
+  Sun,
   Users,
   UserX,
 } from "lucide-vue-next";
@@ -21,6 +23,19 @@ definePageMeta({ middleware: "auth", layout: "app" });
 useHead({ title: "Settings" });
 
 const personal = usePersonalModeration();
+const theme = useTheme();
+
+/*
+ * Three choices rather than a switch.
+ *
+ * A two-way toggle has no way to say "whichever my device says", which is what
+ * most people want and what somebody who has never opened this already has.
+ */
+const themeOptions = [
+  { value: "auto" as const, label: "Follow my device", icon: Monitor },
+  { value: "light" as const, label: "Light", icon: Sun },
+  { value: "dark" as const, label: "Dark", icon: Moon },
+];
 
 /*
  * Three settings rather than two.
@@ -232,6 +247,30 @@ function deviceName(userAgent: string): string {
             </button>
           </li>
         </ul>
+      </section>
+
+      <section>
+        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+          <Sun class="size-4" />
+          Appearance
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Following your device is the default, and changes with it.
+        </p>
+
+        <div class="mt-3 flex flex-wrap gap-1.5">
+          <button
+            v-for="option in themeOptions"
+            :key="option.value"
+            type="button"
+            class="btn"
+            :class="theme.preference.value === option.value ? 'btn-primary' : 'btn-outline'"
+            @click="theme.set(option.value)"
+          >
+            <component :is="option.icon" class="size-3.5" />
+            {{ option.label }}
+          </button>
+        </div>
       </section>
 
       <section>
