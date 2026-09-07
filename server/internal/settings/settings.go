@@ -120,6 +120,23 @@ const (
 		to discard it can set one.
 	*/
 	AuditRetentionDays Key = "audit.retention_days"
+
+	/*
+		ServerVisibility decides who may discover this server.
+
+		"public" — anybody may find it and see what it publishes.
+		"limited" — only servers this operator has listed.
+		"private" — nobody; it is reachable only by somebody who already knows
+		            where it is and holds an invitation.
+
+		Public by default, because a server nobody can find is a server nobody
+		joins, and an operator who wants that should choose it rather than
+		discover they have it.
+	*/
+	ServerVisibility Key = "server.visibility"
+	// VisibilityAllowedServers lists the peers a limited server admits,
+	// comma separated. Meaningless under any other visibility.
+	VisibilityAllowedServers Key = "server.visible_to"
 )
 
 // definition describes one setting: how to validate it, and what it means when
@@ -182,6 +199,21 @@ var definitions = map[Key]definition{
 			}
 			return nil
 		},
+	},
+	ServerVisibility: {
+		fallback:    "public",
+		description: `Who may discover this server: "public", "limited" or "private".`,
+		validate: func(value string) error {
+			switch value {
+			case "public", "limited", "private":
+				return nil
+			}
+			return fmt.Errorf(`%w: expected "public", "limited" or "private"`, ErrInvalidValue)
+		},
+	},
+	VisibilityAllowedServers: {
+		fallback:    "",
+		description: "Servers that may discover this one under limited visibility, comma separated.",
 	},
 	AuditRetentionDays: {
 		fallback:    "0",

@@ -55,6 +55,8 @@ const groupTitles: Record<string, string> = {
   registration: "Who may join",
   limits: "Capacity",
   filter: "Content filter",
+  server: "How this server is found",
+  audit: "Audit log",
 };
 
 /*
@@ -74,6 +76,11 @@ const choices: Record<string, { value: string; label: string }[]> = {
     { value: "closed", label: "Nobody — the operator creates accounts" },
     { value: "domain", label: "Only these email domains" },
   ],
+  "server.visibility": [
+    { value: "public", label: "Anybody may find this server" },
+    { value: "limited", label: "Only the servers listed below" },
+    { value: "private", label: "Nobody — reachable only by invitation" },
+  ],
   "filter.action": [
     { value: "flag", label: "Deliver it, and show a moderator" },
     { value: "mask", label: "Deliver it with the words replaced" },
@@ -82,7 +89,7 @@ const choices: Record<string, { value: string; label: string }[]> = {
 };
 
 /** Settings better typed into a box than a line. */
-const multiline = new Set(["filter.words", "registration.domains"]);
+const multiline = new Set(["filter.words", "registration.domains", "server.visible_to"]);
 
 /** The last segment of a key, as a label. */
 function settingLabel(key: string): string {

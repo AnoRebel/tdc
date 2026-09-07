@@ -374,6 +374,23 @@ func (s *Server) capabilities(ctx context.Context) []string {
 }
 
 func (s *Server) handleServerInfo(c *echo.Context) error {
+	/*
+		A server that is not discoverable by this caller says nothing about
+		itself.
+
+		404 rather than 403: a refusal that distinguished "you may not know"
+		from "there is nothing here" would answer the question it is refusing.
+		Somebody scanning for servers learns the same thing from this address
+		as from one that has never existed.
+
+		Somebody signed in is past this, so a private server's own members are
+		unaffected — and somebody holding an invitation still reaches it, since
+		this governs discovery rather than access.
+	*/
+	if !s.mayDiscover(c) {
+		return echo.NewHTTPError(http.StatusNotFound, "not found")
+	}
+
 	return c.JSON(http.StatusOK, serverInfoResponse{
 		Name:             s.config.ServerName,
 		Description:      s.config.ServerDescription,
