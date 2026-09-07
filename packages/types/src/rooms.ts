@@ -133,6 +133,20 @@ export interface Attachment {
    */
   animated?: boolean;
   /**
+   * Whether this should arrive covered, with the viewer choosing to reveal it.
+   *
+   * A flag rather than a withheld URL: the file is still fetchable by anybody
+   * who may read the room. Obscuring is about not showing somebody something
+   * they did not ask to see, not about who may see it.
+   */
+  sensitive?: boolean;
+  /**
+   * Who decided it is sensitive. An uploader's own mark is theirs to lift; a
+   * moderator's is not, and a client should not offer a control that will be
+   * refused.
+   */
+  sensitiveSource?: "uploader" | "moderator" | "automatic";
+  /**
    * How to display it. Decided by the server so every client agrees, and so
    * markdown — which has no magic bytes and is detected as plain text — is
    * recognised once rather than by each client guessing from a filename.

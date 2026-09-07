@@ -41,8 +41,18 @@ export function useServerInfo() {
     return info.value?.capabilities?.includes(capability) ?? false;
   }
 
+  /*
+   * Whether media marked sensitive should arrive covered.
+   *
+   * Covering while the server description is still loading, and if it failed
+   * to load at all. The wrong answer in one direction briefly covers something
+   * harmlessly; in the other it shows somebody exactly what was marked to
+   * avoid showing them.
+   */
+  const obscureSensitiveMedia = computed(() => info.value?.obscureSensitiveMedia ?? true);
+
   // Loaded on first use rather than by every caller remembering to.
   void load();
 
-  return { info, load, offers };
+  return { info, load, offers, obscureSensitiveMedia };
 }

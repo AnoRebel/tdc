@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import type { LiveEventPayload, Message, Presence, Room, TypingPerson } from "@tdc/types";
+import type {
+  Attachment,
+  LiveEventPayload,
+  Message,
+  Presence,
+  Room,
+  TypingPerson,
+} from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import type { MenuItem } from "~/components/ContextMenu.vue";
 import {
@@ -8,6 +15,8 @@ import {
   ChevronDown,
   Clock,
   Copy,
+  Eye,
+  EyeOff,
   FileText,
   Flag,
   Forward,
@@ -918,7 +927,7 @@ async function saveEdit(messageId: string) {
  * they have already decided.
  */
 function menuFor(
-  message: { id: string; body: string; removed: boolean },
+  message: { id: string; body: string; removed: boolean; attachments?: Attachment[] },
   mine: boolean,
   sender: string,
 ): MenuItem[] {
@@ -955,6 +964,38 @@ function menuFor(
       icon: CheckSquare,
       action: () => toggleSelected(message.id),
     });
+  }
+
+  /*
+   * Marking media sensitive, offered on any message carrying files that this
+   * person may mark: their own, or anybody's for a moderator.
+   *
+   * One control for the whole message rather than one per file. A message is
+   * usually four photographs from the same moment, and marking them
+   * individually is four decisions where somebody meant to make one.
+   */
+  // Whether this person may mark is a fact about the message, not about each
+  // file: they either sent it or they moderate.
+  const markable = mine || can("moderation.review") ? (message.attachments ?? []) : [];
+
+  if (markable.length && !message.removed) {
+    // A moderator cannot lift their own mark from here without seeing which
+    // it is, so the label follows what is currently true of the message.
+    const anyCovered = markable.some((attachment) => attachment.sensitive);
+
+    // Somebody who is not a moderator cannot lift a moderator's mark, so the
+    // control is not offered when that is all there is to lift.
+    const theirsToLift =
+      can("moderation.review") ||
+      markable.some((attachment) => attachment.sensitiveSource !== "moderator");
+
+    if (!anyCovered || theirsToLift) {
+      items.push({
+        label: anyCovered ? "Unmark as sensitive" : "Mark as sensitive",
+        icon: anyCovered ? Eye : EyeOff,
+        action: () => setSensitive(markable, !anyCovered),
+      });
+    }
   }
 
   // Reporting somebody else's message, never one's own: there is nothing to
@@ -1015,6 +1056,21 @@ function menuFor(
  * permission for it. A refusal is reported rather than swallowed: somebody who
  * clicked pin and saw nothing happen would click it again.
  */
+/**
+ * Marks or unmarks a message's files as sensitive.
+ *
+ * Each file is a separate request, since the server governs each one
+ * individually — a moderator's mark on one of four does not decide the other
+ * three. Failures are per file too: three succeeding and one being refused is
+ * a real outcome, and treating it as total failure would hide the three.
+ */
+async function setSensitive(files: { id: string }[], sensitive: boolean) {
+  await Promise.allSettled(
+    files.map((file) => api.put(`/api/attachments/${file.id}/sensitive`, { sensitive })),
+  );
+  await load();
+}
+
 async function togglePin(messageId: string) {
   try {
     if (pins.pinnedIds.value.has(messageId)) {

@@ -268,6 +268,13 @@ type Querier interface {
 	// stands for: how many, and how many people are involved.
 	ListUnreadNotificationsGrouped(ctx context.Context, userID uuid.UUID) ([]ListUnreadNotificationsGroupedRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	// Marks media so viewers see it obscured until they choose otherwise.
+	//
+	// A moderator's mark overwrites an uploader's; an uploader's does not
+	// overwrite a moderator's. Expressed here rather than in Go so the rule holds
+	// for every caller, and so two people marking at once cannot interleave into
+	// the weaker outcome.
+	MarkAttachmentSensitive(ctx context.Context, arg MarkAttachmentSensitiveParams) (int64, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
 	// Withdraws notifications for messages read elsewhere.
 	//
@@ -390,6 +397,13 @@ type Querier interface {
 	TouchSession(ctx context.Context, id uuid.UUID) error
 	UnblockUser(ctx context.Context, arg UnblockUserParams) error
 	UnindexMessage(ctx context.Context, eventID string) error
+	// Removes a mark.
+	//
+	// Scoped by who may: an uploader may undo their own mark and an automatic one
+	// on their own file, but not a moderator's — otherwise marking would be
+	// advisory, and the people most likely to post something unwelcome would be
+	// exactly the people able to unmark it.
+	UnmarkAttachmentSensitive(ctx context.Context, arg UnmarkAttachmentSensitiveParams) (int64, error)
 	UnpinMessage(ctx context.Context, arg UnpinMessageParams) error
 	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)

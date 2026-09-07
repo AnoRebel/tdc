@@ -53,6 +53,13 @@ const (
 	// Server configuration an operator changes while it runs.
 	ActionSettingChanged Action = "server.setting.changed"
 
+	// ActionMediaMarked and ActionMediaUnmarked record a decision about
+	// whether media arrives obscured. Audited because a mark somebody disputes
+	// needs a trail — particularly a moderator's, which the uploader cannot
+	// lift.
+	ActionMediaMarked   Action = "media.marked_sensitive"
+	ActionMediaUnmarked Action = "media.unmarked_sensitive"
+
 	ActionRoleCreated       Action = "role.created"
 	ActionRoleDeleted       Action = "role.deleted"
 	ActionRoleAssigned      Action = "role.assigned"

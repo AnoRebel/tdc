@@ -13,6 +13,8 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/attachments"
+	"github.com/AnoRebel/tdc/server/internal/audit"
+	"github.com/AnoRebel/tdc/server/internal/authz"
 )
 
 // presignedLifetime is how long a redirect to the object store stays valid.
@@ -64,6 +66,21 @@ type attachmentResponse struct {
 	Caption    string `json:"caption,omitempty"`
 	UploadedBy string `json:"uploadedBy"`
 	UploadedAt string `json:"uploadedAt"`
+
+	/*
+		Sensitive says this media should arrive obscured, with the viewer
+		choosing whether to see it.
+
+		A flag rather than a withheld URL. The file is still fetchable by
+		anybody who may read the room — obscuring is about not showing somebody
+		something they did not ask to see, not about access control, and
+		pretending otherwise would be security theatre over a URL the viewer is
+		entitled to.
+	*/
+	Sensitive bool `json:"sensitive,omitempty"`
+	// SensitiveSource says who decided, so a client can tell an uploader that
+	// their own mark is theirs to lift and a moderator's is not.
+	SensitiveSource string `json:"sensitiveSource,omitempty"`
 }
 
 func attachmentResponseOf(attachment *attachments.Attachment) attachmentResponse {
@@ -87,6 +104,9 @@ func attachmentResponseOf(attachment *attachments.Attachment) attachmentResponse
 		Animated:    attachment.Animated,
 		UploadedBy:  attachment.UploaderAddress,
 		UploadedAt:  attachment.CreatedAt.UTC().Format(time.RFC3339),
+
+		Sensitive:       attachment.Sensitive(),
+		SensitiveSource: string(attachment.SensitiveSource),
 	}
 }
 
@@ -595,4 +615,86 @@ func (s *Server) handleCaptionAttachment(c *echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+type markSensitiveRequest struct {
+	Sensitive bool `json:"sensitive"`
+}
+
+/*
+handleMarkSensitive marks or unmarks media as sensitive.
+
+Open to the uploader for their own files and to moderators for anybody's, which
+is what makes this work on a server with no classifier configured: the two
+parties who can see the file are the two who can mark it.
+
+Marking is not access control. Anybody who may read the room may still fetch
+the file; what changes is whether a client shows it without being asked. Making
+it access control would mean a URL somebody is entitled to pretending to be one
+they are not, which protects nobody and confuses everybody.
+*/
+func (s *Server) handleMarkSensitive(c *echo.Context) error {
+	user, _ := currentUser(c)
+	ctx := c.Request().Context()
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such attachment")
+	}
+
+	var request markSensitiveRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	attachment, err := s.attachments.Get(ctx, id)
+	if err != nil {
+		return attachmentError(err)
+	}
+
+	// Readable by this person, or somebody could mark files in rooms they
+	// cannot see — and learn which identifiers exist by which ones succeed.
+	if _, err := s.rooms.Visible(ctx, attachment.RoomID, user.ID); err != nil {
+		return roomError(err)
+	}
+
+	moderator := currentPermissions(c).AllowsServer(authz.PermModerationReview).Allowed
+	mine := attachment.UploaderAddress == s.rooms.UserAddress(user.Username)
+
+	if !moderator && !mine {
+		return echo.NewHTTPError(http.StatusForbidden,
+			"only whoever sent this file, or a moderator, may mark it")
+	}
+
+	if request.Sensitive {
+		source := attachments.SensitiveByUploader
+		if moderator && !mine {
+			source = attachments.SensitiveByModerator
+		}
+
+		if err := s.attachments.MarkSensitive(ctx, id,
+			s.rooms.UserAddress(user.Username), source); err != nil {
+			return attachmentError(err)
+		}
+
+		s.recordModeration(c, user, audit.ActionMediaMarked, "attachment", id.String(),
+			map[string]any{"source": string(source)})
+	} else {
+		err := s.attachments.UnmarkSensitive(ctx, id, user.ID, moderator)
+		if errors.Is(err, attachments.ErrMarkNotYours) {
+			return echo.NewHTTPError(http.StatusForbidden,
+				"a moderator marked this, so only a moderator can unmark it")
+		}
+		if err != nil {
+			return attachmentError(err)
+		}
+
+		s.recordModeration(c, user, audit.ActionMediaUnmarked, "attachment", id.String(), nil)
+	}
+
+	updated, err := s.attachments.Get(ctx, id)
+	if err != nil {
+		return attachmentError(err)
+	}
+	return c.JSON(http.StatusOK, attachmentResponseOf(updated))
 }

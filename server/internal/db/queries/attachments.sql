@@ -63,3 +63,32 @@ WHERE id = $1 AND uploader_id = $2 AND event_id IS NULL;
 -- against space that is not being used.
 SELECT COALESCE(SUM(size_bytes), 0)::bigint
 FROM (SELECT DISTINCT ON (storage_key) storage_key, size_bytes FROM attachments) AS unique_objects;
+
+-- name: MarkAttachmentSensitive :execrows
+-- Marks media so viewers see it obscured until they choose otherwise.
+--
+-- A moderator's mark overwrites an uploader's; an uploader's does not
+-- overwrite a moderator's. Expressed here rather than in Go so the rule holds
+-- for every caller, and so two people marking at once cannot interleave into
+-- the weaker outcome.
+UPDATE attachments
+SET sensitive_by = $2, sensitive_source = $3
+WHERE id = $1
+  AND (sensitive_source IS DISTINCT FROM 'moderator' OR $3 = 'moderator');
+
+-- name: UnmarkAttachmentSensitive :execrows
+-- Removes a mark.
+--
+-- Scoped by who may: an uploader may undo their own mark and an automatic one
+-- on their own file, but not a moderator's — otherwise marking would be
+-- advisory, and the people most likely to post something unwelcome would be
+-- exactly the people able to unmark it.
+UPDATE attachments
+SET sensitive_by = NULL, sensitive_source = NULL
+WHERE id = $1
+  AND (
+    -- A moderator may lift any mark.
+    @as_moderator::boolean
+    -- An uploader may lift their own, and an automatic one on their own file.
+    OR (uploader_id = @actor_id::uuid AND sensitive_source <> 'moderator')
+  );

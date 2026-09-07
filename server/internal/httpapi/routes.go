@@ -111,6 +111,11 @@ func (s *Server) routes() {
 	// A caption belongs to the file, so several sent together can each say
 	// something different.
 	s.echo.PUT("/api/attachments/:id/caption", s.handleCaptionAttachment, requireAuthentication)
+	// Marking media sensitive, which whoever sent it may do to their own and a
+	// moderator may do to anybody's. No permission on the route: which of the
+	// two applies is decided in the handler, and requiring the moderation
+	// permission here would stop an uploader marking their own file.
+	s.echo.PUT("/api/attachments/:id/sensitive", s.handleMarkSensitive, requireAuthentication)
 
 	// Notifications, and what a person wants to be told about.
 	me.GET("/notifications", s.handleListNotifications)
@@ -303,6 +308,18 @@ type serverInfoResponse struct {
 	ProtocolVersions []string `json:"protocolVersions"`
 	Capabilities     []string `json:"capabilities"`
 	DefaultLanguage  string   `json:"defaultLanguage"`
+	/*
+		ObscureSensitiveMedia tells a client to cover media marked sensitive
+		until the viewer asks to see it.
+
+		Sent here rather than left to each client to decide, because it is the
+		operator's policy and a client choosing for itself would mean the same
+		server behaving differently in the web app and the desktop one.
+
+		Unauthenticated, like everything else here: the policy is not a secret,
+		and a client needs it before the first message renders.
+	*/
+	ObscureSensitiveMedia bool `json:"obscureSensitiveMedia"`
 }
 
 /*
@@ -357,7 +374,23 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		// Optional capabilities are advertised as they are built, so a client
 		// adapts to what this server actually offers rather than presenting a
 		// control that cannot work.
-		Capabilities:    s.capabilities(c.Request().Context()),
-		DefaultLanguage: s.config.DefaultLanguage,
+		Capabilities:          s.capabilities(c.Request().Context()),
+		DefaultLanguage:       s.config.DefaultLanguage,
+		ObscureSensitiveMedia: s.obscureSensitiveMedia(c.Request().Context()),
 	})
+}
+
+/*
+obscureSensitiveMedia reports the operator's policy on covering marked media.
+
+Defaults to covering when the setting cannot be read. A server that showed
+everything because a settings query timed out would expose exactly what
+somebody marked to avoid, where the opposite failure covers something
+harmlessly.
+*/
+func (s *Server) obscureSensitiveMedia(ctx context.Context) bool {
+	if s.settings == nil {
+		return true
+	}
+	return s.settings.Get(ctx, settings.ObscureSensitiveMedia) != "false"
 }

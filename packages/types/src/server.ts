@@ -37,6 +37,13 @@ export interface ServerInfo {
   capabilities: Capability[];
   /** Default interface language for users who have not chosen one. */
   defaultLanguage: string;
+  /**
+   * Whether media marked sensitive should arrive covered.
+   *
+   * The operator's policy rather than each client's choice, so the same server
+   * behaves the same way in the web application and the desktop one.
+   */
+  obscureSensitiveMedia: boolean;
 }
 
 /**

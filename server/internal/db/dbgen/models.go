@@ -30,6 +30,8 @@ type Attachment struct {
 	Height          *int32
 	Caption         string
 	Animated        bool
+	SensitiveBy     *string
+	SensitiveSource *string
 }
 
 type AuditEntry struct {

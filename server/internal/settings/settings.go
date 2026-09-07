@@ -84,6 +84,20 @@ const (
 		deciding on its own.
 	*/
 	FilterAction Key = "filter.action"
+
+	/*
+		ObscureSensitiveMedia requires clients to hide media marked sensitive
+		until a viewer chooses to see it.
+
+		On by default. Somebody who marked their upload did so meaning it to be
+		covered, and a server that ignored that until an operator found the
+		setting would be one where the marking did nothing.
+
+		An operator can turn it off for a server where everybody has agreed
+		otherwise — a private team channel where covering images is friction
+		rather than protection.
+	*/
+	ObscureSensitiveMedia Key = "moderation.obscure_sensitive_media"
 )
 
 // definition describes one setting: how to validate it, and what it means when
@@ -147,9 +161,22 @@ var definitions = map[Key]definition{
 			return nil
 		},
 	},
+	ObscureSensitiveMedia: {
+		fallback:    "true",
+		description: "Hide media marked sensitive until a viewer chooses to see it.",
+		validate:    boolean,
+	},
 	MaxUsers:        {fallback: "0", description: "Maximum accounts, or 0 for no limit.", validate: nonNegative},
 	MaxChannels:     {fallback: "0", description: "Maximum channels, or 0 for no limit.", validate: nonNegative},
 	MaxStorageBytes: {fallback: "0", description: "Maximum attachment storage in bytes, or 0 for no limit.", validate: nonNegative},
+}
+
+// boolean accepts what a checkbox sends, and nothing else.
+func boolean(value string) error {
+	if value != "true" && value != "false" {
+		return fmt.Errorf(`%w: expected "true" or "false"`, ErrInvalidValue)
+	}
+	return nil
 }
 
 func nonNegative(value string) error {

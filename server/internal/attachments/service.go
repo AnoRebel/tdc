@@ -64,7 +64,26 @@ type Attachment struct {
 	PreviewType   string
 	PreviewWidth  int
 	PreviewHeight int
+
+	/*
+		SensitiveSource says who decided this is sensitive, and is empty when
+		nobody has.
+
+		Recorded rather than a bare boolean because who marked it decides who
+		may unmark it: an uploader may change their mind about their own file,
+		but a moderator's decision is not theirs to undo. A boolean would make
+		marking advisory, and the people most likely to post something
+		unwelcome would be exactly the people able to unmark it.
+	*/
+	SensitiveSource SensitiveSource
+	// SensitiveBy is who marked it, as an address. Shown to moderators so a
+	// disputed mark can be traced; never shown to other viewers.
+	SensitiveBy string
 }
+
+// Sensitive reports whether this media should be obscured until a viewer
+// chooses to reveal it.
+func (a *Attachment) Sensitive() bool { return a.SensitiveSource != "" }
 
 // HasPreview reports whether a reduced version of this attachment exists.
 func (a *Attachment) HasPreview() bool { return a.PreviewKey != "" }
@@ -472,6 +491,13 @@ func fromRow(row dbgen.Attachment) *Attachment {
 	}
 	if row.EventID != nil {
 		attachment.EventID = *row.EventID
+	}
+	// Both or neither, which the schema enforces.
+	if row.SensitiveSource != nil {
+		attachment.SensitiveSource = SensitiveSource(*row.SensitiveSource)
+	}
+	if row.SensitiveBy != nil {
+		attachment.SensitiveBy = *row.SensitiveBy
 	}
 	if row.PreviewKey != nil {
 		attachment.PreviewKey = *row.PreviewKey

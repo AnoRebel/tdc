@@ -79,7 +79,7 @@ INSERT INTO attachments (
     preview_key, preview_type, preview_width, preview_height, width, height,
     caption, animated
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated
+RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source
 `
 
 type CreateAttachmentParams struct {
@@ -140,6 +140,8 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		&i.Height,
 		&i.Caption,
 		&i.Animated,
+		&i.SensitiveBy,
+		&i.SensitiveSource,
 	)
 	return i, err
 }
@@ -154,7 +156,7 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAttachment = `-- name: GetAttachment :one
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated FROM attachments WHERE id = $1
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments WHERE id = $1
 `
 
 func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error) {
@@ -179,12 +181,14 @@ func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, 
 		&i.Height,
 		&i.Caption,
 		&i.Animated,
+		&i.SensitiveBy,
+		&i.SensitiveSource,
 	)
 	return i, err
 }
 
 const listAttachmentsForEvent = `-- name: ListAttachmentsForEvent :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments
 WHERE event_id = $1
 ORDER BY created_at
 `
@@ -217,6 +221,8 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 			&i.Height,
 			&i.Caption,
 			&i.Animated,
+			&i.SensitiveBy,
+			&i.SensitiveSource,
 		); err != nil {
 			return nil, err
 		}
@@ -229,7 +235,7 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 }
 
 const listOrphanedAttachments = `-- name: ListOrphanedAttachments :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments
 WHERE event_id IS NULL AND created_at < $1
 ORDER BY created_at
 LIMIT $2
@@ -269,6 +275,8 @@ func (q *Queries) ListOrphanedAttachments(ctx context.Context, arg ListOrphanedA
 			&i.Height,
 			&i.Caption,
 			&i.Animated,
+			&i.SensitiveBy,
+			&i.SensitiveSource,
 		); err != nil {
 			return nil, err
 		}
@@ -278,6 +286,33 @@ func (q *Queries) ListOrphanedAttachments(ctx context.Context, arg ListOrphanedA
 		return nil, err
 	}
 	return items, nil
+}
+
+const markAttachmentSensitive = `-- name: MarkAttachmentSensitive :execrows
+UPDATE attachments
+SET sensitive_by = $2, sensitive_source = $3
+WHERE id = $1
+  AND (sensitive_source IS DISTINCT FROM 'moderator' OR $3 = 'moderator')
+`
+
+type MarkAttachmentSensitiveParams struct {
+	ID              uuid.UUID
+	SensitiveBy     *string
+	SensitiveSource *string
+}
+
+// Marks media so viewers see it obscured until they choose otherwise.
+//
+// A moderator's mark overwrites an uploader's; an uploader's does not
+// overwrite a moderator's. Expressed here rather than in Go so the rule holds
+// for every caller, and so two people marking at once cannot interleave into
+// the weaker outcome.
+func (q *Queries) MarkAttachmentSensitive(ctx context.Context, arg MarkAttachmentSensitiveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markAttachmentSensitive, arg.ID, arg.SensitiveBy, arg.SensitiveSource)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setAttachmentCaption = `-- name: SetAttachmentCaption :execrows
@@ -317,4 +352,36 @@ func (q *Queries) TotalAttachmentBytes(ctx context.Context) (int64, error) {
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const unmarkAttachmentSensitive = `-- name: UnmarkAttachmentSensitive :execrows
+UPDATE attachments
+SET sensitive_by = NULL, sensitive_source = NULL
+WHERE id = $1
+  AND (
+    -- A moderator may lift any mark.
+    $2::boolean
+    -- An uploader may lift their own, and an automatic one on their own file.
+    OR (uploader_id = $3::uuid AND sensitive_source <> 'moderator')
+  )
+`
+
+type UnmarkAttachmentSensitiveParams struct {
+	ID          uuid.UUID
+	AsModerator bool
+	ActorID     uuid.UUID
+}
+
+// Removes a mark.
+//
+// Scoped by who may: an uploader may undo their own mark and an automatic one
+// on their own file, but not a moderator's — otherwise marking would be
+// advisory, and the people most likely to post something unwelcome would be
+// exactly the people able to unmark it.
+func (q *Queries) UnmarkAttachmentSensitive(ctx context.Context, arg UnmarkAttachmentSensitiveParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unmarkAttachmentSensitive, arg.ID, arg.AsModerator, arg.ActorID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
