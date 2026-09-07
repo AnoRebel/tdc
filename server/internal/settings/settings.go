@@ -23,6 +23,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -137,6 +139,38 @@ const (
 	// VisibilityAllowedServers lists the peers a limited server admits,
 	// comma separated. Meaningless under any other visibility.
 	VisibilityAllowedServers Key = "server.visible_to"
+
+	/*
+		Branding an operator sets while the server runs, rather than by
+		modifying and rebuilding the application.
+
+		BrandName is what the server calls itself in a client's interface.
+		Empty falls back to the name in the configuration file, which is what
+		the server calls itself to peers — so an operator who sets neither sees
+		something sensible rather than nothing.
+	*/
+	BrandName Key = "brand.name"
+	// BrandInitials are the two or three letters shown where there is no room
+	// for a name. Empty derives them from the name, so most operators set
+	// nothing.
+	BrandInitials Key = "brand.initials"
+	/*
+		BrandLogoURL is an image shown in place of the initials.
+
+		A URL rather than an upload: an operator hosting a server already has
+		somewhere to put a file, and accepting one here would mean this server
+		serving images for its own interface — a path with its own sizing,
+		type-checking and storage questions that a link does not raise.
+	*/
+	BrandLogoURL Key = "brand.logo_url"
+	/*
+		BrandAccent is the colour used for emphasis, as a CSS colour.
+
+		Applied as a custom property rather than substituted into stylesheets,
+		so nothing has to be rebuilt and a malformed value simply fails to
+		apply instead of breaking the interface.
+	*/
+	BrandAccent Key = "brand.accent"
 )
 
 // definition describes one setting: how to validate it, and what it means when
@@ -200,6 +234,30 @@ var definitions = map[Key]definition{
 			return nil
 		},
 	},
+	BrandName: {
+		fallback:    "",
+		description: "What this server calls itself in the interface. Empty uses the configured name.",
+	},
+	BrandInitials: {
+		fallback:    "",
+		description: "Two or three letters shown where there is no room for the name.",
+		validate: func(value string) error {
+			if len([]rune(value)) > 3 {
+				return fmt.Errorf("%w: at most three characters", ErrInvalidValue)
+			}
+			return nil
+		},
+	},
+	BrandLogoURL: {
+		fallback:    "",
+		description: "A link to a logo shown in place of the initials.",
+		validate:    httpURL,
+	},
+	BrandAccent: {
+		fallback:    "",
+		description: "The colour used for emphasis, as a CSS colour.",
+		validate:    cssColour,
+	},
 	ServerVisibility: {
 		fallback:    "public",
 		description: `Who may discover this server: "public", "limited" or "private".`,
@@ -234,6 +292,62 @@ var definitions = map[Key]definition{
 	MaxChannels:     {fallback: "0", description: "Maximum channels, or 0 for no limit.", validate: nonNegative},
 	MaxStorageBytes: {fallback: "0", description: "Maximum attachment storage in bytes, or 0 for no limit.", validate: nonNegative},
 }
+
+/*
+httpURL accepts a link a browser will actually fetch.
+
+Restricted to http and https so a logo cannot be a javascript: or data: URL —
+the first would run in the interface, and the second would let an operator's
+setting carry arbitrary bytes into every client that loads the page.
+*/
+func httpURL(value string) error {
+	if value == "" {
+		return nil
+	}
+
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return fmt.Errorf("%w: that is not a link", ErrInvalidValue)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("%w: a link must begin with http:// or https://", ErrInvalidValue)
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("%w: a link needs a host", ErrInvalidValue)
+	}
+	return nil
+}
+
+/*
+cssColour accepts a colour and nothing else.
+
+The value becomes a custom property, so it reaches a stylesheet. Restricting it
+to the shapes a colour actually takes is what stops an operator's setting
+becoming a way to inject declarations — a value like "red; position: fixed"
+would otherwise be applied verbatim.
+*/
+func cssColour(value string) error {
+	if value == "" {
+		return nil
+	}
+
+	if !colourPattern.MatchString(strings.TrimSpace(value)) {
+		return fmt.Errorf("%w: expected a colour such as #2563eb or oklch(0.6 0.2 260)",
+			ErrInvalidValue)
+	}
+	return nil
+}
+
+/*
+colourPattern matches the colour notations worth supporting, and nothing that
+carries punctuation a declaration needs.
+
+Deliberately narrow. A colour has no use for a semicolon, a brace or a closing
+angle bracket, so refusing them costs an operator nothing and removes the whole
+class of value that would escape the property it is set on.
+*/
+var colourPattern = regexp.MustCompile(
+	`^(#[0-9a-fA-F]{3,8}|(rgb|rgba|hsl|hsla|oklch|oklab|lab|lch)\([0-9a-zA-Z.%,/ +-]+\)|[a-zA-Z]{3,30})$`)
 
 // boolean accepts what a checkbox sends, and nothing else.
 func boolean(value string) error {

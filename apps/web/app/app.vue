@@ -21,6 +21,27 @@
 useHead({
   titleTemplate: (page?: string) => (page ? `${page} — TDC` : "TDC"),
 });
+
+/*
+ * The operator's accent colour, applied as a custom property.
+ *
+ * Set on the root element rather than substituted into a stylesheet, so
+ * nothing is rebuilt and a value the server would not accept simply never
+ * arrives. The server validates it to the shapes a colour actually takes,
+ * which is what stops a setting becoming a declaration of its own.
+ */
+const { branding } = useServerInfo();
+
+watchEffect(() => {
+  if (import.meta.server) return;
+
+  const accent = branding.value.accent;
+  if (accent) {
+    document.documentElement.style.setProperty("--primary", accent);
+  } else {
+    document.documentElement.style.removeProperty("--primary");
+  }
+});
 </script>
 
 <template>

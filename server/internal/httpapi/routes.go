@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"strings"
+	"unicode"
 
 	"github.com/labstack/echo/v5"
 
@@ -330,6 +332,28 @@ type serverInfoResponse struct {
 		and a client needs it before the first message renders.
 	*/
 	ObscureSensitiveMedia bool `json:"obscureSensitiveMedia"`
+
+	/*
+		Branding an operator set, applied by clients without a rebuild.
+
+		Sent alongside the canonical address rather than instead of it. Nothing
+		here can remove that field: a client shows what the operator chose, and
+		still shows which server it is talking to.
+	*/
+	Branding brandingResponse `json:"branding"`
+}
+
+// brandingResponse is what an operator may change about how this server looks.
+type brandingResponse struct {
+	// Name is what the server calls itself in an interface, falling back to
+	// the configured name so an operator who sets nothing still sees something.
+	Name string `json:"name"`
+	// Initials are shown where there is no room for a name.
+	Initials string `json:"initials"`
+	// LogoURL is shown in place of the initials, when set.
+	LogoURL string `json:"logoUrl,omitempty"`
+	// Accent is a CSS colour used for emphasis.
+	Accent string `json:"accent,omitempty"`
 }
 
 /*
@@ -404,6 +428,7 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		Capabilities:          s.capabilities(c.Request().Context()),
 		DefaultLanguage:       s.config.DefaultLanguage,
 		ObscureSensitiveMedia: s.obscureSensitiveMedia(c.Request().Context()),
+		Branding:              s.branding(c.Request().Context()),
 	})
 }
 
@@ -420,4 +445,60 @@ func (s *Server) obscureSensitiveMedia(ctx context.Context) bool {
 		return true
 	}
 	return s.settings.Get(ctx, settings.ObscureSensitiveMedia) != "false"
+}
+
+/*
+branding is what an operator has chosen about how this server looks.
+
+Falls back to the configured name, so a server nobody has branded still calls
+itself something. The canonical address is not part of this and cannot be
+changed by it — which is the whole point: an operator may decide what their
+server is called and never what it is.
+*/
+func (s *Server) branding(ctx context.Context) brandingResponse {
+	branding := brandingResponse{Name: s.config.ServerName}
+
+	if s.settings == nil {
+		branding.Initials = initialsOf(branding.Name)
+		return branding
+	}
+
+	if name := strings.TrimSpace(s.settings.Get(ctx, settings.BrandName)); name != "" {
+		branding.Name = name
+	}
+	branding.Initials = strings.TrimSpace(s.settings.Get(ctx, settings.BrandInitials))
+	if branding.Initials == "" {
+		branding.Initials = initialsOf(branding.Name)
+	}
+
+	branding.LogoURL = strings.TrimSpace(s.settings.Get(ctx, settings.BrandLogoURL))
+	branding.Accent = strings.TrimSpace(s.settings.Get(ctx, settings.BrandAccent))
+
+	return branding
+}
+
+/*
+initialsOf reduces a name to the letters shown where there is no room for it.
+
+The first letter of each of the first three words, which turns "Tanzania
+Developers Community" into TDC and leaves a one-word name as its first letter
+rather than nothing.
+*/
+func initialsOf(name string) string {
+	var initials []rune
+
+	for _, word := range strings.Fields(name) {
+		for _, letter := range word {
+			initials = append(initials, unicode.ToUpper(letter))
+			break
+		}
+		if len(initials) == 3 {
+			break
+		}
+	}
+
+	if len(initials) == 0 {
+		return "?"
+	}
+	return string(initials)
 }

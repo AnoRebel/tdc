@@ -56,6 +56,7 @@ const groupTitles: Record<string, string> = {
   limits: "Capacity",
   filter: "Content filter",
   server: "How this server is found",
+  brand: "How this server looks",
   audit: "Audit log",
 };
 

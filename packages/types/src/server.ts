@@ -44,6 +44,26 @@ export interface ServerInfo {
    * behaves the same way in the web application and the desktop one.
    */
   obscureSensitiveMedia: boolean;
+  /**
+   * How the operator has chosen this server to look.
+   *
+   * Applied by clients at runtime, so a community can look like itself
+   * without maintaining a fork. It governs presentation only: the canonical
+   * address above is not part of it and cannot be changed by it.
+   */
+  branding: Branding;
+}
+
+/** What an operator may change about how their server looks. */
+export interface Branding {
+  /** What the server calls itself, falling back to its configured name. */
+  name: string;
+  /** Shown where there is no room for the name. */
+  initials: string;
+  /** A logo shown in place of the initials, when set. */
+  logoUrl?: string;
+  /** A CSS colour used for emphasis. */
+  accent?: string;
 }
 
 /**

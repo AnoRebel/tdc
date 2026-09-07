@@ -43,6 +43,7 @@ const peers = computed(() => props.servers);
  * them. Guarded for the server render, where there is no navigator.
  */
 const notifications = useNotifications();
+const { branding } = useServerInfo();
 const showNotifications = ref(false);
 const router = useRouter();
 
@@ -94,13 +95,22 @@ function conversationName(room: Room): string {
 
 <template>
   <aside class="flex w-60 shrink-0 flex-col border-r bg-surface-sunken">
+    <!-- What the operator called this server, applied at runtime rather than
+         compiled in. A logo where they set one, their initials otherwise. -->
     <header class="flex h-12 items-center gap-2 border-b px-3">
+      <img
+        v-if="branding.logoUrl"
+        :src="branding.logoUrl"
+        :alt="branding.name"
+        class="size-6 shrink-0 rounded-md object-cover"
+      />
       <span
-        class="grid size-6 place-items-center rounded-md bg-primary text-[0.625rem] font-bold text-primary-foreground"
+        v-else
+        class="grid size-6 shrink-0 place-items-center rounded-md bg-primary text-[0.625rem] font-bold text-primary-foreground"
       >
-        TDC
+        {{ branding.initials }}
       </span>
-      <span class="truncate text-sm font-semibold">Tanzania Developers</span>
+      <span class="truncate text-sm font-semibold">{{ branding.name }}</span>
     </header>
 
     <div class="p-2">

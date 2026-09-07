@@ -54,5 +54,19 @@ export function useServerInfo() {
   // Loaded on first use rather than by every caller remembering to.
   void load();
 
-  return { info, load, offers, obscureSensitiveMedia };
+  /*
+   * How this server has chosen to look.
+   *
+   * Falls back to something usable while the description is still loading, so
+   * the interface does not flash an empty badge on every start.
+   */
+  const branding = computed(
+    () =>
+      info.value?.branding ?? {
+        name: "TDC",
+        initials: "TDC",
+      },
+  );
+
+  return { info, load, offers, obscureSensitiveMedia, branding };
 }

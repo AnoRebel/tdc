@@ -48,6 +48,34 @@ func newTestAPI(t *testing.T) http.Handler {
 	return newTestAPIConfigured(t, nil)
 }
 
+/*
+newTestAPIWithAddress builds a server that knows its own canonical address.
+
+The ordinary harness leaves it empty, which is fine for almost everything —
+but a test asserting that something cannot change the address needs one to
+change.
+*/
+func newTestAPIWithAddress(t *testing.T, address string) http.Handler {
+	t.Helper()
+
+	canonicalAddressForTest = address
+	t.Cleanup(func() { canonicalAddressForTest = "" })
+
+	return newTestAPIConfigured(t, nil)
+}
+
+/*
+canonicalAddressForTest is set by a test that needs the server to know its own
+address, and empty otherwise.
+
+A package variable rather than another parameter on the harness: the
+constructor already takes an optional list typed for adjusting attachments, and
+threading a second unrelated option through every call site would cost more
+than it explains. Tests in this package do not run in parallel, and none of
+these ask to.
+*/
+var canonicalAddressForTest string
+
 // newTestAPIWithScanner builds a handler whose attachments are scanned, for the
 // tests that exercise the fail-closed policy.
 func newTestAPIWithScanner(t *testing.T, address string, failOpen bool) http.Handler {
@@ -145,6 +173,7 @@ func newTestAPIConfigured(
 		IdleTimeout:            10 * time.Second,
 		ShutdownTimeout:        2 * time.Second,
 		ServerName:             "Test Server",
+		CanonicalAddress:       canonicalAddressForTest,
 		DefaultLanguage:        "en",
 		SessionLifetime:        time.Hour,
 		WebRoot:                webRootForTest,
