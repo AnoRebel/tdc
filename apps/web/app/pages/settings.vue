@@ -4,6 +4,7 @@ import { isApiError } from "@tdc/types";
 import {
   ArrowLeft,
   Bell,
+  Compass,
   Flag,
   LogOut,
   Monitor,
@@ -26,6 +27,20 @@ useHead({ title: "Settings" });
 const personal = usePersonalModeration();
 const theme = useTheme();
 const push = usePushNotifications();
+const tour = useTour();
+
+/*
+ * Gives the introduction again, from the beginning.
+ *
+ * Forgotten first, so it starts at step one rather than resuming wherever it
+ * was last left — somebody asking to be shown around wants the whole thing,
+ * not the tail of it. Leaving settings so the tour has something to point at:
+ * every step is anchored to the sidebar and the main view.
+ */
+async function showTourAgain() {
+  tour.forget("chat");
+  await navigateTo("/");
+}
 
 onMounted(() => void push.refresh());
 
@@ -377,6 +392,21 @@ function deviceName(userAgent: string): string {
             </span>
           </span>
         </label>
+      </section>
+
+      <section>
+        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+          <Compass class="size-4" />
+          Getting around
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          The short introduction to the application, if you would like it again.
+        </p>
+
+        <button type="button" class="btn btn-ghost mt-3" @click="showTourAgain">
+          <Compass class="size-3.5" />
+          Show me around
+        </button>
       </section>
 
       <section>

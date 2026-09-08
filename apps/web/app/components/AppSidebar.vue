@@ -120,6 +120,7 @@ function conversationName(room: Room): string {
            worse than one that works. -->
       <button
         type="button"
+        data-tour="search"
         class="flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/40 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted"
         @click="emit('search')"
       >
@@ -129,7 +130,7 @@ function conversationName(room: Room): string {
       </button>
     </div>
 
-    <nav class="flex-1 space-y-4 overflow-y-auto px-2 pb-3">
+    <nav data-tour="channels" class="flex-1 space-y-4 overflow-y-auto px-2 pb-3">
       <section v-if="joined.length">
         <h2
           class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
@@ -251,7 +252,7 @@ function conversationName(room: Room): string {
       </p>
     </nav>
 
-    <div v-if="props.canCreate" class="border-t p-2">
+    <div v-if="props.canCreate" data-tour="create" class="border-t p-2">
       <button type="button" class="nav-item w-full" @click="emit('create')">
         <Plus class="size-3.5" />
         New channel
@@ -268,6 +269,7 @@ function conversationName(room: Room): string {
       </span>
       <button
         type="button"
+        data-tour="notifications"
         class="btn btn-ghost relative size-7 px-0"
         :aria-label="
           notifications.unread.value

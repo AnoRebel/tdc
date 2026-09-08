@@ -147,7 +147,7 @@ Goal: the PWA that most TDC members will actually use.
 - [x] 8.6 Implement the content-hiding option for push payloads; verify a private conversation's push contains no message content when hidden (`platform/notifications`)
 - [x] 8.7 Implement offline tolerance, pending-message queueing, runtime caching, and an offline fallback; verify a message composed offline is sent on reconnection or reported as failed (`clients/web`)
 - [x] 8.8 Implement install and update prompts preserving unsent input; verify a draft survives an update prompt (`clients/web`)
-- [ ] 8.9 Add `v-tour-guide` onboarding tours that are skippable and resumable; verify a completed tour does not recur (`clients/web`)
+- [x] 8.9 Add `driver.js` onboarding tours that are skippable and resumable; verify a completed tour does not recur (`clients/web`)
 - [ ] 8.10 Add automated accessibility checks to CI; verify keyboard-only operation reaches every control and a seeded violation fails the build (`clients/web`)
 - [ ] 8.11 Add an initial-load payload budget check to CI; verify exceeding the budget fails the build (`clients/web`)
 - [ ] **MILESTONE 8** — Demonstrate: install the app to a phone home screen, receive a push notification with the browser closed, read messages offline, and compose one that sends on reconnection. Tag `v0.8.0-dev`.

@@ -2,6 +2,7 @@
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 
+import { chatTour } from "~/lib/chattour";
 import { readFailure } from "~/lib/reachability";
 
 /*
@@ -126,6 +127,26 @@ function restoreRooms() {
 }
 
 await refresh();
+
+/*
+ * The introduction, the first time somebody arrives.
+ *
+ * After the rooms have loaded, because the tour points at a sidebar that has
+ * to have something in it — highlighting an empty list would explain nothing
+ * and look broken. Deferred a frame beyond that so the elements it points at
+ * have actually been laid out.
+ */
+const tour = useTour();
+
+onMounted(() => {
+  if (!tour.offered("chat")) return;
+
+  void nextTick().then(() => {
+    // Still worth giving by the time we get here: somebody who saw it in
+    // another tab meanwhile should not be interrupted by a second copy.
+    if (tour.offered("chat")) void tour.give("chat", chatTour());
+  });
+});
 
 /**
  * Loads the servers this one is connected to.
