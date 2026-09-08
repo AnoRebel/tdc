@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Report } from "@tdc/types";
 import { ArrowLeft, Check, Flag, ShieldAlert, X } from "lucide-vue-next";
-import { Avatar } from "~/components/ui/avatar";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { reportReasonLabel } from "~/lib/reports";
 
 /**

@@ -10,7 +10,7 @@ import {
   Smile,
   UserPlus,
 } from "lucide-vue-next";
-import { Avatar } from "~/components/ui/avatar";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
 
 /**
  * What has happened while you were away.

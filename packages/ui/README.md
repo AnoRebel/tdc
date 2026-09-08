@@ -64,6 +64,23 @@ Forgetting the provider throws on the first request, with a message saying what
 is missing. That is deliberate: the alternative is an error about `undefined`
 some distance from the line that caused it.
 
+## Paths inside this configuration
+
+Anything in `nuxt.config.ts` that names a directory must resolve it absolutely:
+
+```ts
+const here = fileURLToPath(new URL(".", import.meta.url));
+
+components: [{ path: `${here}app/components` }];
+```
+
+A relative path is resolved against whichever application is extending the
+layer, not against this file. `"./app/components"` therefore points at the
+_application's_ components directory, and the layer's own are registered
+nowhere — with no error, since the path it found was real. The symptom is a
+component that renders as nothing, which looks like a template problem rather
+than a configuration one.
+
 ## Importing the layer's own files
 
 Use `#layers/ui/app/...`. The `~` alias resolves to whichever application is

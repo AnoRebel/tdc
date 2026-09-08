@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
 import { ArrowLeft, ShieldAlert, TriangleAlert } from "lucide-vue-next";
-import { Switch } from "~/components/ui/switch";
+import { Switch } from "#layers/ui/app/components/ui/switch";
 
 /**
  * Server administration.

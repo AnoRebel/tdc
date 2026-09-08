@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Keyboard } from "lucide-vue-next";
-import { Kbd } from "~/components/ui/kbd";
+import { Kbd } from "#layers/ui/app/components/ui/kbd";
 import { shortcuts } from "~/composables/useShortcuts";
 
 /**

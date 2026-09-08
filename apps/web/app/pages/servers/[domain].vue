@@ -2,7 +2,7 @@
 import type { ConnectedServer, Room } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { Globe, Hash, Lock, Server, WifiOff } from "lucide-vue-next";
-import { Skeleton } from "~/components/ui/skeleton";
+import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 
 /**
  * A connected server, and the rooms it publishes.

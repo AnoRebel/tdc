@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
-import { Spinner } from "~/components/ui/spinner";
+import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
 

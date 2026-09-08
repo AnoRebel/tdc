@@ -11,8 +11,61 @@
  * the two clients is how a request is sent, and a composable that calls fetch
  * directly has made itself web-only without saying so.
  */
+import { fileURLToPath } from "node:url";
+
+/*
+ * This layer's own directory.
+ *
+ * Relative paths in a layer's configuration are resolved against whichever
+ * application is extending it, not against this file — so "./app/components"
+ * silently pointed at the web application's directory and none of the layer's
+ * components were registered at all.
+ */
+const here = fileURLToPath(new URL(".", import.meta.url));
+
 export default defineNuxtConfig({
-  modules: ["nuxt-i18n-micro"],
+  modules: ["nuxt-i18n-micro", "@nuxt/icon"],
+
+  /*
+   * Icons, resolved offline and bundled into the client.
+   *
+   * The default fetches from Iconify's API at runtime, which this cannot rely
+   * on: a self-hosted server on a network that does not reach the public
+   * internet would show an interface with holes where its icons were. The
+   * collection is a development dependency, so only the icons actually used
+   * reach the built application.
+   */
+  icon: {
+    // Never the network. An icon that is missing at build time should be a
+    // build somebody fixes, not a gap somebody discovers.
+    provider: "none",
+    clientBundle: {
+      /*
+       * Scanning, which is what puts any icon in the bundle at all.
+       *
+       * Without this block nothing is bundled and every icon is fetched from
+       * the network at runtime — measured, not assumed: removing it leaves the
+       * built application with none of them.
+       *
+       * The layer's own path is named alongside the application's. It turns
+       * out not to be strictly required — Nuxt resolves a layer's components
+       * into the application's tree, so the scanner reaches them either way —
+       * but the desktop client will extend this layer from a different
+       * directory, and a scan that depends on that resolution continuing to
+       * work is one nobody would think to check until the icons were gone.
+       */
+      scan: {
+        globInclude: ["app/**/*.{vue,ts}", "../../packages/ui/app/**/*.{vue,ts}"],
+        globExclude: ["node_modules", "dist", ".output", ".nuxt"],
+      },
+      /*
+       * Bounded, because bundling icons trades requests for weight and an
+       * unbounded trade is one nobody notices making. Over this, the build
+       * says so rather than quietly shipping it.
+       */
+      sizeLimitKb: 128,
+    },
+  },
 
   /*
    * English and Swahili, which is what this community actually speaks.
@@ -57,7 +110,7 @@ export default defineNuxtConfig({
 
   components: [
     {
-      path: "./app/components",
+      path: `${here}app/components`,
       // The vendored shadcn directories carry index.ts barrels, which the
       // scanner would otherwise register as a second component under the same
       // name as the .vue file beside it.

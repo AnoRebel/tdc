@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import type { Notification } from "@tdc/types";
-import { Bell, Globe, Hash, Lock, Plus, Search, Server, Settings } from "lucide-vue-next";
-import { Avatar } from "~/components/ui/avatar";
-import { Kbd } from "~/components/ui/kbd";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { Kbd } from "#layers/ui/app/components/ui/kbd";
 
 /**
  * The persistent navigation.
@@ -124,7 +123,7 @@ function conversationName(room: Room): string {
         class="flex h-8 w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-muted/40 px-2 text-xs text-muted-foreground transition-colors hover:bg-muted"
         @click="emit('search')"
       >
-        <Search class="size-3.5 shrink-0" />
+        <Icon name="lucide:search" class="size-3.5 shrink-0" />
         <span>Search</span>
         <Kbd class="ml-auto">{{ shortcut }}</Kbd>
       </button>
@@ -140,8 +139,12 @@ function conversationName(room: Room): string {
         <ul class="space-y-px">
           <li v-for="room in joined" :key="room.id">
             <NuxtLink :to="`/rooms/${room.id}`" class="nav-item" :data-active="isCurrent(room.id)">
-              <component
-                :is="room.visibility === 'private' ? Lock : Hash"
+              <!-- A literal name either way, because the scanner reads names
+                   rather than following a binding: an icon chosen by an
+                   expression is one it cannot see, and the bundle would ship
+                   without it. -->
+              <Icon
+                :name="room.visibility === 'private' ? 'lucide:lock' : 'lucide:hash'"
                 class="size-3.5 shrink-0 opacity-60"
               />
               <span class="truncate">{{ room.name }}</span>
@@ -187,7 +190,7 @@ function conversationName(room: Room): string {
         <ul class="space-y-px">
           <li v-for="room in joinable" :key="room.id">
             <NuxtLink :to="`/rooms/${room.id}`" class="nav-item" :data-active="isCurrent(room.id)">
-              <Hash class="size-3.5 shrink-0 opacity-40" />
+              <Icon name="lucide:hash" class="size-3.5 shrink-0 opacity-40" />
               <span class="truncate opacity-75">{{ room.name }}</span>
             </NuxtLink>
           </li>
@@ -211,13 +214,13 @@ function conversationName(room: Room): string {
               <!-- The icon carries the visibility, the way the channel list
                    uses a lock: a public server is open to the network, a
                    limited or private one is not. -->
-              <component
-                :is="
+              <Icon
+                :name="
                   peer.visibility === 'public'
-                    ? Globe
+                    ? 'lucide:globe'
                     : peer.visibility === 'limited'
-                      ? Server
-                      : Lock
+                      ? 'lucide:server'
+                      : 'lucide:lock'
                 "
                 class="size-3.5 shrink-0 opacity-60"
               />
@@ -254,7 +257,7 @@ function conversationName(room: Room): string {
 
     <div v-if="props.canCreate" data-tour="create" class="border-t p-2">
       <button type="button" class="nav-item w-full" @click="emit('create')">
-        <Plus class="size-3.5" />
+        <Icon name="lucide:plus" class="size-3.5" />
         New channel
       </button>
     </div>
@@ -278,7 +281,7 @@ function conversationName(room: Room): string {
         "
         @click="showNotifications = !showNotifications"
       >
-        <Bell class="size-3.5" />
+        <Icon name="lucide:bell" class="size-3.5" />
         <!-- A dot rather than a number past nine: the exact count stops
              meaning anything, and a three-digit badge crowds the footer. -->
         <span
@@ -292,7 +295,7 @@ function conversationName(room: Room): string {
       <NotificationPanel v-model="showNotifications" @open="goToNotification" />
 
       <NuxtLink to="/settings" class="btn btn-ghost size-7 px-0" aria-label="Settings">
-        <Settings class="size-3.5" />
+        <Icon name="lucide:settings" class="size-3.5" />
       </NuxtLink>
     </footer>
   </aside>

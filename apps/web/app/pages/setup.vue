@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
 import { ShieldCheck } from "lucide-vue-next";
-import { Spinner } from "~/components/ui/spinner";
+import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
 

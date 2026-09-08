@@ -17,6 +17,59 @@ const WORKER = "./.output/public/sw.js";
 /** Where the built application chunks land. */
 const BUNDLE_DIR = "./.output/public/_nuxt";
 
+/*
+ * The layer's icons, in the bundle browsers receive.
+ *
+ * Scanning has to be configured for anything to be bundled: without it every
+ * icon is fetched from the network at runtime, which a server on a network
+ * with no route to the public internet cannot do. The failure is an interface
+ * full of holes rather than an error anybody sees, which is why it is checked
+ * against the built output rather than the configuration.
+ */
+describe.skipIf(!existsSync(BUNDLE_DIR))("the icons a layer contributes", () => {
+  it("bundles the icons the shared sidebar uses", () => {
+    const bundle = readdirSync(BUNDLE_DIR)
+      .filter((name) => name.endsWith(".js"))
+      .map((name) => readFileSync(`${BUNDLE_DIR}/${name}`, "utf8"))
+      .join("\n");
+
+    // Every icon the layer's own sidebar names.
+    const missing = [
+      "bell",
+      "globe",
+      "hash",
+      "lock",
+      "plus",
+      "search",
+      "server",
+      "settings",
+      /*
+       * Matched on the icon data rather than the reference.
+       *
+       * A name like "lucide:bell" appears wherever a component asks for one,
+       * which a bundle contains whether or not the icon itself made it. What
+       * matters is the SVG being there — an earlier version of this test
+       * passed by finding the reference beside a bundle with no icons in it.
+       */
+    ].filter((icon) => !new RegExp(`"${icon}":\\{"width"`).test(bundle));
+
+    expect(missing, "these would render as blank spaces").toEqual([]);
+  });
+
+  /*
+   * Resolved at build time, never fetched.
+   *
+   * The default reaches Iconify's API at runtime, which a server on a network
+   * with no route to the public internet cannot do — and the failure is an
+   * interface full of holes rather than an error anybody sees.
+   */
+  it("does not depend on a network for its icons", () => {
+    const config = readFileSync("../../packages/ui/nuxt.config.ts", "utf8");
+
+    expect(config).toContain('provider: "none"');
+  });
+});
+
 /** The worker browsers actually receive. */
 function builtWorker(): string {
   return readFileSync(WORKER, "utf8");

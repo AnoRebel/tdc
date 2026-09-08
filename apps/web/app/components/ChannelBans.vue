@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ShieldOff } from "lucide-vue-next";
-import { Avatar } from "~/components/ui/avatar";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
 
 /**
  * Who is currently kept out of a channel, and the way back in.

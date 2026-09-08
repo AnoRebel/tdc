@@ -2,11 +2,11 @@
 import type { Message, Thread } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { SendHorizontal, X } from "lucide-vue-next";
-import { Avatar } from "~/components/ui/avatar";
-import { Bubble } from "~/components/ui/bubble";
-import { Separator } from "~/components/ui/separator";
-import { Skeleton } from "~/components/ui/skeleton";
-import { Spinner } from "~/components/ui/spinner";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { Bubble } from "#layers/ui/app/components/ui/bubble";
+import { Separator } from "#layers/ui/app/components/ui/separator";
+import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
+import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
 /**
  * A thread, opened beside the channel.

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
 import { ArrowLeft, Check, Copy, ShieldAlert, UserPlus, UserX } from "lucide-vue-next";
-import { Avatar } from "~/components/ui/avatar";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import type { Person } from "#layers/ui/app/composables/usePeople";
 
 /**

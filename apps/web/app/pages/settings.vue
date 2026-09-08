@@ -16,7 +16,7 @@ import {
   Users,
   UserX,
 } from "lucide-vue-next";
-import { Avatar } from "~/components/ui/avatar";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
 
 /** Account settings: identity, status, signed-in devices. */
 

@@ -2,9 +2,9 @@
 import type { PersonHit, RoomHit } from "@tdc/types";
 import type { Command } from "~/composables/useCommands";
 import { Hash, Lock, MessageSquare, Search, User } from "lucide-vue-next";
-import { Avatar } from "~/components/ui/avatar";
-import { Kbd } from "~/components/ui/kbd";
-import { Spinner } from "~/components/ui/spinner";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { Kbd } from "#layers/ui/app/components/ui/kbd";
+import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
 /**
  * Search across conversations, people and messages.
