@@ -7,6 +7,8 @@
  * party writing an integration.
  */
 
+export * from "./client";
+export * from "./apiclient";
 export * from "./server";
 export * from "./auth";
 export * from "./rooms";

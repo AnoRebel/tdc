@@ -1,104 +1,71 @@
-import { ApiError, type ApiErrorBody, type ErrorCode } from "@tdc/types";
+import { createApiClient, type ApiClient, type ApiRequest, type ApiResponse } from "@tdc/types";
 
 /**
- * Calls the TDC server.
+ * Calls the TDC server over HTTP.
  *
- * Every failure is normalised into ApiError, so callers branch on a code
- * rather than on a status or on prose. The desktop client will do the same
- * over Wails bindings, which have no status codes at all — which is why the
- * code, not the status, is what shared code is written against.
+ * Only the sending lives here. What a refusal means, which code it carries and
+ * how it reaches a caller are decided once in the shared client, so the
+ * desktop client — which speaks to the same server over Wails bindings with no
+ * statuses, headers or cookies — answers to the same contract rather than a
+ * parallel one that drifts.
  */
-export function useApi() {
+export function useApi(): ApiClient {
   const apiBase = useRuntimeConfig().public.apiBase;
 
-  async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${apiBase}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+  return createApiClient(async (request: ApiRequest): Promise<ApiResponse> => {
+    const response = await fetch(`${apiBase}${request.path}`, {
+      method: request.method,
+      headers: { "Content-Type": "application/json" },
+      body: request.body === undefined ? undefined : JSON.stringify(request.body),
       // Sends and accepts the session cookie. The browser stores it as
       // HttpOnly, so no script here ever sees the token.
       credentials: "include",
     });
 
+    /*
+     * A response that carried nothing, which is not the same as one that
+     * carried null. Several endpoints answer 204 to say the request succeeded
+     * and there is nothing to report.
+     */
     if (response.status === 204) {
-      return undefined as T;
+      return { ok: response.ok, status: response.status };
     }
 
     const text = await response.text();
-    const body = text ? JSON.parse(text) : {};
 
-    if (!response.ok) {
-      throw new ApiError(toErrorBody(body, response), response.status);
-    }
-
-    return body as T;
-  }
-
-  return {
-    get: <T>(path: string) => request<T>(path),
-    post: <T>(path: string, body?: unknown) =>
-      request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
-    put: <T>(path: string, body?: unknown) =>
-      request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
-    patch: <T>(path: string, body?: unknown) =>
-      request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined }),
-    delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
-  };
+    return {
+      ok: response.ok,
+      status: response.status,
+      /*
+       * Parsed here rather than in the shared client, because what counts as
+       * a body is a transport's business: this one has text that may or may
+       * not be JSON, and a Wails binding has an object already.
+       */
+      body: text ? safelyParse(text) : undefined,
+      retryAfterSeconds: retryAfterFrom(response),
+    };
+  });
 }
 
 /**
- * Maps a server response to the shared error shape.
+ * Reads a body that should be JSON.
  *
- * The server sends a message and a status; the code is derived here so that
- * shared code has one vocabulary regardless of transport.
+ * A server behind a proxy can answer with the proxy's own HTML — a gateway
+ * error page, most often — and throwing while trying to explain a failure
+ * replaces a useful message with a parse error about the wrong thing.
  */
-function toErrorBody(body: Record<string, unknown>, response: Response): ApiErrorBody {
-  const message =
-    typeof body.message === "string" ? body.message : "The server could not complete the request.";
-
-  return {
-    code: codeForStatus(response.status),
-    message,
-    requiredPermission: permissionFromMessage(message),
-    retryAfterSeconds: retryAfterFrom(response),
-  };
-}
-
-function codeForStatus(status: number): ErrorCode {
-  switch (status) {
-    case 400:
-      return "invalid";
-    case 401:
-      return "unauthenticated";
-    case 403:
-      return "forbidden";
-    case 404:
-      return "not-found";
-    case 409:
-      return "conflict";
-    case 429:
-      return "rate-limited";
-    case 503:
-      return "unavailable";
-    default:
-      return status >= 500 ? "internal" : "invalid";
+function safelyParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text.slice(0, 200) };
   }
-}
-
-/**
- * Extracts the permission a refusal named, so the interface can tell the user
- * what they would need rather than only that they were refused.
- */
-function permissionFromMessage(message: string): string | undefined {
-  return message.match(/requires permission "([^"]+)"/)?.[1];
 }
 
 function retryAfterFrom(response: Response): number | undefined {
   const header = response.headers.get("Retry-After");
   if (!header) return undefined;
+
   const seconds = Number.parseInt(header, 10);
   return Number.isFinite(seconds) ? seconds : undefined;
 }
