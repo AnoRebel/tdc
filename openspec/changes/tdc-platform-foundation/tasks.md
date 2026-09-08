@@ -142,7 +142,7 @@ Goal: the PWA that most TDC members will actually use.
 - [x] 8.2 Implement the pre-paint theme script in `app.head` per the house convention; verify no theme flash on load with a dark preference (`clients/web`)
 - [x] 8.3 Add `@vueuse/motion` and `@vueuse/gesture` interactions — swipe-to-reply, swipe between channels, pull-to-refresh; verify gestures work on a touch device or emulator
 - [x] 8.3a Add keyboard shortcuts using VueUse (`useMagicKeys`, `onKeyStroke`) — quick channel switch, search, composer focus, thread navigation — with a discoverable shortcut reference; verify each shortcut works and none intercept typing in the composer
-- [ ] 8.4 Configure the PWA with `@vite-pwa/nuxt` including `navigateFallbackDenylist` for API and WebSocket paths; verify real-time paths are never served from the cached shell (`clients/web`)
+- [x] 8.4 Configure the PWA with `@vite-pwa/nuxt` including `navigateFallbackDenylist` for API and WebSocket paths; verify real-time paths are never served from the cached shell (`clients/web`)
 - [ ] 8.5 Migrate the service worker to `injectManifest` and implement the web push handler, VAPID key generation, and subscription lifecycle with pruning; verify a push arrives with the browser closed and works with no commercial service (`clients/web`, `platform/notifications`)
 - [ ] 8.6 Implement the content-hiding option for push payloads; verify a private conversation's push contains no message content when hidden (`platform/notifications`)
 - [ ] 8.7 Implement offline tolerance, pending-message queueing, runtime caching, and an offline fallback; verify a message composed offline is sent on reconnection or reported as failed (`clients/web`)
