@@ -1,4 +1,4 @@
-import { remember as rememberIn, type Remembered } from "~/lib/lastseen";
+import { remember as rememberIn, type Remembered } from "#layers/ui/app/lib/lastseen";
 
 /*
  * storageKey holds conversations across a restart.

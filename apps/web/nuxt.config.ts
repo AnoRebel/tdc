@@ -1,10 +1,21 @@
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 
-import { PREPAINT_THEME_SCRIPT } from "./app/lib/theme";
+// A relative path, not an alias: this runs while the configuration is being
+// evaluated, before Nuxt has resolved any of its own aliases.
+import { PREPAINT_THEME_SCRIPT } from "../../packages/ui/app/lib/theme";
 
 export default defineNuxtConfig({
   compatibilityDate: "2026-08-29",
+
+  /*
+   * The interface shared with the desktop client.
+   *
+   * Nuxt merges this application's own directories over the layer's, so
+   * anything here wins where both define the same thing — which is how the
+   * desktop client will replace the transport and keep everything else.
+   */
+  extends: ["../../packages/ui"],
 
   future: {
     // Opt into Nuxt 5 behaviour ahead of its release, which is the supported

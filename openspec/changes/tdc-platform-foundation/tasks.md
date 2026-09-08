@@ -156,7 +156,7 @@ Goal: the PWA that most TDC members will actually use.
 
 Goal: the native client, with the capabilities that justify it over the PWA.
 
-- [ ] 9.1 Extract shared UI into `packages/ui` as a Nuxt layer with the transport-agnostic `ApiClient` interface wired by `provide`/`inject`; verify a unit test drives it with a mock adapter and no Nuxt runtime, and the web app still works unchanged
+- [x] 9.1 Extract shared UI into `packages/ui` as a Nuxt layer with the transport-agnostic `ApiClient` interface wired by `provide`/`inject`; verify a unit test drives it with a mock adapter and no Nuxt runtime, and the web app still works unchanged
 - [ ] 9.2 Refactor the web app to consume the shared layer via its `$fetch` adapter; verify no behaviour regressions against the Phase 8 milestone
 - [ ] 9.3 Set up `nuxt-i18n-micro` with English and Swahili and the per-app generation script; verify both produce working locale payloads and a missing key falls back to English
 - [ ] 9.4 Configure `@nuxt/icon` with an explicit `globInclude` for the layer's components; verify layer icons appear in the client bundle

@@ -8,7 +8,7 @@ import type {
   User,
 } from "@tdc/types";
 
-import { readFailure } from "~/lib/reachability";
+import { readFailure } from "#layers/ui/app/lib/reachability";
 
 /*
  * rememberedUserKey holds who was last signed in.

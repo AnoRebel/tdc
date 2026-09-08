@@ -9,7 +9,7 @@ import type {
   TypingPerson,
 } from "@tdc/types";
 import { isApiError } from "@tdc/types";
-import { readFailure } from "~/lib/reachability";
+import { readFailure } from "#layers/ui/app/lib/reachability";
 import type { MenuItem } from "~/components/ContextMenu.vue";
 import {
   Check,

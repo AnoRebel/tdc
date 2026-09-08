@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import DOMPurify from "dompurify";
 
-import { linkify } from "~/lib/linkify";
+import { linkify } from "#layers/ui/app/lib/linkify";
 
 /**
  * A message's text, with its links, addresses and numbers made clickable.

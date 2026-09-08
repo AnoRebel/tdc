@@ -1,6 +1,11 @@
 import { useSwipe } from "@vueuse/core";
 
-import { PULL_THRESHOLD, pullTriggersRefresh, readPull, readSwipe } from "~/lib/gestures";
+import {
+  PULL_THRESHOLD,
+  pullTriggersRefresh,
+  readPull,
+  readSwipe,
+} from "#layers/ui/app/lib/gestures";
 
 /**
  * Touch gestures over a conversation.

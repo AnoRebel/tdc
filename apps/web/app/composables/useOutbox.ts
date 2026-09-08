@@ -6,7 +6,7 @@ import {
   sendOrder,
   stillWaiting,
   type Queued,
-} from "~/lib/outbox";
+} from "#layers/ui/app/lib/outbox";
 
 /*
  * storageKey holds the queue across a restart.

@@ -9,7 +9,7 @@ import {
   shouldOffer,
   type Progress,
   type TourName,
-} from "~/lib/tours";
+} from "#layers/ui/app/lib/tours";
 
 /*
  * storageKey holds what somebody has been shown.

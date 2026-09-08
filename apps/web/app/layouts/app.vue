@@ -3,7 +3,7 @@ import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 
 import { chatTour } from "~/lib/chattour";
-import { readFailure } from "~/lib/reachability";
+import { readFailure } from "#layers/ui/app/lib/reachability";
 
 /*
  * lastSeenRoomsKey holds the conversations somebody is in.

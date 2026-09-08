@@ -71,6 +71,16 @@
         "vitest": "catalog:testing",
       },
     },
+    "packages/ui": {
+      "name": "@tdc/ui",
+      "version": "0.1.0",
+      "dependencies": {
+        "@tdc/types": "workspace:*",
+      },
+      "devDependencies": {
+        "vitest": "catalog:testing",
+      },
+    },
   },
   "trustedDependencies": [
     "lefthook",
@@ -654,6 +664,8 @@
     "@tanstack/vue-virtual": ["@tanstack/vue-virtual@3.13.36", "", { "dependencies": { "@tanstack/virtual-core": "3.17.8" }, "peerDependencies": { "vue": "^2.7.0 || ^3.0.0" } }, "sha512-gKpExv4RbB9luVG+SucTXoqPZv/gzu/Yvz6BNO+8kpNxJ2x+I/ulryzl5W9BRciahZGp5Tls3Dp5XP1ztVGbMw=="],
 
     "@tdc/types": ["@tdc/types@workspace:packages/types"],
+
+    "@tdc/ui": ["@tdc/ui@workspace:packages/ui"],
 
     "@tdc/web": ["@tdc/web@workspace:apps/web"],
 

@@ -1,7 +1,7 @@
 /** What somebody has chosen, rather than what is currently shown. */
 export type ThemePreference = "light" | "dark" | "auto";
 
-import { THEME_STORAGE_KEY as STORAGE_KEY } from "~/lib/theme";
+import { THEME_STORAGE_KEY as STORAGE_KEY } from "#layers/ui/app/lib/theme";
 
 /**
  * The interface's light or dark appearance.
