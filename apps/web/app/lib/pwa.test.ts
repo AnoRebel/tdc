@@ -161,4 +161,63 @@ describe.skipIf(!existsSync(WORKER))("the built worker's runtime caching", () =>
   it("bounds what it keeps", () => {
     expect(builtWorker()).toContain("ExpirationPlugin");
   });
+
+  /*
+   * A query string does not change which attachment this is.
+   *
+   * Found the hard way: entries stored under a URL carrying anything extra —
+   * a cache-buster, a parameter a future version appends — were never matched
+   * again. The cache filled and served nothing, so an attachment appeared to
+   * be kept and was missing offline, which is the worst of both.
+   */
+  it("matches an attachment regardless of its query string", () => {
+    /*
+     * Scoped to this route's own options.
+     *
+     * Searching the whole worker found "ignoreSearch" in workbox's bundled
+     * code — a comment and an internal helper — so the assertion held with
+     * the option removed. A test that cannot fail is worse than no test,
+     * because it is counted.
+     */
+    expect(attachmentRoute()).toContain("ignoreSearch");
+  });
+
+  /*
+   * Matched on the path, not on what kind of request the browser called it.
+   *
+   * Requiring request.destination to be "image" excluded most of the ways an
+   * attachment is really fetched: a plain fetch has no destination at all, and
+   * neither does a prefetch. Only the ones loaded through an <img> were kept.
+   */
+  it("does not require a request destination", () => {
+    expect(attachmentRouteCondition()).not.toContain("destination");
+  });
 });
+
+/**
+ * The attachment strategy's own configuration, from the built worker.
+ *
+ * Scoped rather than searched whole: workbox's bundled code mentions most of
+ * these names itself, and an assertion against the whole file passes whether
+ * or not this route carries the option.
+ */
+function attachmentRoute(): string {
+  const worker = builtWorker();
+
+  const start = worker.indexOf('cacheName: "tdc-attachments"');
+  if (start < 0) throw new Error("the built worker has no attachment cache");
+
+  return worker.slice(start, start + 600);
+}
+
+/** What decides whether a request is an attachment, in the built worker. */
+function attachmentRouteCondition(): string {
+  const worker = builtWorker();
+
+  const cache = worker.indexOf('cacheName: "tdc-attachments"');
+  if (cache < 0) throw new Error("the built worker has no attachment cache");
+
+  // The registerRoute call immediately preceding it, which carries the match.
+  const route = worker.lastIndexOf("registerRoute(", cache);
+  return worker.slice(route, cache);
+}

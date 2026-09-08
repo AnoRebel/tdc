@@ -70,11 +70,37 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL("/"), { denylist }));
  * bus and seeing a column of broken images.
  */
 registerRoute(
-  ({ url, request }) =>
-    url.pathname.startsWith("/api/attachments/") &&
-    (request.destination === "image" || request.destination === "video"),
+  /*
+   * Matched on the path alone.
+   *
+   * An earlier version also required request.destination to be "image" or
+   * "video", which quietly excluded most of the ways an attachment is
+   * actually fetched: a plain fetch has no destination, and neither does a
+   * prefetch. The path already says what this is, and the endpoint serves
+   * nothing else.
+   */
+  ({ url }) => url.pathname.startsWith("/api/attachments/"),
   new CacheFirst({
     cacheName: "tdc-attachments",
+    /*
+     * The query string is not part of what identifies an attachment.
+     *
+     * Anything appended — a cache-buster, a tracking parameter, a resize hint
+     * a future version adds — would otherwise store the file under a key
+     * nothing asks for again: an entry that fills the cache and is never
+     * served, so the attachment is missing offline while appearing to be
+     * kept.
+     */
+    matchOptions: {
+      ignoreSearch: true,
+      /*
+       * A Vary header would otherwise make a stored response unmatchable for
+       * the same reason a query string does: the browser compares the named
+       * request headers, and one that differs by an Accept the browser chose
+       * this time is a miss against a file that is sitting right there.
+       */
+      ignoreVary: true,
+    },
     plugins: [
       /*
        * Only successful responses.
