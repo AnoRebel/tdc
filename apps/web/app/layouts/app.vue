@@ -2,6 +2,17 @@
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 
+import { readFailure } from "~/lib/reachability";
+
+/*
+ * lastSeenRoomsKey holds the conversations somebody is in.
+ *
+ * Only what the sidebar draws. Membership is checked by the server on every
+ * request, so a stale list here shows a conversation that will refuse to open
+ * rather than granting access to one.
+ */
+const lastSeenRoomsKey = "tdc.lastseen.rooms";
+
 /**
  * The application shell: sidebar beside content, on every signed-in page.
  *
@@ -78,9 +89,39 @@ async function refresh() {
     rooms.value = all;
     direct.value = conversations;
     unread.value = counts;
-  } catch {
+
+    // Kept so that opening the application with no connection shows the
+    // conversations somebody is in rather than an empty sidebar, which reads
+    // as having been signed out of everything.
+    try {
+      localStorage.setItem(lastSeenRoomsKey, JSON.stringify({ rooms: all, direct: conversations }));
+    } catch {
+      // Full or refused. The sidebar simply starts empty next time.
+    }
+  } catch (cause) {
+    /*
+     * A server that could not be reached leaves the last known list in place.
+     * A refusal does not: the server has answered, and showing conversations
+     * somebody may no longer be in would be worse than showing none.
+     */
+    if (readFailure(cause) === "unreachable") restoreRooms();
+
     // Navigation is not worth interrupting someone over; the page they are on
     // reports its own failures.
+  }
+}
+
+/** The conversations this browser last saw, if the server cannot be reached. */
+function restoreRooms() {
+  try {
+    const stored = localStorage.getItem(lastSeenRoomsKey);
+    if (!stored) return;
+
+    const parsed = JSON.parse(stored) as { rooms?: Room[]; direct?: Room[] };
+    if (parsed.rooms) rooms.value = parsed.rooms;
+    if (parsed.direct) direct.value = parsed.direct;
+  } catch {
+    // Unreadable, so the sidebar stays as it is.
   }
 }
 

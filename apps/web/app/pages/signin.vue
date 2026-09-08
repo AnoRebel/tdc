@@ -14,11 +14,23 @@ const password = ref("");
 const error = ref<string | null>(null);
 const submitting = ref(false);
 
-// A server with no accounts cannot be signed into, so send the first visitor
-// to setup rather than showing them a form that can only fail.
-const status = await setupStatus();
-if (status.setupRequired) {
-  await router.replace("/setup");
+/*
+ * A server with no accounts cannot be signed into, so send the first visitor
+ * to setup rather than showing them a form that can only fail.
+ *
+ * Guarded because this awaits during setup: an unhandled rejection here is an
+ * error page rather than a form, and this page in particular has to work with
+ * no connection — it is where somebody lands when their session could not be
+ * confirmed.
+ */
+try {
+  const status = await setupStatus();
+  if (status.setupRequired) {
+    await router.replace("/setup");
+  }
+} catch {
+  // Unknown, so the form is shown. Signing in will report the same problem
+  // more usefully, against something the person actually did.
 }
 
 async function submit() {

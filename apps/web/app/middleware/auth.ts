@@ -18,9 +18,23 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return;
   }
 
-  const status = await setupStatus();
-  if (status.setupRequired) {
-    return navigateTo("/setup");
+  /*
+   * Whether this server has an administrator yet.
+   *
+   * Guarded because it runs on a page load that may have no network. An
+   * unhandled rejection in route middleware is an error page rather than an
+   * application, which would mean a phone with no signal showing a stack
+   * trace where it should show the last conversation.
+   */
+  try {
+    const status = await setupStatus();
+    if (status.setupRequired) {
+      return navigateTo("/setup");
+    }
+  } catch {
+    // Unknown. Sending somebody to sign in is the safe half of the guess: the
+    // sign-in page works offline and says so, and setup is a one-off that can
+    // wait for a connection.
   }
 
   return navigateTo({ path: "/signin", query: { next: to.fullPath } });

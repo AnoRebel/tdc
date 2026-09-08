@@ -44,8 +44,18 @@ func (s *Server) mountWebApp(root string) {
 		return
 	}
 
-	// Held in memory: it is a few kilobytes, served on every navigation, and
-	// rewritten per request to describe what is being shared.
+	/*
+		Held in memory: it is a few kilobytes, served on every navigation, and
+		rewritten per request to describe what is being shared.
+
+		Read once, which means replacing the web root under a running server
+		serves the old shell against the new assets until it is restarted. The
+		shell carries the built runtime configuration, so the symptom is an
+		application calling the address it was built with rather than the one
+		it is served from — which looks like a networking fault and is not.
+		Deploying the web root is therefore a restart, which the README says
+		under "Upgrading".
+	*/
 	s.shell = shell
 
 	/*

@@ -14,8 +14,13 @@ import { describe, expect, it } from "vitest";
  */
 const WORKER = "./.output/public/sw.js";
 
+/** The worker browsers actually receive. */
+function builtWorker(): string {
+  return readFileSync(WORKER, "utf8");
+}
+
 function shippedDenylist(): RegExp[] {
-  const worker = readFileSync(WORKER, "utf8");
+  const worker = builtWorker();
 
   /*
    * Matched loosely on purpose.
@@ -113,5 +118,47 @@ describe.skipIf(!existsSync(WORKER))("what the cached shell may answer", () => {
     for (const path of ["/", "/rooms/abc", "/settings", "/people", "/audit"]) {
       expect(servedFromShell(denylist, path), path).toBe(true);
     }
+  });
+});
+
+/*
+ * Attachments are served from the cache once they have been fetched.
+ *
+ * This is the difference between scrolling back through a conversation on a
+ * bus and seeing a column of broken images. Asserted against the built worker
+ * rather than the source, because a rule that did not survive the build is a
+ * rule that is not running.
+ */
+describe.skipIf(!existsSync(WORKER))("the built worker's runtime caching", () => {
+  it("keeps attachments", () => {
+    const worker = builtWorker();
+
+    expect(worker).toContain("tdc-attachments");
+    // Cache first, not network first: an attachment is addressed by an
+    // identifier that never names different bytes, so a cached copy is the
+    // same file rather than a stale one.
+    expect(worker).toContain("CacheFirst");
+  });
+
+  /*
+   * Only successful responses are kept.
+   *
+   * Without this an authentication failure or a 404 is cached as though it
+   * were the file, and the image stays broken after the cause is fixed —
+   * including across a reconnection, which is when somebody would expect it to
+   * come back.
+   */
+  it("does not keep failures", () => {
+    expect(builtWorker()).toContain("CacheableResponsePlugin");
+  });
+
+  /*
+   * The cache is bounded.
+   *
+   * A phone's storage is not, and a hundred large images is more than somebody
+   * bargained for when they installed a chat application.
+   */
+  it("bounds what it keeps", () => {
+    expect(builtWorker()).toContain("ExpirationPlugin");
   });
 });

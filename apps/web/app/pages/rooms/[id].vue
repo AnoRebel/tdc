@@ -9,12 +9,14 @@ import type {
   TypingPerson,
 } from "@tdc/types";
 import { isApiError } from "@tdc/types";
+import { readFailure } from "~/lib/reachability";
 import type { MenuItem } from "~/components/ContextMenu.vue";
 import {
   Check,
   CheckSquare,
   ChevronDown,
   Clock,
+  CloudOff,
   Copy,
   Eye,
   EyeOff,
@@ -72,6 +74,20 @@ const filePicker = ref<HTMLInputElement | null>(null);
 // Uploads are held here until the message that carries them is sent, so a
 // refusal costs only the transfer and a failed send does not lose the file.
 const uploads = useUploads();
+const outbox = useOutbox();
+
+/** What this conversation is still holding, oldest first. */
+const waiting = computed(() => outbox.waitingIn(roomId.value));
+
+const lastSeen = useLastSeen<Message, Room>();
+
+/*
+ * When what is on screen was last confirmed, or null if it is current.
+ *
+ * Drives the notice above the timeline. Somebody has to be able to tell a
+ * conversation they are watching from one they are remembering.
+ */
+const showingLastSeen = ref<number | null>(null);
 
 /** Files picked but not yet sent, kept so a retry needs no second selection. */
 const pending = new Map<string, File>();
@@ -690,11 +706,49 @@ const live = useLiveConnection({
   },
 });
 
+/*
+ * Queued messages go out when the server is reachable again.
+ *
+ * Keyed on the live connection rather than on the browser's online event: that
+ * one fires when an interface comes up, which is not the same as this server
+ * answering. A flush against a network that is technically up and practically
+ * useless would spend the queue's retries on nothing.
+ */
+watch(
+  () => live.state.value,
+  async (now, before) => {
+    if (now !== "connected" || before === "connected") return;
+
+    await outbox.flush(async (message) => {
+      const sent = await roomsApi.send(
+        message.roomId,
+        message.body,
+        message.clientToken,
+        message.attachmentIds,
+      );
+
+      // Only the conversation being looked at: the others reload their own
+      // timelines when somebody opens them.
+      if (
+        message.roomId === roomId.value &&
+        !messages.value.some((existing) => existing.id === sent.id)
+      ) {
+        messages.value.push(sent);
+        scrollToLatest();
+      }
+    });
+  },
+);
+
 async function load() {
   loading.value = true;
   try {
     room.value = await roomsApi.get(roomId.value);
     messages.value = await roomsApi.timeline(roomId.value);
+    // Kept so the next visit with no connection has something to show.
+    lastSeen.keep(roomId.value, messages.value, room.value);
+    // Current again, so the notice goes.
+    showingLastSeen.value = null;
     await Promise.all([loadPresence(), loadTyping()]);
     markCaughtUp();
     // Subscribing from the last sequence means a reconnection replays exactly
@@ -710,7 +764,37 @@ async function load() {
     void refreshUnreadHere();
     void loadForwardable();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not open this room.";
+    /*
+     * An unreachable server is not a refused request.
+     *
+     * "Could not open this room" reads as a permission problem and sends
+     * somebody looking for the wrong thing. Saying which of the two it was
+     * costs one branch and saves that.
+     */
+    if (readFailure(cause) === "unreachable") {
+      /*
+        What this conversation looked like when the server was last reached.
+
+        Shown rather than an empty room, and labelled rather than passed off as
+        current: somebody replying to a stale timeline is answering a
+        conversation that has moved on, which is worse than knowing they cannot
+        see the latest.
+      */
+      const kept = lastSeen.of(roomId.value);
+      if (kept) {
+        messages.value = kept.messages;
+        // The conversation too, so the header names it rather than showing a
+        // blank where the channel should be.
+        if (kept.room) room.value = kept.room;
+        showingLastSeen.value = kept.at;
+      }
+
+      error.value = kept
+        ? null
+        : "You are offline. This conversation will load when the connection comes back.";
+    } else {
+      error.value = isApiError(cause) ? cause.message : "Could not open this room.";
+    }
   } finally {
     loading.value = false;
 
@@ -939,13 +1023,10 @@ async function send() {
   await nextTick();
   fitComposer();
 
+  const attachmentIds = ready.map((attachment) => attachment.id);
+
   try {
-    const sent = await roomsApi.send(
-      roomId.value,
-      body,
-      clientToken,
-      ready.map((attachment) => attachment.id),
-    );
+    const sent = await roomsApi.send(roomId.value, body, clientToken, attachmentIds);
     uploads.clearFinished();
     pending.clear();
     if (!messages.value.some((message) => message.id === sent.id)) {
@@ -954,11 +1035,31 @@ async function send() {
     }
     live.markRead(roomId.value, sent.sequence);
   } catch (cause) {
-    // The text is restored, so a failure does not lose what was typed.
-    draft.value = previous;
-    await nextTick();
-    fitComposer();
-    error.value = isApiError(cause) ? cause.message : "Could not send that message.";
+    /*
+     * A server that could not be reached is not a message that failed.
+     *
+     * Somebody typing where there is no signal has written something they mean
+     * to send. Restoring the text and apologising would make them retype it on
+     * reconnection; holding it means it goes when the network comes back.
+     * A refusal is different — the server read it and said no — and that is
+     * reported rather than queued.
+     */
+    const held = outbox.holdIfUnsent(
+      { clientToken, roomId: roomId.value, body, attachmentIds },
+      cause,
+    );
+
+    if (held) {
+      uploads.clearFinished();
+      pending.clear();
+      scrollToLatest();
+    } else {
+      // The text is restored, so a refusal does not lose what was typed.
+      draft.value = previous;
+      await nextTick();
+      fitComposer();
+      error.value = isApiError(cause) ? cause.message : "Could not send that message.";
+    }
   } finally {
     sending.value = false;
   }
@@ -1518,6 +1619,21 @@ watch(roomId, load, { immediate: true });
         <span>{{ pull.refreshing.value ? "Refreshing" : "Pull to refresh" }}</span>
       </div>
 
+      <!-- What is on screen was true when the server was last reached, and is
+           not being updated. Said plainly, because somebody replying to a
+           stale conversation is answering something that has moved on. -->
+      <div
+        v-if="showingLastSeen"
+        class="flex shrink-0 items-center justify-center gap-1.5 bg-warning/10 px-4 py-1.5 text-xs text-warning"
+        role="status"
+      >
+        <CloudOff class="size-3.5 shrink-0" />
+        <span
+          >Showing this conversation as it was
+          {{ when(new Date(showingLastSeen).toISOString()) }}</span
+        >
+      </div>
+
       <div ref="timelineElement" class="flex-1 overflow-y-auto px-4 py-4">
         <!-- Shaped like the messages it stands in for, so the layout does not
              jump when the real thing arrives. -->
@@ -1731,6 +1847,34 @@ watch(roomId, load, { immediate: true });
               </button>
             </MessageGroup>
           </template>
+
+          <!-- Messages written while the server could not be reached.
+               Shown rather than hidden: somebody who typed something needs to
+               see that it exists and has not gone yet. Marked as waiting
+               rather than styled like the rest, because a message that looks
+               sent and is not is the worse of the two mistakes. -->
+          <MessageGroup v-if="waiting.length" :mine="true">
+            <div class="flex flex-row-reverse items-center gap-2 px-0.5">
+              <Avatar :name="user?.address ?? ''" size="sm" />
+              <span class="text-xs font-semibold">You</span>
+              <span class="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
+                <CloudOff class="size-3" />
+                Waiting to send
+              </span>
+            </div>
+
+            <MessageRow
+              v-for="(message, position) in waiting"
+              :key="message.clientToken"
+              :mine="true"
+            >
+              <div class="flex w-fit max-w-full flex-col items-end gap-1">
+                <Bubble variant="mine" align="end" :continued="position > 0" class="opacity-60">
+                  <MessageBody :body="message.body" />
+                </Bubble>
+              </div>
+            </MessageRow>
+          </MessageGroup>
         </div>
       </div>
 

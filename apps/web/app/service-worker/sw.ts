@@ -1,11 +1,14 @@
 /// <reference lib="webworker" />
 
+import { CacheableResponsePlugin } from "workbox-cacheable-response";
+import { ExpirationPlugin } from "workbox-expiration";
 import {
   cleanupOutdatedCaches,
   createHandlerBoundToURL,
   precacheAndRoute,
 } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
+import { CacheFirst } from "workbox-strategies";
 
 /*
  * The service worker.
@@ -56,6 +59,48 @@ const denylist = [
 registerRoute(new NavigationRoute(createHandlerBoundToURL("/"), { denylist }));
 
 /*
+ * Attachments, kept once they have been fetched.
+ *
+ * Cache first rather than network first, and deliberately: an attachment is
+ * addressed by an identifier that never names different bytes, so a cached
+ * copy is not a stale copy — it is the same file. Revalidating one would spend
+ * a request to be told what is already known.
+ *
+ * This is the difference between scrolling back through a conversation on a
+ * bus and seeing a column of broken images.
+ */
+registerRoute(
+  ({ url, request }) =>
+    url.pathname.startsWith("/api/attachments/") &&
+    (request.destination === "image" || request.destination === "video"),
+  new CacheFirst({
+    cacheName: "tdc-attachments",
+    plugins: [
+      /*
+       * Only successful responses.
+       *
+       * Without this an authentication failure or a 404 is cached as though it
+       * were the file, and the image stays broken after the problem that broke
+       * it is fixed — including across a reconnection.
+       */
+      new CacheableResponsePlugin({ statuses: [200] }),
+      new ExpirationPlugin({
+        /*
+         * Bounded, because a phone's storage is not. Both limits matter: a
+         * hundred large images would be more than somebody bargained for, and
+         * a month-old attachment is one nobody is scrolling back to.
+         */
+        maxEntries: 200,
+        maxAgeSeconds: 30 * 24 * 60 * 60,
+        // Frees the space rather than leaving it held by a cache the browser
+        // has already decided to evict from.
+        purgeOnQuotaError: true,
+      }),
+    ],
+  }),
+);
+
+/*
  * A new version, applied when the application asks rather than at once.
  *
  * Reloading under somebody who is typing loses what they were writing. The
@@ -74,14 +119,6 @@ interface PushPayload {
 }
 
 /*
- * A notification arriving while the application is closed.
- *
- * The payload has already been decided by the server, including whether it may
- * carry message content — somebody who asked for content to be hidden has that
- * honoured before it is encrypted, not here. This worker displays what it is
- * given and adds nothing.
- */
-/*
  * What a push carried, or nothing.
  *
  * A payload that is absent, empty, or not the JSON this server sends all reach
@@ -97,6 +134,14 @@ function readPayload(event: PushEvent): PushPayload {
   }
 }
 
+/*
+ * A notification arriving while the application is closed.
+ *
+ * The payload has already been decided by the server, including whether it may
+ * carry message content — somebody who asked for content to be hidden has that
+ * honoured before it is encrypted, not here. This worker displays what it is
+ * given and adds nothing.
+ */
 self.addEventListener("push", (event) => {
   /*
    * A push with no readable payload still shows something.

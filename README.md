@@ -50,6 +50,22 @@ Opening the app on a server with no accounts leads to first-run setup, which
 creates the administrator. That route closes as soon as an account exists, so
 it cannot be used to grant administration to somebody who arrives later.
 
+## Upgrading
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+Migrations run on start, so there is no separate step. A version that changes
+the schema is applied before the server begins answering.
+
+Replacing the web assets means restarting the server. The application shell is
+read once at start and served from memory on every navigation, and it carries
+the configuration the application was built with — so a server still running
+against an old shell serves an application that calls the address it was built
+for rather than the one it is served from. The symptom looks like a networking
+fault and is not one.
+
 ## Configuration
 
 Settings come from a file or from the environment, and the environment wins.
