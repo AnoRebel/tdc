@@ -126,6 +126,49 @@ type Service struct {
 	// them safe to leave unset in a test or a minimal deployment.
 	watching  Watching
 	silencing Silencing
+
+	// Optional for the same reason: an operator who has generated no keys
+	// still gets notifications, in the application, where they have always
+	// been.
+	pushing Pushing
+}
+
+/*
+Pushing tells a device about a notification that has just been raised.
+
+An interface rather than the push service itself, so that deciding who hears
+about a message stays independent of how they are reached. This package knows
+who and why; it does not know what a VAPID key is.
+*/
+type Pushing interface {
+	// Deliver reaches one person's subscribed devices. Called only for
+	// notifications that survived every check here, so it makes no decisions
+	// of its own about whether to send.
+	Deliver(ctx context.Context, userID uuid.UUID, about Delivery)
+}
+
+/*
+Delivery is what a raised notification amounts to, for a device.
+
+Carries the message rather than an identifier because the decision about how
+much of it to disclose is made where the notification is sent, and a
+re-read there would be a second query per recipient for something already in
+hand.
+*/
+type Delivery struct {
+	// Sender is who sent it, as a display name.
+	Sender string
+	// Room is the conversation's name.
+	Room string
+	// Body is what was said.
+	Body string
+	// RoomID is where activating the notification should go.
+	RoomID uuid.UUID
+	// EventID names the message, so opening it can land on the right one.
+	EventID string
+	// Private marks a conversation whose contents are not already visible to
+	// everybody on the server.
+	Private bool
 }
 
 func NewService(pool *db.Pool, log *slog.Logger) *Service {
@@ -143,6 +186,18 @@ test, or a server built before this existed — still gets a working service.
 func (s *Service) WithSuppression(watching Watching, silencing Silencing) *Service {
 	s.watching = watching
 	s.silencing = silencing
+	return s
+}
+
+/*
+WithPush adds delivery to devices that are not currently looking at anything.
+
+Separate for the same reason as WithSuppression: a server whose operator has
+generated no keys still raises notifications, and a test that does not care
+about delivery does not have to construct one.
+*/
+func (s *Service) WithPush(pushing Pushing) *Service {
+	s.pushing = pushing
 	return s
 }
 
@@ -225,6 +280,36 @@ func (s *Service) ForMessage(
 	recipients []dbgen.ListRoomMembersRow,
 	directRoom bool,
 ) {
+	s.forMessage(ctx, event, body, recipients, directRoom, Delivery{})
+}
+
+/*
+ForMessageIn is ForMessage for a caller that knows what the conversation is
+called.
+
+The names are what a notification says — "Amina in general" — and this package
+has only identifiers. Kept as a second entry point rather than a wider one so
+that a caller with nothing to add is unchanged.
+*/
+func (s *Service) ForMessageIn(
+	ctx context.Context,
+	event dbgen.Event,
+	body string,
+	recipients []dbgen.ListRoomMembersRow,
+	directRoom bool,
+	about Delivery,
+) {
+	s.forMessage(ctx, event, body, recipients, directRoom, about)
+}
+
+func (s *Service) forMessage(
+	ctx context.Context,
+	event dbgen.Event,
+	body string,
+	recipients []dbgen.ListRoomMembersRow,
+	directRoom bool,
+	about Delivery,
+) {
 	mentioned := MentionsIn(body)
 
 	for _, member := range recipients {
@@ -255,6 +340,28 @@ func (s *Service) ForMessage(
 		if err != nil {
 			s.log.Error("cannot raise a notification",
 				"userId", member.ID, "eventId", event.ID, "error", err)
+			// No push either. A device told about a message the application
+			// has no record of would open onto nothing.
+			continue
+		}
+
+		/*
+			Reached only by a notification that survived every check above:
+			the sender is somebody else, the preference wanted it, and they
+			are neither watching the conversation nor silenced.
+
+			Push follows that decision rather than making its own. Somebody
+			looking at a channel should not have their phone light up about
+			the message they are reading, and that rule lives here.
+		*/
+		if s.pushing != nil {
+			delivery := about
+			delivery.Body = body
+			delivery.RoomID = event.RoomID
+			delivery.EventID = event.ID
+			delivery.Private = delivery.Private || directRoom
+
+			s.pushing.Deliver(ctx, member.ID, delivery)
 		}
 	}
 }

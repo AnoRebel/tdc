@@ -190,7 +190,7 @@ func run() error {
 	// lapsed presence: a policy nothing enforces is a policy that misleads the
 	// people it was disclosed to.
 	go expirePeriodically(ctx, moderationService, settingsService,
-		attachmentService, auditRecorder, log)
+		attachmentService, auditRecorder, pushService, log)
 
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
@@ -427,6 +427,7 @@ func expirePeriodically(
 	settingsService *settings.Service,
 	attachmentService *attachments.Service,
 	auditRecorder *audit.Recorder,
+	pushService *push.Service,
 	log *slog.Logger,
 ) {
 	ticker := time.NewTicker(retentionInterval)
@@ -497,6 +498,24 @@ func expirePeriodically(
 				}
 				if pruned > 0 {
 					log.Info("pruned audit entries", "entries", pruned)
+				}
+			}
+
+			/*
+				Devices that stopped answering.
+
+				Their push service never said they were gone — a service that
+				says so has them removed at once — they simply stopped working.
+				Without this pass they are retried on every notification for as
+				long as the account exists, which is a request per notification
+				forever for a phone that was thrown away.
+			*/
+			// Prune reports what it removed itself, so the count is not
+			// logged twice.
+			if pushService != nil {
+				if _, err := pushService.Prune(ctx); err != nil && ctx.Err() == nil {
+					log.Error("pruning push subscriptions failed",
+						slog.String("error", err.Error()))
 				}
 			}
 		}

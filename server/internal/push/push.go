@@ -91,10 +91,32 @@ type Service struct {
 	queries *dbgen.Queries
 	log     *slog.Logger
 	keys    Keys
+
+	/*
+		How a payload reaches a person, so that what is sent can be observed
+		without a push service.
+
+		The decision about how much of a message to disclose is made here, and
+		a test of that decision has to see the payload. Reaching Mozilla to
+		find out would make the rule untestable on a machine with no outbound
+		access, which is the machine this is meant to run on.
+	*/
+	send func(ctx context.Context, userID uuid.UUID, payload Payload) error
 }
 
 func NewService(pool *db.Pool, keys Keys, log *slog.Logger) *Service {
-	return &Service{queries: dbgen.New(pool), log: log, keys: keys}
+	service := &Service{queries: dbgen.New(pool), log: log, keys: keys}
+	service.send = service.sendToDevices
+	return service
+}
+
+// WithSending replaces delivery, for a caller that wants to observe payloads
+// rather than send them.
+func (s *Service) WithSending(
+	send func(ctx context.Context, userID uuid.UUID, payload Payload) error,
+) *Service {
+	s.send = send
+	return s
 }
 
 /*
@@ -170,6 +192,11 @@ func (s *Service) Send(ctx context.Context, userID uuid.UUID, payload Payload) e
 	if !s.Enabled() {
 		return nil
 	}
+	return s.send(ctx, userID, payload)
+}
+
+// sendToDevices is the real delivery, to every device a person has subscribed.
+func (s *Service) sendToDevices(ctx context.Context, userID uuid.UUID, payload Payload) error {
 
 	subscriptions, err := s.Subscriptions(ctx, userID)
 	if err != nil {

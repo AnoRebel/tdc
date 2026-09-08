@@ -217,6 +217,21 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		}
 	}
 
+	/*
+		Notifications reach devices that are not open.
+
+		Outside the block above deliberately: that one depends on a live
+		connection hub, and push is what matters precisely when there is no
+		live connection. Deliveries returns nothing when the operator has
+		generated no keys, which leaves notifications working as they always
+		have — in the application.
+	*/
+	if services.Notify != nil && services.Push != nil {
+		if deliveries := push.Deliveries(services.Push); deliveries != nil {
+			services.Notify.WithPush(deliveries)
+		}
+	}
+
 	if len(cfg.AllowedOrigins) > 0 {
 		e.Use(cors(cfg.AllowedOrigins))
 	}

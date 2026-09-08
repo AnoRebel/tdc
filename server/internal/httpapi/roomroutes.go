@@ -675,10 +675,31 @@ func (s *Server) notifyRecipients(
 		return
 	}
 
+	/*
+		What a notification says, for the devices that are not open.
+
+		Names rather than identifiers, because a phone shows this to whoever is
+		holding it. Read here because this is where the room is already in
+		hand; how much of it is disclosed is decided further down, against the
+		recipient's own setting.
+	*/
+	about := notify.Delivery{
+		Room: room.Name,
+		// A private channel is one whose contents are not already public on
+		// this server. Direct conversations are added to this by the notifier,
+		// which is told about them separately.
+		Private: room.Visibility != "public",
+	}
+	if event.SenderID != nil {
+		if sender, err := s.queries.GetUserByID(ctx, *event.SenderID); err == nil {
+			about.Sender = sender.DisplayName
+		}
+	}
+
 	// A direct conversation notifies whoever is in it regardless of their
 	// level: somebody set to "mentions" should still hear from a person
 	// speaking to them privately.
-	s.notify.ForMessage(ctx, event, body, members, room.Kind == "direct")
+	s.notify.ForMessageIn(ctx, event, body, members, room.Kind == "direct", about)
 }
 
 /*
