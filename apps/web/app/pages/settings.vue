@@ -3,6 +3,7 @@ import type { ServerStatus, Session } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import {
   ArrowLeft,
+  Bell,
   Flag,
   LogOut,
   Monitor,
@@ -24,6 +25,27 @@ useHead({ title: "Settings" });
 
 const personal = usePersonalModeration();
 const theme = useTheme();
+const push = usePushNotifications();
+
+onMounted(() => void push.refresh());
+
+/*
+ * The checkbox writes through rather than binding both ways.
+ *
+ * A v-model would move the control the instant it is clicked and leave it
+ * there whether or not the server agreed. Here it shows what the account says,
+ * and only moves once the account says something different.
+ */
+async function chooseHidePushContent(event: Event) {
+  const wanted = (event.target as HTMLInputElement).checked;
+
+  try {
+    await push.setHideContent(wanted);
+  } catch {
+    // Put back, because it never changed.
+    (event.target as HTMLInputElement).checked = push.hideContent.value;
+  }
+}
 
 /*
  * Three choices rather than a switch.
@@ -271,6 +293,90 @@ function deviceName(userAgent: string): string {
             {{ option.label }}
           </button>
         </div>
+      </section>
+
+      <!-- Only where the server offers it. A control that cannot work is
+           worse than none: somebody presses it and concludes the application
+           is broken rather than that the feature is not set up here. -->
+      <section v-if="push.offered.value && push.supported.value">
+        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+          <Bell class="size-4" />
+          Notifications
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Told about a message while TDC is closed. Each device is separate.
+        </p>
+
+        <p
+          v-if="push.error.value"
+          class="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          role="alert"
+        >
+          {{ push.error.value }}
+        </p>
+
+        <button
+          v-if="!push.subscribedHere.value"
+          type="button"
+          class="btn btn-primary mt-3"
+          :disabled="push.busy.value"
+          @click="push.subscribe()"
+        >
+          <Bell class="size-3.5" />
+          {{ push.busy.value ? "Asking" : "Notify me on this device" }}
+        </button>
+
+        <ul v-if="push.devices.value.length" class="mt-3 space-y-1.5">
+          <li
+            v-for="device in push.devices.value"
+            :key="device.id"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-surface px-3 py-2.5"
+          >
+            <div class="min-w-0">
+              <p class="truncate text-sm">
+                {{ device.device }}
+                <span
+                  v-if="device.current"
+                  class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success"
+                >
+                  This device
+                </span>
+              </p>
+              <p class="text-xs text-muted-foreground">
+                <template v-if="device.lastUsedAt">
+                  Last notified <time>{{ when(device.lastUsedAt) }}</time>
+                </template>
+                <template v-else>Not used yet</template>
+              </p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-ghost h-7 px-2 text-xs"
+              :disabled="push.busy.value"
+              @click="push.unsubscribe(device.id)"
+            >
+              Stop
+            </button>
+          </li>
+        </ul>
+
+        <!-- A payload is shown on a lock screen: to whoever holds the phone,
+             and to anybody beside them. -->
+        <label class="mt-3 flex cursor-pointer items-start gap-2">
+          <input
+            type="checkbox"
+            class="mt-0.5 accent-primary"
+            :checked="push.hideContent.value"
+            :disabled="push.busy.value"
+            @change="chooseHidePushContent"
+          />
+          <span class="min-w-0">
+            <span class="block text-xs font-medium">Keep messages off my lock screen</span>
+            <span class="block text-[0.6875rem] text-muted-foreground">
+              A notification says something arrived, not what it said.
+            </span>
+          </span>
+        </label>
       </section>
 
       <section>

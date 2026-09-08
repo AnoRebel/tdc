@@ -17,13 +17,45 @@ const WORKER = "./.output/public/sw.js";
 function shippedDenylist(): RegExp[] {
   const worker = readFileSync(WORKER, "utf8");
 
-  // To the closing bracket followed by "})" — a plain "]" would stop inside a
-  // character class, which is exactly what the first attempt did.
-  const match = worker.match(/denylist:\[(.*?)\]\}\)/);
-  if (!match) throw new Error("the built service worker carries no denylist");
+  /*
+   * Matched loosely on purpose.
+   *
+   * The build emits this minified or not depending on the strategy, and an
+   * earlier version of this test keyed on the minified spacing — so switching
+   * to a written service worker broke the test rather than reporting anything
+   * about the worker. What matters is the list, not its whitespace.
+   *
+   * The closing bracket is found by scanning rather than by a lazy match: the
+   * patterns contain "]" inside a character class, which is what the first
+   * attempt tripped over.
+   */
+  const start = worker.search(/denylist\s*:\s*\[/);
+  if (start < 0) throw new Error("the built service worker carries no denylist");
 
-  // eslint-disable-next-line no-eval -- evaluating regexes the build emitted
-  return eval(`[${match[1]}]`) as RegExp[];
+  const from = worker.indexOf("[", start);
+  let depth = 0;
+  let inRegex = false;
+
+  for (let i = from; i < worker.length; i++) {
+    const character = worker[i];
+
+    if (character === "\\") {
+      i++;
+      continue;
+    }
+    if (character === "/" && worker[i - 1] !== "*") inRegex = !inRegex;
+    if (inRegex) continue;
+
+    if (character === "[") depth++;
+    if (character === "]") {
+      depth--;
+      if (depth === 0) {
+        return eval(worker.slice(from, i + 1)) as RegExp[];
+      }
+    }
+  }
+
+  throw new Error("the denylist in the built service worker is not closed");
 }
 
 /** Whether a path would be answered from the cached application shell. */

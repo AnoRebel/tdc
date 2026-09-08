@@ -213,6 +213,23 @@ type hidePushContentRequest struct {
 	Hide bool `json:"hide"`
 }
 
+type hidePushContentResponse struct {
+	Hide bool `json:"hide"`
+}
+
+/*
+handleGetHidePushContent reports the setting back.
+
+Offered because the control that sets it has to show its current state, and a
+checkbox that always opens unchecked would tell somebody their messages are on
+their lock screen when they are not — or, worse, the reverse.
+*/
+func (s *Server) handleGetHidePushContent(c *echo.Context) error {
+	user, _ := currentUser(c)
+
+	return c.JSON(http.StatusOK, hidePushContentResponse{Hide: user.HidePushContent})
+}
+
 /*
 handleSetHidePushContent records whether somebody wants message content kept
 off their lock screen.

@@ -20,7 +20,6 @@ function decide(stored: string | null, deviceDark: boolean): string {
     },
   };
 
-  // eslint-disable-next-line no-eval -- the point is to run the shipped string
   eval(PREPAINT);
 
   return classes.has("dark") ? "dark" : classes.has("light") ? "light" : "neither";
@@ -72,7 +71,6 @@ describe("the pre-paint theme decision", () => {
       },
     };
 
-    // eslint-disable-next-line no-eval -- the point is to run the shipped string
     expect(() => eval(PREPAINT)).not.toThrow();
   });
 

@@ -208,6 +208,7 @@ func (s *Server) routes() {
 	me.GET("/push/subscriptions", s.handleListPushSubscriptions)
 	me.POST("/push/subscriptions", s.handleSubscribeToPush)
 	me.DELETE("/push/subscriptions/:id", s.handleUnsubscribeFromPush)
+	me.GET("/preferences/hide-push-content", s.handleGetHidePushContent)
 	me.PUT("/preferences/hide-push-content", s.handleSetHidePushContent)
 
 	// Direct conversations, which are found by their participants rather than

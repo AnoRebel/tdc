@@ -77,6 +77,19 @@ export default defineNuxtConfig({
   pwa: {
     registerType: "prompt",
 
+    /*
+     * The service worker is written out rather than generated.
+     *
+     * A generated worker cannot be given a push handler, and receiving a
+     * notification while the application is closed is the whole reason a phone
+     * installs this. Everything the generated one did is kept; what is added
+     * is the push and notification handling in service-worker/sw.ts.
+     */
+    strategies: "injectManifest",
+    // Relative to Nuxt's srcDir, which is app/ — not the project root.
+    srcDir: "service-worker",
+    filename: "sw.ts",
+
     manifest: {
       name: "TDC",
       short_name: "TDC",
@@ -109,46 +122,18 @@ export default defineNuxtConfig({
       ],
     },
 
-    workbox: {
+    /*
+     * What is precached into the worker built from sw.ts.
+     *
+     * The routing rules that used to sit here live in that file now, because
+     * the worker decides them itself — keeping them in both places would be
+     * two places to change one rule, and the one that mattered would be the
+     * one somebody missed.
+     */
+    injectManifest: {
       // The built assets, which carry content hashes and so can be cached
       // until they are replaced.
       globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
-
-      /*
-       * What must never be answered from the cached shell.
-       *
-       * A single-page application tells the service worker to answer any
-       * navigation with its shell, which is what makes a deep link work
-       * offline. Left unqualified, that swallows the API and the live
-       * connection too: a request for a conversation would be answered with
-       * the application's own HTML, and a client would parse a page as though
-       * it were messages.
-       *
-       * The live connection is the worse half. A WebSocket upgrade answered
-       * with a cached document does not fail in a way anything reports — it
-       * simply never connects, and the application looks merely quiet.
-       */
-      navigateFallback: "/",
-      navigateFallbackDenylist: [
-        /*
-         * Everything the server answers, which includes the live connection:
-         * it is served at /api/live rather than on a path of its own, so one
-         * rule covers both. Guarding /ws and /socket as well would be guarding
-         * paths this server does not have — a rule that protects nothing is a
-         * rule somebody later trusts.
-         */
-        /^\/api\//,
-        /*
-         * Anything with an extension, which a browser fetches rather than
-         * navigates to. A download answered with the shell is a corrupt file
-         * rather than an error, and a corrupt file is harder to diagnose.
-         */
-        /\.[a-z0-9]+$/i,
-      ],
-
-      // A shell replaced by a newer one leaves its old cache behind otherwise,
-      // and a phone accumulates every version it has ever seen.
-      cleanupOutdatedCaches: true,
       /*
        * Four megabytes, which is more than any built asset here and less than
        * a phone will resent. Without a limit a single large chunk silently
