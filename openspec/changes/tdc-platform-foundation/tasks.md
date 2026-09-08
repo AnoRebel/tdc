@@ -150,7 +150,7 @@ Goal: the PWA that most TDC members will actually use.
 - [x] 8.9 Add `driver.js` onboarding tours that are skippable and resumable; verify a completed tour does not recur (`clients/web`)
 - [x] 8.10 Add automated accessibility checks to CI; verify keyboard-only operation reaches every control and a seeded violation fails the build (`clients/web`)
 - [x] 8.11 Add an initial-load payload budget check to CI; verify exceeding the budget fails the build (`clients/web`)
-- [ ] **MILESTONE 8** — Demonstrate: install the app to a phone home screen, receive a push notification with the browser closed, read messages offline, and compose one that sends on reconnection. Tag `v0.8.0-dev`.
+- [x] **MILESTONE 8** — Demonstrate: install the app to a phone home screen, receive a push notification with the browser closed, read messages offline, and compose one that sends on reconnection. Tag `v0.8.0-dev`.
 
 ## 9. Phase 9 — It runs on the desktop
 

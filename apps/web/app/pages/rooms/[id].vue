@@ -756,31 +756,57 @@ const live = useLiveConnection({
  * answering. A flush against a network that is technically up and practically
  * useless would spend the queue's retries on nothing.
  */
+/**
+ * Sends what is waiting, if anything is.
+ *
+ * Kept separate from what triggers it because more than one thing should:
+ * a queue that only flushes on one signal is a queue that sits full when that
+ * signal does not come.
+ */
+async function flushWaiting() {
+  if (!outbox.queue.value.length) return;
+
+  await outbox.flush(async (message) => {
+    const sent = await roomsApi.send(
+      message.roomId,
+      message.body,
+      message.clientToken,
+      message.attachmentIds,
+    );
+
+    // Only the conversation being looked at: the others reload their own
+    // timelines when somebody opens them.
+    if (
+      message.roomId === roomId.value &&
+      !messages.value.some((existing) => existing.id === sent.id)
+    ) {
+      messages.value.push(sent);
+      scrollToLatest();
+    }
+  });
+}
+
+/*
+ * Queued messages go out when the server is reachable again.
+ *
+ * Two signals, because either alone leaves the queue stuck. The live
+ * connection reconnecting is the reliable one — it means this server is
+ * actually answering — but a socket that never noticed the outage never
+ * reconnects, and the queue then waits for a transition that will not come.
+ * The browser's own online event covers that: it says the interface is back,
+ * which is a weaker claim but arrives when the stronger one does not.
+ *
+ * Flushing twice costs nothing. The messages carry idempotency tokens, so a
+ * resend returns the original rather than posting it again.
+ */
 watch(
   () => live.state.value,
-  async (now, before) => {
-    if (now !== "connected" || before === "connected") return;
-
-    await outbox.flush(async (message) => {
-      const sent = await roomsApi.send(
-        message.roomId,
-        message.body,
-        message.clientToken,
-        message.attachmentIds,
-      );
-
-      // Only the conversation being looked at: the others reload their own
-      // timelines when somebody opens them.
-      if (
-        message.roomId === roomId.value &&
-        !messages.value.some((existing) => existing.id === sent.id)
-      ) {
-        messages.value.push(sent);
-        scrollToLatest();
-      }
-    });
+  (now, before) => {
+    if (now === "connected" && before !== "connected") void flushWaiting();
   },
 );
+
+useEventListener(window, "online", () => void flushWaiting());
 
 async function load() {
   loading.value = true;

@@ -22,6 +22,18 @@ export default defineNuxtConfig({
       // The title template lives in app.vue: a function here does not survive
       // serialisation into the built config and is silently dropped.
       htmlAttrs: { lang: "en" },
+      /*
+       * The web manifest, linked here rather than through the module's own
+       * component.
+       *
+       * That component renders with the application, and this application does
+       * not render on the server — so the link would arrive after the browser
+       * had already decided whether anything was installable. The manifest was
+       * being written, served, and read by nothing: a phone simply never
+       * offered to add it to a home screen, which looks like the feature not
+       * existing rather than a missing line.
+       */
+      link: [{ rel: "manifest", href: "/manifest.webmanifest" }],
       meta: [
         {
           name: "description",

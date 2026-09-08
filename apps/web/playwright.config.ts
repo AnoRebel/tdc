@@ -57,6 +57,20 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"], storageState: SESSION },
       dependencies: ["setup"],
+      // The milestone demonstration signs itself in, because two of its four
+      // parts are about what happens on arrival.
+      testIgnore: /milestone-8\.spec\.ts/,
+    },
+    /*
+     * The milestone demonstration, run on its own.
+     *
+     * A fresh profile each time: it shows what somebody meets on a first
+     * visit, and a shared session would have already been through that.
+     */
+    {
+      name: "milestone",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /milestone-8\.spec\.ts/,
     },
   ],
 });
