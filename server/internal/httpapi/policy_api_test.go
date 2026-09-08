@@ -688,3 +688,109 @@ func TestRemovingYourOwnMessageIsNotRecordedAsModeration(t *testing.T) {
 		}
 	}
 }
+
+/*
+TestThePushSigningKeyIsNeverDisclosed is the same rule the database URL has,
+applied to the other credential this server holds.
+
+Anybody with the private key can send notifications as this server to every
+device that has subscribed to it. An operator inspecting configuration has no
+use for it — they generated it — and a configuration view that displayed it
+would be one screenshot away from handing it over.
+*/
+func TestThePushSigningKeyIsNeverDisclosed(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	recorder := call(t, handler, http.MethodGet, "/api/admin/configuration", nil, owner)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("inspecting configuration returned %d", recorder.Code)
+	}
+
+	var response struct {
+		Values []struct {
+			Key    string `json:"key"`
+			Secret bool   `json:"secret"`
+		} `json:"values"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+
+	marked := map[string]bool{}
+	for _, value := range response.Values {
+		marked[value.Key] = value.Secret
+	}
+
+	if !marked["push.vapid_private"] {
+		t.Error("the push signing key is not marked secret, so a configuration " +
+			"view would display it")
+	}
+	/*
+		And the public half is not, deliberately. It is handed to every browser
+		that subscribes, so hiding it would conceal nothing while making a
+		misconfiguration harder to diagnose.
+	*/
+	if marked["push.vapid_public"] {
+		t.Error("the push public key is redacted, which conceals nothing and " +
+			"hides a value an operator may need to check")
+	}
+}
+
+/*
+TestPushIsOffUntilAnOperatorEnablesIt covers the default.
+
+A server with no keys still stores and shows notifications; what it does not do
+is reach a closed browser. Reporting that plainly lets a client ask for
+permission only where permission would achieve something.
+*/
+func TestPushIsOffUntilAnOperatorEnablesIt(t *testing.T) {
+	handler := newTestAPI(t)
+	completeSetup(t, handler)
+
+	recorder := call(t, handler, http.MethodGet, "/api/push/config", nil, "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("reading the push configuration returned %d", recorder.Code)
+	}
+
+	var config struct {
+		Enabled   bool   `json:"enabled"`
+		PublicKey string `json:"publicKey"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &config); err != nil {
+		t.Fatalf("decoding: %v", err)
+	}
+
+	if config.Enabled {
+		t.Error("push reports itself enabled on a server with no keys")
+	}
+	if config.PublicKey != "" {
+		t.Error("a server with no keys offered one anyway")
+	}
+}
+
+/*
+TestSubscribingNeedsEveryPartOfASubscription keeps a device from appearing
+subscribed and receiving nothing.
+
+A subscription missing its keys cannot be encrypted to. Storing one would mean
+a notification that silently never arrives, which nobody investigates — where a
+refusal is noticed at once.
+*/
+func TestSubscribingNeedsEveryPartOfASubscription(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	for _, incomplete := range []map[string]any{
+		{"keys": map[string]any{"p256dh": "a", "auth": "b"}},
+		{"endpoint": "https://push.example.test/x"},
+		{"endpoint": "https://push.example.test/x", "keys": map[string]any{"p256dh": "a"}},
+	} {
+		recorder := call(t, handler, http.MethodPost, "/api/me/push/subscriptions",
+			incomplete, owner)
+
+		if recorder.Code == http.StatusCreated {
+			t.Errorf("an incomplete subscription was accepted: %v", incomplete)
+		}
+	}
+}

@@ -26,6 +26,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/presence"
+	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
@@ -117,6 +118,7 @@ type Server struct {
 	invitations *invitations.Service
 	queries     *dbgen.Queries
 	presence    *presence.Service
+	push        *push.Service
 	hub         *realtime.Hub
 	realtime    *realtime.Server
 	config      Config
@@ -149,6 +151,10 @@ type Services struct {
 	Settings    *settings.Service
 	Invitations *invitations.Service
 	Presence    *presence.Service
+	// Push is nil, or configured with no keys, on a server whose operator has
+	// not enabled notifications to closed browsers. That is a working state:
+	// notifications are still stored and shown in the application.
+	Push *push.Service
 }
 
 // New builds a server with the health and version routes mounted. It does not
@@ -183,6 +189,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		invitations: services.Invitations,
 		queries:     dbgen.New(pool),
 		presence:    services.Presence,
+		push:        services.Push,
 		config:      cfg,
 	}
 

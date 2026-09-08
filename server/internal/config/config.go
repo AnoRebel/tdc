@@ -19,6 +19,28 @@ type Config struct {
 	Attachments AttachmentsConfig
 	Log         LogConfig
 	GIFs        GIFsConfig
+	Push        PushConfig
+}
+
+/*
+PushConfig configures notifications to browsers that are closed.
+
+Off unless an operator has generated a key pair. The keys identify this server
+to whichever push service a browser chose; no account with anybody is needed,
+and the server can generate a pair itself.
+*/
+type PushConfig struct {
+	// VAPIDPublic and VAPIDPrivate are the operator's own pair. Empty disables
+	// push, which is a working state: notifications are still stored and shown
+	// in the application.
+	VAPIDPublic  string
+	VAPIDPrivate string
+	/*
+		Subject is a mailto: or https: address a push service can use to reach
+		the operator about a problem with their traffic. Required by the
+		specification, and some services refuse without it.
+	*/
+	Subject string
 }
 
 // AttachmentsConfig configures what happens to an uploaded file.

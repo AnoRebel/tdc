@@ -30,6 +30,16 @@ var secretKeys = map[string]bool{
 	// credential, and an operator reading this view needs neither half of it.
 	"storage.s3.access_key": true,
 	"storage.s3.secret_key": true,
+	/*
+		The push signing key. Anybody holding it can send notifications as this
+		server to every device that has subscribed to it, which is why it is
+		redacted wherever configuration is shown or exported.
+
+		The public half is deliberately absent from this list: it is handed to
+		every browser that subscribes, so hiding it from the operator would
+		conceal nothing while making a misconfiguration harder to diagnose.
+	*/
+	"push.vapid_private": true,
 }
 
 // Redact returns a value safe to display.
@@ -94,6 +104,9 @@ func (c Config) Describe(path string) []Setting {
 		{"storage.s3.access_key", c.Storage.S3.AccessKey, defaults.Storage.S3.AccessKey},
 		{"storage.s3.secret_key", c.Storage.S3.SecretKey, defaults.Storage.S3.SecretKey},
 		{"storage.s3.path_style", fmt.Sprint(c.Storage.S3.PathStyle), fmt.Sprint(defaults.Storage.S3.PathStyle)},
+		{"push.vapid_public", c.Push.VAPIDPublic, defaults.Push.VAPIDPublic},
+		{"push.vapid_private", c.Push.VAPIDPrivate, defaults.Push.VAPIDPrivate},
+		{"push.subject", c.Push.Subject, defaults.Push.Subject},
 		{"log.level", c.Log.Level, defaults.Log.Level},
 		{"log.format", c.Log.Format, defaults.Log.Format},
 	}

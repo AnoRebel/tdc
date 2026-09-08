@@ -196,6 +196,20 @@ func (s *Server) routes() {
 		s.requireFeature(settings.FeatureLinkPreviews))
 	me.PUT("/preferences/link-previews", s.handleSetPreviewPreference)
 
+	/*
+		Notifications a closed browser can receive.
+
+		The configuration is readable without a session, because a client asks
+		what the server offers before it asks somebody to grant permission —
+		and it carries only the public key, which every subscriber receives
+		anyway.
+	*/
+	s.echo.GET("/api/push/config", s.handlePushConfig)
+	me.GET("/push/subscriptions", s.handleListPushSubscriptions)
+	me.POST("/push/subscriptions", s.handleSubscribeToPush)
+	me.DELETE("/push/subscriptions/:id", s.handleUnsubscribeFromPush)
+	me.PUT("/preferences/hide-push-content", s.handleSetHidePushContent)
+
 	// Direct conversations, which are found by their participants rather than
 	// by name.
 	direct := s.echo.Group("/api/direct", requireAuthentication)

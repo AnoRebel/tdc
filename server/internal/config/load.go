@@ -209,6 +209,10 @@ func Load(path string) (Config, error) {
 
 	// Empty unless an operator sets both, which is what keeps searching off by
 	// default and this server free of anybody else's account.
+	cfg.Push.VAPIDPublic = l.str("push.vapid_public", d.Push.VAPIDPublic)
+	cfg.Push.VAPIDPrivate = l.str("push.vapid_private", d.Push.VAPIDPrivate)
+	cfg.Push.Subject = l.str("push.subject", d.Push.Subject)
+
 	cfg.GIFs.Provider = l.str("gifs.provider", d.GIFs.Provider)
 	cfg.GIFs.APIKey = l.str("gifs.api_key", d.GIFs.APIKey)
 	cfg.GIFs.ContentFilter = l.str("gifs.content_filter", d.GIFs.ContentFilter)

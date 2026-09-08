@@ -33,6 +33,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/presence"
+	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/settings"
@@ -53,8 +54,34 @@ func run() error {
 	var (
 		configPath  = flag.String("config", "", "path to the configuration file (optional; environment alone is enough)")
 		showVersion = flag.Bool("version", false, "print the version and exit")
+		pushKeys    = flag.Bool("push-keys", false,
+			"generate a push notification key pair and exit")
 	)
 	flag.Parse()
+
+	/*
+		Generating the keys push needs, so enabling it requires nothing but
+		this server.
+
+		A feature that told an operator to visit a website and paste a key back
+		is one that does not work on a machine with no outbound access, and
+		makes them trust a stranger with the identity of their own server.
+	*/
+	if *pushKeys {
+		keys, err := push.GenerateKeys()
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("# Notifications to closed browsers. Keep the private key secret:")
+		fmt.Println("# anybody holding it can send as this server to every device")
+		fmt.Println("# that has subscribed.")
+		fmt.Printf("TDC_PUSH_VAPID_PUBLIC=%s\n", keys.Public)
+		fmt.Printf("TDC_PUSH_VAPID_PRIVATE=%s\n", keys.Private)
+		fmt.Println("# A way for a push service to reach you about a problem:")
+		fmt.Println("TDC_PUSH_SUBJECT=mailto:you@example.org")
+		return nil
+	}
 
 	if *showVersion {
 		info := buildinfo.Current()
@@ -150,6 +177,15 @@ func run() error {
 	settingsService := settings.NewService(pool, log)
 	auditRecorder := audit.NewRecorder(queries, log)
 
+	// Off unless the operator generated keys, which is a working state: a
+	// notification still exists and is shown, it simply does not reach a
+	// closed browser.
+	pushService := push.NewService(pool, push.Keys{
+		Public:  cfg.Push.VAPIDPublic,
+		Private: cfg.Push.VAPIDPrivate,
+		Subject: cfg.Push.Subject,
+	}, log)
+
 	// Content past its retention period, removed on the same principle as
 	// lapsed presence: a policy nothing enforces is a policy that misleads the
 	// people it was disclosed to.
@@ -186,6 +222,7 @@ func run() error {
 		Unfurl: unfurl.NewService(memoryCache,
 			unfurl.Settings{Enabled: cfg.Attachments.LinkPreviews}, log),
 		Presence: presenceService,
+		Push:     pushService,
 	}
 
 	// Messages written now and sent later. The pass takes a row lock and skips
