@@ -55,6 +55,20 @@ export default typescript.config(
   },
 
   {
+    /*
+     * Scripts run from a terminal, where printing is the point.
+     *
+     * The rule is right everywhere else: a stray console.log in the
+     * application ships to everybody's browser console. A build check that
+     * cannot report what it measured is no use to anybody.
+     */
+    files: ["**/scripts/**/*.ts", "scripts/**/*.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+
+  {
     files: ["**/*.vue"],
     languageOptions: {
       parser: vueParser,

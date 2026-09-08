@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run --passWithNoTests",
-    "test:a11y": "playwright test"
+    "test:a11y": "playwright test",
+    "budget": "bun scripts/payload-budget.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

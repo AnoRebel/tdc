@@ -66,6 +66,17 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Build the static application
+        # The budget measures what a browser downloads, which is the static
+        # output rather than the server build above.
+        env:
+          NUXT_PUBLIC_API_BASE: ""
+        run: bun run --cwd apps/web generate
+
+      - name: Initial load stays within budget
+        run: bun run budget
+        working-directory: apps/web
+
   accessibility:
     name: Accessibility
     runs-on: ubuntu-latest
