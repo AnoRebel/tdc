@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -13,6 +13,9 @@ import { describe, expect, it } from "vitest";
  * but the assertions below run in CI, where the build precedes the tests.
  */
 const WORKER = "./.output/public/sw.js";
+
+/** Where the built application chunks land. */
+const BUNDLE_DIR = "./.output/public/_nuxt";
 
 /** The worker browsers actually receive. */
 function builtWorker(): string {
@@ -220,4 +223,55 @@ function attachmentRouteCondition(): string {
   // The registerRoute call immediately preceding it, which carries the match.
   const route = worker.lastIndexOf("registerRoute(", cache);
   return worker.slice(route, cache);
+}
+
+/*
+ * A running application looks for a new version by itself.
+ *
+ * Without this the browser checks only on navigation, and a chat application
+ * is exactly the kind left open for days — a tab could sit on a version from
+ * last week and never be told. The default is off, so the absence of this
+ * setting is silent: everything appears to work and nobody is ever offered
+ * an update.
+ */
+describe.skipIf(!existsSync(BUNDLE_DIR))("checking for a new version", () => {
+  it("checks periodically rather than only on navigation", () => {
+    const bundle = builtBundle();
+
+    // The check itself: a fetch of the worker that bypasses every cache, so
+    // a stale copy cannot answer for the new one.
+    expect(bundle).toContain("no-store");
+    // Guarded so it does not run while offline, where it would only fail.
+    expect(bundle).toContain("navigator.onLine");
+  });
+
+  /*
+   * An interval of zero means never, which is the default and the thing worth
+   * defending against. A regression here reads as "configured" while doing
+   * nothing at all.
+   *
+   * Read from the configuration rather than the bundle. The mechanism is
+   * asserted above against what actually ships; the number is not worth
+   * chasing through minified output, where the variable holding it is renamed
+   * on every build and is usually a single letter that appears in every loop.
+   */
+  it("uses an interval that is actually an interval", () => {
+    const config = readFileSync("./nuxt.config.ts", "utf8");
+
+    const setting = config.match(/periodicSyncForUpdates:\s*([^,\n]+)/);
+    expect(setting, "the update check has no interval configured").not.toBeNull();
+
+    // Evaluated because it is written as an expression — 60 * 60 reads as an
+    // hour where 3600 reads as a number somebody chose for no stated reason.
+    const seconds = Function(`"use strict"; return (${setting![1]});`)() as number;
+    expect(seconds).toBeGreaterThan(0);
+  });
+});
+
+/** Every built chunk, joined — the periodic check lives in one of them. */
+function builtBundle(): string {
+  return readdirSync(BUNDLE_DIR)
+    .filter((name) => name.endsWith(".js"))
+    .map((name) => readFileSync(`${BUNDLE_DIR}/${name}`, "utf8"))
+    .join("\n");
 }

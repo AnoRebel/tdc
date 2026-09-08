@@ -147,6 +147,21 @@ export default defineNuxtConfig({
       // The prompt is ours to show, so an update never interrupts somebody
       // mid-sentence. See 8.8.
       installPrompt: true,
+
+      /*
+       * How often a running application looks for a new version, in seconds.
+       *
+       * Without this the browser checks only on navigation, and a chat
+       * application is precisely the kind that is left open for days — so a
+       * tab could sit on a version from a week ago and never be told. Hourly
+       * is frequent enough that nobody is far behind and rare enough to cost
+       * nothing: the check is one request for the worker, skipped entirely
+       * while offline or while an update is already installing.
+       *
+       * Finding a new version only raises the prompt. Applying it stays
+       * somebody's own decision, which is what registerType "prompt" is for.
+       */
+      periodicSyncForUpdates: 60 * 60,
     },
 
     devOptions: {
