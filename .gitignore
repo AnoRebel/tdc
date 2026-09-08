@@ -55,3 +55,8 @@ AGENTS.md
 # repository — the session file in particular holds a cookie.
 test-results/
 playwright-report/
+
+# Per-page locale scaffolding, created by nuxt-i18n-micro on build. The
+# translations that matter live in packages/ui/locales; these are empty files
+# the module writes for routes it finds, and regenerate on every build.
+apps/web/locales/

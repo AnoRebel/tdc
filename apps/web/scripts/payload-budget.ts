@@ -32,7 +32,16 @@ const SHELL = join(OUTPUT, "index.html");
  * on purpose, in a commit that says why.
  */
 const BUDGETS = {
-  blocking: 175,
+  /*
+   * Raised from 175 when internationalisation was added, which put 23 KB of
+   * runtime into every first visit.
+   *
+   * Paid deliberately. This is a tool for a community that speaks Swahili, and
+   * an interface that can only address them in English is a worse thing to
+   * ship than a slower one. The room above today's figure is for the work
+   * still to come rather than for further growth to go unnoticed.
+   */
+  blocking: 200,
   prefetched: 70,
 };
 

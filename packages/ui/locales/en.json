@@ -1,0 +1,196 @@
+{
+  "app": {
+    "name": "TDC",
+    "tagline": "Where the community talks, plans, and finds each other."
+  },
+  "action": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "remove": "Remove",
+    "send": "Send",
+    "retry": "Try again",
+    "reload": "Reload",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "done": "Done",
+    "copy": "Copy",
+    "edit": "Edit",
+    "reply": "Reply",
+    "search": "Search",
+    "stop": "Stop",
+    "join": "Join",
+    "leave": "Leave"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signingIn": "Signing in",
+    "signOut": "Sign out",
+    "welcomeBack": "Welcome back.",
+    "username": "Username",
+    "usernameOrEmail": "Username or email",
+    "password": "Password",
+    "createAccount": "Create account",
+    "creatingAccount": "Creating account",
+    "noAccountYet": "No account yet?",
+    "createOne": "Create one",
+    "haveAccount": "Already have an account?",
+    "tooManyAttempts": "Too many attempts. Try again later.",
+    "signedInDevices": "Signed-in devices",
+    "endSession": "End session",
+    "endingSessionSignsOut": "Ending a session signs that device out immediately.",
+    "thisDevice": "This device"
+  },
+  "nav": {
+    "channels": "Channels",
+    "directMessages": "Direct messages",
+    "newChannel": "New channel",
+    "newDisposableChat": "New disposable chat",
+    "closeChannelList": "Close the channel list",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "administration": "Administration",
+    "people": "People",
+    "search": "Search",
+    "noRoomsYet": "No rooms yet."
+  },
+  "room": {
+    "messagePlaceholder": "Message {room}",
+    "startOf": "This is the start of",
+    "sendFirstMessage": "Send the first message.",
+    "joinToTakePart": "Join to take part.",
+    "waitingToSend": "Waiting to send",
+    "doNotSend": "Do not send: {body}",
+    "showingAsItWas": "Showing this conversation as it was {when}",
+    "offlineWillLoad": "You are offline. This conversation will load when the connection comes back.",
+    "couldNotOpen": "Could not open this room.",
+    "couldNotSend": "Could not send that message.",
+    "messageRemoved": "This message was removed",
+    "edited": "edited",
+    "pinned": "Pinned",
+    "you": "You",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "reconnecting": "Reconnecting",
+    "pullToRefresh": "Pull to refresh",
+    "refreshing": "Refreshing",
+    "typing": "{names} is typing…",
+    "typingMany": "{names} are typing…"
+  },
+  "channel": {
+    "create": "New channel",
+    "name": "Name",
+    "topic": "Topic",
+    "visibility": "Visibility",
+    "public": "Public",
+    "private": "Private",
+    "couldNotCreate": "Could not create that channel.",
+    "noPermission": "You do not have permission to create channels on this server.",
+    "disposable": "Disposable",
+    "lifetime": {
+      "hour": "An hour",
+      "day": "A day",
+      "week": "A week",
+      "month": "A month",
+      "howLong": "How long"
+    }
+  },
+  "attachment": {
+    "attachments": "Attachments",
+    "chooseFiles": "Choose files to attach",
+    "markedSensitive": "Marked sensitive",
+    "clickToShow": "Click to show",
+    "uploading": "Uploading",
+    "failed": "That file could not be sent."
+  },
+  "notification": {
+    "title": "Notifications",
+    "whileClosed": "Told about a message while TDC is closed. Each device is separate.",
+    "notifyThisDevice": "Notify me on this device",
+    "asking": "Asking",
+    "notUsedYet": "Not used yet",
+    "lastNotified": "Last notified {when}",
+    "keepOffLockScreen": "Keep messages off my lock screen",
+    "keepOffLockScreenHint": "A notification says something arrived, not what it said.",
+    "blockedInBrowser": "Notifications are blocked for this site in your browser's settings.",
+    "notSetUp": "This server has not set up notifications.",
+    "browserCannot": "This browser could not register for notifications. Its push service is unavailable, which is a limit of the browser rather than of this server — TDC still notifies you while it is open.",
+    "staleKey": "This device is subscribed with a key this server no longer uses. Removing it below and subscribing again will fix it.",
+    "couldNotSubscribe": "This device could not be subscribed.",
+    "couldNotRemove": "That device could not be removed.",
+    "nothingWaiting": "Nothing waiting"
+  },
+  "settings": {
+    "title": "Settings",
+    "status": "Status",
+    "statusHint": "What others see beside your name. Your server's administrator chooses which are available.",
+    "available": "Available",
+    "busy": "Busy",
+    "away": "Away",
+    "appearOffline": "Appear offline",
+    "appearance": "Appearance",
+    "appearanceHint": "Following your device is the default, and changes with it.",
+    "followMyDevice": "Follow my device",
+    "light": "Light",
+    "dark": "Dark",
+    "language": "Language",
+    "languageHint": "What this application speaks to you in.",
+    "gettingAround": "Getting around",
+    "gettingAroundHint": "The short introduction to the application, if you would like it again.",
+    "showMeAround": "Show me around",
+    "privacy": "Privacy",
+    "privacyHint": "Who may start a conversation with you. Existing conversations are unaffected by narrowing this.",
+    "anyone": "Anyone",
+    "anyoneHint": "Anybody on this server can start a conversation with you.",
+    "sharedChannel": "People I share a channel with",
+    "sharedChannelHint": "Colleagues can reach you; people you have never met cannot.",
+    "nobody": "Nobody",
+    "nobodyHint": "No new conversations. Moderators can still reach you, so that nobody is beyond contact by the people responsible for this server.",
+    "blocked": "Blocked",
+    "blockedHint": "People you have blocked cannot start a conversation with you. They are not told, and this list is yours alone.",
+    "blockedNobody": "You have not blocked anybody."
+  },
+  "update": {
+    "ready": "A new version is ready.",
+    "typedIsKept": "What you have typed is kept.",
+    "updating": "Updating",
+    "notNow": "Not now"
+  },
+  "tour": {
+    "conversations": {
+      "title": "Your conversations",
+      "body": "Channels you have joined, and the people you are talking to. Whatever you were last reading is where you come back to."
+    },
+    "finding": {
+      "title": "Finding something",
+      "body": "Search messages, channels and people from here — or press the shortcut shown, from anywhere."
+    },
+    "starting": {
+      "title": "Starting a channel",
+      "body": "A channel is a room for a subject. Anyone on this server can be in one, unless you make it private."
+    },
+    "missed": {
+      "title": "What you have missed",
+      "body": "Unread messages gather here. You decide per channel how much you want to hear, in its settings."
+    }
+  },
+  "error": {
+    "couldNotReach": "Could not reach the server.",
+    "notReachableRightNow": "Not reachable right now",
+    "generic": "The server could not complete the request.",
+    "forbidden": "You do not have permission to do that.",
+    "notFound": "That could not be found.",
+    "rateLimited": "Too many attempts. Try again later."
+  },
+  "moderation": {
+    "reports": "Reports",
+    "report": "Report",
+    "allDealtWith": "Every report has been dealt with.",
+    "auditLog": "Audit log",
+    "invitations": "Invitations",
+    "everybodyHere": "Everybody here"
+  }
+}

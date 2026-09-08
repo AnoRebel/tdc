@@ -80,3 +80,45 @@ Run from `apps/web`, which is where the test runner is configured:
 ```sh
 bun run --cwd apps/web test
 ```
+
+## Languages
+
+English and Swahili, configured in this layer so both clients read the same
+files. Translations live in `locales/`, one JSON file per language.
+
+```
+packages/ui/locales/en.json
+packages/ui/locales/sw.json
+```
+
+English is the fallback. A key missing from another language renders in
+English rather than as the key itself — somebody meeting `room.waitingToSend`
+has met a bug wearing the interface's clothes, and English is not ideal for a
+Swahili speaker but is a great deal better than punctuation.
+
+No locale prefix in the URL. The desktop client has no URLs to put one in, and
+a shared layer whose routing depends on a browser is a layer with one
+consumer; the choice lives in a cookie, which both clients have.
+
+### Adding a string
+
+Put it in `en.json`, translate it in `sw.json`, and call `$t("its.key")` from
+the template. `locales/locales.test.ts` will fail if the two files disagree —
+if a key exists in one and not the other, if a placeholder like `{room}` is
+dropped in translation, or if anything is left empty.
+
+### What is not translated yet
+
+The mechanism is complete; wiring every screen through it is not. To see what
+remains:
+
+```sh
+bun run --cwd apps/web translations
+```
+
+That reports literal strings still sitting in templates, where no language but
+English can reach them. It reports rather than fails, because blocking work on
+a half-finished screen helps nobody — the number going down is the point.
+
+The Swahili was written by somebody who is not a native speaker. Corrections
+are welcome and are the kind of contribution that needs no discussion first.

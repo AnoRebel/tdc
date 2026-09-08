@@ -1,0 +1,196 @@
+{
+  "app": {
+    "name": "TDC",
+    "tagline": "Mahali jamii inapozungumza, kupanga, na kupatana."
+  },
+  "action": {
+    "cancel": "Ghairi",
+    "close": "Funga",
+    "save": "Hifadhi",
+    "delete": "Futa",
+    "remove": "Ondoa",
+    "send": "Tuma",
+    "retry": "Jaribu tena",
+    "reload": "Pakia upya",
+    "confirm": "Thibitisha",
+    "back": "Rudi",
+    "next": "Endelea",
+    "previous": "Nyuma",
+    "done": "Nimemaliza",
+    "copy": "Nakili",
+    "edit": "Hariri",
+    "reply": "Jibu",
+    "search": "Tafuta",
+    "stop": "Simamisha",
+    "join": "Jiunge",
+    "leave": "Ondoka"
+  },
+  "auth": {
+    "signIn": "Ingia",
+    "signingIn": "Inaingia",
+    "signOut": "Toka",
+    "welcomeBack": "Karibu tena.",
+    "username": "Jina la mtumiaji",
+    "usernameOrEmail": "Jina la mtumiaji au barua pepe",
+    "password": "Nenosiri",
+    "createAccount": "Fungua akaunti",
+    "creatingAccount": "Inafungua akaunti",
+    "noAccountYet": "Bado huna akaunti?",
+    "createOne": "Fungua moja",
+    "haveAccount": "Tayari una akaunti?",
+    "tooManyAttempts": "Umejaribu mara nyingi mno. Jaribu tena baadaye.",
+    "signedInDevices": "Vifaa vilivyoingia",
+    "endSession": "Maliza kipindi",
+    "endingSessionSignsOut": "Kumaliza kipindi kunatoa kifaa hicho mara moja.",
+    "thisDevice": "Kifaa hiki"
+  },
+  "nav": {
+    "channels": "Vipindi",
+    "directMessages": "Ujumbe binafsi",
+    "newChannel": "Kipindi kipya",
+    "newDisposableChat": "Mazungumzo ya muda",
+    "closeChannelList": "Funga orodha ya vipindi",
+    "settings": "Mipangilio",
+    "notifications": "Arifa",
+    "administration": "Uongozi",
+    "people": "Watu",
+    "search": "Tafuta",
+    "noRoomsYet": "Bado hakuna vyumba."
+  },
+  "room": {
+    "messagePlaceholder": "Andika kwenye {room}",
+    "startOf": "Huu ndio mwanzo wa",
+    "sendFirstMessage": "Tuma ujumbe wa kwanza.",
+    "joinToTakePart": "Jiunge ili ushiriki.",
+    "waitingToSend": "Inasubiri kutumwa",
+    "doNotSend": "Usitume: {body}",
+    "showingAsItWas": "Mazungumzo haya kama yalivyokuwa saa {when}",
+    "offlineWillLoad": "Hauko mtandaoni. Mazungumzo haya yatapakia mtandao utakaporudi.",
+    "couldNotOpen": "Imeshindwa kufungua chumba hiki.",
+    "couldNotSend": "Imeshindwa kutuma ujumbe huo.",
+    "messageRemoved": "Ujumbe huu uliondolewa",
+    "edited": "umehaririwa",
+    "pinned": "Umebandikwa",
+    "you": "Wewe",
+    "today": "Leo",
+    "yesterday": "Jana",
+    "reconnecting": "Inaunganisha tena",
+    "pullToRefresh": "Vuta ili kuonyesha upya",
+    "refreshing": "Inaonyesha upya",
+    "typing": "{names} anaandika…",
+    "typingMany": "{names} wanaandika…"
+  },
+  "channel": {
+    "create": "Kipindi kipya",
+    "name": "Jina",
+    "topic": "Mada",
+    "visibility": "Uonekanaji",
+    "public": "Wazi",
+    "private": "Binafsi",
+    "couldNotCreate": "Imeshindwa kufungua kipindi hicho.",
+    "noPermission": "Huna ruhusa ya kufungua vipindi kwenye seva hii.",
+    "disposable": "Ya muda",
+    "lifetime": {
+      "hour": "Saa moja",
+      "day": "Siku moja",
+      "week": "Wiki moja",
+      "month": "Mwezi mmoja",
+      "howLong": "Kwa muda gani"
+    }
+  },
+  "attachment": {
+    "attachments": "Viambatisho",
+    "chooseFiles": "Chagua faili za kuambatisha",
+    "markedSensitive": "Imewekwa alama ya uangalifu",
+    "clickToShow": "Bofya ili kuona",
+    "uploading": "Inapakia",
+    "failed": "Faili hiyo imeshindwa kutumwa."
+  },
+  "notification": {
+    "title": "Arifa",
+    "whileClosed": "Kujulishwa kuhusu ujumbe wakati TDC imefungwa. Kila kifaa ni chake.",
+    "notifyThisDevice": "Nijulishe kwenye kifaa hiki",
+    "asking": "Inaomba",
+    "notUsedYet": "Bado hakijatumika",
+    "lastNotified": "Ilijulishwa mwisho {when}",
+    "keepOffLockScreen": "Usionyeshe ujumbe kwenye skrini iliyofungwa",
+    "keepOffLockScreenHint": "Arifa itasema kuna kitu kimefika, si kilichosemwa.",
+    "blockedInBrowser": "Arifa zimezuiwa kwa tovuti hii katika mipangilio ya kivinjari chako.",
+    "notSetUp": "Seva hii haijaweka mfumo wa arifa.",
+    "browserCannot": "Kivinjari hiki kimeshindwa kujiandikisha kwa arifa. Huduma yake ya arifa haipatikani — hiyo ni mipaka ya kivinjari, si ya seva hii. TDC bado itakujulisha ikiwa imefunguliwa.",
+    "staleKey": "Kifaa hiki kimeandikishwa kwa ufunguo ambao seva hii haitumii tena. Kikiondolewa hapa chini na kuandikishwa upya kitafanya kazi.",
+    "couldNotSubscribe": "Kifaa hiki hakikuweza kuandikishwa.",
+    "couldNotRemove": "Kifaa hicho hakikuweza kuondolewa.",
+    "nothingWaiting": "Hakuna kinachosubiri"
+  },
+  "settings": {
+    "title": "Mipangilio",
+    "status": "Hali",
+    "statusHint": "Kile wengine wanachoona kando ya jina lako. Msimamizi wa seva yako huchagua zipi zinapatikana.",
+    "available": "Nipo",
+    "busy": "Nina shughuli",
+    "away": "Sipo",
+    "appearOffline": "Onekana sipo mtandaoni",
+    "appearance": "Muonekano",
+    "appearanceHint": "Kufuata kifaa chako ndiyo kawaida, na hubadilika nacho.",
+    "followMyDevice": "Fuata kifaa changu",
+    "light": "Mwangaza",
+    "dark": "Giza",
+    "language": "Lugha",
+    "languageHint": "Lugha ambayo programu hii inakuzungumzia.",
+    "gettingAround": "Kujua mahali",
+    "gettingAroundHint": "Utangulizi mfupi wa programu, ikiwa ungependa tena.",
+    "showMeAround": "Nionyeshe",
+    "privacy": "Faragha",
+    "privacyHint": "Nani anaweza kuanzisha mazungumzo nawe. Mazungumzo yaliyopo hayaathiriwi na kubana huku.",
+    "anyone": "Yeyote",
+    "anyoneHint": "Mtu yeyote kwenye seva hii anaweza kuanzisha mazungumzo nawe.",
+    "sharedChannel": "Watu tunaoshiriki kipindi",
+    "sharedChannelHint": "Wenzako wanaweza kukufikia; watu ambao hujawahi kukutana nao hawawezi.",
+    "nobody": "Hakuna",
+    "nobodyHint": "Hakuna mazungumzo mapya. Wasimamizi bado wanaweza kukufikia, ili hakuna anayekuwa nje ya uwezo wa wanaohusika na seva hii.",
+    "blocked": "Waliozuiwa",
+    "blockedHint": "Watu uliowazuia hawawezi kuanzisha mazungumzo nawe. Hawaambiwi, na orodha hii ni yako peke yako.",
+    "blockedNobody": "Hujamzuia mtu yeyote."
+  },
+  "update": {
+    "ready": "Toleo jipya lipo tayari.",
+    "typedIsKept": "Ulichoandika kimehifadhiwa.",
+    "updating": "Inasasisha",
+    "notNow": "Si sasa"
+  },
+  "tour": {
+    "conversations": {
+      "title": "Mazungumzo yako",
+      "body": "Vipindi ulivyojiunga navyo, na watu unaozungumza nao. Mahali ulipoishia kusoma ndipo unaporudi."
+    },
+    "finding": {
+      "title": "Kutafuta kitu",
+      "body": "Tafuta ujumbe, vipindi na watu hapa — au bonyeza njia ya mkato inayoonyeshwa, ukiwa mahali popote."
+    },
+    "starting": {
+      "title": "Kuanzisha kipindi",
+      "body": "Kipindi ni chumba cha mada. Mtu yeyote kwenye seva hii anaweza kuwemo, isipokuwa ukikifanya cha binafsi."
+    },
+    "missed": {
+      "title": "Uliyoyakosa",
+      "body": "Ujumbe ambao haujasomwa hukusanyika hapa. Wewe huamua kwa kila kipindi ni kiasi gani unataka kusikia, katika mipangilio yake."
+    }
+  },
+  "error": {
+    "couldNotReach": "Imeshindwa kuifikia seva.",
+    "notReachableRightNow": "Haipatikani kwa sasa",
+    "generic": "Seva imeshindwa kukamilisha ombi hilo.",
+    "forbidden": "Huna ruhusa ya kufanya hivyo.",
+    "notFound": "Hicho hakikupatikana.",
+    "rateLimited": "Umejaribu mara nyingi mno. Jaribu tena baadaye."
+  },
+  "moderation": {
+    "reports": "Ripoti",
+    "report": "Ripoti",
+    "allDealtWith": "Kila ripoti imeshughulikiwa.",
+    "auditLog": "Kumbukumbu za matukio",
+    "invitations": "Mialiko",
+    "everybodyHere": "Kila mtu hapa"
+  }
+}

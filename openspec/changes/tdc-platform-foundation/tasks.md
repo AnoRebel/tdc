@@ -166,7 +166,7 @@ Goal: the native client, with the capabilities that justify it over the PWA.
 
 - [x] 9.1 Extract shared UI into `packages/ui` as a Nuxt layer with the transport-agnostic `ApiClient` interface wired by `provide`/`inject`; verify a unit test drives it with a mock adapter and no Nuxt runtime, and the web app still works unchanged
 - [x] 9.2 Refactor the web app to consume the shared layer via its `$fetch` adapter; verify no behaviour regressions against the Phase 8 milestone
-- [ ] 9.3 Set up `nuxt-i18n-micro` with English and Swahili and the per-app generation script; verify both produce working locale payloads and a missing key falls back to English
+- [x] 9.3 Set up `nuxt-i18n-micro` with English and Swahili and the per-app generation script; verify both produce working locale payloads and a missing key falls back to English
 - [ ] 9.4 Configure `@nuxt/icon` with an explicit `globInclude` for the layer's components; verify layer icons appear in the client bundle
 - [ ] 9.5 Vendor shadcn-vue components including DataTable on TanStack Table v9; verify no second copy of `table-core` appears in the dependency tree
 - [ ] 9.6 Evaluate and vendor useful `@inspira-ui` components for animation and effects, reviewing code before adoption; verify they pass lint and accessibility checks
