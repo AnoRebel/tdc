@@ -1,4 +1,12 @@
-import { afterFailure, afterSending, readFailure, sendOrder, type Queued } from "~/lib/outbox";
+import {
+  afterFailure,
+  afterSending,
+  afterUnsending,
+  readFailure,
+  sendOrder,
+  stillWaiting,
+  type Queued,
+} from "~/lib/outbox";
 
 /*
  * storageKey holds the queue across a restart.
@@ -77,6 +85,18 @@ export function useOutbox() {
   }
 
   /**
+   * Withdraws a message that has not gone yet.
+   *
+   * Only ever a message still in this queue: once something has reached the
+   * server it is a sent message, and taking it back is a deletion the server
+   * has to be told about — a different act, with a different record.
+   */
+  function unsend(clientToken: string) {
+    queue.value = afterUnsending(queue.value, clientToken);
+    persist();
+  }
+
+  /**
    * Records that sending failed, and says whether it will be tried again.
    *
    * The caller needs the answer to decide what to tell somebody: a message
@@ -104,6 +124,16 @@ export function useOutbox() {
    */
   async function flush(send: (message: Queued) => Promise<void>) {
     for (const message of sendOrder(queue.value)) {
+      /*
+       * Asked again, immediately before sending.
+       *
+       * The list above was read once, and somebody may have withdrawn this
+       * message while an earlier one was in flight. Without this, unsend works
+       * only while nothing is happening — which is exactly when nobody needs
+       * it.
+       */
+      if (!stillWaiting(queue.value, message.clientToken)) continue;
+
       try {
         await send(message);
         sent(message.clientToken);
@@ -122,5 +152,5 @@ export function useOutbox() {
     }
   }
 
-  return { queue, restore, hold, holdIfUnsent, sent, failed, waitingIn, flush };
+  return { queue, restore, hold, holdIfUnsent, sent, unsend, failed, waitingIn, flush };
 }

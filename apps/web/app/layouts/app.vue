@@ -383,5 +383,9 @@ provide("openSearch", () => {
         </form>
       </aside>
     </Transition>
+
+    <!-- A new version, offered rather than applied. Last in the layout so it
+         sits above everything without competing for a place in it. -->
+    <UpdatePrompt />
   </div>
 </template>

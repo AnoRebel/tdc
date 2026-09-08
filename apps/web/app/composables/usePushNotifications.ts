@@ -1,3 +1,5 @@
+import { subscribeFailure } from "~/lib/pushfailure";
+
 /** A device subscribed to notifications, as its owner sees it. */
 export interface PushDevice {
   id: string;
@@ -149,7 +151,7 @@ export function usePushNotifications() {
 
       await refresh();
     } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : "This device could not be subscribed.";
+      error.value = subscribeFailure(cause);
     } finally {
       busy.value = false;
     }

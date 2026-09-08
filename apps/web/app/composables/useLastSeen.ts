@@ -65,6 +65,9 @@ export function useLastSeen<T, R = unknown>() {
       // The sidebar's list too: it is the same person's conversations, kept
       // under its own key because the layout writes it.
       localStorage.removeItem("tdc.lastseen.rooms");
+      // Drafts too: what somebody was writing is theirs, and the next person
+      // at this browser is not them.
+      localStorage.removeItem("tdc.drafts");
     } catch {
       // Nothing to do. The next sign-in overwrites it anyway.
     }

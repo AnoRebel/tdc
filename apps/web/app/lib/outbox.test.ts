@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   afterFailure,
   afterSending,
+  afterUnsending,
   maxAttempts,
   readFailure,
   sendOrder,
+  stillWaiting,
   shouldRetry,
   type Queued,
 } from "./outbox";
@@ -171,5 +173,41 @@ describe("the order things are sent in", () => {
     sendOrder(queue);
 
     expect(queue[0]!.clientToken).toBe("third");
+  });
+});
+
+describe("withdrawing a message", () => {
+  it("removes the one that was withdrawn", () => {
+    const queue = [queued(), queued({ clientToken: "token-2" })];
+
+    const after = afterUnsending(queue, "token-1");
+
+    expect(after).toHaveLength(1);
+    expect(after[0]!.clientToken).toBe("token-2");
+  });
+
+  it("does not alter the queue it was given", () => {
+    const queue = [queued()];
+    afterUnsending(queue, "token-1");
+
+    expect(queue).toHaveLength(1);
+  });
+
+  /*
+   * The race that makes this more than a filter.
+   *
+   * A flush reads the queue once and sends through it. Somebody who withdraws
+   * a message while the one before it is still in flight has to be obeyed —
+   * otherwise unsend works only when nothing is happening, which is precisely
+   * when nobody needs it.
+   */
+  it("is noticed by a send that was already under way", () => {
+    const queue = [queued({ clientToken: "first" }), queued({ clientToken: "second" })];
+
+    // "first" is in flight; "second" is withdrawn meanwhile.
+    const after = afterUnsending(queue, "second");
+
+    expect(stillWaiting(after, "first")).toBe(true);
+    expect(stillWaiting(after, "second")).toBe(false);
   });
 });

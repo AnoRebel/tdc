@@ -80,6 +80,28 @@ export function afterSending(queue: Queued[], clientToken: string): Queued[] {
 }
 
 /**
+ * The queue after somebody withdrew a message.
+ *
+ * The same removal as a successful send, kept separate because the two are
+ * different intentions that happen to share a mechanism. Naming it after what
+ * somebody did means a later change to one cannot silently alter the other.
+ */
+export function afterUnsending(queue: Queued[], clientToken: string): Queued[] {
+  return queue.filter((message) => message.clientToken !== clientToken);
+}
+
+/**
+ * Whether a message is still waiting to be sent.
+ *
+ * Asked immediately before sending, because a queue read at the start of a
+ * flush is a queue that may since have had something withdrawn from it. A
+ * message somebody unsent while the one before it was in flight must not go.
+ */
+export function stillWaiting(queue: Queued[], clientToken: string): boolean {
+  return queue.some((message) => message.clientToken === clientToken);
+}
+
+/**
  * The order in which a queue is sent.
  *
  * Oldest first, so a conversation arrives in the order it was written. Sending

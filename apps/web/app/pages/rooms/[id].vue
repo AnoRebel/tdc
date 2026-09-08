@@ -39,6 +39,7 @@ import {
   ShieldOff,
   Smile,
   Trash2,
+  X,
   UserX,
 } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
@@ -80,6 +81,26 @@ const outbox = useOutbox();
 const waiting = computed(() => outbox.waitingIn(roomId.value));
 
 const lastSeen = useLastSeen<Message, Room>();
+const drafts = useDrafts();
+
+/*
+ * What was being written here, restored.
+ *
+ * Watched rather than saved on every keystroke by hand: the draft belongs to
+ * the conversation, and switching between two half-written messages should
+ * find each where it was left.
+ */
+watch(
+  roomId,
+  (now, before) => {
+    if (before && before !== now) drafts.keep(before, draft.value);
+    draft.value = drafts.of(now);
+    void nextTick().then(fitComposer);
+  },
+  { immediate: true },
+);
+
+watch(draft, (text) => drafts.keep(roomId.value, text));
 
 /*
  * When what is on screen was last confirmed, or null if it is current.
@@ -88,6 +109,27 @@ const lastSeen = useLastSeen<Message, Room>();
  * conversation they are watching from one they are remembering.
  */
 const showingLastSeen = ref<number | null>(null);
+
+/*
+ * Withdraws a message that has not gone yet.
+ *
+ * The text goes back into the composer rather than vanishing: somebody
+ * withdrawing a message usually wants to change it, and making them retype it
+ * would be a strange reward for noticing a mistake in time.
+ */
+function unsendWaiting(clientToken: string) {
+  const message = waiting.value.find((waiting) => waiting.clientToken === clientToken);
+  if (!message) return;
+
+  outbox.unsend(clientToken);
+
+  // Only into an empty composer: overwriting something half-typed would lose
+  // the newer thought to recover the older one.
+  if (!draft.value.trim()) {
+    draft.value = message.body;
+    void nextTick().then(fitComposer);
+  }
+}
 
 /** Files picked but not yet sent, kept so a retry needs no second selection. */
 const pending = new Map<string, File>();
@@ -1868,10 +1910,24 @@ watch(roomId, load, { immediate: true });
               :key="message.clientToken"
               :mine="true"
             >
-              <div class="flex w-fit max-w-full flex-col items-end gap-1">
-                <Bubble variant="mine" align="end" :continued="position > 0" class="opacity-60">
-                  <MessageBody :body="message.body" />
-                </Bubble>
+              <!-- Withdrawing is offered while it is still ours to withdraw.
+                   Once it reaches the server it is a sent message, and taking
+                   it back is a deletion other people may already have seen. -->
+              <div class="group/waiting flex items-center gap-1.5">
+                <button
+                  type="button"
+                  class="btn btn-ghost size-7 shrink-0 p-0 opacity-0 transition-opacity group-hover/waiting:opacity-100 focus-visible:opacity-100"
+                  :aria-label="`Do not send: ${message.body}`"
+                  @click="unsendWaiting(message.clientToken)"
+                >
+                  <X class="size-3.5" />
+                </button>
+
+                <div class="flex w-fit max-w-full flex-col items-end gap-1">
+                  <Bubble variant="mine" align="end" :continued="position > 0" class="opacity-60">
+                    <MessageBody :body="message.body" />
+                  </Bubble>
+                </div>
               </div>
             </MessageRow>
           </MessageGroup>
