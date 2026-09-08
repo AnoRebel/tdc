@@ -82,7 +82,7 @@ function readableSize(bytes: number): string {
           "
         >
           <AlertCircle v-if="upload.status === 'failed'" class="size-3.5 text-destructive" />
-          <Check v-else-if="upload.status === 'done'" class="size-3.5 text-success" />
+          <Check v-else-if="upload.status === 'done'" class="size-3.5 text-success-text" />
           <Spinner v-else size="sm" class="text-muted-foreground" />
         </span>
 

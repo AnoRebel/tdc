@@ -70,16 +70,28 @@ const sizes = {
       )
     "
     :style="{
-      background: `oklch(0.62 0.13 ${hue})`,
+      /*
+       * Dark enough for white initials to be legible on it.
+       *
+       * At 0.62 some hues fall below the 4.5:1 that WCAG asks for, which axe
+       * caught and an eye would not — the failing ones look fine until they
+       * are the only thing telling two people apart. 0.52 clears it across
+       * the whole wheel while keeping the colours distinct from each other.
+       */
+      background: `oklch(0.52 0.13 ${hue})`,
       color: 'oklch(0.99 0 0)',
     }"
     :title="props.name"
   >
     {{ initials }}
+    <!-- A dot with a name, which needs a role to carry one: ARIA forbids
+         labelling an element that has none, so a screen reader would either
+         ignore this or announce a stray word with nothing attached to it. -->
     <span
       v-if="props.online"
       class="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-surface bg-success"
-      aria-label="online"
+      role="img"
+      aria-label="Online"
     />
   </span>
 </template>

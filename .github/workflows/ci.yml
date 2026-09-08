@@ -43,7 +43,7 @@ jobs:
     name: Web and shared packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -65,6 +65,92 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  accessibility:
+    name: Accessibility
+    runs-on: ubuntu-latest
+    # Needs the database the server runs against, since almost nothing in this
+    # application is reachable without signing in.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tdc
+          POSTGRES_PASSWORD: tdc
+          POSTGRES_DB: tdc
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the application
+        # Empty, so the built application calls the host it is served from
+        # rather than the address a developer's machine uses.
+        env:
+          NUXT_PUBLIC_API_BASE: ""
+        run: bun run --cwd apps/web generate
+
+      - name: Cache the browser
+        uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('bun.lock') }}
+
+      - name: Install the browser
+        # Only when the cache missed: it is a hundred megabytes, and these
+        # checks are worth having on every run rather than only when cheap.
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx --bun playwright install --with-deps chromium
+        working-directory: apps/web
+
+      - name: Serve the application
+        env:
+          TDC_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          TDC_SERVER_WEB_ROOT: ${{ github.workspace }}/apps/web/.output/public
+          TDC_SERVER_ADDRESS: 127.0.0.1:8099
+        run: |
+          go build -o /tmp/tdc-server ./cmd/tdc-server
+          /tmp/tdc-server &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8099/api/server >/dev/null && break
+            sleep 1
+          done
+        working-directory: server
+
+      - name: Prepare an account to sign in with
+        run: |
+          curl -sf -X POST http://127.0.0.1:8099/api/setup             -H 'Content-Type: application/json'             -d '{"username":"founder","password":"correct horse battery staple"}'
+          TOKEN=$(curl -sf -X POST http://127.0.0.1:8099/api/auth/signin             -H 'Content-Type: application/json'             -d '{"username":"founder","password":"correct horse battery staple"}'             | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+          curl -sf -X POST http://127.0.0.1:8099/api/rooms             -H "Authorization: Bearer $TOKEN"             -H 'Content-Type: application/json'             -d '{"slug":"general","name":"General","topic":"A channel to look at"}'
+
+      - name: Check
+        run: bun run test:a11y
+        working-directory: apps/web
+
+      - name: Keep what a failure produced
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: accessibility-failures
+          path: apps/web/test-results/
+          retention-days: 7
 
   server:
     name: Server
@@ -91,9 +177,9 @@ jobs:
       TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: server/go.sum
@@ -129,9 +215,9 @@ jobs:
     if: needs.tier.outputs.full == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: server/go.sum
@@ -151,9 +237,9 @@ jobs:
     if: needs.tier.outputs.full == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: server/go.sum
@@ -185,9 +271,9 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: server/go.sum
@@ -208,7 +294,7 @@ jobs:
   ci-success:
     name: CI
     if: always()
-    needs: [web, server, licences, vulnerabilities, migrations]
+    needs: [web, accessibility, server, licences, vulnerabilities, migrations]
     runs-on: ubuntu-latest
     steps:
       - name: Verify every job succeeded or was skipped

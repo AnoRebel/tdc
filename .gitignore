@@ -49,3 +49,9 @@ data/
 # Agent instruction files (empty placeholders)
 CLAUDE.md
 AGENTS.md
+
+# What the accessibility checks leave behind: traces and screenshots from a
+# failure, and the signed-in session they share. None of it belongs in the
+# repository — the session file in particular holds a cookie.
+test-results/
+playwright-report/

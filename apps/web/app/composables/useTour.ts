@@ -91,11 +91,6 @@ export function useTour() {
      * Without this distinction the resume is unreachable: every exit marks
      * the tour seen, and a tour that is never offered again is never resumed.
      */
-    const done = () => {
-      write(afterSeeing(read(), tour));
-      instance.destroy();
-    };
-
     const instance: Driver = driver({
       showProgress: true,
       // The overlay is the point: everything but the thing being explained is
@@ -109,19 +104,22 @@ export function useTour() {
         if (at !== undefined) write(afterReaching(read(), tour, at));
       },
       /*
-       * Deliberate ways out: the close button and, on the last step, Done.
+       * Every deliberate way out, in one place.
        *
-       * Both record and then tear down, in that order. Recording in
-       * onDestroyed instead would never run: driver.js does not call that
-       * hook for a teardown started from inside another hook, which is a
-       * quiet way to lose every completion — the tour ends, nothing is
-       * written, and it is offered again forever.
+       * onDestroyStarted runs before the teardown and covers all of them —
+       * the close button, Done on the last step, Escape, a click on the
+       * overlay. The narrower hooks do not: onCloseClick misses Escape, and
+       * onDestroyed is skipped entirely for a teardown begun inside another
+       * hook. Both were tried, and both silently lost dismissals somebody had
+       * clearly made, which meant being asked again on the next visit.
        *
-       * Providing these hooks also disables the default behaviour, so the
-       * destroy is ours to do. Omitting it leaves a tour nothing can close.
+       * Providing this disables the default teardown, so the destroy is ours.
+       * Omitting it leaves a tour that nothing can close.
        */
-      onCloseClick: done,
-      onDoneClick: done,
+      onDestroyStarted: () => {
+        write(afterSeeing(read(), tour));
+        instance.destroy();
+      },
     });
 
     instance.drive(resumeAt(read(), tour));

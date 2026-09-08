@@ -1953,10 +1953,14 @@ watch(roomId, load, { immediate: true });
           class="flex items-end gap-2 rounded-xl border bg-surface p-1.5 shadow-xs transition focus-within:border-ring focus-within:shadow-sm"
           @submit.prevent="send"
         >
+          <!-- Opened by the paperclip beside it rather than clicked directly,
+               but still reachable by a screen reader — so it says what it is
+               rather than announcing an unnamed file field. -->
           <input
             ref="filePicker"
             type="file"
             multiple
+            aria-label="Choose files to attach"
             :accept="pickerAccept"
             class="sr-only"
             @change="pickFiles"

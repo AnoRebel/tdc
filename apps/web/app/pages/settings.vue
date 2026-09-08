@@ -264,7 +264,7 @@ function deviceName(userAgent: string): string {
                 {{ deviceName(session.userAgent) }}
                 <span
                   v-if="session.current"
-                  class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success"
+                  class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success-text"
                 >
                   This device
                 </span>
@@ -352,7 +352,7 @@ function deviceName(userAgent: string): string {
                 {{ device.device }}
                 <span
                   v-if="device.current"
-                  class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success"
+                  class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success-text"
                 >
                   This device
                 </span>
