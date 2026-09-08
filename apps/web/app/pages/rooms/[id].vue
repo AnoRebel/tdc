@@ -1931,31 +1931,36 @@ watch(roomId, load, { immediate: true });
               </span>
             </div>
 
-            <MessageRow
-              v-for="(message, position) in waiting"
-              :key="message.clientToken"
-              :mine="true"
-            >
-              <!-- Withdrawing is offered while it is still ours to withdraw.
+            <!-- A queued message arrives rather than appearing: it came from
+                 somewhere, and one that materialises in place reads as the
+                 interface redrawing itself. -->
+            <UiArrive tag="div" class="contents">
+              <MessageRow
+                v-for="(message, position) in waiting"
+                :key="message.clientToken"
+                :mine="true"
+              >
+                <!-- Withdrawing is offered while it is still ours to withdraw.
                    Once it reaches the server it is a sent message, and taking
                    it back is a deletion other people may already have seen. -->
-              <div class="group/waiting flex items-center gap-1.5">
-                <button
-                  type="button"
-                  class="btn btn-ghost size-7 shrink-0 p-0 opacity-0 transition-opacity group-hover/waiting:opacity-100 focus-visible:opacity-100"
-                  :aria-label="`Do not send: ${message.body}`"
-                  @click="unsendWaiting(message.clientToken)"
-                >
-                  <X class="size-3.5" />
-                </button>
+                <div class="group/waiting flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    class="btn btn-ghost size-7 shrink-0 p-0 opacity-0 transition-opacity group-hover/waiting:opacity-100 focus-visible:opacity-100"
+                    :aria-label="`Do not send: ${message.body}`"
+                    @click="unsendWaiting(message.clientToken)"
+                  >
+                    <X class="size-3.5" />
+                  </button>
 
-                <div class="flex w-fit max-w-full flex-col items-end gap-1">
-                  <Bubble variant="mine" align="end" :continued="position > 0" class="opacity-60">
-                    <MessageBody :body="message.body" />
-                  </Bubble>
+                  <div class="flex w-fit max-w-full flex-col items-end gap-1">
+                    <Bubble variant="mine" align="end" :continued="position > 0" class="opacity-60">
+                      <MessageBody :body="message.body" />
+                    </Bubble>
+                  </div>
                 </div>
-              </div>
-            </MessageRow>
+              </MessageRow>
+            </UiArrive>
           </MessageGroup>
         </div>
       </div>

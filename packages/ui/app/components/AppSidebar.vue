@@ -286,9 +286,11 @@ function conversationName(room: Room): string {
              meaning anything, and a three-digit badge crowds the footer. -->
         <span
           v-if="notifications.unread.value"
-          class="absolute -top-0.5 -right-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.5625rem] font-semibold text-primary-foreground tabular-nums"
+          class="absolute -top-0.5 -right-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[0.5625rem] font-semibold text-primary-foreground"
         >
-          {{ notifications.unread.value > 9 ? "9+" : notifications.unread.value }}
+          <!-- The number itself is immediate; what moves is the badge, so a
+               new message is noticed without the count becoming unreadable. -->
+          <UiCount :value="notifications.unread.value" :max="9" />
         </span>
       </button>
 
