@@ -2,7 +2,7 @@
 import { isApiError } from "@tdc/types";
 import { ArrowLeft, Check, Copy, ShieldAlert, UserPlus, UserX } from "lucide-vue-next";
 import { Avatar } from "~/components/ui/avatar";
-import type { Person } from "~/composables/usePeople";
+import type { Person } from "#layers/ui/app/composables/usePeople";
 
 /**
  * Who is on this server: suspending somebody, lifting it, and inviting people.

@@ -1,5 +1,13 @@
 Scope note: these tasks implement **foundation + chat** only. The specs cover the full platform; project management, directory, federation, calls, and integrations are separate later changes. Tasks reference specs for what to build and `design.md` for how.
 
+**Documentation rule: documentation is written as the work is done, not after it.**
+Anything an operator or a contributor would need to know is written in the same
+commit as the capability it describes — how to configure it, what it costs, what
+it refuses to do and why. A phase that adds a setting, an endpoint, a command or
+a constraint leaves the relevant document current before its milestone is
+claimed. Writing this at the end means reconstructing reasons from code that no
+longer remembers them, and the reasons are most of the value.
+
 **Phasing rule: every phase ends in a running, demonstrable system.** Each group below closes with a milestone task that must be satisfiable by launching the software and using it — not by a passing unit test alone. No phase may leave the default branch in a state where the server does not start, the app does not load, or a previously working capability has regressed. A phase's milestone is the gate: if it cannot be demonstrated, the phase is not done, regardless of how many of its tasks are ticked.
 
 ## 1. Phase 1 — It runs and stores data
@@ -157,7 +165,7 @@ Goal: the PWA that most TDC members will actually use.
 Goal: the native client, with the capabilities that justify it over the PWA.
 
 - [x] 9.1 Extract shared UI into `packages/ui` as a Nuxt layer with the transport-agnostic `ApiClient` interface wired by `provide`/`inject`; verify a unit test drives it with a mock adapter and no Nuxt runtime, and the web app still works unchanged
-- [ ] 9.2 Refactor the web app to consume the shared layer via its `$fetch` adapter; verify no behaviour regressions against the Phase 8 milestone
+- [x] 9.2 Refactor the web app to consume the shared layer via its `$fetch` adapter; verify no behaviour regressions against the Phase 8 milestone
 - [ ] 9.3 Set up `nuxt-i18n-micro` with English and Swahili and the per-app generation script; verify both produce working locale payloads and a missing key falls back to English
 - [ ] 9.4 Configure `@nuxt/icon` with an explicit `globInclude` for the layer's components; verify layer icons appear in the client bundle
 - [ ] 9.5 Vendor shadcn-vue components including DataTable on TanStack Table v9; verify no second copy of `table-core` appears in the dependency tree
