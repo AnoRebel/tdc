@@ -102,3 +102,52 @@ ORDER BY n.room_id, n.created_at DESC;
 -- stood for, or the group reappears the moment the list is redrawn.
 UPDATE notifications SET read_at = now()
 WHERE user_id = $1 AND room_id = $2 AND read_at IS NULL;
+
+-- name: SavePushSubscription :one
+-- Records where a device can be reached.
+--
+-- A browser resubscribing returns the same endpoint, so this updates rather
+-- than inserting a second row — two rows for one device would deliver every
+-- notification twice. The failure count resets, since a resubscription is the
+-- browser saying this endpoint works.
+INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh_key, auth_key, user_agent)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (endpoint) DO UPDATE
+SET user_id    = EXCLUDED.user_id,
+    p256dh_key = EXCLUDED.p256dh_key,
+    auth_key   = EXCLUDED.auth_key,
+    user_agent = EXCLUDED.user_agent,
+    failures   = 0
+RETURNING *;
+
+-- name: ListPushSubscriptions :many
+SELECT * FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at;
+
+-- name: DeletePushSubscription :execrows
+-- Scoped to the owner, so one person cannot unsubscribe another's device.
+DELETE FROM push_subscriptions WHERE id = $1 AND user_id = $2;
+
+-- name: DeletePushSubscriptionByEndpoint :exec
+-- Used when the push service reports a subscription gone, where the endpoint
+-- is all the caller has.
+DELETE FROM push_subscriptions WHERE endpoint = $1;
+
+-- name: RecordPushSuccess :exec
+UPDATE push_subscriptions
+SET last_used_at = NOW(), failures = 0
+WHERE endpoint = $1;
+
+-- name: RecordPushFailure :exec
+UPDATE push_subscriptions SET failures = failures + 1 WHERE endpoint = $1;
+
+-- name: PrunePushSubscriptions :execrows
+-- Removes subscriptions that have failed repeatedly without the service ever
+-- saying they are gone.
+--
+-- Some services fail for a while and recover, so one failure is not enough;
+-- a long run of them means nothing is listening, and continuing to try costs
+-- a request per notification forever.
+DELETE FROM push_subscriptions WHERE failures >= $1;
+
+-- name: SetHidePushContent :exec
+UPDATE users SET hide_push_content = $2 WHERE id = $1;

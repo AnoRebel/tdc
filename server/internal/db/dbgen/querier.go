@@ -111,6 +111,11 @@ type Querier interface {
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
 	DeleteLapsedBans(ctx context.Context) (int64, error)
+	// Scoped to the owner, so one person cannot unsubscribe another's device.
+	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) (int64, error)
+	// Used when the push service reports a subscription gone, where the endpoint
+	// is all the caller has.
+	DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error
 	DeleteRole(ctx context.Context, id uuid.UUID) error
 	// Scoped to the sender, and only while unsent: cancelling is the sender's to
 	// do, and a message already sent is a message, not a plan.
@@ -242,6 +247,7 @@ type Querier interface {
 	ListPinnedRooms(ctx context.Context, userID uuid.UUID) ([]ListPinnedRoomsRow, error)
 	ListPostingRestrictions(ctx context.Context, limit int32) ([]ListPostingRestrictionsRow, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
+	ListPushSubscriptions(ctx context.Context, userID uuid.UUID) ([]PushSubscription, error)
 	// Every reaction on a set of messages, for drawing a timeline.
 	//
 	// Returned as rows rather than counts so a client can show who reacted and
@@ -338,6 +344,13 @@ type Querier interface {
 	PinMessage(ctx context.Context, arg PinMessageParams) error
 	// A person's own pinned conversation, which says nothing to anybody else.
 	PinRoom(ctx context.Context, arg PinRoomParams) error
+	// Removes subscriptions that have failed repeatedly without the service ever
+	// saying they are gone.
+	//
+	// Some services fail for a while and recover, so one failure is not enough;
+	// a long run of them means nothing is listening, and continuing to try costs
+	// a request per notification forever.
+	PrunePushSubscriptions(ctx context.Context, failures int32) (int64, error)
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
 	// Claims one use, atomically.
 	//
@@ -354,6 +367,8 @@ type Querier interface {
 	// First view only: the clock starts when they first read it, and a second
 	// look does not restart it.
 	RecordMessageView(ctx context.Context, arg RecordMessageViewParams) error
+	RecordPushFailure(ctx context.Context, endpoint string) error
+	RecordPushSuccess(ctx context.Context, endpoint string) error
 	// Removes content while leaving the event in place, so ordering and the
 	// surrounding events stay verifiable.
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
@@ -379,6 +394,13 @@ type Querier interface {
 	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (Invitation, error)
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	// Records where a device can be reached.
+	//
+	// A browser resubscribing returns the same endpoint, so this updates rather
+	// than inserting a second row — two rows for one device would deliver every
+	// notification twice. The failure count resets, since a resubscription is the
+	// browser saying this endpoint works.
+	SavePushSubscription(ctx context.Context, arg SavePushSubscriptionParams) (PushSubscription, error)
 	// Full-text search, restricted to rooms the caller is in.
 	//
 	// The membership join is the authorisation, done in the query rather than by
@@ -414,6 +436,7 @@ type Querier interface {
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
 	SetDirectMessagePolicy(ctx context.Context, arg SetDirectMessagePolicyParams) error
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
+	SetHidePushContent(ctx context.Context, arg SetHidePushContentParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
 	// Gives a message a lifetime, or replaces one it already has.

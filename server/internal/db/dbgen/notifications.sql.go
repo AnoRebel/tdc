@@ -59,6 +59,35 @@ func (q *Queries) CreateNotification(ctx context.Context, arg CreateNotification
 	return err
 }
 
+const deletePushSubscription = `-- name: DeletePushSubscription :execrows
+DELETE FROM push_subscriptions WHERE id = $1 AND user_id = $2
+`
+
+type DeletePushSubscriptionParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+// Scoped to the owner, so one person cannot unsubscribe another's device.
+func (q *Queries) DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePushSubscription, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deletePushSubscriptionByEndpoint = `-- name: DeletePushSubscriptionByEndpoint :exec
+DELETE FROM push_subscriptions WHERE endpoint = $1
+`
+
+// Used when the push service reports a subscription gone, where the endpoint
+// is all the caller has.
+func (q *Queries) DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error {
+	_, err := q.db.Exec(ctx, deletePushSubscriptionByEndpoint, endpoint)
+	return err
+}
+
 const getNotificationPreference = `-- name: GetNotificationPreference :one
 SELECT level, muted FROM notification_preferences
 WHERE user_id = $1 AND (room_id = $2::uuid OR room_id IS NULL)
@@ -109,6 +138,40 @@ func (q *Queries) ListNotificationPreferences(ctx context.Context, userID uuid.U
 	for rows.Next() {
 		var i ListNotificationPreferencesRow
 		if err := rows.Scan(&i.RoomID, &i.Level, &i.Muted); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPushSubscriptions = `-- name: ListPushSubscriptions :many
+SELECT id, user_id, endpoint, p256dh_key, auth_key, user_agent, created_at, last_used_at, failures FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at
+`
+
+func (q *Queries) ListPushSubscriptions(ctx context.Context, userID uuid.UUID) ([]PushSubscription, error) {
+	rows, err := q.db.Query(ctx, listPushSubscriptions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PushSubscription{}
+	for rows.Next() {
+		var i PushSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Endpoint,
+			&i.P256dhKey,
+			&i.AuthKey,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.LastUsedAt,
+			&i.Failures,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -310,6 +373,95 @@ func (q *Queries) MarkRoomNotificationsReadForUser(ctx context.Context, arg Mark
 	return err
 }
 
+const prunePushSubscriptions = `-- name: PrunePushSubscriptions :execrows
+DELETE FROM push_subscriptions WHERE failures >= $1
+`
+
+// Removes subscriptions that have failed repeatedly without the service ever
+// saying they are gone.
+//
+// Some services fail for a while and recover, so one failure is not enough;
+// a long run of them means nothing is listening, and continuing to try costs
+// a request per notification forever.
+func (q *Queries) PrunePushSubscriptions(ctx context.Context, failures int32) (int64, error) {
+	result, err := q.db.Exec(ctx, prunePushSubscriptions, failures)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const recordPushFailure = `-- name: RecordPushFailure :exec
+UPDATE push_subscriptions SET failures = failures + 1 WHERE endpoint = $1
+`
+
+func (q *Queries) RecordPushFailure(ctx context.Context, endpoint string) error {
+	_, err := q.db.Exec(ctx, recordPushFailure, endpoint)
+	return err
+}
+
+const recordPushSuccess = `-- name: RecordPushSuccess :exec
+UPDATE push_subscriptions
+SET last_used_at = NOW(), failures = 0
+WHERE endpoint = $1
+`
+
+func (q *Queries) RecordPushSuccess(ctx context.Context, endpoint string) error {
+	_, err := q.db.Exec(ctx, recordPushSuccess, endpoint)
+	return err
+}
+
+const savePushSubscription = `-- name: SavePushSubscription :one
+INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh_key, auth_key, user_agent)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (endpoint) DO UPDATE
+SET user_id    = EXCLUDED.user_id,
+    p256dh_key = EXCLUDED.p256dh_key,
+    auth_key   = EXCLUDED.auth_key,
+    user_agent = EXCLUDED.user_agent,
+    failures   = 0
+RETURNING id, user_id, endpoint, p256dh_key, auth_key, user_agent, created_at, last_used_at, failures
+`
+
+type SavePushSubscriptionParams struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Endpoint  string
+	P256dhKey string
+	AuthKey   string
+	UserAgent string
+}
+
+// Records where a device can be reached.
+//
+// A browser resubscribing returns the same endpoint, so this updates rather
+// than inserting a second row — two rows for one device would deliver every
+// notification twice. The failure count resets, since a resubscription is the
+// browser saying this endpoint works.
+func (q *Queries) SavePushSubscription(ctx context.Context, arg SavePushSubscriptionParams) (PushSubscription, error) {
+	row := q.db.QueryRow(ctx, savePushSubscription,
+		arg.ID,
+		arg.UserID,
+		arg.Endpoint,
+		arg.P256dhKey,
+		arg.AuthKey,
+		arg.UserAgent,
+	)
+	var i PushSubscription
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Endpoint,
+		&i.P256dhKey,
+		&i.AuthKey,
+		&i.UserAgent,
+		&i.CreatedAt,
+		&i.LastUsedAt,
+		&i.Failures,
+	)
+	return i, err
+}
+
 const setGlobalNotificationPreference = `-- name: SetGlobalNotificationPreference :exec
 INSERT INTO notification_preferences (user_id, room_id, level, muted)
 VALUES ($1, NULL, $2, $3)
@@ -325,6 +477,20 @@ type SetGlobalNotificationPreferenceParams struct {
 
 func (q *Queries) SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error {
 	_, err := q.db.Exec(ctx, setGlobalNotificationPreference, arg.UserID, arg.Level, arg.Muted)
+	return err
+}
+
+const setHidePushContent = `-- name: SetHidePushContent :exec
+UPDATE users SET hide_push_content = $2 WHERE id = $1
+`
+
+type SetHidePushContentParams struct {
+	ID              uuid.UUID
+	HidePushContent bool
+}
+
+func (q *Queries) SetHidePushContent(ctx context.Context, arg SetHidePushContentParams) error {
+	_, err := q.db.Exec(ctx, setHidePushContent, arg.ID, arg.HidePushContent)
 	return err
 }
 

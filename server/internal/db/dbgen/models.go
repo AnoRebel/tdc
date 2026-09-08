@@ -192,6 +192,18 @@ type PostingRestriction struct {
 	LiftedBy            *uuid.UUID
 }
 
+type PushSubscription struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Endpoint   string
+	P256dhKey  string
+	AuthKey    string
+	UserAgent  string
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
+	Failures   int32
+}
+
 type Reaction struct {
 	ID          uuid.UUID
 	EventID     string
@@ -340,6 +352,7 @@ type User struct {
 	UpdatedAt             time.Time
 	SendsTypingIndication bool
 	LinkPreviewsEnabled   bool
+	HidePushContent       bool
 }
 
 type UserBlock struct {
