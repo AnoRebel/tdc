@@ -12,6 +12,30 @@ import { ArrowLeft, Download, ShieldAlert } from "lucide-vue-next";
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
+/*
+ * The columns, described rather than laid out.
+ *
+ * Sorting and paging come from the description: the table knows a column of
+ * timestamps can be ordered without this page saying how, and adding a column
+ * is adding an entry here rather than four places in a template.
+ */
+const columns = [
+  {
+    accessorKey: "occurredAt",
+    header: "When",
+    cell: ({ row }: { row: { original: AuditEntry } }) => when(row.original.occurredAt),
+  },
+  { accessorKey: "actor", header: "Who" },
+  { accessorKey: "action", header: "Action" },
+  {
+    accessorKey: "targetKind",
+    header: "Target",
+    // An entry about the server itself has no target, and an empty cell reads
+    // as a missing value rather than an absent one.
+    cell: ({ row }: { row: { original: AuditEntry } }) => row.original.targetKind ?? "—",
+  },
+];
+
 useHead({ title: "Audit log" });
 
 interface AuditEntry {
@@ -99,53 +123,13 @@ function when(value: string): string {
           itself recorded.
         </p>
 
-        <!-- Scrolls inside its own container so the page never scrolls
-             sideways on a narrow screen. -->
-        <div class="mt-4 overflow-x-auto rounded-lg border bg-surface">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b text-left">
-                <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
-                  When
-                </th>
-                <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">Who</th>
-                <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
-                  Action
-                </th>
-                <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
-                  Target
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="entry in entries"
-                :key="entry.id"
-                class="border-b transition last:border-0 hover:bg-surface-sunken"
-              >
-                <td class="px-3 py-2 whitespace-nowrap">
-                  <time class="text-muted-foreground">{{ when(entry.occurredAt) }}</time>
-                </td>
-                <td class="px-3 py-2">{{ entry.actor }}</td>
-                <td class="px-3 py-2">
-                  <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                    {{ entry.action }}
-                  </code>
-                </td>
-                <td class="px-3 py-2 text-muted-foreground">
-                  {{ entry.targetKind ?? "—" }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          <p
-            v-if="entries.length === 0"
-            class="px-3 py-8 text-center text-sm text-muted-foreground"
-          >
-            Nothing recorded yet.
-          </p>
-        </div>
+        <UiDataTable
+          class="mt-4 bg-surface"
+          :columns="columns"
+          :data="entries"
+          caption="Recorded actions, most recent first"
+          empty="Nothing recorded yet."
+        />
       </template>
     </div>
   </div>

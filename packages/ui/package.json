@@ -5,13 +5,14 @@
   "type": "module",
   "main": "./nuxt.config.ts",
   "dependencies": {
+    "@tanstack/vue-table": "^9.2.4",
     "@tdc/types": "workspace:*",
-    "vue": "catalog:vue",
-    "reka-ui": "^2.10.4",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^3.6.0",
     "class-variance-authority": "^0.7.1",
-    "lucide-vue-next": "^1.0.0"
+    "clsx": "^2.1.1",
+    "lucide-vue-next": "^1.0.0",
+    "reka-ui": "^2.10.4",
+    "tailwind-merge": "^3.6.0",
+    "vue": "catalog:vue"
   },
   "devDependencies": {
     "vitest": "catalog:testing"

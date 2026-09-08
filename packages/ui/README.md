@@ -64,6 +64,18 @@ Forgetting the provider throws on the first request, with a message saying what
 is missing. That is deliberate: the alternative is an error about `undefined`
 some distance from the line that caused it.
 
+## Component names
+
+Components in this layer are registered with a `Ui` prefix, from the directory
+they sit in: `app/components/ui/data-table/DataTable.vue` becomes
+`<UiDataTable>`. That is what a template should use.
+
+The barrel `index.ts` beside each component exists for explicit imports, which
+is what the vendored primitives use — but the layer's component scanner only
+reads `.vue` files, so an `import { DataTable } from ".../data-table"` in a
+page does not make `<DataTable>` a resolvable tag. The symptom is the element
+rendering literally, with its props stringified as attributes.
+
 ## Paths inside this configuration
 
 Anything in `nuxt.config.ts` that names a directory must resolve it absolutely:
