@@ -29,7 +29,13 @@ import { PREPAINT_THEME_SCRIPT } from "./app/lib/theme";
 const here = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineNuxtConfig({
-  modules: ["nuxt-i18n-micro", "@nuxt/icon"],
+  /*
+   * VueUse belongs here rather than in an application: the components in this
+   * layer use its composables — onClickOutside for a popover that can be
+   * dismissed — and a module registered by only one client is a layer that
+   * builds for one client.
+   */
+  modules: ["nuxt-i18n-micro", "@nuxt/icon", "@vueuse/nuxt"],
 
   /*
    * The theme, which lives here because the components here depend on it.

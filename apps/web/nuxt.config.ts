@@ -51,7 +51,7 @@ export default defineNuxtConfig({
 
   devtools: { enabled: true },
 
-  modules: ["@vueuse/nuxt", "@vite-pwa/nuxt"],
+  modules: ["@vite-pwa/nuxt"],
 
   /*
    * The progressive web app, which is how most people here will use this.

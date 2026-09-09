@@ -159,3 +159,102 @@ test.describe("themes", () => {
     expect(applied).toContain("0.2");
   });
 });
+
+/*
+ * The toggle, which is how most people will actually change this.
+ *
+ * Settings has the same choices plus the accent field; this is the one in the
+ * sidebar, and in the desktop client it is the only one — that client has no
+ * settings screen to send anybody to.
+ */
+test.describe("the appearance toggle", () => {
+  /*
+   * A stored choice outlives the test that made it, and the session is shared
+   * across this whole suite — so a test that picks the warm palette would hand
+   * it to everything that runs afterwards.
+   */
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      try {
+        localStorage.removeItem("tdc-palette");
+        localStorage.removeItem("tdc-accent");
+      } catch {
+        // Nothing stored is the state we wanted anyway.
+      }
+    });
+    await page.reload();
+  });
+
+  test("changes the palette from the sidebar", async ({ page }) => {
+    await page.goto("/");
+
+    await page.getByRole("button", { name: "Appearance" }).click();
+    const menu = page.getByRole("menu", { name: "Appearance" });
+    await expect(menu).toBeVisible();
+
+    await menu.getByRole("menuitemradio", { name: "Warm" }).click();
+
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "congrator");
+
+    // And the colours actually moved, not only the attribute.
+    const primary = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--primary").trim(),
+    );
+    expect(primary).not.toBe("");
+  });
+
+  test("says which choice is active", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Appearance" }).click();
+
+    const menu = page.getByRole("menu", { name: "Appearance" });
+    const cool = menu.getByRole("menuitemradio", { name: "Cool" });
+    const warm = menu.getByRole("menuitemradio", { name: "Warm" });
+
+    await warm.click();
+    await page.getByRole("button", { name: "Appearance" }).click();
+
+    /*
+     * Announced, not only ticked. A screen reader has no way to see a tick, so
+     * a menu that shows the active choice visually and not in its markup has
+     * told only some of its users.
+     */
+    await expect(warm).toHaveAttribute("aria-checked", "true");
+    await expect(cool).toHaveAttribute("aria-checked", "false");
+  });
+
+  /*
+   * Dismissable both ways somebody expects. Without these, a menu opened by
+   * accident can only be closed by choosing something from it — changing a
+   * setting to get rid of a menu.
+   */
+  test("closes on Escape and on a press outside", async ({ page }) => {
+    await page.goto("/");
+    const menu = page.getByRole("menu", { name: "Appearance" });
+
+    await page.getByRole("button", { name: "Appearance" }).click();
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+
+    await page.getByRole("button", { name: "Appearance" }).click();
+    await expect(menu).toBeVisible();
+    await page.mouse.click(400, 300);
+    await expect(menu).toBeHidden();
+  });
+
+  /* The choice survives a reload, which is the whole point of storing it. */
+  test("remembers the choice", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Appearance" }).click();
+    await page
+      .getByRole("menu", { name: "Appearance" })
+      .getByRole("menuitemradio", { name: "Warm" })
+      .click();
+
+    await page.reload();
+
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "congrator");
+  });
+});

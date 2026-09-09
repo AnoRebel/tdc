@@ -182,6 +182,75 @@ describe("what the shared layer may depend on", () => {
   });
 
   /*
+   * And the components it renders are ones it ships.
+   *
+   * Nuxt auto-registers components by name across the layer and the
+   * application together, so a component here rendering <NotificationPanel>
+   * resolves against whichever application is extending — or against nothing.
+   * The sidebar did exactly this for a phase: it worked in the web client and
+   * would have left a hole in the desktop one's footer.
+   */
+  it("ships every component its own files render", () => {
+    const own = new Set<string>();
+    const walkComponents = (directory: string) => {
+      if (!existsSync(directory)) return;
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        if (entry.isDirectory()) walkComponents(join(directory, entry.name));
+        else if (entry.name.endsWith(".vue")) own.add(entry.name.replace(/\.vue$/, ""));
+      }
+    };
+    walkComponents(join(LAYER, "app", "components"));
+
+    /*
+     * What Nuxt itself provides, plus the vendored primitives imported by
+     * name. Rendering one of these is not a dependency on an application.
+     */
+    const framework = new Set([
+      "NuxtLink",
+      "NuxtPage",
+      "NuxtLayout",
+      "ClientOnly",
+      "Icon",
+      "Teleport",
+      "Transition",
+      "TransitionGroup",
+      "KeepAlive",
+      "Suspense",
+      "Component",
+      "NuxtImg",
+      "NuxtPicture",
+      "NuxtLoadingIndicator",
+      "NuxtErrorBoundary",
+    ]);
+
+    const missing = new Set<string>();
+    for (const { path, contents } of sources()) {
+      /*
+       * Templates only. `Array<Room>` and `Ref<User>` are generics, not tags,
+       * and a scan of whole files reports every type this layer names.
+       */
+      if (!path.endsWith(".vue")) continue;
+      const template = contents.match(/<template>([\s\S]*)<\/template>/)?.[1];
+      if (!template) continue;
+
+      const imported = importedNames(contents);
+      for (const match of template.matchAll(/<([A-Z][A-Za-z0-9]*)[\s/>]/g)) {
+        const name = match[1];
+        if (!name) continue;
+        // Ui-prefixed names are this layer's own, resolved by pathPrefix.
+        if (own.has(name) || own.has(name.replace(/^Ui/, ""))) continue;
+        if (framework.has(name) || imported.has(name)) continue;
+        missing.add(name);
+      }
+    }
+
+    expect(
+      [...missing].sort(),
+      "these are rendered here and defined by an application rather than by this layer",
+    ).toEqual([]);
+  });
+
+  /*
    * The layer names itself, which is what makes #layers/ui resolve.
    *
    * Without it the alias is derived from a path, and every import in both

@@ -54,9 +54,21 @@ function acknowledge(what: string) {
   lastCommand.value = what;
 }
 
+/*
+ * Appearance, which is the one setting this client can already offer.
+ *
+ * There is no settings screen here until server selection exists, and the
+ * theme is a choice somebody makes on first opening an application rather
+ * than later — so the toggle is on this screen, and the Settings menu item
+ * opens it rather than reporting that it was pressed.
+ */
+const showAppearance = ref(false);
+
 useMenuCommands({
   search: () => acknowledge("Search"),
-  preferences: () => acknowledge("Settings"),
+  preferences: () => {
+    showAppearance.value = true;
+  },
   newChannel: () => acknowledge("New channel"),
   notifications: () => acknowledge("Notifications"),
   keyboardHelp: () => acknowledge("Keyboard shortcuts"),
@@ -86,6 +98,12 @@ useMenuCommands({
         <template v-if="lastCommand">Menu: {{ lastCommand }}</template>
         <template v-else>Try the menu.</template>
       </p>
+
+      <!-- Not in a sidebar, because there is not one yet. It moves into the
+           footer with the rest of the shell once a server is chosen. -->
+      <div class="mt-6 flex justify-center">
+        <ThemeToggle v-model="showAppearance" />
+      </div>
     </div>
   </main>
 </template>

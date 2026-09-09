@@ -39,8 +39,6 @@
     "@iconify-json/lucide": "^1.2.130",
     "@playwright/test": "^1.63.0",
     "@vite-pwa/nuxt": "^1.1.1",
-    "@vueuse/core": "catalog:vue",
-    "@vueuse/nuxt": "catalog:vue",
     "eslint": "catalog:tooling",
     "jsdom": "^30.0.1",
     "typescript": "catalog:tooling",

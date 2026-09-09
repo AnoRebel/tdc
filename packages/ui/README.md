@@ -147,6 +147,18 @@ source.
 All three are applied by the pre-paint script in the document head. Anything
 applied later flashes for as long as the application takes to load.
 
+### Reaching it
+
+`<ThemeToggle>` in the sidebar footer carries the choices that are one press
+each — the appearance and the palette — and settings carries those plus the
+accent field, which needs a keyboard and somewhere to put a refusal. The
+desktop client has no settings screen yet, so there the toggle is the only
+way.
+
+The active choice is announced as well as ticked: `role="menuitemradio"` with
+`aria-checked`. A menu that shows the current choice only visually has told
+some of its users and not the rest.
+
 ### The accent
 
 An accent somebody chooses is checked before it is applied, against both a

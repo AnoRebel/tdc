@@ -44,6 +44,7 @@ const peers = computed(() => props.servers);
 const notifications = useNotifications();
 const { branding } = useServerInfo();
 const showNotifications = ref(false);
+const showAppearance = ref(false);
 const router = useRouter();
 
 /*
@@ -295,6 +296,11 @@ function conversationName(room: Room): string {
       </button>
 
       <NotificationPanel v-model="showNotifications" @open="goToNotification" />
+
+      <!-- Beside the bell rather than only in settings: somebody trying
+           colours wants to see the result immediately, and the desktop client
+           has no settings URL to send them to. -->
+      <ThemeToggle v-model="showAppearance" />
 
       <NuxtLink to="/settings" class="btn btn-ghost size-7 px-0" aria-label="Settings">
         <Icon name="lucide:settings" class="size-3.5" />
