@@ -217,7 +217,7 @@ watch(results, () => {
 </template>
 
 <style scoped>
-@reference "~/assets/css/main.css";
+@reference "#layers/ui/app/assets/css/main.css";
 
 .emoji-button {
   @apply flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-lg transition-colors hover:bg-accent;

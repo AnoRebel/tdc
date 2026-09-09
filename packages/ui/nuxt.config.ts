@@ -11,7 +11,12 @@
  * the two clients is how a request is sent, and a composable that calls fetch
  * directly has made itself web-only without saying so.
  */
+import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
+
+// A relative path, not an alias: this runs while the configuration is being
+// evaluated, before Nuxt has resolved any of its own aliases.
+import { PREPAINT_THEME_SCRIPT } from "./app/lib/theme";
 
 /*
  * This layer's own directory.
@@ -25,6 +30,77 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineNuxtConfig({
   modules: ["nuxt-i18n-micro", "@nuxt/icon"],
+
+  /*
+   * The theme, which lives here because the components here depend on it.
+   *
+   * It used to sit in the web application, and the layer's components carried
+   * classes that only resolved because that one application happened to define
+   * them. The desktop client extending this layer got the components and none
+   * of the tokens: text rendered in the light theme's near-black against a
+   * dark window, which is legible enough in a screenshot to look like a
+   * styling opinion rather than a missing stylesheet.
+   *
+   * Absolute, for the same reason the component path is: a relative path here
+   * resolves against whichever application is extending.
+   */
+  css: [`${here}app/assets/css/main.css`],
+
+  app: {
+    head: {
+      meta: [
+        /*
+         * The browser is told which themes exist, so its own chrome — the
+         * scrollbars, the form controls it draws itself — matches rather than
+         * rendering a light scrollbar beside a dark page. The desktop client
+         * has a webview drawing exactly the same controls.
+         */
+        { name: "color-scheme", content: "dark light" },
+      ],
+      script: [
+        {
+          /*
+           * The theme, decided before the first paint.
+           *
+           * In the <head> and inline, so it runs before anything is drawn: a
+           * class applied from a component runs after the browser has already
+           * painted, and the flash of the wrong theme is exactly as long as
+           * that takes. In a desktop window that flash is worse — the window
+           * background is painted by the operating system before the webview
+           * draws anything at all.
+           *
+           * The palette treats dark as the default — its rule is
+           * `.dark, :root:not(.light)` — so what this sets is `.light` for
+           * somebody who wants light. Both classes are set explicitly anyway,
+           * because a stylesheet that changes which way it defaults should not
+           * silently change what everybody sees.
+           *
+           * Wrapped in try/catch: localStorage throws in a private window in
+           * some browsers, and a theme preference is not worth a blank page.
+           */
+          key: "theme-prepaint",
+          innerHTML: PREPAINT_THEME_SCRIPT,
+        },
+      ],
+    },
+  },
+
+  vite: {
+    // Tailwind v4 is a Vite plugin rather than a PostCSS one, and it has to be
+    // registered wherever the stylesheet above is compiled — which is now
+    // every application that extends this layer.
+    plugins: [tailwindcss()],
+  },
+
+  alias: {
+    /*
+     * The shared types, by package name.
+     *
+     * Source rather than a build artefact: there is no build step for this
+     * package, and a stale dist would be worse than none.
+     */
+    "@tdc/types": fileURLToPath(new URL("../types/src", import.meta.url)),
+  },
 
   /*
    * Icons, resolved offline and bundled into the client.

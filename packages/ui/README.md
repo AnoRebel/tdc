@@ -102,6 +102,28 @@ extending, which is exactly wrong for a file that lives here.
 import { readFailure } from "#layers/ui/app/lib/reachability";
 ```
 
+This is not a style preference. Nine components here imported `~/lib/utils`
+and worked for a phase, because the web application happened to have that
+file — and the desktop client, which does not, would not build. The same went
+for `useAuth` and `useLastSeen`, which this layer called and that application
+defined, and for the stylesheet defining the tokens these components use.
+
+Two of the tests in `app/lib/layer.test.ts` now hold the boundary: nothing
+here may import through `~` or `@`, and every composable called here must be
+defined here. A dependency on the extending application is a layer with one
+consumer and a misleading name.
+
+## Everything these components need lives here
+
+Including the parts that do not look like code. The theme
+(`app/assets/css/main.css`), the Tailwind plugin that compiles it, the
+`@tdc/types` alias and the pre-paint theme script are all configured in this
+layer's `nuxt.config.ts` rather than in an application, so extending is enough
+to get a working interface.
+
+An application adds only what genuinely differs: the transport, and whatever
+that platform alone can do.
+
 ## Tests
 
 Run from `apps/web`, which is where the test runner is configured:

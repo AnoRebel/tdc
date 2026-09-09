@@ -78,7 +78,7 @@ export function useTour() {
     // The stylesheet travels with it, for the same reason — the library's
     // own, then ours over the top of it.
     await import("driver.js/dist/driver.css");
-    await import("~/assets/css/tour.css");
+    await import("#layers/ui/app/assets/css/tour.css");
 
     /*
      * Reaching the end and leaving early are different answers.

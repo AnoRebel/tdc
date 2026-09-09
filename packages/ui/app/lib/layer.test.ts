@@ -34,6 +34,26 @@ function sources(): { path: string; contents: string }[] {
   return found;
 }
 
+/** Every name a file imports explicitly, however the import is formatted. */
+function importedNames(contents: string): Set<string> {
+  const names = new Set<string>();
+
+  for (const match of contents.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from/g)) {
+    const clause = match[1] ?? "";
+    for (const part of clause.split(",")) {
+      // "Foo as Bar" binds Bar; "type Foo" binds Foo.
+      const bound = part
+        .trim()
+        .replace(/^type\s+/, "")
+        .split(/\s+as\s+/)
+        .pop();
+      if (bound) names.add(bound.trim());
+    }
+  }
+
+  return names;
+}
+
 describe("what the shared layer may depend on", () => {
   /*
    * The one thing that genuinely differs between the two clients.
@@ -63,6 +83,102 @@ describe("what the shared layer may depend on", () => {
       .map(({ path }) => path);
 
     expect(offenders, "these cannot work in a desktop webview").toEqual([]);
+  });
+
+  /*
+   * Nothing here may reach into whichever application is extending.
+   *
+   * `~` and `@` resolve to the extending application's directory, not to this
+   * one — so a component here importing "~/lib/utils" gets the web
+   * application's copy, and the desktop client, which has no such file, does
+   * not build. It went unnoticed for a whole phase because there was only one
+   * consumer, and one consumer is exactly the condition this layer exists to
+   * end.
+   *
+   * The layer's own files are reached by the #layers/ui alias, which resolves
+   * here regardless of who is extending.
+   */
+  it("never imports through the extending application's alias", () => {
+    const offenders = sources()
+      .filter(({ contents }) => /from\s+["'][~@]\//.test(contents))
+      .map(({ path }) => path);
+
+    expect(
+      offenders,
+      "these resolve into whichever application extends this layer, " +
+        "so they work for one client and break the other — use #layers/ui/app/...",
+    ).toEqual([]);
+  });
+
+  /*
+   * And the composables it calls are ones it defines.
+   *
+   * Nuxt auto-imports by name, so a component here calling useAuth() compiles
+   * against whatever the extending application happens to define — or nothing
+   * at all. The failure is a type error in the other client, a long way from
+   * the file that caused it.
+   */
+  it("defines every composable its own files call", () => {
+    const defined = new Set(
+      readdirSync(join(LAYER, "app", "composables"))
+        .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+        .map((name) => name.replace(/\.ts$/, "")),
+    );
+
+    /*
+     * Nuxt's own auto-imports, which every application has: they come from the
+     * framework rather than from either client, so calling one is not a
+     * dependency on anybody.
+     */
+    const framework = new Set([
+      "useHead",
+      "useRoute",
+      "useRouter",
+      "useState",
+      "useFetch",
+      "useAsyncData",
+      "useLazyAsyncData",
+      "useRuntimeConfig",
+      "useNuxtApp",
+      "useCookie",
+      "useError",
+      "useSeoMeta",
+      "useRequestHeaders",
+      "useAppConfig",
+      "useId",
+      "useTemplateRef",
+      "useSlots",
+      "useAttrs",
+      "useModel",
+      "useLocalePath",
+      "useSwitchLocalePath",
+      "useI18n",
+      "useNuxtData",
+      "useRequestURL",
+      "useRequestEvent",
+      "useLoadingIndicator",
+    ]);
+
+    const missing = new Set<string>();
+    for (const { contents } of sources()) {
+      for (const match of contents.matchAll(/\b(use[A-Z][A-Za-z]*)\s*\(/g)) {
+        const name = match[1];
+        if (!name) continue;
+        // Declared in the same file, which several composables do internally.
+        if (defined.has(name) || framework.has(name)) continue;
+        if (contents.includes(`function ${name}`) || contents.includes(`const ${name} =`)) continue;
+        // Imported from a package rather than auto-imported. Read from the
+        // import statements themselves: a name can sit on its own line in a
+        // multi-line import, which a substring check on "import {" misses.
+        if (importedNames(contents).has(name)) continue;
+        missing.add(name);
+      }
+    }
+
+    expect(
+      [...missing].sort(),
+      "these are called here and defined by an application rather than by this layer",
+    ).toEqual([]);
   });
 
   /*

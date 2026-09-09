@@ -36,7 +36,7 @@ const safe = computed(() =>
 </template>
 
 <style scoped>
-@reference "~/assets/css/main.css";
+@reference "#layers/ui/app/assets/css/main.css";
 
 /*
  * Underlined rather than only coloured: inside a sent bubble the text is

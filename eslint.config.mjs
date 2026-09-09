@@ -22,6 +22,11 @@ export default typescript.config(
       "**/bin/**",
       "server/**",
       "apps/desktop/build/**",
+      // Written by `wails3 generate bindings` from the Go services. Style
+      // rules on generated code are a diff to fix on every regeneration.
+      "apps/desktop/frontend/bindings/**",
+      // Written by `go generate ./internal/shell`.
+      "apps/desktop/frontend/app/lib/menu-events.ts",
     ],
   },
 

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=TDC
+Exec=tdc
+Icon=tdc
+Categories=Network;InstantMessaging;Chat;
+Comment=Chat, project tracking, and a directory connecting developers with the people who need them.
+Terminal=false
+Keywords=chat;messaging;team;community;tdc;
+Version=1.0
+GenericName=Team chat
+StartupNotify=false

@@ -172,7 +172,7 @@ Goal: the native client, with the capabilities that justify it over the PWA.
 - [x] 9.6 Evaluate and vendor useful `@inspira-ui` components for animation and effects, reviewing code before adoption; verify they pass lint and accessibility checks
 - [x] 9.7 Add the chart adapter interface with TanStack Charts at an exact pinned version as the default; verify swapping to a fallback implementation requires no caller changes
 - [x] 9.8 Scaffold the Wails v3 app with `build/config.yml` as the version source, `//go:embed all:frontend/dist`, and Nitro `output.publicDir: "dist"`; verify a production build embeds the frontend
-- [ ] 9.9 Configure the desktop frontend extending the shared layer with bindings aliased and dev server on port 9245 from `WAILS_VITE_PORT`; verify `wails3 dev` runs both Go and frontend
+- [x] 9.9 Configure the desktop frontend extending the shared layer with bindings aliased and dev server on port 9245 from `WAILS_VITE_PORT`; verify `wails3 dev` runs both Go and frontend
 - [ ] 9.10 Implement the Wails-bindings transport adapter satisfying `ApiClient`, normalising Wails rejections into the shared error type; verify the same contract tests as the web adapter pass
 - [ ] 9.11 Implement server selection at first launch refusing unencrypted non-loopback addresses, with multi-server switching; verify an insecure address is refused with an explanation (`clients/desktop`)
 - [ ] 9.12 Implement OS keychain credential storage with a documented non-silent fallback; verify the absence of a keychain never results in plaintext storage (`clients/desktop`)

@@ -11,6 +11,8 @@ import (
 	"embed"
 	"log"
 
+	"github.com/AnoRebel/tdc/apps/desktop/internal/api"
+	"github.com/AnoRebel/tdc/apps/desktop/internal/shell"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -38,6 +40,18 @@ func main() {
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
+		/*
+			What the window can call into.
+
+			One service, holding the one thing that genuinely differs between
+			this client and the browser: how a request reaches a server. The
+			bindings for it are generated as TypeScript, so a change to the Go
+			signature stops the frontend compiling rather than failing in front
+			of somebody.
+		*/
+		Services: []application.Service{
+			application.NewService(api.New()),
+		},
 		Mac: application.MacOptions{
 			// Closing the last window quits, which is what somebody means by
 			// closing an application — until the tray exists and offers to
@@ -45,6 +59,13 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
+
+	/*
+		The menu, after the application exists because its items emit events
+		through it. Every item does something: an item that is there to look
+		complete teaches people the menu is not worth opening.
+	*/
+	app.Menu.SetApplicationMenu(shell.NewMenu(app))
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "TDC",

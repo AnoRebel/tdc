@@ -1,3 +1,7 @@
+import { fileURLToPath } from "node:url";
+
+const here = fileURLToPath(new URL(".", import.meta.url));
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-08-29",
 
@@ -39,6 +43,22 @@ export default defineNuxtConfig({
      * where to point the webview before the frontend has started.
      */
     port: Number(process.env.WAILS_VITE_PORT ?? 9245),
+  },
+
+  /*
+   * The generated bindings, under a name worth typing.
+   *
+   * `wails3 generate bindings` writes TypeScript mirroring the Go services
+   * into frontend/bindings, nested by import path — so reaching the API
+   * service from a composable otherwise means seven levels of `../`, which is
+   * both unreadable and quietly wrong the moment a file moves.
+   *
+   * Absolute, for the reason the shared layer's paths are: a relative path in
+   * a Nuxt configuration is resolved against whichever application is
+   * extending, and this one is extending rather than extended.
+   */
+  alias: {
+    "#bindings": `${here}bindings/github.com/AnoRebel/tdc/apps/desktop/internal`,
   },
 
   vite: {

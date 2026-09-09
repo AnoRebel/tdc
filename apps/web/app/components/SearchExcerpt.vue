@@ -28,7 +28,7 @@ const safe = computed(() =>
 </template>
 
 <style scoped>
-@reference "~/assets/css/main.css";
+@reference "#layers/ui/app/assets/css/main.css";
 
 .excerpt :deep(mark) {
   @apply rounded bg-primary/20 px-0.5 text-inherit;

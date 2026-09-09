@@ -4,14 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "nuxt dev",
     "build": "nuxt generate",
+    "dev": "nuxt dev",
+    "lint": "eslint .",
+    "postinstall": "nuxt prepare",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@tdc/types": "workspace:*",
     "@tdc/ui": "workspace:*",
+    "@wailsio/runtime": "^3.0.0-beta.18",
     "nuxt": "catalog:vue",
     "vue": "catalog:vue"
+  },
+  "devDependencies": {
+    "@vue/test-utils": "catalog:testing",
+    "jsdom": "^30.0.1",
+    "typescript": "catalog:tooling",
+    "vitest": "catalog:testing",
+    "vue-tsc": "catalog:tooling"
   }
 }

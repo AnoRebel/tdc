@@ -2215,7 +2215,7 @@ watch(roomId, load, { immediate: true });
 </template>
 
 <style scoped>
-@reference "~/assets/css/main.css";
+@reference "#layers/ui/app/assets/css/main.css";
 
 /*
  * Marks the message a search or a thread jumped to.

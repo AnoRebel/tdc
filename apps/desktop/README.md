@@ -67,6 +67,37 @@ edit without a test saying so:
 go test ./...
 ```
 
+## The menu
+
+`internal/shell` builds the application menu. Items divide in two: those the
+operating system owns — the clipboard, closing a window, quitting, full screen
+— which Wails handles by role, and those the interface owns, which emit an
+event the frontend answers in `useMenuCommands`.
+
+Nothing in Go knows what a room is. A menu item announces that somebody asked
+for something and the interface decides what that means, so the menu item and
+the keyboard shortcut run the same code.
+
+The event names are a contract across two languages. They are declared once in
+Go and written to TypeScript by:
+
+```sh
+go generate ./internal/shell
+```
+
+The generated file is committed so a checkout builds without the tooling, and
+`go test ./internal/shell` fails if the two sides have drifted apart.
+
+Do not add an item that does nothing. A menu listing what an application might
+one day do teaches people not to open it; items appear as the features land.
+
+## Regenerating the bindings
+
+`wails3 generate bindings -ts -i` writes TypeScript mirroring the Go services
+into `frontend/bindings`, which the frontend reaches through the `#bindings`
+alias. The frontend build regenerates them, so this is only needed by hand
+when compiling Go without it.
+
 ## The version
 
 `build/config.yml` carries the version shown on the About screen, and is

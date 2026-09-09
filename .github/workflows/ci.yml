@@ -250,6 +250,22 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: The generated bindings are current
+        # They are committed so a checkout builds without the CLI, which means
+        # they can also be committed stale. Regenerating and finding a diff is
+        # the only way to notice.
+        run: |
+          go run github.com/wailsapp/wails/v3/cmd/wails3 generate bindings -ts -i
+          go generate ./internal/shell
+          if ! git diff --quiet -- frontend/bindings frontend/app/lib/menu-events.ts; then
+            echo "The generated bindings are out of date. Regenerate and commit:"
+            echo "  wails3 generate bindings -ts -i"
+            echo "  go generate ./internal/shell"
+            git diff --stat -- frontend/bindings frontend/app/lib/menu-events.ts
+            exit 1
+          fi
+        working-directory: apps/desktop
+
       - name: Build the frontend
         # Before the Go build, which embeds its output. Without this the embed
         # directive has no directory to read and the compile fails outright —

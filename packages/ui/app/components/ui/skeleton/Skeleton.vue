@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import type { HTMLAttributes } from "vue";
-import { cn } from "~/lib/utils";
+import { cn } from "#layers/ui/app/lib/utils";
 
 /**
  * A placeholder shaped like the content it stands in for.

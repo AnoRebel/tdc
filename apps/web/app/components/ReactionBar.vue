@@ -100,7 +100,7 @@ function whoReacted(reaction: Reaction): string {
 </template>
 
 <style scoped>
-@reference "~/assets/css/main.css";
+@reference "#layers/ui/app/assets/css/main.css";
 
 .reaction {
   @apply flex cursor-pointer items-center gap-1 rounded-full border border-border bg-muted/50 px-1.5 py-0.5 text-xs transition-colors hover:bg-muted;
