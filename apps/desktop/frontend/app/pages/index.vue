@@ -11,32 +11,39 @@
  * arrives. And it answers the application menu, so the menu items are
  * demonstrably connected rather than merely present.
  */
-import * as Api from "#bindings/api";
+import { Unreachable } from "~/lib/transport";
 
 useHead({ title: "TDC" });
 
 const bridge = ref<"asking" | "ready" | "broken">("asking");
 const detail = ref("");
 
+const api = useApi();
+
 onMounted(async () => {
   try {
     /*
-     * Deliberately a request with nowhere to go: no server has been chosen,
-     * so Go answers with ErrNoServer. That refusal is the proof — it could
-     * only have come from the Go side, so the whole path worked.
+     * Through the shared client, not the binding directly. That is the thing
+     * worth checking: every screen above this calls useApi(), and this proves
+     * the desktop adapter satisfies it end to end — the generated bindings,
+     * the transport, and the shared client on top of them.
+     *
+     * Deliberately a request with nowhere to go: no server has been chosen, so
+     * Go answers with ErrNoServer, which the transport reports as an
+     * unreachable server rather than a refusal. That is the correct reading —
+     * nothing answered — and it could only have come from the Go side.
      */
-    await Api.Service.Send({ method: "GET", path: "/api/health" });
+    await api.get("/api/health");
     // Which should not happen. If it did, something is answering that should
     // not be, and saying so is better than a green light that means nothing.
     bridge.value = "broken";
     detail.value = "A request succeeded before a server was chosen.";
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("no server chosen")) {
+    if (error instanceof Unreachable && error.message.includes("no server chosen")) {
       bridge.value = "ready";
     } else {
       bridge.value = "broken";
-      detail.value = message;
+      detail.value = error instanceof Error ? error.message : String(error);
     }
   }
 });
