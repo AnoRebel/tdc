@@ -26,7 +26,7 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, username, username_folded, display_name, email, email_folded, email_verified)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent
 `
 
 type CreateUserParams struct {
@@ -67,12 +67,38 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.SendsTypingIndication,
 		&i.LinkPreviewsEnabled,
 		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
 	)
 	return i, err
 }
 
+const getAppearance = `-- name: GetAppearance :one
+SELECT appearance_palette, appearance_mode, appearance_accent
+FROM users WHERE id = $1
+`
+
+type GetAppearanceRow struct {
+	AppearancePalette string
+	AppearanceMode    string
+	AppearanceAccent  string
+}
+
+// What this person chose the interface to look like.
+//
+// Empty in any column means they have chosen nothing there and take the
+// operator's default, which is resolved by the client rather than here: the
+// server reports what was chosen, and choosing nothing is an answer.
+func (q *Queries) GetAppearance(ctx context.Context, id uuid.UUID) (GetAppearanceRow, error) {
+	row := q.db.QueryRow(ctx, getAppearance, id)
+	var i GetAppearanceRow
+	err := row.Scan(&i.AppearancePalette, &i.AppearanceMode, &i.AppearanceAccent)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content FROM users WHERE email_folded = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent FROM users WHERE email_folded = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, emailFolded *string) (User, error) {
@@ -95,12 +121,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, emailFolded *string) (User
 		&i.SendsTypingIndication,
 		&i.LinkPreviewsEnabled,
 		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content FROM users WHERE id = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -123,12 +152,15 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.SendsTypingIndication,
 		&i.LinkPreviewsEnabled,
 		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content FROM users WHERE username_folded = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent FROM users WHERE username_folded = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, usernameFolded string) (User, error) {
@@ -151,6 +183,9 @@ func (q *Queries) GetUserByUsername(ctx context.Context, usernameFolded string) 
 		&i.SendsTypingIndication,
 		&i.LinkPreviewsEnabled,
 		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
 	)
 	return i, err
 }
@@ -171,7 +206,7 @@ func (q *Queries) LiftUserSuspension(ctx context.Context, id uuid.UUID) error {
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content FROM users
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent FROM users
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -207,6 +242,9 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.SendsTypingIndication,
 			&i.LinkPreviewsEnabled,
 			&i.HidePushContent,
+			&i.AppearancePalette,
+			&i.AppearanceMode,
+			&i.AppearanceAccent,
 		); err != nil {
 			return nil, err
 		}
@@ -216,6 +254,29 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const setAppearance = `-- name: SetAppearance :exec
+UPDATE users
+SET appearance_palette = $2, appearance_mode = $3, appearance_accent = $4
+WHERE id = $1
+`
+
+type SetAppearanceParams struct {
+	ID                uuid.UUID
+	AppearancePalette string
+	AppearanceMode    string
+	AppearanceAccent  string
+}
+
+func (q *Queries) SetAppearance(ctx context.Context, arg SetAppearanceParams) error {
+	_, err := q.db.Exec(ctx, setAppearance,
+		arg.ID,
+		arg.AppearancePalette,
+		arg.AppearanceMode,
+		arg.AppearanceAccent,
+	)
+	return err
 }
 
 const suspendUser = `-- name: SuspendUser :exec
@@ -250,7 +311,7 @@ UPDATE users
 SET display_name = $2,
     updated_at   = NOW()
 WHERE id = $1
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent
 `
 
 type UpdateUserProfileParams struct {
@@ -278,6 +339,9 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.SendsTypingIndication,
 		&i.LinkPreviewsEnabled,
 		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
 	)
 	return i, err
 }

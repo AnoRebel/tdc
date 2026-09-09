@@ -44,3 +44,17 @@ SET suspended_at    = NULL,
     suspension_note = NULL,
     updated_at      = NOW()
 WHERE id = $1;
+
+-- What this person chose the interface to look like.
+--
+-- Empty in any column means they have chosen nothing there and take the
+-- operator's default, which is resolved by the client rather than here: the
+-- server reports what was chosen, and choosing nothing is an answer.
+-- name: GetAppearance :one
+SELECT appearance_palette, appearance_mode, appearance_accent
+FROM users WHERE id = $1;
+
+-- name: SetAppearance :exec
+UPDATE users
+SET appearance_palette = $2, appearance_mode = $3, appearance_accent = $4
+WHERE id = $1;

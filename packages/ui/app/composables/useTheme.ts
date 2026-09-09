@@ -1,10 +1,12 @@
+import type { Appearance as StoredAppearance } from "@tdc/types";
 import {
+  ACCENT_PAIR_STORAGE_KEY,
   ACCENT_STORAGE_KEY,
   APPEARANCES,
   PALETTES,
   PALETTE_STORAGE_KEY,
   THEME_STORAGE_KEY,
-  checkAccent,
+  deriveAccent,
   isAppearance,
   isPalette,
   type Appearance,
@@ -38,6 +40,22 @@ export function useTheme() {
   /** Empty means the palette's own accent, which is the common case. */
   const accent = useState<string>("accent", () => "");
 
+  /**
+   * Whether this person has chosen each of the three for themselves.
+   *
+   * Kept separately from the values above because "chose the default palette"
+   * and "chose nothing" have to stay distinguishable: an operator who changes
+   * the instance's palette should move everybody who chose nothing, and nobody
+   * who chose.
+   */
+  const chosen = useState("theme-chosen", () => ({
+    palette: false,
+    mode: false,
+    accent: false,
+  }));
+
+  const api = useApi();
+
   /** Whether dark is what should currently be shown. */
   function resolve(choice: Appearance): boolean {
     if (choice === "dark") return true;
@@ -57,6 +75,25 @@ export function useTheme() {
     classes.toggle("light", !dark);
   }
 
+  /**
+   * Sets the accent for each appearance, or clears both.
+   *
+   * Two properties rather than one, read by the stylesheet's own light and
+   * dark blocks: an override that set a single --primary would apply the same
+   * shade to both and be unreadable in one of them.
+   */
+  function applyAccent(light: string | null, dark: string | null) {
+    const style = document.documentElement.style;
+
+    if (light && dark) {
+      style.setProperty("--accent-light", light);
+      style.setProperty("--accent-dark", dark);
+    } else {
+      style.removeProperty("--accent-light");
+      style.removeProperty("--accent-dark");
+    }
+  }
+
   /** Stores a choice, or gives up quietly when storage refuses. */
   function remember(key: string, value: string) {
     try {
@@ -68,14 +105,40 @@ export function useTheme() {
     }
   }
 
+  /**
+   * Sends the three choices to the server, where there is one to send to.
+   *
+   * Failures are swallowed deliberately. The choice has already been applied
+   * and stored in this browser, so somebody signed out or offline still gets
+   * the interface they asked for — and refusing to change the theme because a
+   * request failed would be a worse answer than the theme not following them
+   * to another client yet.
+   */
+  async function publish() {
+    if (import.meta.server) return;
+
+    try {
+      await api.put<StoredAppearance>("/api/me/preferences/appearance", {
+        palette: chosen.value.palette ? palette.value : "",
+        mode: chosen.value.mode ? preference.value : "",
+        accent: chosen.value.accent ? accent.value : "",
+      });
+    } catch {
+      // Not signed in, or nothing reachable. This browser still has it.
+    }
+  }
+
   function set(choice: Appearance) {
     preference.value = choice;
+    chosen.value = { ...chosen.value, mode: true };
     apply(choice);
     remember(THEME_STORAGE_KEY, choice);
+    void publish();
   }
 
   function setPalette(choice: Palette) {
     palette.value = choice;
+    chosen.value = { ...chosen.value, palette: true };
 
     if (!import.meta.server) {
       const root = document.documentElement;
@@ -89,6 +152,7 @@ export function useTheme() {
     }
 
     remember(PALETTE_STORAGE_KEY, choice === "default" ? "" : choice);
+    void publish();
   }
 
   /**
@@ -104,23 +168,27 @@ export function useTheme() {
 
     if (wanted) {
       /*
-       * Checked against both foregrounds, because this accent is used under
-       * light text in one appearance and dark text in the other. Approving it
-       * against only the current one would break for whoever switched.
+       * One colour becomes two shades of itself, because a single value cannot
+       * be readable in both appearances: light mode draws near-white text on
+       * the accent and dark mode near-black, so a shade dark enough for one is
+       * too light for the other. The hue is kept, so what appears is
+       * recognisably the colour that was asked for.
        */
-      const refusal = checkAccent(wanted, ["#ffffff", "#111111"]);
-      if (refusal) return { refused: refusal.message };
+      const derived = deriveAccent(wanted);
+      if ("reason" in derived) return { refused: derived.message };
+
+      accent.value = wanted;
+      if (!import.meta.server) applyAccent(derived.light, derived.dark);
+      remember(ACCENT_PAIR_STORAGE_KEY, JSON.stringify(derived));
+    } else {
+      accent.value = "";
+      if (!import.meta.server) applyAccent(null, null);
+      remember(ACCENT_PAIR_STORAGE_KEY, "");
     }
 
-    accent.value = wanted;
-
-    if (!import.meta.server) {
-      const style = document.documentElement.style;
-      if (wanted) style.setProperty("--primary", wanted);
-      else style.removeProperty("--primary");
-    }
-
+    chosen.value = { ...chosen.value, accent: Boolean(wanted) };
     remember(ACCENT_STORAGE_KEY, wanted);
+    void publish();
     return {};
   }
 
@@ -159,9 +227,67 @@ export function useTheme() {
     onUnmounted(() => query.removeEventListener("change", follow));
   });
 
+  /**
+   * Takes what the server knows, and applies whichever wins.
+   *
+   * The order is: what this person chose, then what the operator chose, then
+   * what the palette itself carries. Each of the three resolves independently
+   * — somebody may have chosen a palette and left the accent to the operator.
+   *
+   * Called with the operator's branding and, when signed in, this person's own
+   * stored choice. Before this ran, the operator's accent was applied by a
+   * watcher that cleared `--primary` whenever the operator had set none, which
+   * silently wiped a person's own accent every time server information
+   * reloaded.
+   */
+  function settle(operator: { accent?: string; palette?: string }, mine?: StoredAppearance) {
+    if (import.meta.server) return;
+
+    const root = document.documentElement;
+
+    // The palette.
+    const wantedPalette = isPalette(mine?.palette)
+      ? mine.palette
+      : isPalette(operator.palette)
+        ? operator.palette
+        : "default";
+    chosen.value = { ...chosen.value, palette: isPalette(mine?.palette) };
+    palette.value = wantedPalette;
+    if (wantedPalette === "default") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", wantedPalette);
+
+    // Light or dark. The operator has no say here: it is a property of the
+    // room somebody is sitting in, not of the instance they are using.
+    if (isAppearance(mine?.mode)) {
+      chosen.value = { ...chosen.value, mode: true };
+      preference.value = mine.mode;
+      apply(mine.mode);
+    }
+
+    /*
+     * The accent, where an empty value means "inherit" rather than "clear".
+     * Removing the property is only right when neither this person nor the
+     * operator has set one — which is what the old watcher got wrong.
+     */
+    const wantedAccent = mine?.accent || operator.accent || "";
+    chosen.value = { ...chosen.value, accent: Boolean(mine?.accent) };
+    accent.value = wantedAccent;
+
+    if (wantedAccent) {
+      const derived = deriveAccent(wantedAccent);
+      // A stored colour that cannot be derived is left unapplied rather than
+      // applied badly: the palette's own accent is always readable.
+      if ("light" in derived) applyAccent(derived.light, derived.dark);
+      else applyAccent(null, null);
+    } else {
+      applyAccent(null, null);
+    }
+  }
+
   return {
     preference,
     set,
+    settle,
     palette,
     setPalette,
     palettes: PALETTES,

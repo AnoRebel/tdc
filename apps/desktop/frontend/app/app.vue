@@ -10,6 +10,14 @@
 useHead({
   titleTemplate: (page?: string) => (page ? `${page} — TDC` : "TDC"),
 });
+
+/*
+ * The colours, resolved the same way the web client resolves them: this
+ * person's choice over the operator's default over the palette's own. Both
+ * clients call the one function, so a change to the order cannot apply to one
+ * of them and not the other.
+ */
+useAppearanceSync();
 </script>
 
 <template>

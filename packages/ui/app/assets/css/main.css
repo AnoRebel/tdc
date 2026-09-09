@@ -44,7 +44,15 @@
   --border: oklch(0.905 0.006 265);
   --border-strong: oklch(0.855 0.008 265);
 
-  --primary: oklch(0.53 0.16 269);
+  /*
+   * The accent, which somebody may override.
+   *
+   * --accent-light and --accent-dark are set on the root element when
+   * somebody chooses their own, one shade per appearance: light mode draws
+   * near-white text on this and dark mode near-black, so a single value
+   * cannot be readable in both. Unset, each palette's own colour applies.
+   */
+  --primary: var(--accent-light, oklch(0.53 0.16 269));
   --primary-hover: oklch(0.48 0.17 269);
   --primary-foreground: oklch(0.99 0 0);
 
@@ -98,7 +106,7 @@
   --border: oklch(1 0 0 / 9%);
   --border-strong: oklch(1 0 0 / 16%);
 
-  --primary: oklch(0.66 0.16 268);
+  --primary: var(--accent-dark, oklch(0.66 0.16 268));
   --primary-hover: oklch(0.71 0.16 268);
   --primary-foreground: oklch(0.16 0.01 265);
 
@@ -149,7 +157,7 @@
   --border: oklch(0.9 0.029 51);
   --border-strong: oklch(0.855 0.035 51);
 
-  --primary: oklch(0.449 0.15 35);
+  --primary: var(--accent-light, oklch(0.449 0.15 35));
   --primary-hover: oklch(0.4 0.155 35);
   --primary-foreground: oklch(0.98 0.01 87);
 
@@ -193,7 +201,7 @@
   --border: oklch(0.279 0.02 28);
   --border-strong: oklch(0.319 0.026 34);
 
-  --primary: oklch(0.738 0.172 46);
+  --primary: var(--accent-dark, oklch(0.738 0.172 46));
   --primary-hover: oklch(0.78 0.16 46);
   --primary-foreground: oklch(0.151 0.02 26);
 
@@ -203,8 +211,16 @@
   --success: oklch(0.7 0.15 150);
   --success-text: oklch(0.7 0.15 150);
   --warning: oklch(0.78 0.14 75);
-  /* Darkened from the source palette so its foreground clears 4.5:1. */
-  --destructive: oklch(0.56 0.215 25);
+  /*
+   * Lightened from the source palette, which was 0.56.
+   *
+   * This colour is used as text as well as a fill — a destructive button on
+   * this surface is transparent with the word in this colour — and at 0.56 it
+   * managed 3.4:1 against the dark surface behind it. The accessibility pass
+   * caught it, which is the reason for having one: a value copied from a
+   * palette designed against different surfaces is not thereby right here.
+   */
+  --destructive: oklch(0.64 0.215 25);
   --destructive-foreground: oklch(0.971 0.01 87);
 
   --ring: oklch(0.649 0.15 50);

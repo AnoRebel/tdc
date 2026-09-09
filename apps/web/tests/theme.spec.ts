@@ -34,6 +34,25 @@ async function palette(page: Page): Promise<Record<string, string>> {
 }
 
 test.describe("themes", () => {
+  /*
+   * Waits for the application to finish applying what the server told it.
+   *
+   * The stored appearance arrives asynchronously and is applied when it does,
+   * so a test that set the palette itself and looked immediately would be
+   * measuring whichever won the race. Waiting for the request to land makes
+   * the order deterministic.
+   */
+  async function settled(page: Page) {
+    await page
+      .waitForResponse((response) => response.url().includes("/preferences/appearance"), {
+        timeout: 10_000,
+      })
+      .catch(() => {
+        // Signed out, or already fetched on an earlier navigation. Either way
+        // there is nothing still in flight to overwrite what the test sets.
+      });
+  }
+
   /* Sets the appearance and the palette together, since a token is only
      defined for one combination of the two. */
   async function wear(page: Page, theme: string | null, appearance: "light" | "dark") {
@@ -62,6 +81,7 @@ test.describe("themes", () => {
   for (const appearance of ["light", "dark"] as const) {
     test(`a second palette changes every colour in ${appearance}`, async ({ page }) => {
       await page.goto("/settings");
+      await settled(page);
 
       await wear(page, null, appearance);
       const before = await palette(page);
@@ -74,8 +94,16 @@ test.describe("themes", () => {
        * that redefined most of them would pass a comparison of the whole and
        * leave one cool grey border in a warm interface — which is the failure
        * nobody reports and everybody notices.
+       *
+       * The accent tokens are excepted, and deliberately: somebody who chose
+       * their own accent keeps it across a palette change, so those staying
+       * the same is the feature rather than a gap in the palette.
        */
-      for (const [token, value] of Object.entries(before)) {
+      const paletteOwned = Object.entries(before).filter(
+        ([token]) => !token.startsWith("--primary"),
+      );
+
+      for (const [token, value] of paletteOwned) {
         expect(after[token], `${token} is the default's in ${appearance}`).not.toBe(value);
       }
     });

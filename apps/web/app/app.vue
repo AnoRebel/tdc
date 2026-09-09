@@ -23,25 +23,15 @@ useHead({
 });
 
 /*
- * The operator's accent colour, applied as a custom property.
+ * The colours, resolved from what the operator chose and what this person did.
  *
- * Set on the root element rather than substituted into a stylesheet, so
- * nothing is rebuilt and a value the server would not accept simply never
- * arrives. The server validates it to the shapes a colour actually takes,
- * which is what stops a setting becoming a declaration of its own.
+ * In the shared layer rather than here, so the desktop client resolves them
+ * the same way. It used to be a watcher in this file that applied the
+ * operator's accent and cleared the custom property when the operator had set
+ * none — which wiped a person's own accent every time server information
+ * reloaded.
  */
-const { branding } = useServerInfo();
-
-watchEffect(() => {
-  if (import.meta.server) return;
-
-  const accent = branding.value.accent;
-  if (accent) {
-    document.documentElement.style.setProperty("--primary", accent);
-  } else {
-    document.documentElement.style.removeProperty("--primary");
-  }
-});
+useAppearanceSync();
 </script>
 
 <template>

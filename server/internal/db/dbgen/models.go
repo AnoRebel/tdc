@@ -353,6 +353,9 @@ type User struct {
 	SendsTypingIndication bool
 	LinkPreviewsEnabled   bool
 	HidePushContent       bool
+	AppearancePalette     string
+	AppearanceMode        string
+	AppearanceAccent      string
 }
 
 type UserBlock struct {

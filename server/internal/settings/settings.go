@@ -171,6 +171,14 @@ const (
 		apply instead of breaking the interface.
 	*/
 	BrandAccent Key = "brand.accent"
+	/*
+		BrandPalette is which set of colours this instance uses by default.
+
+		"default" or "congrator". A person may choose otherwise for themselves;
+		this is what somebody sees who has not, which is most people and
+		everybody on their first visit.
+	*/
+	BrandPalette Key = "brand.palette"
 )
 
 // definition describes one setting: how to validate it, and what it means when
@@ -257,6 +265,22 @@ var definitions = map[Key]definition{
 		fallback:    "",
 		description: "The colour used for emphasis, as a CSS colour.",
 		validate:    cssColour,
+	},
+	BrandPalette: {
+		fallback:    "default",
+		description: `The colours this instance uses: "default" or "congrator".`,
+		validate: func(value string) error {
+			switch value {
+			case "", "default", "congrator":
+				return nil
+			}
+			/*
+				Named rather than described. An operator who has mistyped one
+				needs to know which names exist, and a message saying only
+				that the value is wrong sends them to the source.
+			*/
+			return fmt.Errorf(`%w: expected "default" or "congrator"`, ErrInvalidValue)
+		},
 	},
 	ServerVisibility: {
 		fallback:    "public",

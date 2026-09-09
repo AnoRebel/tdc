@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 /**
@@ -21,5 +23,16 @@ export default defineConfig({
      * suite people wait for is a suite people stop running.
      */
     fsModuleCache: true,
+  },
+
+  resolve: {
+    alias: {
+      /*
+       * Nuxt resolves this at build time; a test process does not, so a file
+       * in the layer importing its own sibling fails to load. Pointed at the
+       * layer itself, which is what the alias means.
+       */
+      "#layers/ui": fileURLToPath(new URL("../../packages/ui", import.meta.url)),
+    },
   },
 });

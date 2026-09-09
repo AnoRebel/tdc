@@ -74,7 +74,7 @@ func (q *Queries) GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (b
 }
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip_address, sessions.created_at, sessions.last_seen_at, sessions.expires_at, sessions.revoked_at, users.id, users.username, users.username_folded, users.display_name, users.email, users.email_folded, users.email_verified, users.suspended_at, users.suspended_until, users.suspended_by, users.suspension_note, users.created_at, users.updated_at, users.sends_typing_indication, users.link_previews_enabled, users.hide_push_content
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.user_agent, sessions.ip_address, sessions.created_at, sessions.last_seen_at, sessions.expires_at, sessions.revoked_at, users.id, users.username, users.username_folded, users.display_name, users.email, users.email_folded, users.email_verified, users.suspended_at, users.suspended_until, users.suspended_by, users.suspension_note, users.created_at, users.updated_at, users.sends_typing_indication, users.link_previews_enabled, users.hide_push_content, users.appearance_palette, users.appearance_mode, users.appearance_accent
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = $1
@@ -116,6 +116,9 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (
 		&i.User.SendsTypingIndication,
 		&i.User.LinkPreviewsEnabled,
 		&i.User.HidePushContent,
+		&i.User.AppearancePalette,
+		&i.User.AppearanceMode,
+		&i.User.AppearanceAccent,
 	)
 	return i, err
 }

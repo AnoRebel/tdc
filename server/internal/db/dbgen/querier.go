@@ -152,6 +152,12 @@ type Querier interface {
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)
 	FindInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
+	// What this person chose the interface to look like.
+	//
+	// Empty in any column means they have chosen nothing there and take the
+	// operator's default, which is resolved by the client rather than here: the
+	// server reports what was chosen, and choosing nothing is an answer.
+	GetAppearance(ctx context.Context, id uuid.UUID) (GetAppearanceRow, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetDirectMessagePolicy(ctx context.Context, userID uuid.UUID) (string, error)
@@ -431,6 +437,7 @@ type Querier interface {
 	// Visibility is the authorisation: a private channel appears only to somebody
 	// already in it, so searching cannot be used to discover that one exists.
 	SearchRooms(ctx context.Context, arg SearchRoomsParams) ([]SearchRoomsRow, error)
+	SetAppearance(ctx context.Context, arg SetAppearanceParams) error
 	// Scoped to the uploader and to attachments not yet sent: a caption is written
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)

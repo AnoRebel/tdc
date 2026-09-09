@@ -64,6 +64,31 @@ export interface Branding {
   logoUrl?: string;
   /** A CSS colour used for emphasis. */
   accent?: string;
+  /**
+   * Which set of colours this instance uses by default.
+   *
+   * What somebody sees who has chosen nothing for themselves, which is most
+   * people and everybody on their first visit.
+   */
+  palette?: string;
+}
+
+/**
+ * What one person chose the interface to look like.
+ *
+ * Empty in any field means they have chosen nothing there and take the
+ * operator's default. Kept as three values rather than one because they are
+ * three independent choices, and resolved against the operator's branding by
+ * the client — the operator's default can change while somebody is signed in,
+ * and their own choice should not have to be rewritten when it does.
+ */
+export interface Appearance {
+  /** "default", "congrator", or empty. */
+  palette: string;
+  /** "light", "dark", "auto", or empty. */
+  mode: string;
+  /** A CSS colour, or empty for the palette's own. */
+  accent: string;
 }
 
 /**

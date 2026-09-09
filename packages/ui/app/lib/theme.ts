@@ -32,6 +32,15 @@ export function isAppearance(value: unknown): value is Appearance {
 export const THEME_STORAGE_KEY = "tdc-theme";
 export const PALETTE_STORAGE_KEY = "tdc-palette";
 export const ACCENT_STORAGE_KEY = "tdc-accent";
+/**
+ * The derived pair, stored alongside the chosen colour.
+ *
+ * Kept rather than recomputed before the first paint: deriving a shade is a
+ * search, and the script in the document head has to be small and immediate.
+ * The colour somebody chose is stored too, so the field can show what they
+ * typed rather than what was derived from it.
+ */
+export const ACCENT_PAIR_STORAGE_KEY = "tdc-accent-pair";
 
 /**
  * The theme decision, made before the first paint.
@@ -62,8 +71,10 @@ export const PREPAINT_THEME_SCRIPT =
   "r.classList.toggle('dark',d);r.classList.toggle('light',!d);" +
   "var p=localStorage.getItem('tdc-palette');" +
   "if(p&&p!=='default')r.setAttribute('data-theme',p);" +
-  "var a=localStorage.getItem('tdc-accent');" +
-  "if(a)r.style.setProperty('--primary',a);" +
+  "var a=localStorage.getItem('tdc-accent-pair');" +
+  "if(a){try{var p=JSON.parse(a);" +
+  "r.style.setProperty('--accent-light',p.light);" +
+  "r.style.setProperty('--accent-dark',p.dark);}catch(e){}}" +
   "}catch(e){}})();";
 
 /*
@@ -163,44 +174,140 @@ export function contrastRatio(one: string, other: string): number | null {
 /** What WCAG AA asks of normal text. */
 export const AA_CONTRAST = 4.5;
 
+/**
+ * The foregrounds each appearance puts on the accent.
+ *
+ * Light mode draws near-white text on it and dark mode near-black, which is
+ * why one colour cannot serve both: a shade dark enough for white text is too
+ * dark for black text, and there is no value in between that clears 4.5:1
+ * against either — measured, not assumed.
+ */
+const FOREGROUNDS = {
+  light: "oklch(0.99 0 0)",
+  dark: "oklch(0.16 0.01 265)",
+} as const;
+
+/** An accent, as each appearance needs it. */
+export interface AccentPair {
+  light: string;
+  dark: string;
+}
+
 /** Why an accent was refused, in words somebody can act on. */
 export interface AccentRefusal {
   reason: "unreadable" | "unmeasurable";
   message: string;
-  /** What it managed, when it could be measured at all. */
+  /** The best ratio reached while trying, when it could be measured at all. */
   ratio?: number;
 }
 
+/** A colour in oklch, which is where the lightness can be adjusted. */
+interface Oklch {
+  lightness: number;
+  chroma: number;
+  hue: number;
+}
+
 /**
- * Whether text can be read on this accent.
+ * Converts to oklch, so a colour's lightness can be moved without its hue.
  *
- * Both foregrounds are checked because an accent is used under white text in
- * one appearance and dark text in the other, and an accent that works for one
- * is not thereby fit for the other — the failure would appear only for people
- * who had switched.
+ * The inverse of oklchToRgb, by the same steps in reverse. Approximate at the
+ * edges of the gamut, which does not matter here: the result is only used to
+ * search for a lightness, and every candidate is measured as sRGB afterwards.
  */
-export function checkAccent(accent: string, foregrounds: string[]): AccentRefusal | null {
-  for (const foreground of foregrounds) {
-    const ratio = contrastRatio(accent, foreground);
+function rgbToOklch({ r, g, b }: Rgb): Oklch {
+  const linear = (channel: number) =>
+    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 
-    if (ratio === null) {
-      return {
-        reason: "unmeasurable",
-        message:
-          "That colour could not be read. Use a hex value like #4f46e5, " + "or an oklch() colour.",
-      };
-    }
+  const [lr, lg, lb] = [linear(r), linear(g), linear(b)];
 
-    if (ratio < AA_CONTRAST) {
-      return {
-        reason: "unreadable",
-        ratio,
-        message:
-          `Text on that colour would be hard to read — ${ratio.toFixed(1)}:1, ` +
-          `where ${AA_CONTRAST}:1 is the minimum. Try a darker or more saturated shade.`,
-      };
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+
+  const lightness = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s;
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+
+  const hue = (Math.atan2(bb, a) * 180) / Math.PI;
+
+  return {
+    lightness,
+    chroma: Math.sqrt(a * a + bb * bb),
+    hue: hue < 0 ? hue + 360 : hue,
+  };
+}
+
+/** The ratio between two colours already parsed. */
+function ratioBetween(one: Rgb, other: Rgb): number {
+  const brighter = Math.max(luminance(one), luminance(other));
+  const darker = Math.min(luminance(one), luminance(other));
+  return (brighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Finds the shade of this colour that its appearance can read.
+ *
+ * The hue and chroma are kept and only the lightness moves, so what comes back
+ * is recognisably the colour somebody chose. Light mode wants a darker shade
+ * (its text is near-white) and dark mode a lighter one, so each is searched
+ * from its own end and the first shade that clears the threshold wins — the
+ * nearest to what was asked for rather than the safest.
+ */
+function shadeFor(base: Oklch, foreground: Rgb, direction: "darker" | "lighter"): string | null {
+  const step = 0.01;
+
+  for (let offset = 0; offset <= 1; offset += step) {
+    const lightness = direction === "darker" ? base.lightness - offset : base.lightness + offset;
+    if (lightness < 0 || lightness > 1) break;
+
+    const candidate = oklchToRgb(lightness, base.chroma, base.hue);
+    if (ratioBetween(candidate, foreground) >= AA_CONTRAST) {
+      return `oklch(${lightness.toFixed(3)} ${base.chroma.toFixed(3)} ${base.hue.toFixed(1)})`;
     }
   }
 
   return null;
+}
+
+/**
+ * Turns one chosen colour into the pair each appearance needs.
+ *
+ * A single value cannot serve both: light mode draws near-white text on the
+ * accent and dark mode near-black, so a shade dark enough for one is too dark
+ * for the other. Rather than refusing every colour — which is what a single
+ * check does, since no value clears both — the hue is kept and the lightness
+ * moved until each appearance has a shade its own text can be read on.
+ *
+ * Returns a refusal only when no shade of this colour works, which in practice
+ * means a colour with so little chroma that adjusting it produces grey.
+ */
+export function deriveAccent(colour: string): AccentPair | AccentRefusal {
+  const parsed = parseColour(colour);
+  if (!parsed) {
+    return {
+      reason: "unmeasurable",
+      message: "That colour could not be read. Use a hex value like #4f46e5, or an oklch() colour.",
+    };
+  }
+
+  const base = rgbToOklch(parsed);
+  const lightForeground = parseColour(FOREGROUNDS.light)!;
+  const darkForeground = parseColour(FOREGROUNDS.dark)!;
+
+  // Light mode: near-white text, so the accent has to be dark enough.
+  const light = shadeFor(base, lightForeground, "darker");
+  // Dark mode: near-black text, so it has to be light enough.
+  const dark = shadeFor(base, darkForeground, "lighter");
+
+  if (!light || !dark) {
+    return {
+      reason: "unreadable",
+      message:
+        "No shade of that colour can be read in both light and dark. " +
+        "Try one with more colour in it — a near-grey has nowhere to move to.",
+    };
+  }
+
+  return { light, dark };
 }

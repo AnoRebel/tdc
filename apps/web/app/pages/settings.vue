@@ -86,9 +86,10 @@ const paletteOptions = [
 /*
  * The accent, typed rather than picked from a list.
  *
- * A colour input would be simpler and would also let somebody choose one their
- * own text cannot be read on, so the value is checked before it is applied and
- * the refusal explains the number it missed by.
+ * Whatever is chosen becomes two shades of itself, one per appearance: light
+ * mode draws near-white text on the accent and dark mode near-black, so a
+ * single value cannot be readable in both. The hue is kept, so what appears is
+ * recognisably the colour that was asked for — only its lightness moves.
  */
 const accentDraft = ref("");
 const accentRefusal = ref("");
@@ -363,7 +364,8 @@ function deviceName(userAgent: string): string {
 
         <h3 class="mt-5 text-xs font-semibold">Accent</h3>
         <p class="mt-1 text-xs text-muted-foreground">
-          The colour on buttons and links. Leave it empty for the one this palette comes with.
+          The colour on buttons and links. Adjusted for light and dark so its label stays readable
+          in both. Leave it empty for the one this palette comes with.
         </p>
 
         <div class="mt-2 flex flex-wrap items-start gap-1.5">

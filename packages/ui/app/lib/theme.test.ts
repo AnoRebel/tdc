@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   AA_CONTRAST,
   PREPAINT_THEME_SCRIPT as PREPAINT,
-  checkAccent,
   contrastRatio,
+  deriveAccent,
   isAppearance,
   isPalette,
   parseColour,
@@ -139,27 +139,46 @@ describe("the pre-paint palette and accent", () => {
     expect(apply({}, true).attributes.has("data-theme")).toBe(false);
   });
 
-  it("applies a chosen accent", () => {
-    const { properties } = apply({ "tdc-accent": "#4f46e5" }, true);
+  /*
+   * The derived pair, not the chosen colour.
+   *
+   * One value applied to both appearances is unreadable in one of them, so
+   * what is stored and applied is a shade per appearance. The script reads the
+   * pair rather than deriving it: deriving is a search, and this runs before
+   * anything is drawn.
+   */
+  it("applies a chosen accent's derived pair", () => {
+    const pair = JSON.stringify({ light: "oklch(0.51 0.23 277)", dark: "oklch(0.61 0.23 277)" });
+    const { properties } = apply({ "tdc-accent-pair": pair }, true);
 
-    expect(properties.get("--primary")).toBe("#4f46e5");
+    expect(properties.get("--accent-light")).toBe("oklch(0.51 0.23 277)");
+    expect(properties.get("--accent-dark")).toBe("oklch(0.61 0.23 277)");
   });
 
   it("leaves the palette's own accent alone when none was chosen", () => {
-    expect(apply({}, true).properties.has("--primary")).toBe(false);
+    expect(apply({}, true).properties.has("--accent-light")).toBe(false);
+  });
+
+  /* Storage somebody has edited by hand, or a value from an older version.
+     A malformed pair leaves the palette's accent rather than a broken one. */
+  it("ignores a stored pair it cannot read", () => {
+    const { properties } = apply({ "tdc-accent-pair": "not json" }, true);
+
+    expect(properties.has("--accent-light")).toBe(false);
   });
 
   /* The three are independent: choosing a palette says nothing about light or
      dark, and choosing an accent says nothing about either. */
   it("keeps the three choices independent", () => {
+    const pair = JSON.stringify({ light: "oklch(0.55 0.15 49)", dark: "oklch(0.6 0.15 49)" });
     const { classes, attributes, properties } = apply(
-      { "tdc-theme": "light", "tdc-palette": "congrator", "tdc-accent": "#b45309" },
+      { "tdc-theme": "light", "tdc-palette": "congrator", "tdc-accent-pair": pair },
       true,
     );
 
     expect(classes.has("light")).toBe(true);
     expect(attributes.get("data-theme")).toBe("congrator");
-    expect(properties.get("--primary")).toBe("#b45309");
+    expect(properties.get("--accent-light")).toBe("oklch(0.55 0.15 49)");
   });
 });
 
@@ -204,36 +223,68 @@ describe("measuring contrast", () => {
 });
 
 describe("choosing an accent", () => {
-  it("accepts one that can be read against both foregrounds", () => {
-    // Dark enough for white text, and the check is against white only —
-    // an accent is used under one foreground per appearance.
-    expect(checkAccent("#3730a3", ["#ffffff"])).toBeNull();
+  /* The foregrounds each appearance actually puts on the accent. */
+  const lightForeground = "oklch(0.99 0 0)";
+  const darkForeground = "oklch(0.16 0.01 265)";
+
+  /*
+   * One chosen colour becomes two shades of itself.
+   *
+   * A single value cannot be readable in both appearances — this was measured
+   * rather than assumed, and no value clears 4.5:1 against both a near-white
+   * and a near-black foreground. #6366f1, sitting between them, manages 4.34
+   * and 4.35. So the hue is kept and the lightness moved until each appearance
+   * has a shade its own text can be read on.
+   */
+  it("derives a shade each appearance can read", () => {
+    for (const chosen of ["#4f46e5", "#b45309", "#facc15", "#0ea5e9"]) {
+      const derived = deriveAccent(chosen);
+      expect("light" in derived, `${chosen} was refused`).toBe(true);
+      if (!("light" in derived)) continue;
+
+      expect(
+        contrastRatio(derived.light, lightForeground),
+        `${chosen} is unreadable in light mode`,
+      ).toBeGreaterThanOrEqual(AA_CONTRAST);
+      expect(
+        contrastRatio(derived.dark, darkForeground),
+        `${chosen} is unreadable in dark mode`,
+      ).toBeGreaterThanOrEqual(AA_CONTRAST);
+    }
   });
 
-  it("refuses one that would be hard to read, and says by how much", () => {
-    const refusal = checkAccent("#facc15", ["#ffffff"]);
+  /*
+   * And it is still the colour somebody asked for.
+   *
+   * A derivation that returned a readable colour of some other hue would pass
+   * a contrast check and ignore the choice — somebody picking orange would get
+   * a readable blue.
+   */
+  it("keeps the hue somebody chose", () => {
+    const derived = deriveAccent("#b45309");
+    expect("light" in derived).toBe(true);
+    if (!("light" in derived)) return;
 
-    expect(refusal?.reason).toBe("unreadable");
-    expect(refusal?.ratio).toBeLessThan(AA_CONTRAST);
-    // The number belongs in the message: "too light" is not something somebody
-    // can act on, and a ratio tells them how far off they are.
-    expect(refusal?.message).toMatch(/1\.\d:1/);
+    // The source is an orange at roughly 49 degrees.
+    for (const shade of [derived.light, derived.dark]) {
+      const hue = Number(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/.exec(shade)?.[1] ?? "0");
+      expect(Math.abs(hue - 49), `${shade} is not the chosen hue`).toBeLessThan(5);
+    }
   });
 
-  /* An accent that works in light and fails in dark is the failure that only
-     appears for people who switched, which is the hardest kind to hear about. */
-  it("refuses one that works against a single foreground but not both", () => {
-    // 6.4:1 under white text and 3.3:1 under dark: fine in one appearance and
-    // not the other, which is the failure that only reaches the people who
-    // switched.
-    const splitting = "#5f5f5f";
-
-    expect(checkAccent(splitting, ["#ffffff"])).toBeNull();
-    expect(checkAccent(splitting, ["#ffffff", "#000000"])?.reason).toBe("unreadable");
+  it("refuses a colour it cannot measure rather than guessing", () => {
+    const refusal = deriveAccent("chartreuse");
+    expect("reason" in refusal && refusal.reason).toBe("unmeasurable");
   });
 
-  it("refuses a colour it cannot measure rather than passing it", () => {
-    expect(checkAccent("chartreuse", ["#ffffff"])?.reason).toBe("unmeasurable");
+  /* The two shades differ, which is the whole point: one value applied to both
+     appearances is what this replaced. */
+  it("gives each appearance its own shade", () => {
+    const derived = deriveAccent("#4f46e5");
+    expect("light" in derived).toBe(true);
+    if (!("light" in derived)) return;
+
+    expect(derived.light).not.toBe(derived.dark);
   });
 });
 

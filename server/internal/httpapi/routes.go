@@ -210,6 +210,12 @@ func (s *Server) routes() {
 	me.DELETE("/push/subscriptions/:id", s.handleUnsubscribeFromPush)
 	me.GET("/preferences/hide-push-content", s.handleGetHidePushContent)
 	me.PUT("/preferences/hide-push-content", s.handleSetHidePushContent)
+	/*
+		What the interface looks like, on the account rather than in a browser,
+		so the choice follows somebody to the desktop client and back.
+	*/
+	me.GET("/preferences/appearance", s.handleGetAppearance)
+	me.PUT("/preferences/appearance", s.handleSetAppearance)
 
 	// Direct conversations, which are found by their participants rather than
 	// by name.
@@ -373,6 +379,13 @@ type brandingResponse struct {
 	LogoURL string `json:"logoUrl,omitempty"`
 	// Accent is a CSS colour used for emphasis.
 	Accent string `json:"accent,omitempty"`
+	/*
+		Palette is which set of colours this instance uses by default.
+
+		What somebody sees who has chosen nothing for themselves, which is most
+		people and everybody on their first visit.
+	*/
+	Palette string `json:"palette,omitempty"`
 }
 
 /*
@@ -492,6 +505,7 @@ func (s *Server) branding(ctx context.Context) brandingResponse {
 
 	branding.LogoURL = strings.TrimSpace(s.settings.Get(ctx, settings.BrandLogoURL))
 	branding.Accent = strings.TrimSpace(s.settings.Get(ctx, settings.BrandAccent))
+	branding.Palette = strings.TrimSpace(s.settings.Get(ctx, settings.BrandPalette))
 
 	return branding
 }

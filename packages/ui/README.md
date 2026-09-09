@@ -161,14 +161,38 @@ some of its users and not the rest.
 
 ### The accent
 
-An accent somebody chooses is checked before it is applied, against both a
-light and a dark foreground — an accent fine under white text and unreadable
-under dark text fails only for the people who switched. `checkAccent` in
-`app/lib/theme.ts` returns a refusal carrying the ratio it managed, so the
-message can say how far off it was rather than only that it will not do.
+One chosen colour becomes two shades of itself, one per appearance. Light mode
+draws near-white text on the accent and dark mode near-black, so a single value
+cannot be readable in both — measured, not assumed: no value clears 4.5:1
+against both a near-white and a near-black foreground, and `#6366f1`, sitting
+between them, manages 4.34 and 4.35.
+
+`deriveAccent` in `app/lib/theme.ts` keeps the hue and chroma and moves only
+the lightness, from each end, until each appearance has a shade its own text
+reads on. What appears is recognisably the colour that was asked for. The pair
+is applied as `--accent-light` and `--accent-dark`, which each palette's own
+blocks read as the default for `--primary`.
+
+Because a readable shade can be found for any colour that can be parsed, the
+only refusal is for a value that is not a colour. The server applies the same
+rule — it has to accept exactly what the client can derive, or a setting saves
+and then does nothing.
 
 The conversion is oklch → sRGB → relative luminance, and the tests pin it to
 values the specification fixes rather than to its own output.
+
+### Where the choice lives
+
+On the account, not in a browser: `/api/me/preferences/appearance` holds the
+palette, the appearance and the accent, so somebody who chooses the warm
+palette on the desktop client sees it on the web one. An operator sets the
+instance's defaults through `brand.palette` and `brand.accent`.
+
+`useAppearanceSync` resolves the two in one place — this person's choice, then
+the operator's, then the palette's own — and each of the three resolves
+independently. Applying them separately is what the web application used to do,
+with a watcher that cleared the accent whenever the operator had set none,
+silently wiping a person's own choice every time server information reloaded.
 
 ## Tests
 
