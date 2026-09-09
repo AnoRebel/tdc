@@ -7,6 +7,7 @@
  * party writing an integration.
  */
 
+export * from "./charts";
 export * from "./client";
 export * from "./apiclient";
 export * from "./server";

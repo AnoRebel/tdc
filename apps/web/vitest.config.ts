@@ -12,5 +12,14 @@ export default defineConfig({
   test: {
     include: ["app/**/*.test.ts", "../../packages/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/.output/**", "tests/**"],
+
+    /*
+     * Transforms kept between runs.
+     *
+     * Nearly forty per cent of a run was re-transforming modules that had not
+     * changed. These are meant to be fast enough to run on every save, and a
+     * suite people wait for is a suite people stop running.
+     */
+    fsModuleCache: true,
   },
 });

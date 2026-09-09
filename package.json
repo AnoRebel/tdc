@@ -38,7 +38,7 @@
         "prettier": "^3.9.6"
       },
       "testing": {
-        "vitest": "^4.1.11",
+        "vitest": "^5.0.0",
         "@vue/test-utils": "^2.4.11",
         "happy-dom": "^20.11.6",
         "@vitejs/plugin-vue": "^6.0.8"
