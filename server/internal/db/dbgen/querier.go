@@ -182,6 +182,11 @@ type Querier interface {
 	GetServerConfigValue(ctx context.Context, key string) (ServerConfig, error)
 	GetServerStatus(ctx context.Context, key string) (ServerStatus, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error)
+	// Which introductions this person has already been given.
+	//
+	// Read whole and written whole: the structure is small, and a partial update
+	// would mean the database knowing what a tour is.
+	GetTourProgress(ctx context.Context, id uuid.UUID) ([]byte, error)
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
@@ -458,6 +463,7 @@ type Querier interface {
 	SetRoomNotificationPreference(ctx context.Context, arg SetRoomNotificationPreferenceParams) error
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
 	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
+	SetTourProgress(ctx context.Context, arg SetTourProgressParams) error
 	SetTypingPreference(ctx context.Context, arg SetTypingPreferenceParams) error
 	// Whether two people are in any channel together, for the 'shared' policy.
 	//

@@ -356,6 +356,7 @@ type User struct {
 	AppearancePalette     string
 	AppearanceMode        string
 	AppearanceAccent      string
+	TourProgress          []byte
 }
 
 type UserBlock struct {

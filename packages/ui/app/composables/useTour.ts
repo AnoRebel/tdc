@@ -12,12 +12,17 @@ import {
 } from "#layers/ui/app/lib/tours";
 
 /*
- * storageKey holds what somebody has been shown.
+ * storageKey holds what somebody has been shown, in this browser.
  *
  * Keyed by account rather than by browser, because the record answers "has
  * this person seen this" and a shared machine has more than one person. The
  * library's own persistence is a single global key, which would have shown a
  * new colleague a tour marked complete by whoever used the laptop before them.
+ *
+ * The account is where this actually lives — a tour given on the web client
+ * should not be given again on the desktop one. This is the copy that answers
+ * immediately: the server's takes a request to reach, and a tour decided
+ * against a moment ago should not reappear while that is in flight.
  */
 function storageKey(who: string): string {
   return `tdc.tours.${who}`;
@@ -33,11 +38,32 @@ function storageKey(who: string): string {
  */
 export function useTour() {
   const { user } = useAuth();
+  const api = useApi();
 
   /** Who this progress belongs to, or nobody when signed out. */
   const owner = computed(() => user.value?.id ?? "");
 
-  function read(): Progress {
+  /**
+   * What the server holds, once it is known.
+   *
+   * Shared across every caller of this composable, so the fetch happens once
+   * rather than per component that might give a tour.
+   */
+  const fromServer = useState<Progress | null>("tour-progress", () => null);
+  const asked = useState("tour-progress-asked", () => false);
+
+  /**
+   * Bumped whenever the record changes, so a screen can react to it.
+   *
+   * A layout that only checked on mount could not offer a tour somebody asked
+   * for from settings: the two share a layout, so navigating between them
+   * mounts nothing at all. The button cleared the record and nothing ever
+   * looked again — which made "show me around" a button that did nothing
+   * visible.
+   */
+  const changed = useState("tour-progress-changed", () => 0);
+
+  function readLocally(): Progress {
     if (import.meta.server || !owner.value) return nothingSeen();
 
     try {
@@ -49,18 +75,75 @@ export function useTour() {
     }
   }
 
+  /**
+   * What has been seen, from whichever source knows.
+   *
+   * The server wins where it has answered, because it is the record that
+   * follows somebody between clients. Until it has, this browser's own copy
+   * answers — so a tour dismissed a moment ago stays dismissed rather than
+   * reappearing while a request is in flight.
+   */
+  function read(): Progress {
+    return fromServer.value ?? readLocally();
+  }
+
   function write(progress: Progress) {
     if (import.meta.server || !owner.value) return;
+
+    fromServer.value = progress;
 
     try {
       localStorage.setItem(storageKey(owner.value), JSON.stringify(progress));
     } catch {
-      // The tour still works; it simply will not be remembered.
+      // The tour still works in this browser; it simply will not be
+      // remembered here. The server's copy is the one that matters.
     }
   }
 
-  /** Whether this tour has still to be given. */
-  function offered(tour: TourName): boolean {
+  /**
+   * And to the account, so the next client already knows.
+   *
+   * Failures are swallowed: the tour has been given, this browser has recorded
+   * it, and refusing to run a tour because a request failed would be a worse
+   * answer than one being offered again on another device.
+   */
+  function publish(progress: Progress) {
+    if (import.meta.server || !owner.value) return;
+
+    void api.put("/api/me/preferences/tours", progress).catch(() => {
+      // Offline, or signed out between reading and writing.
+    });
+  }
+
+  /**
+   * Fetches what the account holds, once.
+   *
+   * Called before deciding whether to offer a tour rather than on mount: most
+   * screens never give one, and a request from every screen that might would
+   * be a request on every navigation.
+   */
+  async function load() {
+    if (import.meta.server || !owner.value || asked.value) return;
+    asked.value = true;
+
+    try {
+      const stored = await api.get<unknown>("/api/me/preferences/tours");
+      fromServer.value = readProgress(JSON.stringify(stored));
+    } catch {
+      // Nothing reachable. This browser's own copy answers, which is what it
+      // did before any of this existed.
+    }
+  }
+
+  /**
+   * Whether this tour has still to be given.
+   *
+   * Asks the account first. A tour given on another client is one this person
+   * has seen, and offering it again because this browser has no record is the
+   * whole thing being avoided.
+   */
+  async function offered(tour: TourName): Promise<boolean> {
+    await load();
     return shouldOffer(read(), tour);
   }
 
@@ -101,7 +184,15 @@ export function useTour() {
       steps,
       onHighlightStarted: () => {
         const at = instance.getActiveIndex();
-        if (at !== undefined) write(afterReaching(read(), tour, at));
+        if (at === undefined) return;
+
+        const progress = afterReaching(read(), tour, at);
+        write(progress);
+        /*
+         * Not published per step. Somebody moving through a tour would send a
+         * request per step, and what the account needs is where they stopped —
+         * which the dismissal below records.
+         */
       },
       /*
        * Every deliberate way out, in one place.
@@ -117,7 +208,9 @@ export function useTour() {
        * Omitting it leaves a tour that nothing can close.
        */
       onDestroyStarted: () => {
-        write(afterSeeing(read(), tour));
+        const progress = afterSeeing(read(), tour);
+        write(progress);
+        publish(progress);
         instance.destroy();
       },
     });
@@ -134,11 +227,17 @@ export function useTour() {
   function forget(tour: TourName) {
     const progress = read();
 
-    write({
+    const forgotten = {
       seen: progress.seen.filter((name) => name !== tour),
       reached: { ...progress.reached, [tour]: 0 },
-    });
+    };
+
+    write(forgotten);
+    // Published too, or asking to see a tour again would work on this device
+    // and nowhere else.
+    publish(forgotten);
+    changed.value += 1;
   }
 
-  return { offered, give, forget };
+  return { offered, give, forget, changed };
 }

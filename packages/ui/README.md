@@ -194,6 +194,25 @@ independently. Applying them separately is what the web application used to do,
 with a watcher that cleared the accent whenever the operator had set none,
 silently wiping a person's own choice every time server information reloaded.
 
+## Introductions
+
+A tour is worth giving to somebody who has not seen it and an obstacle to
+everybody else — including the same person on a second device, which is why the
+record lives on the account at `/api/me/preferences/tours` rather than in one
+browser. The browser keeps a copy that answers immediately, so a tour dismissed
+a moment ago does not reappear while a request is in flight; the account's copy
+wins once it arrives.
+
+The server stores what the client defines and hands it back unchanged. It does
+not know what a tour is, which is what lets a later phase add one without a
+migration or a server that refuses a client newer than itself.
+
+Skipping counts as seeing. Somebody who dismissed a tour said what they thought
+of it more clearly than somebody who sat through it — but an interruption is
+not a dismissal, so a tour left mid-step stays offered and resumes where it
+stopped. Settings can forget one, and that reaches the account too: asking to
+be shown around again should not work on one device only.
+
 ## Tests
 
 Run from `apps/web`, which is where the test runner is configured:

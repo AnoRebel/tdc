@@ -58,3 +58,13 @@ FROM users WHERE id = $1;
 UPDATE users
 SET appearance_palette = $2, appearance_mode = $3, appearance_accent = $4
 WHERE id = $1;
+
+-- Which introductions this person has already been given.
+--
+-- Read whole and written whole: the structure is small, and a partial update
+-- would mean the database knowing what a tour is.
+-- name: GetTourProgress :one
+SELECT tour_progress FROM users WHERE id = $1;
+
+-- name: SetTourProgress :exec
+UPDATE users SET tour_progress = $2 WHERE id = $1;

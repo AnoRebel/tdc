@@ -2,7 +2,7 @@
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 
-import { chatTour } from "~/lib/chattour";
+import { chatTour } from "#layers/ui/app/lib/chattour";
 import { readFailure } from "#layers/ui/app/lib/reachability";
 
 /*
@@ -138,15 +138,31 @@ await refresh();
  */
 const tour = useTour();
 
-onMounted(() => {
-  if (!tour.offered("chat")) return;
+/**
+ * Offers the introduction to somebody who has not had it.
+ *
+ * Watched rather than checked on mount, because settings shares this layout:
+ * asking to be shown around from there navigates here without mounting
+ * anything, so a check that ran once would never see the record change and
+ * the button would appear to do nothing.
+ *
+ * Awaited, because what has been seen is now on the account and the first call
+ * fetches it. A Promise is always truthy, so forgetting to await would show
+ * the introduction to everybody on every visit.
+ */
+watch(
+  () => tour.changed.value,
+  async () => {
+    if (!(await tour.offered("chat"))) return;
 
-  void nextTick().then(() => {
+    await nextTick();
+
     // Still worth giving by the time we get here: somebody who saw it in
     // another tab meanwhile should not be interrupted by a second copy.
-    if (tour.offered("chat")) void tour.give("chat", chatTour());
-  });
-});
+    if (await tour.offered("chat")) void tour.give("chat", chatTour());
+  },
+  { immediate: true },
+);
 
 /**
  * Loads the servers this one is connected to.

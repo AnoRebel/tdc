@@ -216,6 +216,13 @@ func (s *Server) routes() {
 	*/
 	me.GET("/preferences/appearance", s.handleGetAppearance)
 	me.PUT("/preferences/appearance", s.handleSetAppearance)
+	/*
+		Which introductions have been given, on the account for the same
+		reason: one shown on the web client should not be shown again on the
+		desktop one.
+	*/
+	me.GET("/preferences/tours", s.handleGetTourProgress)
+	me.PUT("/preferences/tours", s.handleSetTourProgress)
 
 	// Direct conversations, which are found by their participants rather than
 	// by name.
