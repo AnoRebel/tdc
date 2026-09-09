@@ -1,3 +1,10 @@
+/*
+ * Imported for the {@link} references below, which is a use the linter cannot
+ * see: without it the links in this file's documentation resolve to nothing in
+ * an editor, and the type somebody most needs to find from here is the one
+ * they cannot click through to.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { ApiError } from "./errors";
 
 /**

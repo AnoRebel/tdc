@@ -1,0 +1,17 @@
+{
+  "name": "@tdc/desktop-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt generate",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@tdc/types": "workspace:*",
+    "@tdc/ui": "workspace:*",
+    "nuxt": "catalog:vue",
+    "vue": "catalog:vue"
+  }
+}

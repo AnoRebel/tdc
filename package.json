@@ -11,6 +11,7 @@
   "workspaces": {
     "packages": [
       "apps/web",
+      "apps/desktop/frontend",
       "packages/*"
     ],
     "catalog": {

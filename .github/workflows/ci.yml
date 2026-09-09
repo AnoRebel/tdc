@@ -219,6 +219,67 @@ jobs:
         working-directory: server
         run: go build ./...
 
+  desktop:
+    name: Desktop
+    # Full tier only. It compiles a webview application against GTK and
+    # WebKit, which is several minutes of apt on every run — too slow to sit
+    # in front of every push to dev, and the thing it guards (an embed
+    # directive) changes rarely.
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: apps/desktop/go.sum
+
+      - name: Install the webview's dependencies
+        # What Wails links against on Linux. Named rather than pulled in by a
+        # setup action so an upgrade is somebody's decision.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the frontend
+        # Before the Go build, which embeds its output. Without this the embed
+        # directive has no directory to read and the compile fails outright —
+        # which is the right failure, just an unhelpfully worded one.
+        run: bun run --cwd apps/desktop/frontend build
+
+      - name: Formatting
+        working-directory: apps/desktop
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        working-directory: apps/desktop
+        run: go vet ./...
+
+      - name: Test
+        # Checks that the built frontend actually reached the binary, which a
+        # successful build does not.
+        working-directory: apps/desktop
+        run: go test ./...
+
+      - name: Build
+        working-directory: apps/desktop
+        run: go build ./...
+
   # The heavier checks, on the branches other people actually run.
   licences:
     name: Licence audit
@@ -305,7 +366,7 @@ jobs:
   ci-success:
     name: CI
     if: always()
-    needs: [web, accessibility, server, licences, vulnerabilities, migrations]
+    needs: [web, accessibility, server, desktop, licences, vulnerabilities, migrations]
     runs-on: ubuntu-latest
     steps:
       - name: Verify every job succeeded or was skipped

@@ -50,6 +50,18 @@ Opening the app on a server with no accounts leads to first-run setup, which
 creates the administrator. That route closes as soon as an account exists, so
 it cannot be used to grant administration to somebody who arrives later.
 
+## On the desktop
+
+A native application for Linux, macOS and Windows, wrapping the same interface
+in a window and adding what a browser cannot do: notifications that survive the
+window being closed, credentials in the operating system's keychain, and a tray
+icon carrying the unread count.
+
+It is optional. The web application is installable to a home screen and works
+offline on its own, and on a phone or tablet that is the one to use.
+
+Building it is documented in [apps/desktop](apps/desktop/README.md).
+
 ## Upgrading
 
 ```sh

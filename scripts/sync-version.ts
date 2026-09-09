@@ -55,10 +55,19 @@ const targets: Target[] = [
   { path: "apps/web/package.json", read: jsonVersion, write: writeJsonVersion },
   { path: "apps/desktop/frontend/package.json", read: jsonVersion, write: writeJsonVersion },
   {
-    // Wails v3 reads the desktop application's version from this file.
+    /*
+     * Wails v3 reads the desktop application's version from this file.
+     *
+     * Matched under `info:` specifically. The file opens with `version: '3'`,
+     * which is the Taskfile schema version — an unanchored match takes that
+     * one, reports it as drift, and then overwrites it, breaking the build
+     * configuration to fix a version that was never wrong.
+     */
     path: "apps/desktop/build/config.yml",
-    read: (text) => text.match(/^\s*version:\s*"?([^"\n]+)"?/m)?.[1]?.trim() ?? null,
-    write: (text, next) => text.replace(/^(\s*version:\s*)"?[^"\n]+"?/m, `$1"${next}"`),
+    read: (text) =>
+      text.match(/^info:\n(?:[ \t]+.*\n)*?[ \t]+version:\s*"?([^"\n]+)"?/m)?.[1]?.trim() ?? null,
+    write: (text, next) =>
+      text.replace(/^(info:\n(?:[ \t]+.*\n)*?[ \t]+version:\s*)"?[^"\n]+"?/m, `$1"${next}"`),
   },
   {
     // Compiled into the server so it can report its own version at runtime.
