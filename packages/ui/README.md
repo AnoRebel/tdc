@@ -124,6 +124,40 @@ to get a working interface.
 An application adds only what genuinely differs: the transport, and whatever
 that platform alone can do.
 
+## Themes
+
+Three independent choices, which is why they are three values rather than one
+setting listing every combination:
+
+| Choice     | Where it lives                 | Values                       |
+| ---------- | ------------------------------ | ---------------------------- |
+| Palette    | `data-theme` on the root       | `default`, `congrator`       |
+| Appearance | `.dark` / `.light` on the root | light, dark, or the device's |
+| Accent     | `--primary` set inline         | any readable colour          |
+
+The default palette is the absence of the attribute — the stylesheet's own
+`:root` rules — so it is never written twice. Each palette defines **every**
+token in **both** appearances; one that defines most of them leaves a stray
+default-coloured border in an otherwise warm interface, which is the failure
+nobody reports and everybody notices. `apps/web/tests/theme.spec.ts` checks
+each token individually in each appearance, in a real browser, because whether
+a palette arrives depends on the build and the cascade rather than on the
+source.
+
+All three are applied by the pre-paint script in the document head. Anything
+applied later flashes for as long as the application takes to load.
+
+### The accent
+
+An accent somebody chooses is checked before it is applied, against both a
+light and a dark foreground — an accent fine under white text and unreadable
+under dark text fails only for the people who switched. `checkAccent` in
+`app/lib/theme.ts` returns a refusal carrying the ratio it managed, so the
+message can say how far off it was rather than only that it will not do.
+
+The conversion is oklch → sRGB → relative luminance, and the tests pin it to
+values the specification fixes rather than to its own output.
+
 ## Tests
 
 Run from `apps/web`, which is where the test runner is configured:

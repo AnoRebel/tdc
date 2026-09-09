@@ -12,6 +12,10 @@ WORKDIR /src
 COPY package.json bun.lock ./
 COPY apps/web/package.json apps/web/
 COPY packages/types/package.json packages/types/
+# The shared layer, whose own dependencies the web application's build needs:
+# it owns the stylesheet and the Tailwind plugin that compiles it, so a build
+# without them fails while resolving the layer's configuration.
+COPY packages/ui/package.json packages/ui/
 # --ignore-scripts because postinstall installs git hooks, which is a
 # developer convenience that needs git and has no meaning in an image.
 RUN bun install --frozen-lockfile --ignore-scripts
@@ -22,6 +26,15 @@ COPY apps/web/ apps/web/
 # Generated rather than built: the application is client-rendered, so this
 # produces static files with no server of its own — which is what lets the Go
 # server serve them from the same origin as the API.
+# Empty means "the host this was served from", which is what a container
+# always wants: the server serves the application, so the API is on the same
+# origin whatever address somebody reaches it at.
+#
+# Without this the build takes the development default of localhost:8080 and
+# bakes it in, so every image ships a client that calls that address — right
+# only for as long as the server happens to be on 8080, and a networking
+# fault everywhere else.
+ENV NUXT_PUBLIC_API_BASE=""
 RUN cd apps/web && bun run generate
 
 # Build the server.

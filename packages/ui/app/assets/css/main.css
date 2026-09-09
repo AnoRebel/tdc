@@ -121,6 +121,100 @@
   --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.55);
 }
 
+/*
+ * Warm, as a second palette.
+ *
+ * Selected with `data-theme="congrator"` on the root element. Drawn from the
+ * Congrator application so somebody running both sees one family rather than
+ * two unrelated products — a terracotta and amber ground against the default's
+ * cool indigo.
+ *
+ * Every token the default defines is redefined here. A palette that sets only
+ * the colours somebody thought to check leaves the rest inherited from the
+ * default, which shows up as one cool grey border in an otherwise warm
+ * interface — the kind of thing nobody reports and everybody notices.
+ */
+[data-theme="congrator"] {
+  --background: oklch(0.991 0.005 95);
+  --foreground: oklch(0.151 0.02 20);
+
+  --surface: oklch(0.994 0.003 85);
+  --surface-raised: oklch(0.999 0.002 85);
+  --surface-sunken: oklch(0.966 0.01 42);
+
+  --muted: oklch(0.961 0.01 42);
+  /* Darkened from the source palette's 0.549 to clear 4.5:1 on muted. */
+  --muted-foreground: oklch(0.53 0.021 26);
+
+  --border: oklch(0.9 0.029 51);
+  --border-strong: oklch(0.855 0.035 51);
+
+  --primary: oklch(0.449 0.15 35);
+  --primary-hover: oklch(0.4 0.155 35);
+  --primary-foreground: oklch(0.98 0.01 87);
+
+  --accent: oklch(0.951 0.02 45);
+  --accent-foreground: oklch(0.25 0.05 25);
+
+  --success: oklch(0.6 0.13 150);
+  --success-text: oklch(0.45 0.13 150);
+  --warning: oklch(0.7 0.14 70);
+  --destructive: oklch(0.581 0.238 28);
+  --destructive-foreground: oklch(0.989 0.01 82);
+
+  --ring: oklch(0.65 0.12 40);
+
+  /* The ground's own hue, so a shadow reads as depth rather than as dirt. */
+  --shadow-xs: 0 1px 2px oklch(0.151 0.02 20 / 0.06);
+  --shadow-sm: 0 1px 3px oklch(0.151 0.02 20 / 0.09), 0 1px 2px oklch(0.151 0.02 20 / 0.05);
+  --shadow-md: 0 4px 12px oklch(0.151 0.02 20 / 0.1), 0 2px 4px oklch(0.151 0.02 20 / 0.05);
+  --shadow-lg: 0 12px 32px oklch(0.151 0.02 20 / 0.14);
+}
+
+/*
+ * The same palette after dark.
+ *
+ * The selector mirrors the default's: an explicit .dark class, or the absence
+ * of .light, so a palette behaves the same way the default does rather than
+ * needing its own rule about when dark applies.
+ */
+[data-theme="congrator"].dark,
+[data-theme="congrator"]:not(.light) {
+  --background: oklch(0.181 0.018 32);
+  --foreground: oklch(0.971 0.01 87);
+
+  --surface: oklch(0.212 0.02 30);
+  --surface-raised: oklch(0.25 0.031 29);
+  --surface-sunken: oklch(0.16 0.016 31);
+
+  --muted: oklch(0.22 0.02 24);
+  --muted-foreground: oklch(0.681 0.029 41);
+
+  --border: oklch(0.279 0.02 28);
+  --border-strong: oklch(0.319 0.026 34);
+
+  --primary: oklch(0.738 0.172 46);
+  --primary-hover: oklch(0.78 0.16 46);
+  --primary-foreground: oklch(0.151 0.02 26);
+
+  --accent: oklch(0.551 0.144 51);
+  --accent-foreground: oklch(0.959 0.01 82);
+
+  --success: oklch(0.7 0.15 150);
+  --success-text: oklch(0.7 0.15 150);
+  --warning: oklch(0.78 0.14 75);
+  /* Darkened from the source palette so its foreground clears 4.5:1. */
+  --destructive: oklch(0.56 0.215 25);
+  --destructive-foreground: oklch(0.971 0.01 87);
+
+  --ring: oklch(0.649 0.15 50);
+
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.4), 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.45), 0 2px 4px oklch(0 0 0 / 0.3);
+  --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.55);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

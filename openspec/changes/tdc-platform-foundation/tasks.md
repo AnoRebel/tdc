@@ -173,6 +173,9 @@ Goal: the native client, with the capabilities that justify it over the PWA.
 - [x] 9.7 Add the chart adapter interface with TanStack Charts at an exact pinned version as the default; verify swapping to a fallback implementation requires no caller changes
 - [x] 9.8 Scaffold the Wails v3 app with `build/config.yml` as the version source, `//go:embed all:frontend/dist`, and Nitro `output.publicDir: "dist"`; verify a production build embeds the frontend
 - [x] 9.9 Configure the desktop frontend extending the shared layer with bindings aliased and dev server on port 9245 from `WAILS_VITE_PORT`; verify `wails3 dev` runs both Go and frontend
+- [x] 9.9a Add named themes selected by a `data-theme` attribute, each defining light and dark, with a second palette drawn from Congrator alongside the default; verify switching changes every surface in both clients and that no component hard-codes a colour (`clients/web`, `clients/desktop`)
+- [x] 9.9b Make the accent configurable independently of the palette, with contrast against its own foreground checked rather than assumed; verify a chosen accent that would fail WCAG AA is refused with an explanation (`clients/web`)
+- [ ] 9.9c Let an operator set the instance's default theme and accent, and a person override both for themselves, stored server-side so the choice follows them between clients; verify a person's choice survives signing in on a second client and that clearing it returns them to the operator's default (`platform/settings`)
 - [ ] 9.10 Implement the Wails-bindings transport adapter satisfying `ApiClient`, normalising Wails rejections into the shared error type; verify the same contract tests as the web adapter pass
 - [ ] 9.11 Implement server selection at first launch refusing unencrypted non-loopback addresses, with multi-server switching; verify an insecure address is refused with an explanation (`clients/desktop`)
 - [ ] 9.12 Implement OS keychain credential storage with a documented non-silent fallback; verify the absence of a keychain never results in plaintext storage (`clients/desktop`)
@@ -207,6 +210,21 @@ Goal: everything needed for TDC and others to actually deploy and adopt it.
 - [ ] 10.18 Write the upgrade and migration guide including skipped-release upgrades; verify the documented procedure works across two releases
 - [ ] 10.19 Write the Telegram and WhatsApp migration guide for TDC members; verify it addresses account creation, channel setup, and expectations differing from those tools
 - [ ] **MILESTONE 10** — Demonstrate: a person who has never seen the repository deploys a server from the published container image following only the hosting guide, invites a second person, and both exchange messages from the web and desktop apps. Tag `v1.0.0-rc.1`.
+
+## 10a. Phase 10a — The same interface for people and programs
+
+Everything the web client does is an HTTP call somebody else can make. This
+phase makes that true deliberately rather than incidentally, and adds the
+messages that carry their own actions.
+
+- [ ] 10a.1 Issue API tokens as first-class credentials on an existing account, scoped and revocable, with the same permissions and audit trail as a session; verify a token cannot do what its account may not, and that revoking one takes effect immediately (`platform/api`)
+- [ ] 10a.2 Accept bearer tokens on every existing route rather than a separate namespace; verify each documented endpoint answers identically to a session and to a token, and that a token is refused where a session would be (`platform/api`)
+- [ ] 10a.3 Publish a machine-readable description of the API generated from the routes themselves; verify a route added without documentation fails the check (`platform/api`)
+- [ ] 10a.4 Add message actions — a message may carry labelled buttons — with a documented boundary between actions that emit an event to the sender and the fixed set the client may perform itself; verify an action naming an undeclared client capability is refused at the point it is posted (`chat/messages`)
+- [ ] 10a.5 Deliver action presses to the sender as events, identifying who pressed and which action, exactly once; verify a press reaches a program and a repeated press of a one-shot action is refused (`chat/messages`)
+- [ ] 10a.6 Render actions accessibly in both clients — reachable and operable by keyboard, announced as buttons, with the outcome announced when it arrives; verify with a screen reader and in the automated accessibility pass (`clients/web`, `clients/desktop`)
+- [ ] 10a.7 Document writing a program against the API, with a worked example that posts a message carrying actions and responds to a press; verify somebody can follow it without reading the server source
+- [ ] **MILESTONE 10a** — Demonstrate: a program authenticates with a token, posts a message offering two choices, a person presses one in the web client and another in the desktop client, and the program receives both presses and replies. Tag `v1.1.0-dev`.
 
 ## 11. Cross-cutting verification
 

@@ -75,6 +75,40 @@ const themeOptions = [
 ];
 
 /*
+ * The palettes, described by what they look like rather than named after where
+ * they came from — "Congrator" means nothing to somebody who has not used it.
+ */
+const paletteOptions = [
+  { value: "default" as const, label: "Cool", description: "Indigo on tinted grey" },
+  { value: "congrator" as const, label: "Warm", description: "Terracotta and amber" },
+];
+
+/*
+ * The accent, typed rather than picked from a list.
+ *
+ * A colour input would be simpler and would also let somebody choose one their
+ * own text cannot be read on, so the value is checked before it is applied and
+ * the refusal explains the number it missed by.
+ */
+const accentDraft = ref("");
+const accentRefusal = ref("");
+
+watchEffect(() => {
+  accentDraft.value = theme.accent.value;
+});
+
+function applyAccent() {
+  const { refused } = theme.setAccent(accentDraft.value);
+  accentRefusal.value = refused ?? "";
+}
+
+function clearAccent() {
+  accentDraft.value = "";
+  accentRefusal.value = "";
+  theme.setAccent("");
+}
+
+/*
  * Three settings rather than two.
  *
  * "Anyone" and "nobody" leave out the case most people actually want, which is
@@ -308,6 +342,63 @@ function deviceName(userAgent: string): string {
             {{ option.label }}
           </button>
         </div>
+
+        <h3 class="mt-5 text-xs font-semibold">Colours</h3>
+        <p class="mt-1 text-xs text-muted-foreground">Each works in both light and dark.</p>
+
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          <button
+            v-for="option in paletteOptions"
+            :key="option.value"
+            type="button"
+            class="btn"
+            :class="theme.palette.value === option.value ? 'btn-primary' : 'btn-outline'"
+            :aria-pressed="theme.palette.value === option.value"
+            @click="theme.setPalette(option.value)"
+          >
+            {{ option.label }}
+            <span class="text-[0.6875rem] opacity-70">{{ option.description }}</span>
+          </button>
+        </div>
+
+        <h3 class="mt-5 text-xs font-semibold">Accent</h3>
+        <p class="mt-1 text-xs text-muted-foreground">
+          The colour on buttons and links. Leave it empty for the one this palette comes with.
+        </p>
+
+        <div class="mt-2 flex flex-wrap items-start gap-1.5">
+          <label class="sr-only" for="accent">Accent colour</label>
+          <input
+            id="accent"
+            v-model="accentDraft"
+            type="text"
+            class="input w-40"
+            placeholder="#4f46e5"
+            :aria-invalid="Boolean(accentRefusal)"
+            :aria-describedby="accentRefusal ? 'accent-refusal' : undefined"
+            @keydown.enter.prevent="applyAccent"
+          />
+          <button type="button" class="btn btn-outline" @click="applyAccent">Apply</button>
+          <button
+            v-if="theme.accent.value"
+            type="button"
+            class="btn btn-ghost"
+            @click="clearAccent"
+          >
+            Reset
+          </button>
+        </div>
+
+        <!-- The number, not just "that will not work": somebody who is 0.2
+             short of readable should be told how far off they are. -->
+        <p
+          v-if="accentRefusal"
+          id="accent-refusal"
+          role="alert"
+          class="mt-1.5 text-xs text-destructive"
+        >
+          {{ accentRefusal }}
+        </p>
       </section>
 
       <!-- Only where the server offers it. A control that cannot work is
