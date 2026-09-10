@@ -19,6 +19,19 @@ const running = ref(100);
 const pending = computed(() => running.value !== opacity.value);
 
 /*
+ * Whether this platform does anything with it.
+ *
+ * Linux does not today: Wails leaves its GTK4 transparency function empty, so
+ * the window is never given a background to composite against. Saying so is
+ * the only honest thing — a slider that quietly does nothing is a bug report
+ * waiting to be written.
+ */
+const ignoredHere = ref(false);
+onMounted(() => {
+  ignoredHere.value = navigator.userAgent.includes("Linux");
+});
+
+/*
  * The palette and light-or-dark, as buttons rather than the sidebar's toggle.
  *
  * That toggle is built for a footer: it opens upwards and sizes itself to a
@@ -110,7 +123,12 @@ onMounted(async () => {
         <span class="tabular w-12 shrink-0 text-right text-xs">{{ opacity }}%</span>
       </div>
 
-      <p v-if="pending" class="mt-2 text-xs text-warning">
+      <p v-if="ignoredHere" class="mt-2 text-xs text-warning">
+        Your desktop ignores this at the moment. The toolkit TDC is built on has not implemented
+        window transparency on Linux yet, so the window stays solid whatever this says. The setting
+        is kept because it will work as soon as that lands.
+      </p>
+      <p v-else-if="pending" class="mt-2 text-xs text-warning">
         Reopen TDC to see this. A window's transparency is fixed when it opens, so this one stays at
         {{ running }}% until then.
       </p>

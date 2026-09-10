@@ -13,14 +13,29 @@ import (
 How solid the window is.
 
 Some people want an application that shows a little of what is behind it, and
-some find that unreadable. Neither is wrong, so it is a setting — and it is off
-by default, because a chat window somebody cannot read is worse than a plain
-one they can.
+some find that unreadable. Neither is wrong, so it is a setting — off by
+default, because a chat window somebody cannot read is worse than a plain one
+they can.
 
-The window is always created able to be translucent; what the setting changes
-is the alpha of its background. Creating it solid would make this need a
-restart, and a preference that needs a restart is one people set once and never
-revisit.
+# It does nothing on Linux today
+
+Wails' setTransparent() is an empty function on its GTK4 path
+(pkg/application/linux_cgo.go, "GTK4: Transparency via CSS - different from
+GTK3"), so the window is never given a transparent background to composite
+against. A minimal Wails application asking for alpha 128 is solid too, which
+is how this was told apart from a fault here.
+
+What is missing upstream is two things that have to happen together: a GTK4
+style provider setting the window's own background to rgba(0,0,0,0), and
+WebKitGTK's background set transparent on a window that actually has an alpha
+channel — the WebKitGTK documentation is explicit that its background colour
+is ignored unless the parent window is set up for it, and that a page
+specifying its own background wins regardless.
+
+The setting is kept rather than removed: it is correct, it works wherever the
+platform honours it, and the alternative is deleting code that will be right
+again the moment Wails fills that function in. What the interface must not do
+is pretend — it says the platform ignores this.
 */
 
 // EventSetTranslucency is the interface asking for a different opacity.

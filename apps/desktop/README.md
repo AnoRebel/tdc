@@ -162,17 +162,28 @@ so settings arriving from the webview cannot claim a check that never was.
 
 ## Translucency
 
-The window can show a little of what is behind it. Off by default, adjustable
-between half and fully solid, and it stops at half because below that text on
-any background becomes a struggle.
+The window can show a little of what is behind it — where the platform allows
+it. **Linux does not, today**, and the setting says so rather than appearing
+broken.
 
-Two things have to agree for it to work. The window is created able to be
-translucent — the type is fixed at creation, so a solid window could only
-change after a restart — and the page has to stop painting over it. The shared
-stylesheet draws the body with `var(--app-ground, var(--background))`, and this
-client sets `--app-ground: transparent`. Only the body steps aside; cards,
-dialogs and the sidebar keep their own opaque surfaces, so text always sits on
-something solid.
+Wails' `setTransparent()` is an empty function on its GTK4 path
+(`pkg/application/linux_cgo.go`, commented "GTK4: Transparency via CSS -
+different from GTK3"), so the window is never given a transparent background to
+composite against. A minimal Wails application asking for alpha 128 is solid
+too, which is how this was told apart from a fault here.
+
+Everything on this side is in place for when that lands. The alpha is applied
+when the window is created rather than afterwards, because WebKitGTK latches
+its clear colour at the first composite and ignores later calls — which is why
+the setting says it takes effect on reopening. The page paints the theme colour
+_at_ that alpha rather than painting nothing: the shared stylesheet draws the
+body with `var(--app-ground, var(--background))` and this client sets
+`--app-ground` to a `color-mix` of the theme colour. Painting nothing was the
+first attempt and it broke light mode, showing dark text on whatever WebKitGTK
+clears to.
+
+Only the body is tinted. Cards, dialogs and the sidebar keep their own opaque
+surfaces, so text always sits on something solid.
 
 Focus rings are drawn without the shared stylesheet's outline offset. That gap
 shows the surface behind a control on a solid page, which is right — and shows
