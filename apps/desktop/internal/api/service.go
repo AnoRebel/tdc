@@ -22,8 +22,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -52,15 +54,38 @@ type Response struct {
 /*
 Service sends requests to whichever server this client is signed in to.
 
-One per application. It holds the cookie jar, which is the session: losing it
-signs the person out, so it outlives any individual window.
+One per application, holding every server somebody has added and the session
+for each. A session is a cookie jar, and one jar shared between servers would
+send one server's cookie to another — so each gets its own, and switching
+between them is picking a different jar rather than signing in again.
 */
 type Service struct {
-	client *http.Client
-	// Where requests go. Empty until somebody has chosen a server, which is
-	// what 9.11 asks for; a request before then is refused rather than sent
-	// somewhere arbitrary.
-	base string
+	// Guards everything below. The window switches servers from one goroutine
+	// and requests are made from others.
+	mu sync.RWMutex
+
+	/*
+		A client per server, because the session lives in its cookie jar.
+
+		Keyed by the checked origin, so two spellings of the same server —
+		with and without a trailing slash, say — are one entry rather than two
+		half-signed-in ones.
+	*/
+	clients map[string]*http.Client
+
+	// Which server requests currently go to. Empty until somebody has chosen
+	// one; a request before then is refused rather than sent somewhere
+	// arbitrary.
+	current string
+
+	/*
+		The servers somebody has added, in the order they added them.
+
+		Kept separately from the clients so the interface can list them without
+		holding the map, and so a server stays listed while its session is
+		gone — being signed out of a server is not the same as not having it.
+	*/
+	order []string
 }
 
 // ErrNoServer is what a request before choosing a server gets.
@@ -76,27 +101,103 @@ exactly the connections that most need patience. Requests that should give up
 sooner pass their own context.
 */
 func New() *Service {
-	// Errors only on an invalid public-suffix list, which is compiled in.
-	jar, _ := cookiejar.New(nil)
-
-	return &Service{
-		client: &http.Client{
-			Jar:     jar,
-			Timeout: 2 * time.Minute,
-		},
-	}
+	return &Service{clients: map[string]*http.Client{}}
 }
 
 /*
-UseServer points subsequent requests at an address.
+clientFor returns the client holding this server's session, making one if this
+is the first time this server has been used.
 
-Validation of the address — refusing an unencrypted one that is not loopback —
-belongs to the server-selection work in 9.11 and is done before this is
-called, so that a refusal can explain itself in the interface rather than
-failing here as an opaque error.
+Called with the lock held.
 */
-func (s *Service) UseServer(base string) {
-	s.base = strings.TrimSuffix(base, "/")
+func (s *Service) clientFor(origin string) *http.Client {
+	if existing, ok := s.clients[origin]; ok {
+		return existing
+	}
+
+	// Errors only on an invalid public-suffix list, which is compiled in.
+	jar, _ := cookiejar.New(nil)
+
+	client := &http.Client{Jar: jar, Timeout: 2 * time.Minute}
+	s.clients[origin] = client
+	return client
+}
+
+/*
+UseServer points subsequent requests at an address, adding it if it is new.
+
+The address is checked here rather than by the caller. This is the only way in,
+and a check somewhere else would be one a program calling these bindings could
+skip — the refusal has to be where the decision is.
+
+Returns the checked address so the interface can show what was actually used:
+somebody who typed a bare host gets https:// added, and seeing that is how they
+learn it was not sent in the clear.
+*/
+func (s *Service) UseServer(address string) (Address, error) {
+	checked, err := ParseAddress(address)
+	if err != nil {
+		return Address{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.clientFor(checked.URL)
+	if !slices.Contains(s.order, checked.URL) {
+		s.order = append(s.order, checked.URL)
+	}
+	s.current = checked.URL
+
+	return checked, nil
+}
+
+// Servers lists what somebody has added, in the order they added them.
+func (s *Service) Servers() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return slices.Clone(s.order)
+}
+
+// CurrentServer reports which one requests go to, or empty if none is chosen.
+func (s *Service) CurrentServer() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.current
+}
+
+/*
+ForgetServer removes a server and the session held for it.
+
+The session goes with it: somebody removing a server from this client means to
+be rid of it, and leaving a signed-in jar behind so that re-adding it silently
+resumes the old session would be a surprise — and on a shared machine, the
+wrong kind.
+*/
+func (s *Service) ForgetServer(address string) error {
+	checked, err := ParseAddress(address)
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.clients, checked.URL)
+	s.order = slices.DeleteFunc(s.order, func(held string) bool { return held == checked.URL })
+
+	// Switching away from the one being removed rather than leaving requests
+	// pointed at a server this no longer holds a session for.
+	if s.current == checked.URL {
+		s.current = ""
+		if len(s.order) > 0 {
+			s.current = s.order[0]
+		}
+	}
+
+	return nil
 }
 
 /*
@@ -105,12 +206,18 @@ Send makes one request and reports what happened.
 A refusal by the server is a Response with OK false, not a Go error: a 403 is
 an answer, and the interface above needs the body to say why. An error is
 returned only when there is no answer at all — the machine is unreachable, the
-name does not resolve, the connection died mid-body. That distinction is the
-whole reason the shared error type has a code for "offline" separate from its
-codes for things a server said.
+name does not resolve, the connection died mid-body.
+
+That distinction is what the shared layer decides on: a refusal carries a
+status and an unreachable server does not, and the difference is whether to
+retry or to keep somebody's work rather than discard it.
 */
 func (s *Service) Send(ctx context.Context, request Request) (Response, error) {
-	if s.base == "" {
+	s.mu.RLock()
+	base, client := s.current, s.clients[s.current]
+	s.mu.RUnlock()
+
+	if base == "" || client == nil {
 		return Response{}, ErrNoServer
 	}
 
@@ -119,7 +226,7 @@ func (s *Service) Send(ctx context.Context, request Request) (Response, error) {
 		body = bytes.NewReader(request.Body)
 	}
 
-	url := s.base + "/" + strings.TrimPrefix(request.Path, "/")
+	url := base + "/" + strings.TrimPrefix(request.Path, "/")
 
 	outgoing, err := http.NewRequestWithContext(ctx, request.Method, url, body)
 	if err != nil {
@@ -130,10 +237,10 @@ func (s *Service) Send(ctx context.Context, request Request) (Response, error) {
 	}
 	outgoing.Header.Set("Accept", "application/json")
 
-	incoming, err := s.client.Do(outgoing)
+	incoming, err := client.Do(outgoing)
 	if err != nil {
 		// Unreachable, not refused. The interface says "offline" for this.
-		return Response{}, fmt.Errorf("reaching %s: %w", s.base, err)
+		return Response{}, fmt.Errorf("reaching %s: %w", base, err)
 	}
 	defer incoming.Body.Close()
 

@@ -67,6 +67,36 @@ edit without a test saying so:
 go test ./...
 ```
 
+## Choosing a server
+
+TDC is self-hosted, so this application is installed once and pointed at
+whichever server its owner belongs to — which the web client never has to ask,
+being served by the server it talks to. The first screen is that question, and
+`internal/api/address.go` decides which answers are acceptable.
+
+One rule: **a server reached over plain HTTP must be on this machine.** The
+session cookie and every message travel over that connection, and on a network
+somebody else can see, plain HTTP hands all of it to anybody on the same wire.
+Loopback is exempt because there is no wire — and refusing it would make trying
+this out impossible without first arranging a certificate.
+
+The check lives in `UseServer`, not in the interface. These are bindings a
+program can call directly, so a check anywhere else is one that can be skipped.
+
+A bare host becomes `https://`, because somebody typing the name of their
+server has not mistyped it by leaving off the scheme. What it will not do is
+silently upgrade an address written explicitly as `http://`: quietly changing
+what somebody asked for is how people end up trusting the wrong thing.
+
+### More than one
+
+Somebody may belong to their community's server and their employer's. Each gets
+its own cookie jar, so switching is picking a different session rather than
+signing in again — and one server's cookie never reaches another, which a
+shared jar would do. Removing a server takes its session with it: re-adding it
+starts signed out rather than silently resuming, which on a shared machine is
+the difference that matters.
+
 ## The menu
 
 `internal/shell` builds the application menu. Items divide in two: those the

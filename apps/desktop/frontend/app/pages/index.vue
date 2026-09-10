@@ -11,50 +11,37 @@
  * arrives. And it answers the application menu, so the menu items are
  * demonstrably connected rather than merely present.
  */
-import { Unreachable } from "~/lib/transport";
+import * as Api from "#bindings/api";
 
 useHead({ title: "TDC" });
 
 const bridge = ref<"asking" | "ready" | "broken">("asking");
 const detail = ref("");
 
-const api = useApi();
-
 onMounted(async () => {
-  try {
-    /*
-     * Through the shared client, not the binding directly. That is the thing
-     * worth checking: every screen above this calls useApi(), and this proves
-     * the desktop adapter satisfies it end to end — the generated bindings,
-     * the transport, and the shared client on top of them.
-     *
-     * Deliberately a request with nowhere to go: no server has been chosen, so
-     * Go answers with ErrNoServer, which the transport reports as an
-     * unreachable server rather than a refusal. That is the correct reading —
-     * nothing answered — and it could only have come from the Go side.
-     */
-    await api.get("/api/health");
-    // Which should not happen. If it did, something is answering that should
-    // not be, and saying so is better than a green light that means nothing.
-    bridge.value = "broken";
-    detail.value = "A request succeeded before a server was chosen.";
-  } catch (error) {
-    if (error instanceof Unreachable && error.message.includes("no server chosen")) {
-      bridge.value = "ready";
-    } else {
-      bridge.value = "broken";
-      detail.value = error instanceof Error ? error.message : String(error);
-    }
+  /*
+   * Nowhere to go yet sends somebody to choose a server.
+   *
+   * The first thing this application needs is an address: it is installed once
+   * and pointed at whichever server its owner belongs to, and every screen
+   * beyond this one needs to know which.
+   */
+  const current = await Api.Service.CurrentServer();
+  if (!current) {
+    await navigateTo("/servers");
+    return;
   }
+
+  bridge.value = "ready";
+  detail.value = current;
 });
 
 /*
  * The menu, answered.
  *
- * There is no search or settings screen yet, so for now each one reports that
- * it arrived. That is not a placeholder for its own sake: it is what makes the
- * menu demonstrably wired, and each line is replaced by the real screen as
- * that screen lands rather than being removed.
+ * There is no search or channel list yet, so those report that they arrived —
+ * which is what makes the menu demonstrably wired rather than merely present.
+ * Each is replaced by the real screen as that screen lands.
  */
 const lastCommand = ref("");
 function acknowledge(what: string) {
@@ -64,10 +51,10 @@ function acknowledge(what: string) {
 /*
  * Appearance, which is the one setting this client can already offer.
  *
- * There is no settings screen here until server selection exists, and the
- * theme is a choice somebody makes on first opening an application rather
- * than later — so the toggle is on this screen, and the Settings menu item
- * opens it rather than reporting that it was pressed.
+ * There is no settings screen here yet, and the theme is a choice somebody
+ * makes on first opening an application rather than later — so the toggle is
+ * on this screen, and the Settings menu item opens it rather than reporting
+ * that it was pressed.
  */
 const showAppearance = ref(false);
 
@@ -86,9 +73,7 @@ useMenuCommands({
   <main class="grid min-h-dvh place-items-center bg-background p-8 text-foreground">
     <div class="max-w-sm text-center">
       <h1 class="text-lg font-semibold">TDC</h1>
-      <p class="mt-2 text-sm text-muted-foreground">
-        The desktop client. Choosing a server comes next.
-      </p>
+      <p class="mt-2 text-sm text-muted-foreground">The desktop client. Signing in comes next.</p>
 
       <p
         data-testid="bridge"
@@ -96,8 +81,8 @@ useMenuCommands({
         class="mt-6 text-xs"
         :class="bridge === 'broken' ? 'text-destructive' : 'text-muted-foreground'"
       >
-        <template v-if="bridge === 'asking'">Checking the connection to the application…</template>
-        <template v-else-if="bridge === 'ready'">Connected to the application.</template>
+        <template v-if="bridge === 'asking'">Looking for your server…</template>
+        <template v-else-if="bridge === 'ready'">Connected to {{ detail }}.</template>
         <template v-else>Could not reach the application. {{ detail }}</template>
       </p>
 
