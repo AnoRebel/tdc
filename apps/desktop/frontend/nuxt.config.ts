@@ -46,6 +46,14 @@ export default defineNuxtConfig({
   },
 
   /*
+   * The window paints its own ground, so the page does not.
+   *
+   * After the layer's stylesheet, so it overrides the token rather than being
+   * overridden by it.
+   */
+  css: [`${here}app/assets/css/translucent.css`],
+
+  /*
    * The generated bindings, under a name worth typing.
    *
    * `wails3 generate bindings` writes TypeScript mirroring the Go services

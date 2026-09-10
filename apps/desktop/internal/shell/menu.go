@@ -77,6 +77,10 @@ const (
 		of small wrongness that makes an application feel unmaintained.
 	*/
 	EventHideWindow = "window:hide"
+
+	// EventShowUpdates opens the screen that says whether there is a newer
+	// version.
+	EventShowUpdates = "app:updates"
 )
 
 /*
@@ -170,6 +174,9 @@ func NewMenu(app *application.App) *application.Menu {
 	// reporting a problem is asked for.
 	help.Add("About TDC").
 		OnClick(func(*application.Context) { app.Event.Emit(EventShowAbout) })
+	// Where somebody looks when they wonder whether they are up to date.
+	help.Add("Check for updates…").
+		OnClick(func(*application.Context) { app.Event.Emit(EventShowUpdates) })
 	help.AddSeparator()
 	help.Add("Keyboard shortcuts").
 		SetAccelerator("CmdOrCtrl+/").

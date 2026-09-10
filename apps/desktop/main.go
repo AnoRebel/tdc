@@ -8,12 +8,16 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/AnoRebel/tdc/apps/desktop/internal/api"
 	"github.com/AnoRebel/tdc/apps/desktop/internal/notify"
 	"github.com/AnoRebel/tdc/apps/desktop/internal/shell"
+	"github.com/AnoRebel/tdc/apps/desktop/internal/updater"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
@@ -45,6 +49,40 @@ the only thing that looks right on both, which is what a template icon means.
 //go:embed build/icons/tray-32.png
 var trayIcon []byte
 
+/*
+What a release must be signed by for this build to install it.
+
+A placeholder until there is a release pipeline, which leaves updates disabled
+rather than unverified — the application says so, and installs nothing. Replaced
+at release time with the real sigstore trusted root.
+*/
+//go:embed build/trust/sigstore-root.json
+var sigstoreRoot []byte
+
+/*
+updateFeedURL is where this asks whether there is a newer version.
+
+A plain document rather than an API, so it can be served from anything —
+release hosting, a static file, somebody's own server for a fork. What makes an
+update trustworthy is the signature on the artifact, not where the list came
+from.
+*/
+const updateFeedURL = "https://raw.githubusercontent.com/AnoRebel/tdc/main/releases/latest.json"
+
+/*
+windowSettingsPath is where how-the-window-looks is kept.
+
+Beside the update settings, under the user's own configuration directory: none
+of it is secret, and all of it belongs to one person rather than the machine.
+*/
+func windowSettingsPath() string {
+	config, err := os.UserConfigDir()
+	if err != nil || config == "" {
+		return ""
+	}
+	return filepath.Join(config, "tdc", "window.json")
+}
+
 func main() {
 	/*
 		Declared before the options because the second-instance callback
@@ -57,6 +95,17 @@ func main() {
 		handler is attached before any could arrive.
 	*/
 	notifier := notify.New(notifications.New())
+
+	/*
+		Updates, which verify or refuse.
+
+		The trusted root is installed before anything can check: an updater
+		that could run before its trust was configured would have a window in
+		which it accepted anything.
+	*/
+	updater.SetTrustedRoot(sigstoreRoot)
+	settingsPath, downloadDir := updater.DefaultPaths()
+	updates := updater.NewService(updateFeedURL, settingsPath, downloadDir)
 
 	app := application.New(application.Options{
 		Name:        "TDC",
@@ -86,6 +135,8 @@ func main() {
 			// What this build is, which is the first thing anybody reporting a
 			// problem is asked for.
 			application.NewService(shell.NewAboutService()),
+			// Checking for, fetching and installing a newer version.
+			application.NewService(updates),
 		},
 		/*
 			One instance, because this application is a place rather than a
@@ -162,7 +213,16 @@ func main() {
 			launch.
 		*/
 		BackgroundColour: application.NewRGB(20, 22, 28),
-		URL:              "/",
+		/*
+			Able to be translucent, whether or not it currently is.
+
+			The type is fixed when the window is created, so a window made
+			solid could only become translucent after a restart — and a
+			preference that needs a restart is one people set once and never
+			revisit. What the setting changes is the alpha of the colour above.
+		*/
+		BackgroundType: application.BackgroundTypeTranslucent,
+		URL:            "/",
 	})
 
 	/*
@@ -183,6 +243,20 @@ func main() {
 		Neither is guessable, so the first close asks and every one after does
 		what was chosen.
 	*/
+	/*
+		How solid the window is, restored before anything is drawn.
+
+		Applied here rather than from the interface: the window is painted
+		before any JavaScript runs, and one that flashed solid before turning
+		translucent would be worse than one that never moved.
+	*/
+	translucency := shell.NewTranslucency(window, windowSettingsPath(), 20, 22, 28)
+	/*
+		Registered after the window exists, because it acts on one. The
+		services above are declared with the application; this one cannot be.
+	*/
+	app.RegisterService(application.NewService(shell.NewTranslucencyService(translucency)))
+
 	closing := shell.NewClosing(app, window, true)
 	closing.OnHide(func() { tray.WindowShown(false) })
 	app.Event.On(shell.EventSetCloseBehaviour, func(event *application.CustomEvent) {
@@ -227,6 +301,18 @@ func main() {
 			"message": target.Message,
 		})
 	})
+
+	/*
+		Whatever checking the settings ask for, once the application is up.
+
+		Started here rather than in NewService so nothing happens during
+		construction — an application that made a network request before its
+		window existed would be doing so on somebody's behalf without showing
+		them anything.
+	*/
+	updateContext, stopUpdates := context.WithCancel(context.Background())
+	defer stopUpdates()
+	updates.Start(updateContext)
 
 	if err := app.Run(); err != nil {
 		log.Fatalf("tdc: %v", err)

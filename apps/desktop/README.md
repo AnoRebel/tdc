@@ -134,6 +134,51 @@ shipped the first time, confirmed by reading the pixmap off the bus as black at
 The two bubbles are outline-and-solid rather than two solids, because at
 sixteen pixels two solid shapes merge into a blob.
 
+## Updates
+
+Three separate steps, and deliberately so: checking says what exists,
+downloading prepares it, and installing replaces what somebody is running.
+Nothing moves to the next step on its own.
+
+An artifact is installed only when a sigstore bundle proves it was built by
+this project's release workflow. No trust root, no bundle, no matching
+identity — nothing installed, and somebody told why. An updater that installed
+what it could not verify would be a way to replace a running application with
+whatever answered the request, wearing the appearance of a security feature.
+
+**This build ships a placeholder trust root**, so updates are switched off: it
+says so, offers to check anyway, and links to the releases page. That is honest
+where silently doing nothing is not, and it changes when there is a release
+pipeline to verify against.
+
+Checking works whether or not installing does. Knowing a newer version exists
+is the difference between updating by hand and not knowing there is anything to
+update to.
+
+How often is somebody's choice — on launch, daily, weekly, or only when asked —
+because a check tells the release server that TDC is installed here and which
+version. When the last check happened is kept by Go rather than the interface,
+so settings arriving from the webview cannot claim a check that never was.
+
+## Translucency
+
+The window can show a little of what is behind it. Off by default, adjustable
+between half and fully solid, and it stops at half because below that text on
+any background becomes a struggle.
+
+Two things have to agree for it to work. The window is created able to be
+translucent — the type is fixed at creation, so a solid window could only
+change after a restart — and the page has to stop painting over it. The shared
+stylesheet draws the body with `var(--app-ground, var(--background))`, and this
+client sets `--app-ground: transparent`. Only the body steps aside; cards,
+dialogs and the sidebar keep their own opaque surfaces, so text always sits on
+something solid.
+
+Focus rings are drawn without the shared stylesheet's outline offset. That gap
+shows the surface behind a control on a solid page, which is right — and shows
+the _desktop_ through a translucent window, which makes the ring read as a
+stray box floating beside what it marks.
+
 ## Asking first
 
 Anything that loses something asks, and says what would be lost rather than

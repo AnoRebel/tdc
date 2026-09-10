@@ -21,6 +21,7 @@ export interface AboutDetails {
 }
 
 export function useAppCommands() {
+  const router = useRouter();
   const about = useState<AboutDetails | null>("about", () => null);
   const showingAbout = useState("about-showing", () => false);
   const confirmingQuit = useState("quit-confirming", () => false);
@@ -42,6 +43,17 @@ export function useAppCommands() {
       Events.On(menuEvents.quitRequested, () => {
         confirmingQuit.value = true;
       }),
+      // Where somebody looks when they wonder whether they are up to date.
+      Events.On(menuEvents.showUpdates, () => void router.push("/updates")),
+      /*
+       * Settings, from the menu or its shortcut.
+       *
+       * Here rather than on a screen: it can be asked for from any of them,
+       * and a handler living on one page hears nothing from the others —
+       * which is what made this item do nothing anywhere but the first
+       * screen.
+       */
+      Events.On(menuEvents.preferences, () => void router.push("/appearance")),
     ];
 
     onBeforeUnmount(() => {

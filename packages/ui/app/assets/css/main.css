@@ -277,7 +277,15 @@
   }
 
   body {
-    background: var(--background);
+    /*
+     * The ground everything is drawn on.
+     *
+     * A variable rather than the token directly, so a client that draws its
+     * own ground can step aside. The desktop application does: its window can
+     * be translucent, and an opaque body would paint over whatever the window
+     * was letting through — which is the whole of the setting doing nothing.
+     */
+    background: var(--app-ground, var(--background));
     color: var(--foreground);
     font-family: var(--font-sans);
     /* Optical rather than metric spacing at body size reads cleaner. */

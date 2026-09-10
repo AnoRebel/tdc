@@ -52,6 +52,7 @@ func TestTheFrontendWaitsForNothingUnsent(t *testing.T) {
 		EventAskCloseBehaviour: true, EventConfirmQuit: true,
 		EventSetCloseBehaviour: true, EventShowAbout: true,
 		EventQuitConfirmed: true, EventHideWindow: true,
+		EventShowUpdates: true,
 	}
 
 	for _, line := range strings.Split(generated, "\n") {

@@ -188,7 +188,8 @@ Goal: the native client, with the capabilities that justify it over the PWA.
 - [ ] 9.14d Menu mnemonics on Linux — Alt+F, Alt+H and so on do nothing under GTK4, because Wails sets `use_underline` only on its GTK3 path. Verify with a keyboard alone that every menu can be opened and every item reached; raise it upstream if it is still absent (`clients/desktop`)
 - [ ] 9.14e Ask before the destructive actions whose features do not exist yet — deleting a channel, deleting a server, blocking a whole channel or server. Each needs the same treatment as the ones done in 9.14a: say what will be lost, not merely ask whether to continue (`clients/web`, `clients/desktop`)
 - [ ] 9.15 Implement opt-in launch at login and window state restoration; verify autostart is off by default and position is restored, adjusted for disconnected displays (`clients/desktop`)
-- [ ] 9.16 Implement update checking with authenticity verification aborting on failure; verify an unverified update is discarded and reported (`clients/desktop`)
+- [x] 9.16 Implement update checking with authenticity verification aborting on failure; verify an unverified update is discarded and reported (`clients/desktop`)
+- [ ] 9.16a Publish signed releases — a workflow that builds each platform, signs every artifact with sigstore, and writes the release feed; then replace the placeholder trust root with the real one. Until this exists the desktop client says it cannot verify updates and installs none, which is true but not useful (`clients/desktop`)
 - [ ] 9.17 Test on NVIDIA under both Wayland and X11 per the identified risk; verify no blank-window rendering failure occurs
 - [ ] **MILESTONE 9** — Demonstrate: the desktop app launches on Linux, connects to a chosen server, signs in with credentials held in the OS keychain, receives a native notification while minimised to tray, and behaves identically to the web app for messaging. Tag `v0.9.0-dev`.
 

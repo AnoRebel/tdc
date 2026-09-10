@@ -67,6 +67,7 @@ export const menuEvents = {
 		{"showAbout", shell.EventShowAbout},
 		{"quitConfirmed", shell.EventQuitConfirmed},
 		{"hideWindow", shell.EventHideWindow},
+		{"showUpdates", shell.EventShowUpdates},
 	} {
 		fmt.Fprintf(&out, "  %s: %q,\n", event.Name, event.Value)
 	}

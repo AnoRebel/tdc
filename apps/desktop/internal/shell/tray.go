@@ -293,6 +293,11 @@ func (t *Tray) rebuild() {
 		})
 
 	menu.AddSeparator()
+	menu.Add("Check for updates…").OnClick(func(*application.Context) {
+		t.tray.ShowWindow()
+		t.WindowShown(true)
+		t.app.Event.Emit(EventShowUpdates)
+	})
 	menu.Add("About TDC").OnClick(func(*application.Context) {
 		t.tray.ShowWindow()
 		t.WindowShown(true)

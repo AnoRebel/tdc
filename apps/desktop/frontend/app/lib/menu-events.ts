@@ -23,6 +23,7 @@ export const menuEvents = {
   showAbout: "app:about",
   quitConfirmed: "app:quit-confirmed",
   hideWindow: "window:hide",
+  showUpdates: "app:updates",
 } as const;
 
 /** One of the names above. */

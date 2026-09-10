@@ -60,9 +60,6 @@ const showAppearance = ref(false);
 
 useMenuCommands({
   search: () => acknowledge("Search"),
-  preferences: () => {
-    showAppearance.value = true;
-  },
   newChannel: () => acknowledge("New channel"),
   notifications: () => acknowledge("Notifications"),
   keyboardHelp: () => acknowledge("Keyboard shortcuts"),
@@ -70,7 +67,7 @@ useMenuCommands({
 </script>
 
 <template>
-  <main class="grid min-h-dvh place-items-center bg-background p-8 text-foreground">
+  <main class="grid min-h-dvh place-items-center p-8 text-foreground">
     <div class="max-w-sm text-center">
       <h1 class="text-lg font-semibold">TDC</h1>
       <p class="mt-2 text-sm text-muted-foreground">The desktop client. Signing in comes next.</p>
