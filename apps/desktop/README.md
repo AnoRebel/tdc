@@ -97,6 +97,49 @@ shared jar would do. Removing a server takes its session with it: re-adding it
 starts signed out rather than silently resuming, which on a shared machine is
 the difference that matters.
 
+## Notifications
+
+Two kinds, both shown for the same message. The interface has its own — a bell
+with a count and a panel — and those work exactly as they do in a browser.
+System notifications are the other kind: the ones that arrive when nobody is
+looking at the application, which is most of the time and the reason for
+installing it rather than keeping a tab open.
+
+Both, because somebody who dismissed a banner without reading it has not read
+it, and a count that left it out would be lying.
+
+Permission is asked for when somebody turns notifications on, not at startup.
+An application that asks before it has shown anybody anything is asking about
+something they have no opinion on yet, and the usual answer to that is no —
+which on some platforms cannot be undone from inside the application.
+
+Pressing one opens the conversation it was about. The room and message travel
+inside the notification and come back on activation, so one pressed an hour
+later still knows where it was going without this keeping an index of pending
+notifications correct.
+
+Quiet hours are respected by not overriding them: notifications go out at
+ordinary priority rather than time-sensitive, because whether a message is
+worth interrupting for is a judgement the person made about their own
+attention.
+
+A second notification for one conversation replaces the first, so an hour away
+does not produce forty banners for the same channel.
+
+## Identity
+
+`net.anorebel.tdc` — the bundle identifier, the keychain service name, and the
+Linux program name.
+
+The window class is not this. Wails builds a GTK application id of
+`org.wails.<Name>` itself and does not expose it, so the window reports
+`org.wails.tdc` and the desktop entry's `StartupWMClass` has to say so or the
+running window will not associate with the launcher entry. Both are set
+deliberately: when Wails allows the id to be configured, the three become one.
+
+That value is case-sensitive and taken from a running window rather than
+guessed — the application is named "TDC" and the class is lowercase.
+
 ## Staying signed in
 
 Two things are kept per server: the session the server issued, and the password

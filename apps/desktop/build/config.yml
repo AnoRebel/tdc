@@ -7,7 +7,7 @@ version: '3'
 info:
   companyName: "Tanzania Developers Community"
   productName: "TDC"
-  productIdentifier: "tz.or.tdc.desktop"
+  productIdentifier: "net.anorebel.tdc"
   description: "Chat, project tracking, and a directory connecting developers with the people who need them."
   copyright: "(c) 2026 Ano Rebel and contributors"
   comments: "Self-hosted, by the community, for the community."

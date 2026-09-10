@@ -27,6 +27,7 @@ func TestTheFrontendKnowsEveryMenuEvent(t *testing.T) {
 		EventNewChannel,
 		EventNotifications,
 		EventKeyboardHelp,
+		EventOpenConversation,
 	} {
 		if !strings.Contains(string(generated), `"`+event+`"`) {
 			t.Errorf("%q is emitted by the menu and unknown to the frontend — "+
@@ -51,6 +52,7 @@ func TestTheFrontendWaitsForNothingUnsent(t *testing.T) {
 	sent := map[string]bool{
 		EventSearch: true, EventPreferences: true, EventNewChannel: true,
 		EventNotifications: true, EventKeyboardHelp: true,
+		EventOpenConversation: true,
 	}
 
 	for _, line := range strings.Split(string(generated), "\n") {

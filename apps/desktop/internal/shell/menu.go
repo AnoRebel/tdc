@@ -37,6 +37,15 @@ const (
 	EventNewChannel    = "menu:new-channel"
 	EventNotifications = "menu:notifications"
 	EventKeyboardHelp  = "menu:keyboard-help"
+
+	/*
+		Somebody pressed a system notification.
+
+		Not a menu item, and here because this is where the names the frontend
+		listens for are declared — one place, generated into TypeScript, so a
+		rename cannot leave one side listening for something nothing sends.
+	*/
+	EventOpenConversation = "notification:open"
 )
 
 /*

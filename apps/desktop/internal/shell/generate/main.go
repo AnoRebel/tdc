@@ -54,6 +54,7 @@ export const menuEvents = {
 		{"newChannel", shell.EventNewChannel},
 		{"notifications", shell.EventNotifications},
 		{"keyboardHelp", shell.EventKeyboardHelp},
+		{"openConversation", shell.EventOpenConversation},
 	} {
 		fmt.Fprintf(&out, "  %s: %q,\n", event.Name, event.Value)
 	}

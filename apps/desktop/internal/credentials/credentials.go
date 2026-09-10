@@ -32,7 +32,7 @@ The reverse-domain identifier the application is packaged with, so somebody
 looking through their keychain sees which application asked for it rather than
 a bare word that could be anything.
 */
-const service = "tz.or.tdc.desktop"
+const service = "net.anorebel.tdc"
 
 // ErrNoStore is returned when nothing on this machine can hold a credential.
 var ErrNoStore = errors.New("no credential store")

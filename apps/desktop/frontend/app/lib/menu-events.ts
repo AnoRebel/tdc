@@ -10,6 +10,7 @@ export const menuEvents = {
   newChannel: "menu:new-channel",
   notifications: "menu:notifications",
   keyboardHelp: "menu:keyboard-help",
+  openConversation: "notification:open",
 } as const;
 
 /** One of the names above. */

@@ -18,6 +18,14 @@ useHead({
  * of them and not the other.
  */
 useAppearanceSync();
+
+/*
+ * Pressing a system notification opens what it was about.
+ *
+ * Here rather than on a screen, because one may be pressed at any time —
+ * including while looking at something else entirely.
+ */
+useNotificationOpens();
 </script>
 
 <template>

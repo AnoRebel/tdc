@@ -12,8 +12,10 @@ import (
 	"log"
 
 	"github.com/AnoRebel/tdc/apps/desktop/internal/api"
+	"github.com/AnoRebel/tdc/apps/desktop/internal/notify"
 	"github.com/AnoRebel/tdc/apps/desktop/internal/shell"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
 
 /*
@@ -34,6 +36,12 @@ saying so.
 var assets embed.FS
 
 func main() {
+	/*
+		System notifications, built before the application so the response
+		handler is attached before any could arrive.
+	*/
+	notifier := notify.New(notifications.New())
+
 	app := application.New(application.Options{
 		Name:        "TDC",
 		Description: "Chat, project tracking, and a directory connecting developers with the people who need them.",
@@ -51,6 +59,31 @@ func main() {
 		*/
 		Services: []application.Service{
 			application.NewService(api.New()),
+			/*
+				The platform's own notifications, and this application's use of
+				them. Both are registered: the first is what Wails needs to
+				start the service, the second is the small surface the webview
+				may call.
+			*/
+			application.NewService(notifications.New()),
+			application.NewService(notify.NewService(notifier)),
+		},
+		Linux: application.LinuxOptions{
+			/*
+				What the window manager calls this program.
+
+				Set so a desktop environment can match the running window to
+				the .desktop entry that launched it — without which the
+				application appears as a second, nameless icon and pinning it
+				to a dock pins something that never lights up.
+
+				The GTK application id is org.wails.<Name>, which Wails builds
+				itself and does not expose. So this and StartupWMClass are both
+				set to what the toolkit actually produces; when Wails allows
+				the id to be configured, all three become net.anorebel.tdc
+				together.
+			*/
+			ProgramName: "net.anorebel.tdc",
 		},
 		Mac: application.MacOptions{
 			// Closing the last window quits, which is what somebody means by
@@ -88,6 +121,21 @@ func main() {
 		*/
 		BackgroundColour: application.NewRGB(20, 22, 28),
 		URL:              "/",
+	})
+
+	/*
+		Pressing a notification goes to what it was about.
+
+		Emitted rather than navigated directly: the interface knows how to
+		reach a conversation and this does not, and an event is the same path
+		the menu already uses.
+	*/
+	notifier.OnOpen(func(target notify.Target) {
+		app.Event.Emit(shell.EventOpenConversation, map[string]string{
+			"server":  target.Server,
+			"room":    target.Room,
+			"message": target.Message,
+		})
 	})
 
 	if err := app.Run(); err != nil {

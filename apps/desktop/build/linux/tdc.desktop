@@ -10,3 +10,4 @@ Keywords=chat;messaging;team;community;tdc;
 Version=1.0
 GenericName=Team chat
 StartupNotify=false
+StartupWMClass=org.wails.tdc
