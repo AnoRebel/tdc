@@ -11,13 +11,38 @@ useHead({ title: "Appearance" });
 const { opacity, refresh, set } = useWindowOpacity();
 
 /*
- * The palette and light-or-dark, from the same toggle the sidebar carries —
- * so somebody looking for "how this looks" finds all of it in one place
- * rather than two.
+ * What the window is actually running at, kept apart from what the slider
+ * shows. They differ the moment somebody moves it, and saying so is the whole
+ * point — a slider that appears to do nothing reads as broken.
  */
-const showTheme = ref(false);
+const running = ref(100);
+const pending = computed(() => running.value !== opacity.value);
 
-onMounted(() => void refresh());
+/*
+ * The palette and light-or-dark, as buttons rather than the sidebar's toggle.
+ *
+ * That toggle is built for a footer: it opens upwards and sizes itself to a
+ * narrow strip, which on a full page leaves stretched labels and collapsed
+ * swatches. A settings screen has room to show the choices outright, and a
+ * menu that has to be opened to see what is selected is worse here anyway.
+ */
+const theme = useTheme();
+
+const appearances = [
+  { value: "auto" as const, label: "Follow my device" },
+  { value: "light" as const, label: "Light" },
+  { value: "dark" as const, label: "Dark" },
+];
+
+const palettes = [
+  { value: "default" as const, label: "Cool", description: "Indigo on tinted grey" },
+  { value: "congrator" as const, label: "Warm", description: "Terracotta and amber" },
+];
+
+onMounted(async () => {
+  await refresh();
+  running.value = opacity.value;
+});
 </script>
 
 <template>
@@ -30,8 +55,35 @@ onMounted(() => void refresh());
         The palette, and whether to follow your device's light or dark setting.
       </p>
 
-      <div class="mt-3">
-        <ThemeToggle v-model="showTheme" />
+      <h3 class="mt-4 text-xs font-semibold">Light or dark</h3>
+      <div class="mt-2 flex flex-wrap gap-1.5">
+        <button
+          v-for="option in appearances"
+          :key="option.value"
+          type="button"
+          class="btn"
+          :class="theme.preference.value === option.value ? 'btn-primary' : 'btn-outline'"
+          :aria-pressed="theme.preference.value === option.value"
+          @click="theme.set(option.value)"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+
+      <h3 class="mt-4 text-xs font-semibold">Palette</h3>
+      <div class="mt-2 flex flex-wrap gap-1.5">
+        <button
+          v-for="option in palettes"
+          :key="option.value"
+          type="button"
+          class="btn"
+          :class="theme.palette.value === option.value ? 'btn-primary' : 'btn-outline'"
+          :aria-pressed="theme.palette.value === option.value"
+          @click="theme.setPalette(option.value)"
+        >
+          {{ option.label }}
+          <span class="text-[0.6875rem] opacity-70">{{ option.description }}</span>
+        </button>
       </div>
     </section>
 
@@ -58,6 +110,10 @@ onMounted(() => void refresh());
         <span class="tabular w-12 shrink-0 text-right text-xs">{{ opacity }}%</span>
       </div>
 
+      <p v-if="pending" class="mt-2 text-xs text-warning">
+        Reopen TDC to see this. A window's transparency is fixed when it opens, so this one stays at
+        {{ running }}% until then.
+      </p>
       <p class="mt-2 text-xs text-muted-foreground">
         The slider stops at half, because below that text on any background becomes a struggle.
       </p>

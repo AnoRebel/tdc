@@ -20,13 +20,30 @@ export function useWindowOpacity() {
   }
 
   /**
-   * Applied as it moves rather than on release, because the whole point is
-   * seeing what a value looks like before settling on it.
+   * Paints the page's ground at the same alpha the window has.
+   *
+   * The two have to agree: the window's transparency is fixed when it opens,
+   * so this reads what it actually is rather than what the slider currently
+   * shows. A page painted more solid than its window hides the transparency;
+   * one painted less solid shows a double-faded ground.
+   */
+  async function matchTheWindow() {
+    const current = await Shell.TranslucencyService.WindowOpacity();
+    document.documentElement.style.setProperty("--app-alpha", `${current}%`);
+  }
+
+  /**
+   * Records the choice.
+   *
+   * Deliberately does not repaint the page to match: the window's own
+   * transparency cannot change until it is reopened, and a page that went
+   * see-through against a still-solid window would show a faded ground with
+   * nothing behind it — which looks like a bug rather than a preview.
    */
   async function set(percent: number) {
     opacity.value = percent;
     await Shell.TranslucencyService.SetWindowOpacity(percent);
   }
 
-  return { opacity, refresh, set };
+  return { opacity, refresh, set, matchTheWindow };
 }

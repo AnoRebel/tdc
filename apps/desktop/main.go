@@ -193,6 +193,16 @@ func main() {
 	*/
 	app.Menu.SetApplicationMenu(shell.NewMenu(app))
 
+	/*
+		How solid the window should be, read before it is built.
+
+		WebKitGTK latches its clear colour at the first composite and does not
+		refresh it from a later call, so this cannot be changed once the window
+		exists — which is why the setting says it applies when TDC is reopened.
+	*/
+	windowSettings := windowSettingsPath()
+	opacity := shell.SavedOpacity(windowSettings)
+
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "TDC",
 		/*
@@ -212,7 +222,12 @@ func main() {
 			shared stylesheet; a mismatch here shows as a flicker on every
 			launch.
 		*/
-		BackgroundColour: application.NewRGB(20, 22, 28),
+		BackgroundColour: application.RGBA{
+			Red: 20, Green: 22, Blue: 28,
+			// The alpha somebody chose, applied at creation because it cannot
+			// be applied afterwards.
+			Alpha: opacity.Alpha(),
+		},
 		/*
 			Able to be translucent, whether or not it currently is.
 
@@ -250,7 +265,7 @@ func main() {
 		before any JavaScript runs, and one that flashed solid before turning
 		translucent would be worse than one that never moved.
 	*/
-	translucency := shell.NewTranslucency(window, windowSettingsPath(), 20, 22, 28)
+	translucency := shell.NewTranslucency(window, windowSettings, 20, 22, 28)
 	/*
 		Registered after the window exists, because it acts on one. The
 		services above are declared with the application; this one cannot be.

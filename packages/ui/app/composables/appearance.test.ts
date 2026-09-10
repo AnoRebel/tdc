@@ -105,6 +105,29 @@ describe("resolving the colours", () => {
   });
 
   /*
+   * A choice made in this session survives server information arriving.
+   *
+   * The bug this replaces: resolving to "default" when neither the person's
+   * stored choice nor the operator had one, which undid a palette chosen a
+   * moment earlier. On the desktop client, where there may be no server at
+   * all, it happened immediately and made the palette buttons appear dead.
+   */
+  it("does not undo a palette chosen in this session", () => {
+    const theme = useTheme();
+
+    theme.setPalette("congrator");
+    expect(documentState().palette).toBe("congrator");
+
+    // Server information arriving, with nothing to say about the palette.
+    theme.settle({}, undefined);
+
+    expect(
+      documentState().palette,
+      "a palette chosen a moment ago was reset by an unrelated refresh",
+    ).toBe("congrator");
+  });
+
+  /*
    * Light or dark is the one the operator has no say in: it is a property of
    * the room somebody is sitting in, not of the instance they are using.
    */

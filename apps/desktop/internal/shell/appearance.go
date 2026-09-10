@@ -55,6 +55,19 @@ func (o Opacity) Clamp() Opacity {
 }
 
 /*
+SavedOpacity reads what was chosen, for use before the window exists.
+
+WebKitGTK latches its clear colour at the first composite and does not refresh
+it from a later call, so the alpha a window is created with is the alpha it
+keeps. That makes this a launch-time value rather than a live one — and the
+reason the setting appeared to do nothing when it was applied afterwards.
+*/
+func SavedOpacity(path string) Opacity {
+	opacity, _ := readOpacity(path)
+	return opacity
+}
+
+/*
 Translucency applies and remembers how solid the window is.
 
 The value is kept in a file rather than asked of the interface at startup: the
@@ -71,19 +84,19 @@ type Translucency struct {
 	red, green, blue uint8
 }
 
-// NewTranslucency restores whatever was chosen and applies it.
+/*
+NewTranslucency tracks the choice for a window already created with it.
+
+The window is built with the saved alpha by whoever calls this — see
+SavedOpacity — because the alpha cannot be changed afterwards. What this adds
+is remembering a new choice for next time, and applying what can be applied
+now.
+*/
 func NewTranslucency(window application.Window, path string, red, green, blue uint8) *Translucency {
-	translucency := &Translucency{
-		window: window, path: path, opacity: Solid,
+	return &Translucency{
+		window: window, path: path, opacity: SavedOpacity(path),
 		red: red, green: green, blue: blue,
 	}
-
-	if saved, ok := readOpacity(path); ok {
-		translucency.opacity = saved
-	}
-	translucency.apply()
-
-	return translucency
 }
 
 // Opacity reports how solid the window currently is.
@@ -94,10 +107,12 @@ func (t *Translucency) Opacity() int {
 }
 
 /*
-SetOpacity changes it and remembers the choice.
+SetOpacity records a new choice.
 
-Clamped rather than refused: a value outside the range is somebody dragging a
-slider to its end, not an error worth reporting.
+Applied to the window too, which helps on platforms that honour it — but the
+value that matters is the one saved, because WebKitGTK on Linux keeps whatever
+alpha the window was created with. So the interface says this takes effect when
+TDC is reopened rather than pretending otherwise.
 */
 func (t *Translucency) SetOpacity(percent int) {
 	t.mu.Lock()
@@ -109,6 +124,15 @@ func (t *Translucency) SetOpacity(percent int) {
 	writeOpacity(path, opacity)
 }
 
+/*
+Alpha is the opacity as a colour channel, for building the window.
+
+255 is fully opaque, so a percentage maps onto it directly.
+*/
+func (o Opacity) Alpha() uint8 {
+	return uint8(int(o.Clamp()) * 255 / 100)
+}
+
 // apply paints the window at the current opacity.
 func (t *Translucency) apply() {
 	t.mu.RLock()
@@ -117,8 +141,7 @@ func (t *Translucency) apply() {
 
 	t.window.SetBackgroundColour(application.RGBA{
 		Red: red, Green: green, Blue: blue,
-		// 255 is fully opaque, so a percentage maps onto it directly.
-		Alpha: uint8(int(opacity) * 255 / 100),
+		Alpha: opacity.Alpha(),
 	})
 }
 

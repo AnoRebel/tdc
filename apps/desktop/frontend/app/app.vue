@@ -28,6 +28,15 @@ useAppearanceSync();
 useNotificationOpens();
 
 /*
+ * The page's ground, painted at the same alpha as the window.
+ *
+ * Here rather than on a screen: every screen sits on this ground, and one that
+ * matched only on the appearance page would be solid everywhere else.
+ */
+const { matchTheWindow } = useWindowOpacity();
+onMounted(() => void matchTheWindow());
+
+/*
  * What closing the window does, asked the first time it happens.
  *
  * Here rather than on a screen: a window can be closed from any of them, and a
