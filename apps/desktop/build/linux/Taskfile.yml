@@ -186,7 +186,10 @@ tasks:
       # applications menu, where every other entry is capitalised.
       DISPLAY_NAME: 'TDC'
       EXEC: '{{.APP_NAME}}'
-      ICON: '{{.APP_NAME}}'
+      # The name the icon files are installed under, which is the application
+      # id rather than the binary name — an entry naming an icon nothing is
+      # installed as shows a blank square in the launcher.
+      ICON: 'net.anorebel.tdc'
       # What somebody who does not know the name would search for.
       GENERIC_NAME: 'Team chat'
       COMMENT: 'Chat, project tracking, and a directory connecting developers with the people who need them.'

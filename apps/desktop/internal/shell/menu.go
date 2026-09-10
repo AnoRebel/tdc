@@ -46,6 +46,15 @@ const (
 		rename cannot leave one side listening for something nothing sends.
 	*/
 	EventOpenConversation = "notification:open"
+
+	/*
+		Somebody asked to quit, from the tray or the menu.
+
+		A request rather than an instruction: the interface knows whether
+		anything is unsent and this does not, so it decides whether to ask
+		before letting the application end.
+	*/
+	EventQuitRequested = "app:quit-requested"
 )
 
 /*

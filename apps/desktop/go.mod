@@ -2,11 +2,14 @@ module github.com/AnoRebel/tdc/apps/desktop
 
 go 1.27
 
-require github.com/wailsapp/wails/v3 v3.0.0-beta.18
+require (
+	github.com/99designs/keyring v1.2.2
+	github.com/wailsapp/wails/v3 v3.0.0-beta.18
+)
 
 require (
+	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
-	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect

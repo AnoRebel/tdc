@@ -55,6 +55,12 @@ export const menuEvents = {
 		{"notifications", shell.EventNotifications},
 		{"keyboardHelp", shell.EventKeyboardHelp},
 		{"openConversation", shell.EventOpenConversation},
+		{"quitRequested", shell.EventQuitRequested},
+		{"muteFor", shell.EventMuteFor},
+		{"unmute", shell.EventUnmute},
+		{"addServer", shell.EventAddServer},
+		{"newChannelFromTray", shell.EventNewChannelFromTray},
+		{"openRoom", shell.EventOpenRoom},
 	} {
 		fmt.Fprintf(&out, "  %s: %q,\n", event.Name, event.Value)
 	}

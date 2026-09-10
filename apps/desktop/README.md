@@ -97,6 +97,52 @@ shared jar would do. Removing a server takes its session with it: re-adding it
 starts signed out rather than silently resuming, which on a shared machine is
 the difference that matters.
 
+## The tray
+
+What makes closing the window different from quitting. The menu carries the
+few things somebody wants without looking at the application: bring it back,
+silence it for a while, go straight to a conversation, add a server or a
+channel, or leave.
+
+Every item does something. A tray menu listing what an application might one
+day do teaches people not to open it.
+
+The mute options are flat rather than a submenu, and deliberately so: this menu
+is rebuilt whenever the unread count or the conversations change, and nested
+items do not survive that round trip over D-Bus — they arrive as an empty
+submenu. Three items at the top level cost a little height and actually work.
+
+Muting offers fifteen minutes, an hour, or until tomorrow, and says how long is
+left. A meeting is why somebody reaches for it, and an application offering only
+"off" would leave them silent for a week without noticing. "Until tomorrow"
+means local midnight rather than twenty-four hours, which would run through most
+of the next working day.
+
+### The icon
+
+Two icons, from `build/icons/*.svg` — run `sh build/icons/generate.sh` after
+changing the artwork, and commit the result so a checkout builds without
+librsvg.
+
+The tray one is a single colour, because a tray sits on a panel whose colour
+this application cannot read. It is drawn in **white**, not `currentColor`:
+`currentColor` has no value when an SVG is rendered on its own and falls back
+to black, which on a dark panel is an invisible icon — and that is exactly what
+shipped the first time, confirmed by reading the pixmap off the bus as black at
+12% opacity.
+
+The two bubbles are outline-and-solid rather than two solids, because at
+sixteen pixels two solid shapes merge into a blob.
+
+## One instance
+
+Launching TDC again means "show me TDC", not "give me a second copy". Two
+copies would hold two sessions, two trays and two sets of notifications for one
+person, and their unread counts would disagree.
+
+A second launch raises the first window and exits, so pressing a launcher icon
+while the application is minimised does what somebody meant.
+
 ## Notifications
 
 Two kinds, both shown for the same message. The interface has its own — a bell

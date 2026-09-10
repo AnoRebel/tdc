@@ -11,6 +11,12 @@ export const menuEvents = {
   notifications: "menu:notifications",
   keyboardHelp: "menu:keyboard-help",
   openConversation: "notification:open",
+  quitRequested: "app:quit-requested",
+  muteFor: "tray:mute-for",
+  unmute: "tray:unmute",
+  addServer: "tray:add-server",
+  newChannelFromTray: "tray:new-channel",
+  openRoom: "tray:open-room",
 } as const;
 
 /** One of the names above. */

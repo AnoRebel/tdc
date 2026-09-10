@@ -2,7 +2,7 @@
 Type=Application
 Name=TDC
 Exec=tdc
-Icon=tdc
+Icon=net.anorebel.tdc
 Categories=Network;InstantMessaging;Chat;
 Comment=Chat, project tracking, and a directory connecting developers with the people who need them.
 Terminal=false

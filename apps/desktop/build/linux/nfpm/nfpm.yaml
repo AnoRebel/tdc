@@ -19,10 +19,14 @@ release: "1"
 contents:
   - src: "./bin/tdc"
     dst: "/usr/local/bin/tdc"
-  - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/tdc.png"
+  # Every size a desktop environment looks for, under the application id the
+  # .desktop entry names. Installing one large image as though it were 128px —
+  # which this did — leaves the launcher scaling a 1024px picture down badly
+  # and every other size missing.
+  - src: "./build/linux/icons/hicolor/"
+    dst: "/usr/share/icons/hicolor/"
   - src: "./build/linux/tdc.desktop"
-    dst: "/usr/share/applications/tdc.desktop"
+    dst: "/usr/share/applications/net.anorebel.tdc.desktop"
 
 # Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
 depends:

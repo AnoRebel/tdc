@@ -35,7 +35,23 @@ saying so.
 //go:embed all:frontend/dist
 var assets embed.FS
 
+/*
+The tray icon, in one colour.
+
+A tray sits on a panel whose colour this application cannot read — light on
+some desktops, dark on others. A single-colour icon the desktop recolours is
+the only thing that looks right on both, which is what a template icon means.
+*/
+//go:embed build/icons/tray-32.png
+var trayIcon []byte
+
 func main() {
+	/*
+		Declared before the options because the second-instance callback
+		refers to it, and assigned below once the application exists.
+	*/
+	var window application.Window
+
 	/*
 		System notifications, built before the application so the response
 		handler is attached before any could arrive.
@@ -67,6 +83,29 @@ func main() {
 			*/
 			application.NewService(notifications.New()),
 			application.NewService(notify.NewService(notifier)),
+		},
+		/*
+			One instance, because this application is a place rather than a
+			document.
+
+			Launching it again — from a launcher, a notification, a desktop
+			file — means "show me TDC", not "give me a second copy". Two copies
+			would hold two sessions, two trays and two sets of notifications
+			for the same person, and the unread counts would disagree.
+
+			The second launch raises the first's window and exits, so pressing
+			the launcher icon while it is minimised does what somebody meant.
+		*/
+		SingleInstance: &application.SingleInstanceOptions{
+			// The application id, so the lock is this application's rather
+			// than anything else that picked the same word.
+			UniqueID: "net.anorebel.tdc",
+			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+				if window != nil {
+					window.Show()
+					window.Focus()
+				}
+			},
 		},
 		Linux: application.LinuxOptions{
 			/*
@@ -100,7 +139,7 @@ func main() {
 	*/
 	app.Menu.SetApplicationMenu(shell.NewMenu(app))
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "TDC",
 		/*
 			Large enough for a conversation beside a channel list, and small
@@ -122,6 +161,16 @@ func main() {
 		BackgroundColour: application.NewRGB(20, 22, 28),
 		URL:              "/",
 	})
+
+	/*
+		The tray, which is what makes closing the window different from
+		quitting.
+
+		Attached to the window so showing and hiding reach the right one, and
+		given the same icon the application uses everywhere else.
+	*/
+	tray := shell.NewTray(app, trayIcon)
+	tray.AttachWindow(window)
 
 	/*
 		Pressing a notification goes to what it was about.
