@@ -55,6 +55,18 @@ const (
 		before letting the application end.
 	*/
 	EventQuitRequested = "app:quit-requested"
+
+	// EventShowAbout asks the interface to say what this is and which version.
+	EventShowAbout = "app:about"
+
+	/*
+		EventQuitConfirmed is the interface saying it is all right to end.
+
+		The other half of EventQuitRequested: Go asks, the interface checks
+		whether anything would be lost and asks the person, and this is the
+		answer. Without it a quit request would hang for ever.
+	*/
+	EventQuitConfirmed = "app:quit-confirmed"
 )
 
 /*
@@ -92,9 +104,23 @@ func NewMenu(app *application.App) *application.Menu {
 	*/
 	file.AddRole(application.CloseWindow)
 	if !onMac {
-		// macOS puts Quit in the application menu, which AppMenu above added.
+		/*
+			Quit, asked for rather than done.
+
+			The platform's own Quit role ends the application immediately,
+			which is wrong when something is unsent — and only the interface
+			knows whether anything is. So this asks, and the interface quits
+			once it has checked.
+
+			macOS puts Quit in the application menu that AppMenu added above,
+			and that one is still the platform's. Replacing it there means
+			losing the conventional placement and shortcut, which is a worse
+			trade than an unconfirmed quit on one platform.
+		*/
 		file.AddSeparator()
-		file.AddRole(application.Quit)
+		file.Add("Quit TDC").
+			SetAccelerator("CmdOrCtrl+Q").
+			OnClick(func(*application.Context) { app.Event.Emit(EventQuitRequested) })
 	}
 
 	// The clipboard and undo, which a webview does not provide by itself: a
@@ -115,6 +141,11 @@ func NewMenu(app *application.App) *application.Menu {
 	menu.AddRole(application.WindowMenu)
 
 	help := menu.AddSubmenu("Help")
+	// What this is and which version, which is the first thing somebody
+	// reporting a problem is asked for.
+	help.Add("About TDC").
+		OnClick(func(*application.Context) { app.Event.Emit(EventShowAbout) })
+	help.AddSeparator()
 	help.Add("Keyboard shortcuts").
 		SetAccelerator("CmdOrCtrl+/").
 		OnClick(func(*application.Context) { app.Event.Emit(EventKeyboardHelp) })

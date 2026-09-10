@@ -31,6 +31,23 @@ onMounted(async () => {
   }
 });
 
+/*
+ * The server somebody is removing, held until they confirm.
+ *
+ * Removing takes the stored session with it, so the next launch needs a
+ * password — and the button sits beside "Switch to" in a list, where a
+ * misplaced press is easy.
+ */
+const removing = ref<KnownServer | null>(null);
+
+async function confirmRemoval() {
+  const server = removing.value;
+  if (!server) return;
+
+  removing.value = null;
+  await forget(server.url);
+}
+
 async function addServer() {
   refusal.value = "";
 
@@ -120,7 +137,7 @@ async function addServer() {
             type="button"
             class="btn btn-ghost shrink-0 text-xs text-destructive"
             :aria-label="`Remove ${server.url} and sign out of it`"
-            @click="forget(server.url)"
+            @click="removing = server"
           >
             Remove
           </button>
@@ -129,5 +146,14 @@ async function addServer() {
 
       <p v-else class="mt-6 text-xs text-muted-foreground">No servers yet.</p>
     </div>
+
+    <ConfirmDialog
+      v-if="removing"
+      title="Remove this server?"
+      :detail="`${removing.url} will be forgotten, along with the session kept for it. You will need to sign in again to add it back. Nothing on the server itself is changed.`"
+      confirm-label="Remove"
+      @cancel="removing = null"
+      @confirm="confirmRemoval"
+    />
   </main>
 </template>

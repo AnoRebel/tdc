@@ -30,6 +30,24 @@ const push = usePushNotifications();
 const tour = useTour();
 
 /*
+ * The person somebody is unblocking, held until they confirm.
+ *
+ * Blocking is something somebody did for a reason, and the button sits in a
+ * list where a misplaced press is easy. Unblocking is reversible, but not
+ * before the person is able to reach them again — which is the part that
+ * cannot be taken back.
+ */
+const unblocking = ref<{ id: string; username: string } | null>(null);
+
+async function confirmUnblock() {
+  const person = unblocking.value;
+  if (!person) return;
+
+  unblocking.value = null;
+  await personal.unblock(person.id);
+}
+
+/*
  * Gives the introduction again, from the beginning.
  *
  * Forgotten first, so it starts at step one rather than resuming wherever it
@@ -563,7 +581,7 @@ function deviceName(userAgent: string): string {
             <button
               type="button"
               class="btn btn-ghost h-7 px-2 text-xs"
-              @click="personal.unblock(person.id)"
+              @click="unblocking = person"
             >
               Unblock
             </button>
@@ -615,4 +633,13 @@ function deviceName(userAgent: string): string {
       </section>
     </div>
   </div>
+
+  <ConfirmDialog
+    v-if="unblocking"
+    :title="`Unblock @${unblocking.username}?`"
+    detail="They will be able to start a conversation with you again. They are not told that they were blocked, or that they no longer are."
+    confirm-label="Unblock"
+    @cancel="unblocking = null"
+    @confirm="confirmUnblock"
+  />
 </template>

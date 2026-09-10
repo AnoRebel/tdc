@@ -17,6 +17,11 @@ export const menuEvents = {
   addServer: "tray:add-server",
   newChannelFromTray: "tray:new-channel",
   openRoom: "tray:open-room",
+  askCloseBehaviour: "window:ask-close-behaviour",
+  confirmQuit: "window:confirm-quit",
+  setCloseBehaviour: "window:set-close-behaviour",
+  showAbout: "app:about",
+  quitConfirmed: "app:quit-confirmed",
 } as const;
 
 /** One of the names above. */

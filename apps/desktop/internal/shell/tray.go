@@ -293,14 +293,22 @@ func (t *Tray) rebuild() {
 		})
 
 	menu.AddSeparator()
+	menu.Add("About TDC").OnClick(func(*application.Context) {
+		t.tray.ShowWindow()
+		t.WindowShown(true)
+		t.app.Event.Emit(EventShowAbout)
+	})
+
 	/*
 		Quit, which asks first where anything would be lost.
 
-		The confirmation is the interface's, because it knows whether anything
-		is unsent and this does not — so this asks it to quit rather than
-		quitting, and the application ends when the interface says so.
+		The window is shown before asking: a confirmation nobody can see is a
+		quit that silently does nothing, which is exactly what this did when
+		the window was hidden in the tray.
 	*/
 	menu.Add("Quit TDC").OnClick(func(*application.Context) {
+		t.tray.ShowWindow()
+		t.WindowShown(true)
 		t.app.Event.Emit(EventQuitRequested)
 	})
 

@@ -134,6 +134,26 @@ shipped the first time, confirmed by reading the pixmap off the bus as black at
 The two bubbles are outline-and-solid rather than two solids, because at
 sixteen pixels two solid shapes merge into a blob.
 
+## Asking first
+
+Anything that loses something asks, and says what would be lost rather than
+only whether to continue. "Are you sure?" is a question nobody can answer;
+"the link stops working and whoever holds it cannot join" is.
+
+Cancel takes focus, so a reflexive Enter is the safe answer.
+
+Quitting is a request rather than an instruction. The menu item and the tray
+both emit it, the interface checks whether anything is unsent and asks, and Go
+ends the application only once it answers — neither side can decide alone,
+because only one knows the state and only the other can act on it.
+
+Closing the window asks once, the first time. For a chat client left open all
+day, closing usually means "off my screen"; for somebody who opens it to read
+something, it means done. Neither is guessable, so it asks and then does what
+was chosen. Without a tray it always quits, whatever was chosen — hiding a
+window with no icon to bring it back leaves an application somebody can neither
+see nor stop.
+
 ## One instance
 
 Launching TDC again means "show me TDC", not "give me a second copy". Two

@@ -75,6 +75,13 @@ const targets: Target[] = [
     read: (text) => text.match(/Version\s*=\s*"([^"]*)"/)?.[1] ?? null,
     write: (text, next) => text.replace(/(Version\s*=\s*")[^"]*(")/, `$1${next}$2`),
   },
+  {
+    // And into the desktop client, which shows it on its About screen and
+    // compares it against what a release feed offers.
+    path: "apps/desktop/internal/buildinfo/version.go",
+    read: (text) => text.match(/Version\s*=\s*"([^"]*)"/)?.[1] ?? null,
+    write: (text, next) => text.replace(/(Version\s*=\s*")[^"]*(")/, `$1${next}$2`),
+  },
 ];
 
 let drifted = 0;

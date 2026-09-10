@@ -61,6 +61,11 @@ export const menuEvents = {
 		{"addServer", shell.EventAddServer},
 		{"newChannelFromTray", shell.EventNewChannelFromTray},
 		{"openRoom", shell.EventOpenRoom},
+		{"askCloseBehaviour", shell.EventAskCloseBehaviour},
+		{"confirmQuit", shell.EventConfirmQuit},
+		{"setCloseBehaviour", shell.EventSetCloseBehaviour},
+		{"showAbout", shell.EventShowAbout},
+		{"quitConfirmed", shell.EventQuitConfirmed},
 	} {
 		fmt.Fprintf(&out, "  %s: %q,\n", event.Name, event.Value)
 	}

@@ -43,6 +43,23 @@ const durations = [
   { hours: 0, label: "Until somebody lifts it" },
 ];
 
+/*
+ * The invitation somebody is withdrawing, held until they confirm.
+ *
+ * Withdrawing cannot be undone and is not obviously destructive from the
+ * button — "Withdraw" beside a list reads like tidying up, and whoever holds
+ * the link simply finds it stops working.
+ */
+const withdrawing = ref<ServerInvitation | null>(null);
+
+async function confirmWithdrawal() {
+  const invitation = withdrawing.value;
+  if (!invitation) return;
+
+  withdrawing.value = null;
+  await people.revoke(invitation.id);
+}
+
 async function confirmSuspension() {
   if (!suspending.value || !reason.value.trim()) return;
 
@@ -210,7 +227,7 @@ function when(value: string): string {
                 v-if="invitation.usable"
                 type="button"
                 class="btn btn-ghost h-7 px-2 text-xs"
-                @click="people.revoke(invitation.id)"
+                @click="withdrawing = invitation"
               >
                 Withdraw
               </button>
@@ -332,4 +349,18 @@ function when(value: string): string {
       </div>
     </div>
   </div>
+
+  <!--
+      Withdrawing an invitation cannot be undone. The link stops working, and
+      whoever holds it has no way of asking for another — they do not know who
+      to ask.
+    -->
+  <ConfirmDialog
+    v-if="withdrawing"
+    title="Withdraw this invitation?"
+    detail="The link stops working immediately. Anybody holding it will not be able to join, and will not be told why."
+    confirm-label="Withdraw"
+    @cancel="withdrawing = null"
+    @confirm="confirmWithdrawal"
+  />
 </template>

@@ -83,6 +83,9 @@ func main() {
 			*/
 			application.NewService(notifications.New()),
 			application.NewService(notify.NewService(notifier)),
+			// What this build is, which is the first thing anybody reporting a
+			// problem is asked for.
+			application.NewService(shell.NewAboutService()),
 		},
 		/*
 			One instance, because this application is a place rather than a
@@ -171,6 +174,31 @@ func main() {
 	*/
 	tray := shell.NewTray(app, trayIcon)
 	tray.AttachWindow(window)
+
+	/*
+		What the close button does, which is a question rather than an answer.
+
+		For a chat client left open all day, closing usually means "off my
+		screen"; for somebody who opens it to read something, it means done.
+		Neither is guessable, so the first close asks and every one after does
+		what was chosen.
+	*/
+	closing := shell.NewClosing(app, window, true)
+	closing.OnHide(func() { tray.WindowShown(false) })
+	app.Event.On(shell.EventSetCloseBehaviour, func(event *application.CustomEvent) {
+		closing.SetBehaviour(shell.BehaviourFrom(event.Data))
+	})
+
+	/*
+		Quitting, once the interface has checked that nothing is lost.
+
+		Go asks and the interface answers, rather than either deciding alone:
+		only the interface knows whether a message is unsent, and only Go can
+		end the process.
+	*/
+	app.Event.On(shell.EventQuitConfirmed, func(*application.CustomEvent) {
+		app.Quit()
+	})
 
 	/*
 		Pressing a notification goes to what it was about.
