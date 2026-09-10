@@ -179,7 +179,7 @@ Goal: the native client, with the capabilities that justify it over the PWA.
 - [x] 9.9d Store which tours somebody has seen on their account rather than in one browser, so an introduction shown on the web client is not shown again on the desktop one; verify replaying a tour by hand still works and that clearing the record offers it again (`platform/settings`)
 - [x] 9.10 Implement the Wails-bindings transport adapter satisfying `ApiClient`, normalising Wails rejections into the shared error type; verify the same contract tests as the web adapter pass
 - [x] 9.11 Implement server selection at first launch refusing unencrypted non-loopback addresses, with multi-server switching; verify an insecure address is refused with an explanation (`clients/desktop`)
-- [ ] 9.12 Implement OS keychain credential storage with a documented non-silent fallback; verify the absence of a keychain never results in plaintext storage (`clients/desktop`)
+- [x] 9.12 Implement OS keychain credential storage with a documented non-silent fallback; verify the absence of a keychain never results in plaintext storage (`clients/desktop`)
 - [ ] 9.13 Implement native notifications respecting system quiet modes, with activation navigating to the conversation; verify a background notification appears and navigates (`clients/desktop`)
 - [ ] 9.14 Implement the system tray with unread indication and configurable close-to-tray; verify disabling it makes closing exit the app (`clients/desktop`)
 - [ ] 9.15 Implement opt-in launch at login and window state restoration; verify autostart is off by default and position is restored, adjusted for disconnected displays (`clients/desktop`)

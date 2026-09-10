@@ -311,13 +311,17 @@ jobs:
           cache-dependency-path: server/go.sum
 
       - name: Check Go dependency licences
-        working-directory: server
         run: |
           # AGPL in the default path would make this impossible to self-host
           # freely, which is the whole premise. An operator may still choose an
           # AGPL service to run alongside; that is different from linking one.
+          #
+          # Both modules, not only the server: the desktop client links a
+          # keychain library and its transitive dependencies, which is exactly
+          # where something restricted would arrive unnoticed.
           go install github.com/google/go-licenses@latest
-          go-licenses check ./... --disallowed_types=forbidden,restricted
+          (cd server && go-licenses check ./... --disallowed_types=forbidden,restricted)
+          (cd apps/desktop && go-licenses check ./... --disallowed_types=forbidden,restricted)
 
   vulnerabilities:
     name: Vulnerability scan

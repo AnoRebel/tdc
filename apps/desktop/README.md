@@ -97,6 +97,42 @@ shared jar would do. Removing a server takes its session with it: re-adding it
 starts signed out rather than silently resuming, which on a shared machine is
 the difference that matters.
 
+## Staying signed in
+
+Two things are kept per server: the session the server issued, and the password
+that would obtain a new one. Storing both is what makes an expiring session
+invisible — the client renews it rather than showing a sign-in form every few
+weeks — and it is also why where they live matters. A session can be revoked
+from another device and expires on its own; a password is the account until it
+is changed.
+
+So they go in the operating system's keychain: Keychain on macOS, Credential
+Manager on Windows, Secret Service or KWallet on Linux. Encrypted at rest, and
+unlocked by the person's own login.
+
+The webview never sees them. `Recall` returns only the username, because a
+script in the page reaching a password would defeat the point of a keychain
+entirely — the Go side signs in with what it holds.
+
+### When there is no keychain
+
+Some machines have none: a bare window manager, a session reached over SSH, a
+keyring service that is installed but not running. On those, **nothing is
+written**. The application says so in words, offers to carry on signing in each
+time, and offers a file encrypted with a passphrase for somebody who would
+rather be remembered.
+
+What never happens is a quiet fall back to something weaker. `keyring`'s own
+default backend list ends with a file backend chosen automatically when no
+keychain is present, which would write a password to disk on exactly the
+machines least able to protect it — so this names the backends it will accept,
+and a test reads that list to be sure a file backend has not crept back in.
+
+The encrypted file is opt-in for a reason worth stating: its passphrase is
+typed into this application rather than held by the operating system. That is
+weaker than a keychain and stronger than not being remembered at all, and which
+of those matters more is a judgement only the person using it can make.
+
 ## The menu
 
 `internal/shell` builds the application menu. Items divide in two: those the

@@ -6,7 +6,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -260,4 +262,82 @@ func mustSend(t *testing.T, service *Service, path string) {
 	if _, err := service.Send(context.Background(), Request{Method: "GET", Path: path}); err != nil {
 		t.Fatalf("sending to %s: %v", path, err)
 	}
+}
+
+/*
+What the webview may learn about a stored credential.
+
+Only the username. The password and the session stay on the Go side, where a
+script in the webview cannot reach them — which is the whole reason for
+putting them in a keychain rather than in the page's own storage.
+
+Read from the source rather than by calling it, because a method that returned
+them would still pass a test that only looked at one field.
+*/
+func TestRecallReturnsNoSecrets(t *testing.T) {
+	source, err := os.ReadFile("service.go")
+	if err != nil {
+		t.Fatalf("reading the source: %v", err)
+	}
+
+	body := between(string(source), "func (s *Service) Recall(", "\n}")
+	if body == "" {
+		t.Fatal("Recall was not found")
+	}
+
+	for _, secret := range []string{"credential.Password", "credential.Session"} {
+		if strings.Contains(body, secret) {
+			t.Errorf("Recall returns %s to the webview", secret)
+		}
+	}
+	if !strings.Contains(body, "credential.Username") {
+		t.Error("Recall returns no username, so it tells the interface nothing")
+	}
+}
+
+/*
+Nowhere to keep a credential is reported rather than worked around.
+
+A service on a machine with no keychain still works — it just asks for a
+password each launch — and the interface can only say so if this does.
+*/
+func TestAServiceWithNoStoreSaysSo(t *testing.T) {
+	service := &Service{clients: map[string]*http.Client{}}
+
+	if got := service.CredentialStorage(); got != "none" {
+		t.Errorf("a service with no store reports %q", got)
+	}
+	if service.CredentialAdvice() == "" {
+		t.Error("a service with no store offers no advice")
+	}
+}
+
+/*
+And remembering without a store is refused, not silently dropped.
+
+Somebody who believes they are being remembered and is not will conclude the
+application is broken rather than that their machine has no keychain.
+*/
+func TestRememberingWithNoStoreIsRefused(t *testing.T) {
+	service := &Service{clients: map[string]*http.Client{}}
+
+	err := service.Remember("https://tdc.or.tz", "amina", "hunter2", "session")
+	if err == nil {
+		t.Error("remembering with nowhere to keep it reported success")
+	}
+}
+
+/** The text between two markers, or empty when either is missing. */
+func between(source, start, end string) string {
+	from := strings.Index(source, start)
+	if from < 0 {
+		return ""
+	}
+	rest := source[from+len(start):]
+
+	to := strings.Index(rest, end)
+	if to < 0 {
+		return ""
+	}
+	return rest[:to]
 }

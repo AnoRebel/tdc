@@ -27,6 +27,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/AnoRebel/tdc/apps/desktop/internal/credentials"
 )
 
 /*
@@ -65,6 +67,16 @@ type Service struct {
 	mu sync.RWMutex
 
 	/*
+		Where sessions are kept between launches, or nil where nothing on this
+		machine can hold one.
+
+		Nil is a working application that asks for a password each launch, not
+		a broken one — and the interface says so rather than leaving somebody
+		to notice.
+	*/
+	store *credentials.Store
+
+	/*
 		A client per server, because the session lives in its cookie jar.
 
 		Keyed by the checked origin, so two spellings of the same server —
@@ -101,7 +113,110 @@ exactly the connections that most need patience. Requests that should give up
 sooner pass their own context.
 */
 func New() *Service {
-	return &Service{clients: map[string]*http.Client{}}
+	service := &Service{clients: map[string]*http.Client{}}
+
+	/*
+		A keychain if this machine has one. The error is deliberately not
+		returned: an application that refused to start because a keyring
+		daemon was not running would be worse than one that asks for a
+		password each time and says why.
+	*/
+	if store, err := credentials.Open(); err == nil {
+		service.store = store
+	}
+
+	return service
+}
+
+/*
+CredentialStorage reports where credentials are kept, so the interface can say
+so.
+
+"none" is the answer that needs explaining, and CredentialAdvice is what to
+say about it.
+*/
+func (s *Service) CredentialStorage() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return string(s.store.Kind())
+}
+
+// CredentialAdvice explains a machine with nowhere to keep a credential.
+func (s *Service) CredentialAdvice() string {
+	return credentials.Advice()
+}
+
+/*
+UseEncryptedFile switches to a file encrypted with a passphrase.
+
+Only reached when somebody has been told there is no keychain and has chosen
+this rather than signing in each time. The passphrase is not kept: losing it
+means the file cannot be read, which is what makes it worth having.
+*/
+func (s *Service) UseEncryptedFile(directory, passphrase string) error {
+	store, err := credentials.OpenEncryptedFile(directory, func() (string, error) {
+		return passphrase, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.store = store
+
+	return nil
+}
+
+/*
+Remember keeps what lets somebody stay signed in to one server.
+
+Refused rather than silently skipped where there is nowhere safe: somebody who
+believes they are being remembered and is not will conclude the application is
+broken.
+*/
+func (s *Service) Remember(server, username, password, session string) error {
+	checked, err := ParseAddress(server)
+	if err != nil {
+		return err
+	}
+
+	s.mu.RLock()
+	store := s.store
+	s.mu.RUnlock()
+
+	return store.Save(checked.URL, credentials.Credential{
+		Session:  session,
+		Password: password,
+		Username: username,
+	})
+}
+
+/*
+Recall returns the username held for a server, and nothing else.
+
+Deliberately not the password or the session. Those are for this Go side to
+use when signing in again; handing them to the webview would put them where a
+script could reach them, which is the thing keeping them in a keychain was
+for.
+*/
+func (s *Service) Recall(server string) (string, error) {
+	checked, err := ParseAddress(server)
+	if err != nil {
+		return "", err
+	}
+
+	s.mu.RLock()
+	store := s.store
+	s.mu.RUnlock()
+
+	credential, found, err := store.Load(checked.URL)
+	if err != nil || !found {
+		return "", err
+	}
+
+	return credential.Username, nil
 }
 
 /*
@@ -187,6 +302,11 @@ func (s *Service) ForgetServer(address string) error {
 
 	delete(s.clients, checked.URL)
 	s.order = slices.DeleteFunc(s.order, func(held string) bool { return held == checked.URL })
+
+	// The stored credential goes with it. Leaving one behind so that re-adding
+	// a server silently signed somebody back in would be a surprise, and on a
+	// shared machine the wrong kind.
+	_ = s.store.Forget(checked.URL)
 
 	// Switching away from the one being removed rather than leaving requests
 	// pointed at a server this no longer holds a session for.

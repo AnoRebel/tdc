@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import * as Api from "#bindings/api";
+
 /**
  * Choosing which server to talk to.
  *
@@ -13,7 +15,21 @@ const { servers, loading, refresh, add, use, forget } = useServers();
 const typed = ref("");
 const refusal = ref("");
 
-onMounted(() => void refresh());
+/*
+ * Where this machine can keep a session, which somebody needs to know before
+ * signing in rather than after wondering why they are asked every time.
+ */
+const storage = ref("");
+const storageAdvice = ref("");
+
+onMounted(async () => {
+  await refresh();
+
+  storage.value = await Api.Service.CredentialStorage();
+  if (storage.value === "none") {
+    storageAdvice.value = await Api.Service.CredentialAdvice();
+  }
+});
 
 async function addServer() {
   refusal.value = "";
@@ -61,6 +77,18 @@ async function addServer() {
       <p v-if="refusal" id="refusal" role="alert" class="mt-2 text-xs text-destructive">
         {{ refusal }}
       </p>
+
+      <!-- Said before signing in, not after. Somebody who is not going to be
+           remembered should know that while choosing, and be told what would
+           change it — a machine that cannot keep a session is a working
+           application, not a broken one. -->
+      <section
+        v-if="storageAdvice"
+        class="mt-6 rounded-lg border border-warning/40 bg-warning/10 p-3"
+      >
+        <h2 class="text-xs font-semibold">You will have to sign in each time</h2>
+        <p class="mt-1 text-xs whitespace-pre-line text-muted-foreground">{{ storageAdvice }}</p>
+      </section>
 
       <ul v-if="servers.length" class="mt-6 space-y-1">
         <li
