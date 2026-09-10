@@ -22,6 +22,7 @@ export const menuEvents = {
   setCloseBehaviour: "window:set-close-behaviour",
   showAbout: "app:about",
   quitConfirmed: "app:quit-confirmed",
+  hideWindow: "window:hide",
 } as const;
 
 /** One of the names above. */

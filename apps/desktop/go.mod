@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/99designs/keyring v1.2.2
-	github.com/wailsapp/wails/v3 v3.0.0-beta.18
+	github.com/wailsapp/wails/v3 v3.0.0-beta.19
 )
 
 require (

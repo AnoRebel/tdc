@@ -201,6 +201,19 @@ func main() {
 	})
 
 	/*
+		Hiding the window, from the menu or its shortcut.
+
+		Through the tray rather than the window directly, so its menu says
+		"Show TDC" afterwards — a tray offering to hide a window that is
+		already hidden is the kind of small wrongness that makes an
+		application feel unmaintained.
+	*/
+	app.Event.On(shell.EventHideWindow, func(*application.CustomEvent) {
+		window.Hide()
+		tray.WindowShown(false)
+	})
+
+	/*
 		Pressing a notification goes to what it was about.
 
 		Emitted rather than navigated directly: the interface knows how to

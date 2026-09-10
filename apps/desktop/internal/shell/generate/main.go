@@ -66,6 +66,7 @@ export const menuEvents = {
 		{"setCloseBehaviour", shell.EventSetCloseBehaviour},
 		{"showAbout", shell.EventShowAbout},
 		{"quitConfirmed", shell.EventQuitConfirmed},
+		{"hideWindow", shell.EventHideWindow},
 	} {
 		fmt.Fprintf(&out, "  %s: %q,\n", event.Name, event.Value)
 	}

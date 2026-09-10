@@ -302,6 +302,25 @@ attaches a status, which is what `readFailure` reads.
 Go returns refusals as an answer with `ok` false and reports only genuine
 unreachability as an error, which is why `Send` has both.
 
+## Upgrading Wails
+
+Three things move together, and all three must:
+
+```sh
+go get github.com/wailsapp/wails/v3@vX             # the Go side
+go install github.com/wailsapp/wails/v3/cmd/wails3@vX   # the CLI
+bun add --cwd frontend @wailsio/runtime@X          # the JavaScript side
+```
+
+The Go library and `@wailsio/runtime` are two halves of one bridge, released
+together. When they disagree the application builds, starts, opens a window —
+and the window is blank, with nothing in any log to say why. Upgrading the Go
+side alone is the easy mistake, and it costs an hour to diagnose.
+
+`internal/shell/runtime_test.go` compares the two and fails if they drift. It
+also refuses a version range: `^3.0.0-beta.19` resolves to whatever npm feels
+like, which is the same failure with an extra step.
+
 ## Regenerating the bindings
 
 `wails3 generate bindings -ts -i` writes TypeScript mirroring the Go services

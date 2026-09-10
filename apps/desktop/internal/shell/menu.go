@@ -67,6 +67,16 @@ const (
 		answer. Without it a quit request would hang for ever.
 	*/
 	EventQuitConfirmed = "app:quit-confirmed"
+
+	/*
+		EventHideWindow puts the window behind the tray icon.
+
+		Not the same as minimising, which leaves it in a taskbar. Emitted
+		rather than done directly so the tray's own label stays in step —
+		the menu saying "Hide" while the window is already hidden is the kind
+		of small wrongness that makes an application feel unmaintained.
+	*/
+	EventHideWindow = "window:hide"
 )
 
 /*
@@ -138,7 +148,22 @@ func NewMenu(app *application.App) *application.Menu {
 	view.AddRole(application.Reload)
 	view.AddRole(application.ToggleFullscreen)
 
-	menu.AddRole(application.WindowMenu)
+	/*
+		The window menu, plus hiding.
+
+		The platform's Minimise sends the window to a taskbar; hiding puts it
+		behind the tray icon, which is the thing somebody actually wants when
+		they are done with it for now. Both are offered because they are
+		different, and the shortcut is the one every application uses for
+		getting a window out of the way.
+	*/
+	window := menu.AddSubmenu("Window")
+	window.Add("Hide TDC").
+		SetAccelerator("CmdOrCtrl+H").
+		OnClick(func(*application.Context) { app.Event.Emit(EventHideWindow) })
+	window.AddSeparator()
+	window.AddRole(application.Minimise)
+	window.AddRole(application.Zoom)
 
 	help := menu.AddSubmenu("Help")
 	// What this is and which version, which is the first thing somebody
