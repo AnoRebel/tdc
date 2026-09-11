@@ -246,21 +246,31 @@ export function useTheme() {
     const root = document.documentElement;
 
     /*
-     * The palette: this person's stored choice, then the operator's, then
-     * whatever is already applied.
+     * The palette: this person's stored choice, then a choice they have just
+     * made, then the operator's, then whatever is already applied.
      *
-     * The last of those matters. Falling back to "default" undid a choice made
-     * in this session every time server information arrived — and on a client
-     * with no server yet, that is immediately and for ever. Light and dark
-     * already worked this way; the palette did not, which is why one appeared
-     * to work and the other did not.
+     * The second of those is the one that was missing, and it is what made the
+     * toggle appear to do nothing. The operator's branding reports a palette
+     * even when the operator has chosen none — "default" is a real palette, not
+     * an absence — so it satisfied this chain and won. Somebody clicking "Warm"
+     * saw the attribute set and then removed again within the same tick, as the
+     * next run of the appearance watcher resolved the operator's default over
+     * the top of them.
+     *
+     * `chosen.palette` is the record of a deliberate choice in this session,
+     * which has not reached the account yet. It outranks an operator default
+     * for the same reason a stored choice does: the operator says what somebody
+     * starts with, not what they must keep.
      */
+    const chosenHere = chosen.value.palette;
     const wantedPalette = isPalette(mine?.palette)
       ? mine.palette
-      : isPalette(operator.palette)
-        ? operator.palette
-        : palette.value;
-    chosen.value = { ...chosen.value, palette: isPalette(mine?.palette) };
+      : chosenHere
+        ? palette.value
+        : isPalette(operator.palette)
+          ? operator.palette
+          : palette.value;
+    chosen.value = { ...chosen.value, palette: isPalette(mine?.palette) || chosenHere };
     palette.value = wantedPalette;
     if (wantedPalette === "default") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", wantedPalette);

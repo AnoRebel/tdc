@@ -128,6 +128,32 @@ describe("resolving the colours", () => {
   });
 
   /*
+   * The same thing, against the branding a real server actually sends.
+   *
+   * An operator who has chosen no palette is still reported as having
+   * "default", because that is the name of the palette the stylesheet ships —
+   * there is no value meaning "no opinion". So the previous test, which passed
+   * an empty operator, never met the case that broke: a person clicked "Warm",
+   * the attribute was set, and the next run of the appearance watcher resolved
+   * the operator's "default" over the top of it within the same tick. What the
+   * person saw was a toggle that did nothing.
+   */
+  it("does not let the operator's default undo a palette chosen in this session", () => {
+    const theme = useTheme();
+
+    theme.setPalette("congrator");
+    expect(documentState().palette).toBe("congrator");
+
+    // What a server with no palette configured actually reports.
+    theme.settle({ palette: "default" }, { palette: "", mode: "", accent: "" });
+
+    expect(
+      documentState().palette,
+      "the operator's default was applied over a choice made a moment ago",
+    ).toBe("congrator");
+  });
+
+  /*
    * Light or dark is the one the operator has no say in: it is a property of
    * the room somebody is sitting in, not of the instance they are using.
    */
