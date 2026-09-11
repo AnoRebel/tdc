@@ -21,6 +21,7 @@ export interface AboutDetails {
 }
 
 export function useAppCommands() {
+  const { $localeRoute: localeRoute } = useI18n();
   const router = useRouter();
   const about = useState<AboutDetails | null>("about", () => null);
   const showingAbout = useState("about-showing", () => false);
@@ -44,7 +45,7 @@ export function useAppCommands() {
         confirmingQuit.value = true;
       }),
       // Where somebody looks when they wonder whether they are up to date.
-      Events.On(menuEvents.showUpdates, () => void router.push("/updates")),
+      Events.On(menuEvents.showUpdates, () => void router.push(localeRoute({ name: "updates" }))),
       /*
        * Settings, from the menu or its shortcut.
        *
@@ -53,7 +54,10 @@ export function useAppCommands() {
        * which is what made this item do nothing anywhere but the first
        * screen.
        */
-      Events.On(menuEvents.preferences, () => void router.push("/appearance")),
+      Events.On(
+        menuEvents.preferences,
+        () => void router.push(localeRoute({ name: "appearance" })),
+      ),
     ];
 
     onBeforeUnmount(() => {

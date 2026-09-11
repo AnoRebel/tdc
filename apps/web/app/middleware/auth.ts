@@ -5,6 +5,7 @@
  * request independently, so a visitor who skips the interface gains nothing.
  */
 export default defineNuxtRouteMiddleware(async (to) => {
+  const { $localeRoute: localeRoute } = useI18n();
   const { signedIn, ready, refresh, setupStatus } = useAuth();
 
   // On a full page load, route middleware runs before the application has
@@ -29,7 +30,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   try {
     const status = await setupStatus();
     if (status.setupRequired) {
-      return navigateTo("/setup");
+      return navigateTo(localeRoute({ name: "setup" }));
     }
   } catch {
     // Unknown. Sending somebody to sign in is the safe half of the guess: the
@@ -37,5 +38,5 @@ export default defineNuxtRouteMiddleware(async (to) => {
     // wait for a connection.
   }
 
-  return navigateTo({ path: "/signin", query: { next: to.fullPath } });
+  return navigateTo(localeRoute({ name: "signin", query: { next: to.fullPath } }));
 });

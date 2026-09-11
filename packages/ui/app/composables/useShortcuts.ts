@@ -1,5 +1,6 @@
 import { onKeyStroke } from "@vueuse/core";
 
+import { isMac } from "#layers/ui/app/lib/platform";
 import { isTyping } from "#layers/ui/app/lib/shortcuts";
 
 /**
@@ -22,8 +23,7 @@ export interface Shortcut {
  * something unexpected on a Mac, where Ctrl is a different modifier.
  */
 function hasCommandModifier(event: KeyboardEvent): boolean {
-  const mac = navigator.platform.toUpperCase().includes("MAC");
-  return mac ? event.metaKey : event.ctrlKey;
+  return isMac() ? event.metaKey : event.ctrlKey;
 }
 
 /**

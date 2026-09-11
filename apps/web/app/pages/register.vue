@@ -8,6 +8,7 @@ useHead({ title: "Create an account" });
 
 const { register } = useAuth();
 const router = useRouter();
+const { $localeRoute: localeRoute } = useI18n();
 
 const username = ref("");
 const email = ref("");
@@ -27,7 +28,7 @@ async function submit() {
       email: email.value || undefined,
       displayName: displayName.value || undefined,
     });
-    await router.push("/");
+    await router.push(localeRoute({ name: "index" }));
   } catch (cause) {
     // The server names which field is the problem — a taken username, a weak
     // password — so its message is shown rather than a generic one.
@@ -117,7 +118,12 @@ async function submit() {
 
     <p class="mt-6 text-center text-sm text-muted-foreground">
       Already have an account?
-      <NuxtLink to="/signin" class="font-medium text-primary hover:underline">Sign in</NuxtLink>
+      <NuxtLink
+        :to="localeRoute({ name: 'signin' })"
+        class="font-medium text-primary hover:underline"
+      >
+        Sign in
+      </NuxtLink>
     </p>
   </div>
 </template>

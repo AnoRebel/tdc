@@ -8,6 +8,7 @@ useHead({ title: "Sign in" });
 
 const { signIn, setupStatus } = useAuth();
 const router = useRouter();
+const { $localeRoute: localeRoute } = useI18n();
 
 const username = ref("");
 const password = ref("");
@@ -26,7 +27,7 @@ const submitting = ref(false);
 try {
   const status = await setupStatus();
   if (status.setupRequired) {
-    await router.replace("/setup");
+    await router.replace(localeRoute({ name: "setup" }));
   }
 } catch {
   // Unknown, so the form is shown. Signing in will report the same problem
@@ -107,7 +108,10 @@ async function submit() {
 
     <p class="mt-6 text-center text-sm text-muted-foreground">
       No account yet?
-      <NuxtLink to="/register" class="font-medium text-primary hover:underline">
+      <NuxtLink
+        :to="localeRoute({ name: 'register' })"
+        class="font-medium text-primary hover:underline"
+      >
         Create one
       </NuxtLink>
     </p>

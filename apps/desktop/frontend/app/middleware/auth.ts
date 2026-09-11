@@ -12,6 +12,7 @@ import * as Api from "#bindings/api";
  * request on its own, so a visitor who skips the interface gains nothing.
  */
 export default defineNuxtRouteMiddleware(async (to) => {
+  const { $localeRoute: localeRoute } = useI18n();
   /*
    * Asked for before anything is awaited.
    *
@@ -26,7 +27,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // of a session.
   const current = await Api.Service.CurrentServer();
   if (!current) {
-    return navigateTo("/servers");
+    return navigateTo(localeRoute({ name: "servers" }));
   }
 
   // On a full load the session has not been resolved yet; without this a signed
@@ -37,5 +38,5 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (signedIn.value) return;
 
-  return navigateTo({ path: "/signin", query: { next: to.fullPath } });
+  return navigateTo(localeRoute({ name: "signin", query: { next: to.fullPath } }));
 });

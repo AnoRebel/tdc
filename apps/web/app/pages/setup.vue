@@ -17,6 +17,7 @@ useHead({ title: "Set up this server" });
 
 const { setupStatus, completeSetup } = useAuth();
 const router = useRouter();
+const { $localeRoute: localeRoute } = useI18n();
 
 const username = ref("");
 const password = ref("");
@@ -26,7 +27,7 @@ const submitting = ref(false);
 
 const status = await setupStatus();
 if (!status.setupRequired) {
-  await router.replace("/signin");
+  await router.replace(localeRoute({ name: "signin" }));
 }
 
 async function submit() {
@@ -39,7 +40,7 @@ async function submit() {
       password: password.value,
       displayName: displayName.value || undefined,
     });
-    await router.push("/");
+    await router.push(localeRoute({ name: "index" }));
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not reach the server.";
   } finally {

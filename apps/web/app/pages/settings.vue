@@ -57,7 +57,7 @@ async function confirmUnblock() {
  */
 async function showTourAgain() {
   tour.forget("chat");
-  await navigateTo("/");
+  await navigateTo(localeRoute({ name: "index" }));
 }
 
 onMounted(() => void push.refresh());
@@ -158,6 +158,7 @@ onMounted(() => void personal.refresh());
 const { user, can, signOut, listSessions, revokeSession } = useAuth();
 const api = useApi();
 const router = useRouter();
+const { $localeRoute: localeRoute } = useI18n();
 
 const sessions = ref<Session[]>([]);
 const statuses = ref<ServerStatus[]>([]);
@@ -200,7 +201,7 @@ async function endSession(id: string) {
 
 async function leave() {
   await signOut();
-  await router.push("/signin");
+  await router.push(localeRoute({ name: "signin" }));
 }
 
 function when(value: string): string {
@@ -252,7 +253,11 @@ function deviceName(userAgent: string): string {
 <template>
   <div class="flex-1 overflow-y-auto">
     <header class="flex h-12 items-center gap-3 border-b px-4">
-      <NuxtLink to="/" class="btn btn-ghost size-7 px-0" aria-label="Back">
+      <NuxtLink
+        :to="localeRoute({ name: 'index' })"
+        class="btn btn-ghost size-7 px-0"
+        aria-label="Back"
+      >
         <ArrowLeft class="size-4" />
       </NuxtLink>
       <h1 class="text-sm font-semibold">Settings</h1>
@@ -600,25 +605,37 @@ function deviceName(userAgent: string): string {
       >
         <h2 class="text-sm font-semibold">Administration</h2>
         <div class="mt-3 flex flex-wrap gap-2">
-          <NuxtLink v-if="can('server.configure')" to="/admin" class="btn btn-outline">
+          <NuxtLink
+            v-if="can('server.configure')"
+            :to="localeRoute({ name: 'admin' })"
+            class="btn btn-outline"
+          >
             <SlidersHorizontal class="size-3.5" />
             Server settings
           </NuxtLink>
           <NuxtLink
             v-if="can('user.suspend') || can('user.invite')"
-            to="/people"
+            :to="localeRoute({ name: 'people' })"
             class="btn btn-outline"
           >
             <Users class="size-3.5" />
             People
           </NuxtLink>
-          <NuxtLink v-if="can('moderation.review')" to="/reports" class="btn btn-outline">
+          <NuxtLink
+            v-if="can('moderation.review')"
+            :to="localeRoute({ name: 'reports' })"
+            class="btn btn-outline"
+          >
             <Flag class="size-3.5" />
             Reports
             <!-- The count is fetched by the queue itself; a badge here would
                  mean every settings visit reads the moderation queue. -->
           </NuxtLink>
-          <NuxtLink v-if="can('server.audit.read')" to="/audit" class="btn btn-outline">
+          <NuxtLink
+            v-if="can('server.audit.read')"
+            :to="localeRoute({ name: 'audit' })"
+            class="btn btn-outline"
+          >
             <ScrollText class="size-3.5" />
             View the audit log
           </NuxtLink>

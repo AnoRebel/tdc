@@ -3,6 +3,8 @@ import { isApiError } from "@tdc/types";
 import { ArrowLeft, ShieldAlert, TriangleAlert } from "lucide-vue-next";
 import { Switch } from "#layers/ui/app/components/ui/switch";
 
+const { $localeRoute: localeRoute } = useI18n();
+
 /**
  * Server administration.
  *
@@ -141,7 +143,11 @@ function bytes(value: number): string {
 <template>
   <div class="flex-1 overflow-y-auto">
     <header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
-      <NuxtLink to="/settings" class="btn btn-ghost size-7 px-0" aria-label="Back to settings">
+      <NuxtLink
+        :to="localeRoute({ name: 'settings' })"
+        class="btn btn-ghost size-7 px-0"
+        aria-label="Back to settings"
+      >
         <ArrowLeft class="size-4" />
       </NuxtLink>
       <h1 class="text-sm font-semibold">Server settings</h1>

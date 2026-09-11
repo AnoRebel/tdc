@@ -4,6 +4,8 @@ import { ArrowLeft, Check, Flag, ShieldAlert, X } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { reportReasonLabel } from "#layers/ui/app/lib/reports";
 
+const { $localeRoute: localeRoute } = useI18n();
+
 /**
  * The moderation queue.
  *
@@ -81,7 +83,11 @@ function name(address: string): string {
 <template>
   <div class="flex-1 overflow-y-auto">
     <header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
-      <NuxtLink to="/settings" class="btn btn-ghost size-7 px-0" aria-label="Back to settings">
+      <NuxtLink
+        :to="localeRoute({ name: 'settings' })"
+        class="btn btn-ghost size-7 px-0"
+        aria-label="Back to settings"
+      >
         <ArrowLeft class="size-4" />
       </NuxtLink>
       <h1 class="text-sm font-semibold">Reports</h1>

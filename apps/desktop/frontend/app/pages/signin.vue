@@ -19,6 +19,7 @@ useHead({ title: "Sign in" });
 
 const { signIn } = useAuth();
 const router = useRouter();
+const { $localeRoute: localeRoute } = useI18n();
 
 const server = ref("");
 const username = ref("");
@@ -40,7 +41,7 @@ onMounted(async () => {
     const current = await Api.Service.CurrentServer();
     if (!current) {
       // No server chosen yet — that screen comes first.
-      await router.replace("/servers");
+      await router.replace(localeRoute({ name: "servers" }));
       return;
     }
     server.value = current;
@@ -89,7 +90,7 @@ async function submit() {
       }
     }
 
-    await router.push("/");
+    await router.push(localeRoute({ name: "index" }));
   } catch (cause) {
     if (isApiError(cause) && cause.code === "rate-limited") {
       const wait = cause.retryAfterSeconds;
@@ -161,7 +162,10 @@ async function submit() {
 
     <p class="mt-6 text-center text-xs text-muted-foreground">
       Signing in to a different server?
-      <NuxtLink to="/servers" class="font-medium text-primary hover:underline">
+      <NuxtLink
+        :to="localeRoute({ name: 'servers' })"
+        class="font-medium text-primary hover:underline"
+      >
         Choose one
       </NuxtLink>
     </p>

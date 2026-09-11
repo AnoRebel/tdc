@@ -35,6 +35,7 @@ export interface Command {
  * showing, never what is allowed.
  */
 export function useCommands(options: { openShortcuts: () => void; createChannel: () => void }) {
+  const { $localeRoute: localeRoute } = useI18n();
   const { can, signOut } = useAuth();
   const router = useRouter();
   const theme = useTheme();
@@ -61,7 +62,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         label: "Settings",
         icon: Settings,
         keywords: "account status devices privacy blocked",
-        run: () => void router.push("/settings"),
+        run: () => void router.push(localeRoute({ name: "settings" })),
       },
       {
         id: "shortcuts",
@@ -92,7 +93,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         label: "Reports",
         icon: Flag,
         keywords: "moderation queue abuse",
-        run: () => void router.push("/reports"),
+        run: () => void router.push(localeRoute({ name: "reports" })),
       });
     }
 
@@ -102,7 +103,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         label: "People",
         icon: Users,
         keywords: "members invite suspend accounts",
-        run: () => void router.push("/people"),
+        run: () => void router.push(localeRoute({ name: "people" })),
       });
     }
 
@@ -112,7 +113,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         label: "Server settings",
         icon: SlidersHorizontal,
         keywords: "administration limits policy filter branding",
-        run: () => void router.push("/admin"),
+        run: () => void router.push(localeRoute({ name: "admin" })),
       });
     }
 
@@ -122,7 +123,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         label: "Audit log",
         icon: ScrollText,
         keywords: "history record who did",
-        run: () => void router.push("/audit"),
+        run: () => void router.push(localeRoute({ name: "audit" })),
       });
     }
 
@@ -139,7 +140,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         label: "Invite somebody",
         icon: Users,
         keywords: "invitation link code join",
-        run: () => void router.push("/people"),
+        run: () => void router.push(localeRoute({ name: "people" })),
       });
     }
 
@@ -150,7 +151,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
       keywords: "leave log out",
       run: async () => {
         await signOut();
-        await router.push("/signin");
+        await router.push(localeRoute({ name: "signin" }));
       },
     });
 

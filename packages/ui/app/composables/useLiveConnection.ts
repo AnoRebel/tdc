@@ -64,6 +64,19 @@ export function useLiveConnection(handlers: LiveHandlers) {
     closedDeliberately = false;
     open = false;
 
+    /*
+     * Whatever came before goes first.
+     *
+     * A reconnection asks for a new socket, and a socket that is merely
+     * forgotten is not closed: on the web its listeners stay attached, and on
+     * the desktop the Go side closes the previous connection when it opens the
+     * next — so the two sockets take turns killing each other, the replay is
+     * cut off mid-flight, and not one frame arrives. Dropping the reference was
+     * never the same as letting go of the thing.
+     */
+    socket?.close();
+    socket = null;
+
     socket = openSocket({
       onOpen: () => {
         open = true;
@@ -95,6 +108,17 @@ export function useLiveConnection(handlers: LiveHandlers) {
       },
 
       onClose: () => {
+        /*
+         * Let go of it properly, not merely forget it.
+         *
+         * A socket that reported closed still holds whatever it registered to
+         * hear about — listeners on the web, a bridge on the desktop. Nulling
+         * the reference leaves those attached, so every reconnection stacked
+         * another set on top and the desktop's Go side closed the live
+         * connection each time it opened the next. No frame ever survived long
+         * enough to be delivered.
+         */
+        socket?.close();
         socket = null;
         open = false;
         if (closedDeliberately) {

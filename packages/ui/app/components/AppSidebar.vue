@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { isMac } from "#layers/ui/app/lib/platform";
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import type { Notification } from "@tdc/types";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
+
+const { $localeRoute: localeRoute } = useI18n();
 
 /**
  * The persistent navigation.
@@ -74,7 +77,7 @@ async function goToNotification(notification: Notification) {
 }
 
 const shortcut = computed(() => {
-  const mac = import.meta.client && /Mac|iP(hone|ad|od)/.test(navigator.platform);
+  const mac = import.meta.client && isMac();
   return mac ? "⌘K" : "Ctrl K";
 });
 
@@ -302,7 +305,11 @@ function conversationName(room: Room): string {
            has no settings URL to send them to. -->
       <ThemeToggle v-model="showAppearance" />
 
-      <NuxtLink to="/settings" class="btn btn-ghost size-7 px-0" aria-label="Settings">
+      <NuxtLink
+        :to="localeRoute({ name: 'settings' })"
+        class="btn btn-ghost size-7 px-0"
+        aria-label="Settings"
+      >
         <Icon name="lucide:settings" class="size-3.5" />
       </NuxtLink>
     </footer>

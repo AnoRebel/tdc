@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import * as Api from "#bindings/api";
 
+const { $localeRoute: localeRoute } = useI18n();
+
 /**
  * Choosing which server to talk to.
  *
@@ -62,13 +64,13 @@ async function addServer() {
   // A server was chosen, so the next thing is signing in to it. The reachable
   // check inside add() has already passed, so this does not send anybody to a
   // form that cannot work.
-  await navigateTo("/signin");
+  await navigateTo(localeRoute({ name: "signin" }));
 }
 
 /** Switches to a server already added, then goes on to sign in to it. */
 async function useAndSignIn(url: string) {
   await use(url);
-  await navigateTo("/signin");
+  await navigateTo(localeRoute({ name: "signin" }));
 }
 </script>
 
@@ -126,7 +128,11 @@ async function useAndSignIn(url: string) {
         >
           <span class="min-w-0 flex-1 truncate text-sm">{{ server.url }}</span>
 
-          <NuxtLink v-if="server.current" to="/signin" class="btn btn-primary shrink-0 text-xs">
+          <NuxtLink
+            v-if="server.current"
+            :to="localeRoute({ name: 'signin' })"
+            class="btn btn-primary shrink-0 text-xs"
+          >
             Sign in
           </NuxtLink>
           <button

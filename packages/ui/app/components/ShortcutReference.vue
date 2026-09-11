@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { commandKeyLabel } from "#layers/ui/app/lib/platform";
 import { Keyboard } from "lucide-vue-next";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
 import { shortcuts } from "#layers/ui/app/composables/useShortcuts";
@@ -35,7 +36,7 @@ const groups = computed(() => {
  */
 const commandKey = computed(() => {
   if (import.meta.server) return "Ctrl";
-  return navigator.platform.toUpperCase().includes("MAC") ? "⌘" : "Ctrl";
+  return commandKeyLabel();
 });
 
 function label(key: string): string {
