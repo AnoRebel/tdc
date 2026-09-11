@@ -421,3 +421,34 @@ version is one place being wrong.
 Built for Linux, macOS and Windows. Phones and tablets are the progressive
 web application's job, so the mobile targets Wails scaffolds are not kept
 here.
+
+## If the window comes up blank on Linux
+
+The window is drawn by WebKitGTK, and on NVIDIA's proprietary driver it can
+come up blank — or die with "Error 71 (Protocol error)" — because that driver
+fails to map the shared buffers WebKit asks for. It happens under both
+Wayland and X11, so switching session type is not a cure.
+
+Wails already handles the usual case: at startup it looks for
+`/sys/module/nvidia`, and if that kernel module is loaded it turns the
+DMA-BUF renderer off before WebKit starts. Nothing is required of you.
+
+What that check misses is a card running the open-source nouveau driver,
+which loads a differently named module. Whether nouveau needs the workaround
+at all is unconfirmed — the underlying bug is described against the
+proprietary driver. If you are on one of those cards and the window is blank,
+set the switch yourself:
+
+```sh
+WEBKIT_DISABLE_DMABUF_RENDERER=1 tdc
+```
+
+It is honoured whatever the detection concluded, so it is also the way to
+rule the renderer in or out when you are not sure what you are looking at.
+Making it permanent means putting it in the environment the desktop entry
+launches with, not in a shell profile, since nothing launched from a menu
+reads those.
+
+Both backends are otherwise equivalent, and are checked that way: the same
+window rendered through Wayland and through XWayland produces the same
+picture, pixel for pixel.
