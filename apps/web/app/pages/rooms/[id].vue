@@ -10,7 +10,7 @@ import type {
 } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { readFailure } from "#layers/ui/app/lib/reachability";
-import type { MenuItem } from "~/components/ContextMenu.vue";
+import type { MenuItem } from "#layers/ui/app/components/ContextMenu.vue";
 import {
   Check,
   CheckSquare,

@@ -1,4 +1,4 @@
-import type { MenuItem } from "~/components/ContextMenu.vue";
+import type { MenuItem } from "#layers/ui/app/components/ContextMenu.vue";
 
 /**
  * Opens a context menu by right-click or by long press.

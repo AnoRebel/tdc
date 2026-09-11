@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PersonHit, RoomHit } from "@tdc/types";
-import type { Command } from "~/composables/useCommands";
+import type { Command } from "#layers/ui/app/composables/useCommands";
 import { Hash, Lock, MessageSquare, Search, User } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";

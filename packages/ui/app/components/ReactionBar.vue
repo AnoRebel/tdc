@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Reaction } from "@tdc/types";
 import { SmilePlus } from "lucide-vue-next";
-import { quickReactions } from "~/lib/emoji";
+import { quickReactions } from "#layers/ui/app/lib/emoji";
 
 /**
  * The reactions on one message, and the way to add another.

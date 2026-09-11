@@ -1,6 +1,6 @@
 import { onKeyStroke } from "@vueuse/core";
 
-import { isTyping } from "~/lib/shortcuts";
+import { isTyping } from "#layers/ui/app/lib/shortcuts";
 
 /**
  * One keyboard shortcut, as somebody reading the reference sees it.

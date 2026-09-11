@@ -2,7 +2,7 @@
 import type { Report } from "@tdc/types";
 import { ArrowLeft, Check, Flag, ShieldAlert, X } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
-import { reportReasonLabel } from "~/lib/reports";
+import { reportReasonLabel } from "#layers/ui/app/lib/reports";
 
 /**
  * The moderation queue.

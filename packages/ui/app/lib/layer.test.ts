@@ -119,11 +119,23 @@ describe("what the shared layer may depend on", () => {
    * the file that caused it.
    */
   it("defines every composable its own files call", () => {
-    const defined = new Set(
-      readdirSync(join(LAYER, "app", "composables"))
-        .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
-        .map((name) => name.replace(/\.ts$/, "")),
-    );
+    /*
+     * Every composable the layer defines, by the name it is called under —
+     * which is not always the file's own name. Nuxt auto-imports each exported
+     * function, so `useModeration.ts` exporting `useChannelBans` makes that
+     * name available; a check that only read filenames would report a name the
+     * layer genuinely provides as missing, which it did the moment a file with
+     * several exports moved in.
+     */
+    const defined = new Set<string>();
+    for (const name of readdirSync(join(LAYER, "app", "composables"))) {
+      if (!name.endsWith(".ts") || name.endsWith(".test.ts")) continue;
+      defined.add(name.replace(/\.ts$/, ""));
+      const contents = readFileSync(join(LAYER, "app", "composables", name), "utf8");
+      for (const match of contents.matchAll(/export\s+function\s+(use[A-Z][A-Za-z]*)/g)) {
+        if (match[1]) defined.add(match[1]);
+      }
+    }
 
     /*
      * Nuxt's own auto-imports, which every application has: they come from the
@@ -159,13 +171,22 @@ describe("what the shared layer may depend on", () => {
       "useLoadingIndicator",
     ]);
 
+    /*
+     * VueUse, auto-imported by @vueuse/nuxt — a module the layer itself
+     * registers (see nuxt.config.ts), so these come with the layer rather than
+     * from either application. Named explicitly rather than allowing every
+     * `use*`: the point of this check is to catch a name no one provides, and a
+     * blanket exception for the VueUse prefix would let those through too.
+     */
+    const vueuse = new Set(["useDebounceFn", "useThrottleFn", "useEventListener"]);
+
     const missing = new Set<string>();
     for (const { contents } of sources()) {
       for (const match of contents.matchAll(/\b(use[A-Z][A-Za-z]*)\s*\(/g)) {
         const name = match[1];
         if (!name) continue;
         // Declared in the same file, which several composables do internally.
-        if (defined.has(name) || framework.has(name)) continue;
+        if (defined.has(name) || framework.has(name) || vueuse.has(name)) continue;
         if (contents.includes(`function ${name}`) || contents.includes(`const ${name} =`)) continue;
         // Imported from a package rather than auto-imported. Read from the
         // import statements themselves: a name can sit on its own line in a
@@ -200,6 +221,24 @@ describe("what the shared layer may depend on", () => {
       }
     };
     walkComponents(join(LAYER, "app", "components"));
+
+    /*
+     * Components the layer registers globally from a plugin, rather than as a
+     * file under components/. The date picker is one: it is a third-party
+     * component the layer wraps and registers by name, and a template rendering
+     * <VueDatePicker> resolves against that registration, which travels with
+     * the layer to whichever application extends it.
+     */
+    const pluginsDir = join(LAYER, "app", "plugins");
+    if (existsSync(pluginsDir)) {
+      for (const entry of readdirSync(pluginsDir)) {
+        if (!entry.endsWith(".ts") || entry.endsWith(".test.ts")) continue;
+        const contents = readFileSync(join(pluginsDir, entry), "utf8");
+        for (const match of contents.matchAll(/\.component\(\s*["']([A-Za-z0-9]+)["']/g)) {
+          if (match[1]) own.add(match[1]);
+        }
+      }
+    }
 
     /*
      * What Nuxt itself provides, plus the vendored primitives imported by

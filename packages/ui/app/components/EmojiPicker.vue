@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Search } from "lucide-vue-next";
-import { emojiGroups, searchEmoji } from "~/lib/emoji";
+import { emojiGroups, searchEmoji } from "#layers/ui/app/lib/emoji";
 
 /**
  * Choosing an emoji.

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Flag } from "lucide-vue-next";
-import { reportReasonLabel } from "~/lib/reports";
+import { reportReasonLabel } from "#layers/ui/app/lib/reports";
 
 /**
  * Reporting something to a moderator.

@@ -39,6 +39,7 @@ const truncated = computed(() => props.size > maxBytes);
 /** Markdown can be read as its source as well as rendered. */
 const showSource = ref(false);
 const renderMarkdown = useMarkdown();
+const fetchMedia = useMediaFetch();
 
 const rendered = computed(() => {
   if (props.kind !== "markdown" || showSource.value) return "";
@@ -50,20 +51,21 @@ async function load() {
   error.value = null;
 
   try {
-    const response = await fetch(props.src, { credentials: "include" });
-    if (!response.ok) {
-      error.value = `The file could not be read (${response.status}).`;
-      return;
-    }
-
-    const buffer = await response.arrayBuffer();
+    // Through the injected fetcher, not fetch: on the desktop the session that
+    // authorises this is in the Go client's jar, not the webview, and a fetch
+    // from here would be refused. The web client's provider is a credentialed
+    // fetch; the desktop's routes through Go.
+    const buffer = await fetchMedia(props.src);
     const slice = buffer.byteLength > maxBytes ? buffer.slice(0, maxBytes) : buffer;
 
     // Anything that is not valid UTF-8 becomes a replacement character rather
     // than throwing: a log with one bad byte should still be readable.
     source.value = new TextDecoder("utf-8", { fatal: false }).decode(slice);
-  } catch {
-    error.value = "The file could not be reached.";
+  } catch (cause) {
+    // The provider puts the status in the message where it has one; a plain
+    // unreachable server has none, and either is more use than a bare failure.
+    error.value =
+      cause instanceof Error && cause.message ? cause.message : "The file could not be reached.";
   } finally {
     loading.value = false;
   }

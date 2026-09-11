@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Keyboard } from "lucide-vue-next";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
-import { shortcuts } from "~/composables/useShortcuts";
+import { shortcuts } from "#layers/ui/app/composables/useShortcuts";
 
 /**
  * What the keyboard does, for somebody who pressed "?".

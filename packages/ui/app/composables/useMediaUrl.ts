@@ -10,12 +10,15 @@
  * would 404 against the dev server.
  */
 export function useMediaUrl() {
-  const apiBase = useRuntimeConfig().public.apiBase ?? "";
+  // Where the API lives, from whichever application is running. On the web
+  // this is the configured base (empty in production, so paths stay relative to
+  // the page); on the desktop it is the chosen server's address.
+  const base = useMediaBase();
 
   return function mediaUrl(path: string | undefined): string {
     if (!path) return "";
     // Already absolute — a presigned object-store URL, for instance.
     if (/^https?:\/\//i.test(path)) return path;
-    return `${apiBase}${path}`;
+    return `${base}${path}`;
   };
 }
