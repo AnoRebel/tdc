@@ -134,6 +134,31 @@ shipped the first time, confirmed by reading the pixmap off the bus as black at
 The two bubbles are outline-and-solid rather than two solids, because at
 sixteen pixels two solid shapes merge into a blob.
 
+## Starting, and where the window goes
+
+Two choices, neither on unless somebody turns it on: open at login, and open to
+the tray rather than to a window. An application that added itself to a login,
+or opened invisibly, without being asked has taken a decision about somebody's
+machine that is not its to take.
+
+Opening hidden is read before the window is created, because a window created
+visible and then hidden flashes on screen — which is exactly what somebody
+choosing it asked not to happen.
+
+The window's last position and size are remembered, and checked against the
+connected displays before being used. A position remembered from a docked
+laptop is off-screen on a train, and a window restored to it is one nobody can
+see or reach.
+
+What is checked is not whether the window fits but whether enough of it can be
+**grabbed**: a strip along the top, which is what somebody actually takes hold
+of, overlapping a screen by at least a third of the window's width. Judging by
+total area accepts a window pushed up so far that only its lower half shows —
+plenty of pixels on screen, and no title bar to drag it back by.
+
+Saving is debounced by a second: dragging a window emits an event per frame,
+and this is a file.
+
 ## Updates
 
 Three separate steps, and deliberately so: checking says what exists,

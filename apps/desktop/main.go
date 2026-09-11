@@ -75,6 +75,29 @@ windowSettingsPath is where how-the-window-looks is kept.
 Beside the update settings, under the user's own configuration directory: none
 of it is secret, and all of it belongs to one person rather than the machine.
 */
+/*
+placementPath is where the window's last position is kept.
+
+Under the user's cache rather than their configuration: it is something
+observed rather than chosen, and losing it costs one badly-placed window.
+*/
+func placementPath() string {
+	cache, err := os.UserCacheDir()
+	if err != nil || cache == "" {
+		return ""
+	}
+	return filepath.Join(cache, "tdc", "placement.json")
+}
+
+// startupSettingsPath is where opening at login and opening hidden are kept.
+func startupSettingsPath() string {
+	config, err := os.UserConfigDir()
+	if err != nil || config == "" {
+		return ""
+	}
+	return filepath.Join(config, "tdc", "startup.json")
+}
+
 func windowSettingsPath() string {
 	config, err := os.UserConfigDir()
 	if err != nil || config == "" {
@@ -203,6 +226,16 @@ func main() {
 	windowSettings := windowSettingsPath()
 	opacity := shell.SavedOpacity(windowSettings)
 
+	/*
+		Whether to open to the tray rather than to a window.
+
+		Read before the window is created, because a window created visible and
+		then hidden flashes on screen — which is exactly what somebody choosing
+		this asked not to happen.
+	*/
+	startupSettings := startupSettingsPath()
+	openHidden := shell.StartsHidden(startupSettings)
+
 	window = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "TDC",
 		/*
@@ -237,7 +270,10 @@ func main() {
 			revisit. What the setting changes is the alpha of the colour above.
 		*/
 		BackgroundType: application.BackgroundTypeTranslucent,
-		URL:            "/",
+		// Created hidden where that was chosen, rather than shown and then
+		// hidden, which flashes.
+		Hidden: openHidden,
+		URL:    "/",
 	})
 
 	/*
@@ -249,6 +285,23 @@ func main() {
 	*/
 	tray := shell.NewTray(app, trayIcon)
 	tray.AttachWindow(window)
+	tray.WindowShown(!openHidden)
+
+	/*
+		Where the window was last time, if that is still somewhere it can be
+		seen.
+
+		Checked against the connected displays: a position remembered from a
+		docked laptop is off-screen on a train, and a window restored to it is
+		one nobody can reach.
+	*/
+	shell.RestoreWindowState(window, placementPath(), shell.ScreenBounds(app))
+
+	/*
+		Opening at login, and opening to the tray. Registered here because it
+		needs the application, which the service list above is declared with.
+	*/
+	app.RegisterService(application.NewService(shell.NewStartupService(app, startupSettings)))
 
 	/*
 		What the close button does, which is a question rather than an answer.

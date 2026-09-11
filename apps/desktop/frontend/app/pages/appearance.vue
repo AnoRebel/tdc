@@ -11,6 +11,12 @@ useHead({ title: "Appearance" });
 const { opacity, refresh, set } = useWindowOpacity();
 
 /*
+ * Opening at login, and opening to the tray. On this screen because it is
+ * where the desktop client's own settings live.
+ */
+const startup = useStartup();
+
+/*
  * What the window is actually running at, kept apart from what the slider
  * shows. They differ the moment somebody moves it, and saying so is the whole
  * point — a slider that appears to do nothing reads as broken.
@@ -55,6 +61,7 @@ const palettes = [
 onMounted(async () => {
   await refresh();
   running.value = opacity.value;
+  await startup.refresh();
 });
 </script>
 
@@ -134,6 +141,47 @@ onMounted(async () => {
       </p>
       <p class="mt-2 text-xs text-muted-foreground">
         The slider stops at half, because below that text on any background becomes a struggle.
+      </p>
+    </section>
+    <section class="mt-8">
+      <h2 class="text-sm font-semibold">Starting</h2>
+      <p class="mt-1 text-xs text-muted-foreground">
+        Neither of these is on unless you turn it on.
+      </p>
+
+      <label class="mt-3 flex items-start gap-2 text-xs">
+        <input
+          type="checkbox"
+          class="mt-0.5"
+          :checked="startup.atLogin.value"
+          @change="startup.setAtLogin(($event.target as HTMLInputElement).checked)"
+        />
+        <span>
+          Open TDC when I log in
+          <span class="block text-muted-foreground">Takes effect at your next login.</span>
+        </span>
+      </label>
+
+      <label class="mt-2 flex items-start gap-2 text-xs">
+        <input
+          type="checkbox"
+          class="mt-0.5"
+          :checked="startup.hidden.value"
+          @change="startup.setHidden(($event.target as HTMLInputElement).checked)"
+        />
+        <span>
+          Start in the tray, without a window
+          <span class="block text-muted-foreground">
+            TDC is there and receiving messages, without a window appearing over whatever you sat
+            down to do.
+          </span>
+        </span>
+      </label>
+
+      <!-- Some desktops have nowhere to register this. Saying so beats a
+           switch that quietly returns to off. -->
+      <p v-if="startup.problem.value" role="alert" class="mt-2 text-xs text-destructive">
+        {{ startup.problem.value }}
       </p>
     </section>
   </main>
