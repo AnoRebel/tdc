@@ -207,7 +207,7 @@ The chat is built once and shared, so the desktop and the web cannot drift. What
 
 - [x] 9b.4 Build the desktop sign-in screen over the shared `useAuth`, and offer to keep the session in the OS keychain after it succeeds — the `Remember` and `Recall` bindings exist and are unused. Somebody who accepts is not asked for a password on the next launch; somebody who declines, or has no keychain, signs in each time, which the servers screen already explains (`clients/desktop`)
 - [x] 9b.5 Build the desktop chat shell and conversation screen over the shared components — the sidebar as a column that stays, since a desktop window is not a phone, but the drawer and the full keyboard set kept for a small window on a small laptop. The conversation itself is the shared surface, unchanged (`clients/desktop`)
-- [ ] 9b.6 A native notification opens the conversation it is about. The tray and notifications are wired; clicking one now raises the window and navigates to the room, rather than only raising the window (`clients/desktop`)
+- [x] 9b.6 A native notification opens the conversation it is about — already wired from the tray work, and now by named route rather than a built path, so it survives a locale strategy that prefixes (`clients/desktop`)
 - [ ] 9b.7 Verify on this machine: sign in against a local server, send and receive in a channel and a direct conversation, and confirm a message sent from the web appears in the desktop client. Keychain round-trip checked in both directions where a keychain is present (`clients/desktop`)
 - [ ] **MILESTONE 9b** — The desktop app signs in and holds a conversation indistinguishable from the web's, because it is the same conversation. This is what MILESTONE 9 was waiting on; tag `v0.9.0-dev` once both are demonstrable.
 

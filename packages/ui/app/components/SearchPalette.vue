@@ -26,6 +26,7 @@ const { matching } = useCommands({
 });
 const rooms = useRooms();
 const router = useRouter();
+const { $localeRoute: localeRoute } = useI18n();
 
 const field = ref<HTMLInputElement>();
 const active = ref(0);
@@ -124,10 +125,13 @@ async function choose(entry: Entry | undefined) {
   // and the second attempt does nothing — which reads as the search being
   // broken rather than as already being there.
   open.value = false;
-  await router.push({
-    path: `/rooms/${message.roomId}`,
-    query: { at: message.eventId, jump: String(Date.now()) },
-  });
+  await router.push(
+    localeRoute({
+      name: "rooms-id",
+      params: { id: message.roomId },
+      query: { at: message.eventId, jump: String(Date.now()) },
+    }),
+  );
 }
 
 /** Opens a room, joining first when the person is not yet in it. */
@@ -147,7 +151,7 @@ async function openRoom(room: RoomHit) {
   }
 
   open.value = false;
-  await router.push(`/rooms/${room.id}`);
+  await router.push(localeRoute({ name: "rooms-id", params: { id: room.id } }));
 }
 
 async function openDirect(person: PersonHit) {
@@ -155,7 +159,7 @@ async function openDirect(person: PersonHit) {
   try {
     const room = await rooms.openDirect([person.id]);
     open.value = false;
-    await router.push(`/rooms/${room.id}`);
+    await router.push(localeRoute({ name: "rooms-id", params: { id: room.id } }));
   } catch {
     // Somebody may not accept direct messages. The palette stays open with the
     // results still showing, so the attempt is visibly not a navigation.

@@ -70,10 +70,13 @@ onMounted(() => {
 
 /** Opens the message a notification is about. */
 async function goToNotification(notification: Notification) {
-  await router.push({
-    path: `/rooms/${notification.roomId}`,
-    query: { at: notification.eventId, jump: String(Date.now()) },
-  });
+  await router.push(
+    localeRoute({
+      name: "rooms-id",
+      params: { id: notification.roomId },
+      query: { at: notification.eventId, jump: String(Date.now()) },
+    }),
+  );
 }
 
 const shortcut = computed(() => {

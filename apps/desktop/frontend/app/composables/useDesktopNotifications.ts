@@ -46,6 +46,7 @@ export function useDesktopNotifications() {
  */
 export function useNotificationOpens() {
   const router = useRouter();
+  const { $localeRoute: localeRoute } = useI18n();
 
   onMounted(() => {
     const stop = Events.On(menuEvents.openConversation, (event: { data?: unknown }) => {
@@ -58,11 +59,19 @@ export function useNotificationOpens() {
 
       if (!target?.room) return;
 
-      void router.push({
-        path: `/rooms/${target.room}`,
-        // The message to scroll to, where the notification was about one.
-        query: target.message ? { at: target.message, jump: String(Date.now()) } : {},
-      });
+      /*
+       * By name, like every other navigation here: a conversation's own
+       * identifier is a parameter of the route rather than part of a path, so
+       * this keeps working whatever the locale strategy prefixes.
+       */
+      void router.push(
+        localeRoute({
+          name: "rooms-id",
+          params: { id: target.room },
+          // The message to scroll to, where the notification was about one.
+          query: target.message ? { at: target.message, jump: String(Date.now()) } : {},
+        }),
+      );
     });
 
     onBeforeUnmount(() => stop());

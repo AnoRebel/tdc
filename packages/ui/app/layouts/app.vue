@@ -25,6 +25,7 @@ const lastSeenRoomsKey = "tdc.lastseen.rooms";
 const roomsApi = useRooms();
 const api = useApi();
 const router = useRouter();
+const { $localeRoute: localeRoute } = useI18n();
 const { can } = useAuth();
 
 /*
@@ -248,7 +249,7 @@ async function createRoom() {
     newDisposable.value = false;
     creating.value = false;
     await refresh();
-    await router.push(`/rooms/${room.id}`);
+    await router.push(localeRoute({ name: "rooms-id", params: { id: room.id } }));
   } catch (cause) {
     // A refusal names the permission it wanted, which is precise but not a
     // sentence. Someone who cannot create channels needs to be told that,
@@ -276,7 +277,7 @@ function moveChannel(direction: number) {
   // settings means "take me to a conversation".
   const next = current < 0 ? 0 : (current + direction + rooms.length) % rooms.length;
 
-  void router.push(`/rooms/${rooms[next]!.id}`);
+  void router.push(localeRoute({ name: "rooms-id", params: { id: rooms[next]!.id } }));
 }
 
 /*

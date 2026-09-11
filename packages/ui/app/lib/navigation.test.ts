@@ -54,9 +54,20 @@ describe("how the applications navigate", () => {
         offenders.push(`${path}: ${match[1]}("${match[2]}")`);
       }
 
-      // navigateTo({ path: "/x" })
-      for (const match of contents.matchAll(/navigateTo\(\s*\{\s*path:\s*["'](\/[^"']*)["']/g)) {
-        offenders.push(`${path}: navigateTo({ path: "${match[1]}" })`);
+      // navigateTo({ path: "/x" }) and router.push({ path: `/x/${id}` }) alike.
+      // The template-literal form is how a conversation's own URL was built,
+      // which a check for quoted strings alone walked straight past.
+      for (const match of contents.matchAll(
+        /(navigateTo|router\.push|router\.replace)\(\s*\{\s*path:\s*[`"'](\/[^`"']*)/g,
+      )) {
+        offenders.push(`${path}: ${match[1]}({ path: "${match[2]}..." })`);
+      }
+
+      // router.push(`/x/${id}`) — the same thing without the object.
+      for (const match of contents.matchAll(
+        /(navigateTo|router\.push|router\.replace)\(\s*`(\/[^`]*)`/g,
+      )) {
+        offenders.push(`${path}: ${match[1]}(\`${match[2]}\`)`);
       }
 
       /*
