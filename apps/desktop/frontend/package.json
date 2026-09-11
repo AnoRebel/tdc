@@ -14,7 +14,7 @@
   "dependencies": {
     "@tdc/types": "workspace:*",
     "@tdc/ui": "workspace:*",
-    "@wailsio/runtime": "3.0.0-beta.19",
+    "@wailsio/runtime": "3.0.0-beta.20",
     "nuxt": "catalog:vue",
     "vue": "catalog:vue"
   },

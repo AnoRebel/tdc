@@ -23,7 +23,7 @@
       "dependencies": {
         "@tdc/types": "workspace:*",
         "@tdc/ui": "workspace:*",
-        "@wailsio/runtime": "3.0.0-beta.19",
+        "@wailsio/runtime": "3.0.0-beta.20",
         "nuxt": "catalog:vue",
         "vue": "catalog:vue",
       },
@@ -843,7 +843,7 @@
 
     "@vueuse/shared": ["@vueuse/shared@14.4.0", "", { "peerDependencies": { "vue": "^3.5.0" } }, "sha512-JRgY90Sz8DDtPMsaDflvPMp9xYk69JZAmbuDvAquUVXKr2gEjqtzGNTTthLfckH0BzBqvnu31gb4a8TGLRe79g=="],
 
-    "@wailsio/runtime": ["@wailsio/runtime@3.0.0-beta.19", "", {}, "sha512-y5kpadWYzrxClPfzCxu+LBAjEXUcrLHsEixjODscLQy18Ja+e3SFIpP464wTDymbjtZ70FqF2ORyYG5qazlhYQ=="],
+    "@wailsio/runtime": ["@wailsio/runtime@3.0.0-beta.20", "", {}, "sha512-oPpWBgNK4QISP9/AweVnRIBg6hlEP7HVi0i4gVl0+6JEsQ6vDDTJXmbyy/j6AITPHWq7cWOYl2Ey5uucl1u3hw=="],
 
     "abbrev": ["abbrev@5.0.0", "", {}, "sha512-/XrFJgzQQQHpti1raDJC6m4ws6aNktmjBlhk8Fdlk7LwCEuDoieEJJY9OFHjfiFJFFRM2tK+Ky/IsfbbmlMu1w=="],
 
