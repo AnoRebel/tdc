@@ -30,7 +30,12 @@ const maxRetryDelay = 30_000;
 export function useLiveConnection(handlers: LiveHandlers) {
   const state = ref<ConnectionState>("connecting");
 
-  let socket: WebSocket | null = null;
+  // How the connection is actually opened — a WebSocket on the web, a Go bridge
+  // on the desktop. Everything below this is the same for both.
+  const openSocket = useLiveSocket();
+
+  let socket: LiveSocket | null = null;
+  let open = false;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let attempt = 0;
   let closedDeliberately = false;
@@ -42,13 +47,6 @@ export function useLiveConnection(handlers: LiveHandlers) {
   // The room currently on screen, restored on reconnection.
   let watching: string | null = null;
   const lastSequence = new Map<string, number>();
-
-  const apiBase = useRuntimeConfig().public.apiBase;
-
-  function socketUrl(): string {
-    const base = apiBase || window.location.origin;
-    return base.replace(/^http/, "ws") + "/api/live";
-  }
 
   /**
    * How long to wait before the next attempt.
@@ -64,49 +62,48 @@ export function useLiveConnection(handlers: LiveHandlers) {
 
   function connect() {
     closedDeliberately = false;
-    socket = new WebSocket(socketUrl());
+    open = false;
 
-    socket.onopen = () => {
-      attempt = 0;
-      state.value = "connected";
-      // Resubscribe to everything, telling the server how far each room was
-      // read so it can replay the gap.
-      if (watching) {
-        send({ action: "viewing", room: watching });
-      }
+    socket = openSocket({
+      onOpen: () => {
+        open = true;
+        attempt = 0;
+        state.value = "connected";
+        // Resubscribe to everything, telling the server how far each room was
+        // read so it can replay the gap.
+        if (watching) {
+          send({ action: "viewing", room: watching });
+        }
 
-      if (subscribed.size > 0) {
-        send({
-          action: "subscribe",
-          rooms: [...subscribed],
-          since: Object.fromEntries(lastSequence),
-        });
-      }
-    };
+        if (subscribed.size > 0) {
+          send({
+            action: "subscribe",
+            rooms: [...subscribed],
+            since: Object.fromEntries(lastSequence),
+          });
+        }
+      },
 
-    socket.onmessage = (message) => {
-      let frame: LiveFrame;
-      try {
-        frame = JSON.parse(message.data as string);
-      } catch {
-        return;
-      }
-      handleFrame(frame);
-    };
+      onMessage: (data) => {
+        let frame: LiveFrame;
+        try {
+          frame = JSON.parse(data);
+        } catch {
+          return;
+        }
+        handleFrame(frame);
+      },
 
-    socket.onclose = () => {
-      socket = null;
-      if (closedDeliberately) {
-        state.value = "offline";
-        return;
-      }
-      scheduleReconnect();
-    };
-
-    socket.onerror = () => {
-      // onclose follows, which is where reconnection is handled.
-      socket?.close();
-    };
+      onClose: () => {
+        socket = null;
+        open = false;
+        if (closedDeliberately) {
+          state.value = "offline";
+          return;
+        }
+        scheduleReconnect();
+      },
+    });
   }
 
   function handleFrame(frame: LiveFrame) {
@@ -148,8 +145,12 @@ export function useLiveConnection(handlers: LiveHandlers) {
   }
 
   function send(message: Record<string, unknown>) {
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(message));
+    // Only once the socket has reported open. Before that the web's WebSocket
+    // would throw and the desktop's bridge would have nowhere to send; the
+    // machinery replays every subscription on open, so nothing is lost by
+    // dropping a message sent too early.
+    if (open && socket) {
+      socket.send(message);
     }
   }
 
@@ -185,6 +186,7 @@ export function useLiveConnection(handlers: LiveHandlers) {
     if (retryTimer) clearTimeout(retryTimer);
     socket?.close();
     socket = null;
+    open = false;
     state.value = "offline";
   }
 

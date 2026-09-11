@@ -14,7 +14,17 @@
  * web notion. Each application provides the base under this key, the way each
  * provides its transport under apiClientKey.
  */
-export const mediaBaseKey = Symbol("tdc.mediaBase") as InjectionKey<string>;
+/**
+ * A getter rather than a string, so the value can change after it is provided.
+ *
+ * The web client's base is fixed and returns the same string every time. The
+ * desktop client's is whichever server the person has chosen, which is empty
+ * before they choose and set once they do — so it is read each time rather than
+ * captured when the plugin ran.
+ */
+export type MediaBase = () => string;
+
+export const mediaBaseKey = Symbol("tdc.mediaBase") as InjectionKey<MediaBase>;
 
 /**
  * The base every media path is resolved against.
@@ -26,5 +36,5 @@ export const mediaBaseKey = Symbol("tdc.mediaBase") as InjectionKey<string>;
  * always provides one.
  */
 export function useMediaBase(): string {
-  return inject(mediaBaseKey, "");
+  return inject(mediaBaseKey, () => "")();
 }

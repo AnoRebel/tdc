@@ -16,6 +16,26 @@
  */
 @import "@vuepic/vue-datepicker/dist/main.css";
 
+/*
+ * Where the classes actually are, named rather than discovered.
+ *
+ * Tailwind v4 finds its sources by scanning outward from this stylesheet, and
+ * what that reaches depends on where the build is run from. The web client's
+ * build happened to reach this layer's components; the desktop client's, run
+ * from its own frontend directory, did not — so every class used only in a
+ * shared component was absent from its stylesheet, and the application shell
+ * rendered with no layout at all: no sidebar column, no full-height flex, the
+ * whole interface stacked in the first two hundred pixels.
+ *
+ * Naming the directories removes the guesswork. Both clients compile the same
+ * classes because both are told the same places to look.
+ */
+@source "../../components";
+@source "../../composables";
+@source "../../layouts";
+@source "../../lib";
+@source "../../plugins";
+
 @custom-variant dark (&:is(.dark *));
 
 /*

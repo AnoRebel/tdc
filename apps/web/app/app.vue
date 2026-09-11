@@ -38,4 +38,13 @@ useAppearanceSync();
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
+
+  <!--
+    A new version, offered rather than applied. Web-only: it updates the
+    service worker, which a desktop webview does not have — the desktop client
+    offers its own update through the menu, from the updater service. Rendered
+    here rather than in the shared layout so that the layout carries nothing a
+    desktop webview cannot run.
+  -->
+  <UpdatePrompt />
 </template>

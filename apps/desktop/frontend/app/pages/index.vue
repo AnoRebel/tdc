@@ -1,98 +1,73 @@
 <script setup lang="ts">
-/*
- * What opens when the application starts.
+import type { Room } from "@tdc/types";
+import { Hash, MessagesSquare } from "lucide-vue-next";
+
+/**
+ * The view before a conversation is chosen, on the desktop.
  *
- * A placeholder until server selection exists — 9.11 decides which server this
- * client talks to, and until it does there is nothing to sign in to.
- *
- * It does two real things, neither of them decoration. It calls into Go, which
- * is the only evidence that the generated bindings, the alias and the runtime
- * line up — a build that compiles proves the types agree, not that the call
- * arrives. And it answers the application menu, so the menu items are
- * demonstrably connected rather than merely present.
+ * The same empty state the web shows: the sidebar already holds every room, so
+ * what is useful here is saying what to do next rather than listing them again.
+ * The routing before this — no server, or not signed in — is the auth
+ * middleware's; by the time this renders, both are settled.
  */
-import * as Api from "#bindings/api";
 
-useHead({ title: "TDC" });
+definePageMeta({ middleware: "auth", layout: "app" });
 
-const bridge = ref<"asking" | "ready" | "broken">("asking");
-const detail = ref("");
+useHead({ title: "Home" });
 
-onMounted(async () => {
-  /*
-   * Nowhere to go yet sends somebody to choose a server.
-   *
-   * The first thing this application needs is an address: it is installed once
-   * and pointed at whichever server its owner belongs to, and every screen
-   * beyond this one needs to know which.
-   */
-  const current = await Api.Service.CurrentServer();
-  if (!current) {
-    await navigateTo("/servers");
-    return;
-  }
+const roomsApi = useRooms();
+const { user } = useAuth();
 
-  bridge.value = "ready";
-  detail.value = current;
-});
-
-/*
- * The menu, answered.
- *
- * There is no search or channel list yet, so those report that they arrived —
- * which is what makes the menu demonstrably wired rather than merely present.
- * Each is replaced by the real screen as that screen lands.
- */
-const lastCommand = ref("");
-function acknowledge(what: string) {
-  lastCommand.value = what;
+const rooms = ref<Room[]>([]);
+try {
+  rooms.value = await roomsApi.list();
+} catch {
+  // The sidebar reports its own failures; this view degrades to the prompt
+  // below rather than an error of its own.
 }
 
-/*
- * Appearance, which is the one setting this client can already offer.
- *
- * There is no settings screen here yet, and the theme is a choice somebody
- * makes on first opening an application rather than later — so the toggle is
- * on this screen, and the Settings menu item opens it rather than reporting
- * that it was pressed.
- */
-const showAppearance = ref(false);
+const joined = computed(() => rooms.value.filter((room) => room.member));
 
-useMenuCommands({
-  search: () => acknowledge("Search"),
-  newChannel: () => acknowledge("New channel"),
-  notifications: () => acknowledge("Notifications"),
-  keyboardHelp: () => acknowledge("Keyboard shortcuts"),
-});
+/** Just the first name, which is how people greet each other. */
+const firstName = computed(() => user.value?.displayName?.split(" ")[0] ?? "");
 </script>
 
 <template>
-  <main class="grid min-h-dvh place-items-center p-8 text-foreground">
-    <div class="max-w-sm text-center">
-      <h1 class="text-lg font-semibold">TDC</h1>
-      <p class="mt-2 text-sm text-muted-foreground">The desktop client. Signing in comes next.</p>
+  <div class="grid flex-1 place-items-center p-8">
+    <div class="w-full max-w-sm text-center">
+      <span class="mx-auto grid size-12 place-items-center rounded-xl bg-muted">
+        <MessagesSquare class="size-5 text-muted-foreground" />
+      </span>
 
-      <p
-        data-testid="bridge"
-        :data-state="bridge"
-        class="mt-6 text-xs"
-        :class="bridge === 'broken' ? 'text-destructive' : 'text-muted-foreground'"
-      >
-        <template v-if="bridge === 'asking'">Looking for your server…</template>
-        <template v-else-if="bridge === 'ready'">Connected to {{ detail }}.</template>
-        <template v-else>Could not reach the application. {{ detail }}</template>
+      <h1 class="mt-4 text-lg font-semibold">Karibu, {{ firstName }}</h1>
+
+      <p class="mt-1.5 text-sm text-pretty text-muted-foreground">
+        {{
+          joined.length
+            ? "Pick a conversation from the sidebar to carry on where you left off."
+            : "Join a channel from the sidebar, or create one to get started."
+        }}
       </p>
 
-      <p data-testid="menu-command" class="mt-2 text-xs text-muted-foreground">
-        <template v-if="lastCommand">Menu: {{ lastCommand }}</template>
-        <template v-else>Try the menu.</template>
-      </p>
-
-      <!-- Not in a sidebar, because there is not one yet. It moves into the
-           footer with the rest of the shell once a server is chosen. -->
-      <div class="mt-6 flex justify-center">
-        <ThemeToggle v-model="showAppearance" />
+      <div v-if="joined.length" class="mt-6 space-y-1 text-left">
+        <p
+          class="px-1 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
+        >
+          Jump back in
+        </p>
+        <NuxtLink
+          v-for="room in joined.slice(0, 4)"
+          :key="room.id"
+          :to="`/rooms/${room.id}`"
+          class="flex items-center gap-2 rounded-lg border bg-surface px-3 py-2 text-sm transition hover:border-border-strong hover:bg-accent"
+        >
+          <Hash class="size-3.5 shrink-0 text-muted-foreground" />
+          <span class="truncate font-medium">{{ room.name }}</span>
+          <span v-if="room.topic" class="truncate text-xs text-muted-foreground">
+            {{ room.topic }}
+          </span>
+        </NuxtLink>
       </div>
     </div>
-  </main>
+  </div>
 </template>

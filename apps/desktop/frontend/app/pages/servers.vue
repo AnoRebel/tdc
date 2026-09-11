@@ -58,6 +58,17 @@ async function addServer() {
   }
 
   typed.value = "";
+
+  // A server was chosen, so the next thing is signing in to it. The reachable
+  // check inside add() has already passed, so this does not send anybody to a
+  // form that cannot work.
+  await navigateTo("/signin");
+}
+
+/** Switches to a server already added, then goes on to sign in to it. */
+async function useAndSignIn(url: string) {
+  await use(url);
+  await navigateTo("/signin");
 }
 </script>
 
@@ -115,19 +126,16 @@ async function addServer() {
         >
           <span class="min-w-0 flex-1 truncate text-sm">{{ server.url }}</span>
 
-          <span
-            v-if="server.current"
-            class="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[0.6875rem] font-semibold text-primary-foreground"
-          >
-            Current
-          </span>
+          <NuxtLink v-if="server.current" to="/signin" class="btn btn-primary shrink-0 text-xs">
+            Sign in
+          </NuxtLink>
           <button
             v-else
             type="button"
             class="btn btn-outline shrink-0 text-xs"
-            @click="use(server.url)"
+            @click="useAndSignIn(server.url)"
           >
-            Switch to
+            Sign in
           </button>
 
           <!-- Removing a server takes its session with it, which is said here

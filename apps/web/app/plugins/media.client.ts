@@ -25,7 +25,7 @@ export default defineNuxtPlugin({
   setup(nuxtApp) {
     const base = useRuntimeConfig().public.apiBase ?? "";
 
-    nuxtApp.vueApp.provide(mediaBaseKey, base);
+    nuxtApp.vueApp.provide(mediaBaseKey, () => base);
 
     nuxtApp.vueApp.provide(mediaFetchKey, async (path: string) => {
       const url = /^https?:\/\//i.test(path) ? path : `${base}${path}`;

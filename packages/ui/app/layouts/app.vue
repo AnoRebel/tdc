@@ -27,6 +27,19 @@ const api = useApi();
 const router = useRouter();
 const { can } = useAuth();
 
+/*
+ * The introduction, the first time somebody arrives.
+ *
+ * Asked for here, with the other composables, and deliberately not further
+ * down beside the watcher that offers it. Everything below awaits, and a
+ * composable called after an await in a `<script setup>` that suspends has no
+ * component instance to inject from — useTour reaches for the transport, so it
+ * threw "no API client has been provided" from a layout whose first line had
+ * injected one perfectly well. When it is *offered* is the watcher's business;
+ * where it is *obtained* has to be before the first await.
+ */
+const tour = useTour();
+
 const rooms = ref<Room[]>([]);
 const direct = ref<Room[]>([]);
 const unread = ref<UnreadCounts>({});
@@ -126,17 +139,46 @@ function restoreRooms() {
   }
 }
 
-await refresh();
+const searching = ref(false);
+const showingShortcuts = ref(false);
 
 /*
- * The introduction, the first time somebody arrives.
+ * What the conversation can do, registered by whichever page is showing.
  *
- * After the rooms have loaded, because the tour points at a sidebar that has
- * to have something in it — highlighting an empty list would explain nothing
- * and look broken. Deferred a frame beyond that so the elements it points at
- * have actually been laid out.
+ * Refs rather than an event: the layout has to call these, and a page that is
+ * not a conversation simply never sets them — pressing the key then does
+ * nothing, which is the right outcome.
  */
-const tour = useTour();
+const composerFocus = ref<(() => void) | null>(null);
+const threadOpen = ref<(() => void) | null>(null);
+provide("composerFocus", composerFocus);
+provide("threadOpen", threadOpen);
+
+/*
+ * The keyboard, bound once for the whole application.
+ *
+ * Here rather than in each page because a shortcut that worked on one screen
+ * and not another would be one nobody relies on. What the conversation itself
+ * needs — focusing the message box, opening a thread — is provided by the page
+ * currently showing, which is the only thing that knows what "the last
+ * message" means.
+ */
+useShortcuts({
+  search: () => (searching.value = !searching.value),
+  reference: () => (showingShortcuts.value = !showingShortcuts.value),
+
+  // Switching channel is search with the channels already in front of you;
+  // there is no second palette to write.
+  switchChannel: () => (searching.value = true),
+
+  previousChannel: () => moveChannel(-1),
+  nextChannel: () => moveChannel(1),
+
+  composer: () => composerFocus.value?.(),
+  thread: () => threadOpen.value?.(),
+});
+
+await refresh();
 
 /**
  * Offers the introduction to somebody who has not had it.
@@ -219,34 +261,6 @@ async function createRoom() {
   }
 }
 
-const searching = ref(false);
-
-const showingShortcuts = ref(false);
-
-/*
- * The keyboard, bound once for the whole application.
- *
- * Here rather than in each page because a shortcut that worked on one screen
- * and not another would be one nobody relies on. What the conversation itself
- * needs — focusing the message box, opening a thread — is provided by the page
- * currently showing, which is the only thing that knows what "the last
- * message" means.
- */
-useShortcuts({
-  search: () => (searching.value = !searching.value),
-  reference: () => (showingShortcuts.value = !showingShortcuts.value),
-
-  // Switching channel is search with the channels already in front of you;
-  // there is no second palette to write.
-  switchChannel: () => (searching.value = true),
-
-  previousChannel: () => moveChannel(-1),
-  nextChannel: () => moveChannel(1),
-
-  composer: () => composerFocus.value?.(),
-  thread: () => threadOpen.value?.(),
-});
-
 /*
  * Moving between channels in the order the sidebar shows them.
  *
@@ -264,18 +278,6 @@ function moveChannel(direction: number) {
 
   void router.push(`/rooms/${rooms[next]!.id}`);
 }
-
-/*
- * What the conversation can do, registered by whichever page is showing.
- *
- * Refs rather than an event: the layout has to call these, and a page that is
- * not a conversation simply never sets them — pressing the key then does
- * nothing, which is the right outcome.
- */
-const composerFocus = ref<(() => void) | null>(null);
-const threadOpen = ref<(() => void) | null>(null);
-provide("composerFocus", composerFocus);
-provide("threadOpen", threadOpen);
 
 /*
  * Moving between channels, shared with whatever asks.
@@ -420,9 +422,5 @@ provide("openSearch", () => {
         </form>
       </aside>
     </Transition>
-
-    <!-- A new version, offered rather than applied. Last in the layout so it
-         sits above everything without competing for a place in it. -->
-    <UpdatePrompt />
   </div>
 </template>

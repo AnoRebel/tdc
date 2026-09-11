@@ -4,6 +4,7 @@ go 1.27
 
 require (
 	github.com/99designs/keyring v1.2.2
+	github.com/coder/websocket v1.8.15
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/wailsapp/wails/v3 v3.0.0-beta.20
 )
@@ -16,7 +17,6 @@ require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/coder/websocket v1.8.15 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20230818184609-3a137a874352 // indirect

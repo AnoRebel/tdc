@@ -290,6 +290,65 @@ describe("what the shared layer may depend on", () => {
   });
 
   /*
+   * And it asks for what it needs before it waits for anything.
+   *
+   * A `<script setup>` with a top-level await compiles to an async setup, and
+   * Vue only keeps the current component instance for the synchronous part of
+   * it. A composable called after the first await therefore injects from
+   * nothing — `useApi()` throws "no API client has been provided" from a file
+   * that injected one correctly three lines earlier, which reads as a missing
+   * plugin rather than a misplaced call.
+   *
+   * The application layout did exactly this: it obtained the tour after
+   * awaiting the room list, and the desktop client could not open a
+   * conversation at all. The web never showed it, which is the worst kind of
+   * bug to leave to a second client to find.
+   */
+  it("calls its composables before it awaits", () => {
+    const offenders: string[] = [];
+
+    for (const { path, contents } of sources()) {
+      if (!path.endsWith(".vue")) continue;
+
+      const setup = contents.match(/<script setup[^>]*>([\s\S]*?)<\/script>/)?.[1];
+      if (!setup) continue;
+
+      /*
+       * Where this file first suspends.
+       *
+       * Column zero only. An await inside a function body is indented and does
+       * not suspend setup — matching those would flag every conversation that
+       * fetches anything, which is all of them.
+       */
+      const firstAwait = setup.search(/^(?:await |(?:const|let) [^=]*= await )/m);
+      if (firstAwait < 0) continue;
+
+      /*
+       * Likewise only unindented calls: one inside a function runs when that
+       * function is called, which is not this problem. Both a declaration and a
+       * bare call count — useShortcuts({...}) injects nothing today, but the
+       * next composable called that way might.
+       */
+      for (const match of setup
+        .slice(firstAwait)
+        .matchAll(/^(?:(?:const|let)\s.*?=\s*)?\b(use[A-Z][A-Za-z]*)\s*\(/gm)) {
+        const name = match[1];
+        // useState and the router are safe; they do not inject. Keeping the
+        // list short on purpose — anything else is worth moving up rather than
+        // excusing here.
+        if (!name || name === "useState") continue;
+        offenders.push(`${path}: ${name}()`);
+      }
+    }
+
+    expect(
+      offenders.sort(),
+      "these run after a top-level await, where there is no component instance " +
+        "to inject from — move them above the first await",
+    ).toEqual([]);
+  });
+
+  /*
    * The layer names itself, which is what makes #layers/ui resolve.
    *
    * Without it the alias is derived from a path, and every import in both

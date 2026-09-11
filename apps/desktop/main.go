@@ -130,6 +130,11 @@ func main() {
 	settingsPath, downloadDir := updater.DefaultPaths()
 	updates := updater.NewService(updateFeedURL, settingsPath, downloadDir)
 
+	// Held by name because the live bridge, registered once the application
+	// exists, needs the same instance the webview's requests go through — the
+	// one whose cookie jar holds the session the live socket must carry.
+	apiService := api.New()
+
 	app := application.New(application.Options{
 		Name:        "TDC",
 		Description: "Chat, project tracking, and a directory connecting developers with the people who need them.",
@@ -146,7 +151,7 @@ func main() {
 			of somebody.
 		*/
 		Services: []application.Service{
-			application.NewService(api.New()),
+			application.NewService(apiService),
 			/*
 				The platform's own notifications, and this application's use of
 				them. Both are registered: the first is what Wails needs to
@@ -302,6 +307,16 @@ func main() {
 		needs the application, which the service list above is declared with.
 	*/
 	app.RegisterService(application.NewService(shell.NewStartupService(app, startupSettings)))
+
+	/*
+		The live connection, bridged from Go.
+
+		Registered here for the same reason the others are: it needs the
+		application, to push each frame to the webview as an event. It shares the
+		api service's cookie jar, so the socket it opens carries the session the
+		webview cannot.
+	*/
+	app.RegisterService(application.NewService(api.NewLiveBridge(apiService, app.Event.Emit)))
 
 	/*
 		What the close button does, which is a question rather than an answer.
