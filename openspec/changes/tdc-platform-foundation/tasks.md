@@ -209,6 +209,17 @@ The chat is built once and shared, so the desktop and the web cannot drift. What
 - [x] 9b.5 Build the desktop chat shell and conversation screen over the shared components — the sidebar as a column that stays, since a desktop window is not a phone, but the drawer and the full keyboard set kept for a small window on a small laptop. The conversation itself is the shared surface, unchanged (`clients/desktop`)
 - [x] 9b.6 A native notification opens the conversation it is about — already wired from the tray work, and now by named route rather than a built path, so it survives a locale strategy that prefixes (`clients/desktop`)
 - [ ] 9b.7 Verify on this machine: sign in against a local server, send and receive in a channel and a direct conversation, and confirm a message sent from the web appears in the desktop client. Keychain round-trip checked in both directions where a keychain is present (`clients/desktop`)
+## 9c. Phase 9c — The stack the frontend was meant to be built on
+
+Four libraries the constraints name were in no package at all, and only display primitives had been vendored. Everything somebody types into was a native element with a hand-written class.
+
+- [x] 9c.1 Add the libraries the constraints name — `@tanstack/vue-form`, `valibot`, `date-fns`, `@date-fns/tz` — to the layer, and make them resolvable from both applications (`packages/ui`)
+- [x] 9c.2 Vendor the form family into `components/ui` — Button, Input, Textarea, Select, Label, Checkbox, and a Field that ties a label, a control and its error together. Every colour a theme token, checked by a test that fails on a literal; the Select drawn on reka-ui rather than native, so the desktop webview and a browser show the same control (`packages/ui`)
+- [x] 9c.3 A check that a vendored component rendered in a template is imported. The scanner registers them with a Ui prefix, so an unimported name resolves to nothing — and it type-checks, so the first sign is a control missing from a screen. It found two already missing: the audio player's buffering spinner and the text viewer's loading skeleton (`packages/ui`)
+- [~] 9c.4 Move the call sites over. Done: the desktop's sign-in (now TanStack Form with a Valibot schema), servers and appearance screens. Remaining: the web's eight screens and the shared chat surface — roughly a hundred buttons and thirty fields (`apps/web`, `packages/ui`)
+- [ ] 9c.5 Dates through `date-fns` and `@date-fns/tz` rather than bare `Date` and `Intl`. Twenty-two `new Date(` and four `toLocale*` calls, plus a date picker that is `@vuepic/vue-datepicker` rather than anything built on date-fns (`packages/ui`)
+- [ ] 9c.6 A check that forms use TanStack Form rather than refs and a hand-written submit, the way the navigation and layer-boundary checks work (`packages/ui`)
+
 - [ ] **MILESTONE 9b** — The desktop app signs in and holds a conversation indistinguishable from the web's, because it is the same conversation. This is what MILESTONE 9 was waiting on; tag `v0.9.0-dev` once both are demonstrable.
 
 ## 10. Phase 10 — Ready for other people to run
