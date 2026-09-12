@@ -19,15 +19,19 @@
     "translations": "bun scripts/check-translations.ts"
   },
   "dependencies": {
+    "@date-fns/tz": "^1.5.0",
     "@nuxt/icon": "^2.5.1",
+    "@tanstack/vue-form": "^1.33.5",
     "@tdc/types": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
     "lucide-vue-next": "^1.0.0",
     "nuxt": "catalog:vue",
     "nuxt-i18n-micro": "^3.28.5",
     "reka-ui": "^2.10.4",
     "tailwind-merge": "^3.6.0",
+    "valibot": "^1.5.0",
     "vue": "catalog:vue",
     "vue-router": "catalog:vue"
   },
