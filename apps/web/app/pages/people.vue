@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useForm } from "@tanstack/vue-form";
+import type { AnyFieldApi } from "@tanstack/vue-form";
+import * as v from "valibot";
+
 import { isApiError } from "@tdc/types";
 import { ArrowLeft, Check, Copy, ShieldAlert, UserPlus, UserX } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
@@ -7,6 +11,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Select } from "#layers/ui/app/components/ui/select";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
 import { onDate, onDayAtTime } from "#layers/ui/app/lib/dates";
+import { Field } from "#layers/ui/app/components/ui/field";
 
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -27,8 +32,25 @@ const { can } = useAuth();
 
 const error = ref<string | null>(null);
 const suspending = ref<Person | null>(null);
-const reason = ref("");
-const hours = ref(0);
+/*
+ * What a suspension needs: a reason somebody else can read.
+ *
+ * Required rather than merely encouraged — a suspension nobody can explain is
+ * one nobody else can review, which the note under the box already said and
+ * nothing enforced.
+ */
+const suspension = v.object({
+  reason: v.pipe(v.string(), v.trim(), v.minLength(1, "Say why, for whoever reviews this.")),
+  hours: v.number(),
+});
+
+/** The first thing wrong with a field, once somebody has touched it. */
+function firstError(field: AnyFieldApi): string | undefined {
+  if (!field.state.meta.isTouched) return undefined;
+  const [issue] = field.state.meta.errors;
+  if (!issue) return undefined;
+  return typeof issue === "string" ? issue : (issue as { message?: string }).message;
+}
 const inviting = ref(false);
 const issued = ref<{ url?: string; code?: string } | null>(null);
 const copied = ref(false);
@@ -66,19 +88,30 @@ async function confirmWithdrawal() {
   await people.revoke(invitation.id);
 }
 
-async function confirmSuspension() {
-  if (!suspending.value || !reason.value.trim()) return;
+const suspendForm = useForm({
+  defaultValues: { reason: "", hours: 0 },
+  validators: { onSubmit: suspension },
+  async onSubmit({ value }) {
+    const person = suspending.value;
+    if (!person) return;
 
-  const person = suspending.value;
-  suspending.value = null;
-  error.value = null;
+    suspending.value = null;
+    error.value = null;
 
-  try {
-    await people.suspend(person.id, reason.value.trim(), hours.value || undefined);
-    reason.value = "";
-  } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "That suspension was not accepted.";
-  }
+    try {
+      await people.suspend(person.id, value.reason, value.hours || undefined);
+      suspendForm.reset();
+    } catch (cause) {
+      error.value = isApiError(cause) ? cause.message : "That suspension was not accepted.";
+    }
+  },
+});
+
+/** Opens the suspension form for one person, cleared and set to a day. */
+function askToSuspend(person: (typeof people.people.value)[number]) {
+  suspending.value = person;
+  suspendForm.reset();
+  suspendForm.setFieldValue("hours", 24);
 }
 
 async function lift(person: Person) {
@@ -283,11 +316,7 @@ function when(value: string): string {
                 variant="ghost"
                 class="h-7 shrink-0 px-2 text-xs text-destructive"
                 v-else
-                @click="
-                  suspending = person;
-                  reason = '';
-                  hours = 24;
-                "
+                @click="askToSuspend(person)"
               >
                 <UserX class="size-3.5" />
                 Suspend
@@ -316,35 +345,53 @@ function when(value: string): string {
           is.
         </p>
 
-        <form class="mt-3 space-y-3" @submit.prevent="confirmSuspension">
-          <div>
-            <label for="suspend-reason" class="mb-1 block text-xs font-medium">Why</label>
-            <Textarea
-              class="h-auto py-2"
-              id="suspend-reason"
-              v-model="reason"
-              rows="3"
-              placeholder="What they did"
-            />
-            <!-- Required, because a suspension nobody can explain is one
-                 nobody else can review. -->
-            <p class="mt-1 text-[0.6875rem] text-muted-foreground">
-              Recorded, and shown to whoever reviews this later.
-            </p>
-          </div>
+        <form class="mt-3 space-y-3" @submit.prevent="suspendForm.handleSubmit()">
+          <suspendForm.Field name="reason">
+            <template #default="{ field }">
+              <Field
+                label="Why"
+                hint="Recorded, and shown to whoever reviews this later."
+                :error="firstError(field)"
+                required
+              >
+                <template #default="{ id, invalid, describedBy }">
+                  <Textarea
+                    :id="id"
+                    class="h-auto py-2"
+                    :model-value="field.state.value"
+                    rows="3"
+                    placeholder="What they did"
+                    :invalid="invalid"
+                    :described-by="describedBy"
+                    @update:model-value="field.handleChange($event)"
+                    @blur="field.handleBlur"
+                  />
+                </template>
+              </Field>
+            </template>
+          </suspendForm.Field>
 
-          <div>
-            <label for="suspend-hours" class="mb-1 block text-xs font-medium">For how long</label>
-            <Select
-              v-model="hours"
-              label="For how long"
-              :options="durations.map((choice) => ({ value: choice.hours, label: choice.label }))"
-            />
-          </div>
+          <suspendForm.Field name="hours">
+            <template #default="{ field }">
+              <Field label="For how long">
+                <template #default="{ id }">
+                  <Select
+                    :id="id"
+                    :model-value="field.state.value"
+                    label="For how long"
+                    :options="
+                      durations.map((choice) => ({ value: choice.hours, label: choice.label }))
+                    "
+                    @update:model-value="$event !== undefined && field.handleChange($event)"
+                  />
+                </template>
+              </Field>
+            </template>
+          </suspendForm.Field>
 
           <div class="flex justify-end gap-2">
             <Button variant="ghost" @click="suspending = null">Cancel</Button>
-            <Button variant="danger" type="submit" :disabled="!reason.trim()">Suspend</Button>
+            <Button variant="danger" type="submit">Suspend</Button>
           </div>
         </form>
       </div>

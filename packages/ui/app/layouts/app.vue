@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
+import { useForm } from "@tanstack/vue-form";
+import type { AnyFieldApi } from "@tanstack/vue-form";
+import * as v from "valibot";
+
 import { isApiError } from "@tdc/types";
 
 import { chatTour } from "#layers/ui/app/lib/chattour";
@@ -7,6 +11,8 @@ import { readFailure } from "#layers/ui/app/lib/reachability";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Select } from "#layers/ui/app/components/ui/select";
 import { Input } from "#layers/ui/app/components/ui/input";
+import { Field } from "#layers/ui/app/components/ui/field";
+import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 
 /*
  * lastSeenRoomsKey holds the conversations somebody is in.
@@ -68,7 +74,6 @@ watch(
 );
 
 const creating = ref(false);
-const newSlug = ref("");
 
 /*
  * A disposable chat, whose messages the server removes after a chosen time.
@@ -78,8 +83,6 @@ const newSlug = ref("");
  * presets rather than a number: somebody choosing this is thinking "a day",
  * not "86400 seconds".
  */
-const newDisposable = ref(false);
-const newLifetime = ref(86400);
 
 const lifetimeChoices = [
   { seconds: 3600, label: "An hour" },
@@ -89,6 +92,34 @@ const lifetimeChoices = [
 ];
 const slugInput = ref<HTMLInputElement | null>(null);
 const createError = ref<string | null>(null);
+
+/*
+ * What a channel needs before it is worth asking the server for.
+ *
+ * The rule under the field said "Letters, digits, underscore, dot and hyphen"
+ * and nothing checked it — the name became the channel's address, so a name
+ * with a space in it was refused by the server after a round trip, with the
+ * server's own vocabulary rather than the sentence already written above the
+ * box.
+ */
+const channel = v.object({
+  slug: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, "A channel needs a name."),
+    v.regex(/^[a-z0-9_.-]+$/i, "Letters, digits, underscore, dot and hyphen."),
+  ),
+  disposable: v.boolean(),
+  lifetime: v.number(),
+});
+
+/** The first thing wrong with a field, once somebody has touched it. */
+function firstError(field: AnyFieldApi): string | undefined {
+  if (!field.state.meta.isTouched) return undefined;
+  const [issue] = field.state.meta.errors;
+  if (!issue) return undefined;
+  return typeof issue === "string" ? issue : (issue as { message?: string }).message;
+}
 
 // Direct conversations are listed separately, so they are excluded here even
 // though the room list returns them alongside channels.
@@ -182,6 +213,46 @@ useShortcuts({
   thread: () => threadOpen.value?.(),
 });
 
+/*
+ * The form for a new channel, obtained before anything is awaited.
+ *
+ * Everything below this suspends, and a composable called after a top-level
+ * await has no component instance to inject from — useForm reaches for one,
+ * so it would fail the way useTour did.
+ */
+const createForm = useForm({
+  defaultValues: { slug: "", disposable: false, lifetime: 86400 },
+  validators: { onSubmit: channel },
+  async onSubmit({ value }) {
+    createError.value = null;
+    try {
+      const room = await roomsApi.create(
+        value.disposable
+          ? {
+              slug: value.slug,
+              name: value.slug,
+              kind: "disposable",
+              messageTtlSeconds: value.lifetime,
+            }
+          : { slug: value.slug, name: value.slug },
+      );
+      createForm.reset();
+      creating.value = false;
+      await refresh();
+      await router.push(localeRoute({ name: "rooms-id", params: { id: room.id } }));
+    } catch (cause) {
+      // A refusal names the permission it wanted, which is precise but not a
+      // sentence. Someone who cannot create channels needs to be told that,
+      // rather than shown the server's vocabulary.
+      createError.value = isApiError(cause)
+        ? cause.requiredPermission
+          ? "You do not have permission to create channels on this server."
+          : cause.message
+        : "Could not create that channel.";
+    }
+  },
+});
+
 await refresh();
 
 /**
@@ -236,34 +307,6 @@ watch(creating, async (open) => {
   await nextTick();
   slugInput.value?.focus();
 });
-
-async function createRoom() {
-  const slug = newSlug.value.trim();
-  if (!slug) return;
-
-  createError.value = null;
-  try {
-    const room = await roomsApi.create(
-      newDisposable.value
-        ? { slug, name: slug, kind: "disposable", messageTtlSeconds: newLifetime.value }
-        : { slug, name: slug },
-    );
-    newSlug.value = "";
-    newDisposable.value = false;
-    creating.value = false;
-    await refresh();
-    await router.push(localeRoute({ name: "rooms-id", params: { id: room.id } }));
-  } catch (cause) {
-    // A refusal names the permission it wanted, which is precise but not a
-    // sentence. Someone who cannot create channels needs to be told that,
-    // rather than shown the server's vocabulary.
-    createError.value = isApiError(cause)
-      ? cause.requiredPermission
-        ? "You do not have permission to create channels on this server."
-        : cause.message
-      : "Could not create that channel.";
-  }
-}
 
 /*
  * Moving between channels in the order the sidebar shows them.
@@ -364,58 +407,92 @@ provide("openSearch", () => {
         v-if="creating"
         class="fixed inset-y-0 right-0 z-20 w-80 border-l bg-surface p-4 shadow-lg"
       >
-        <h2 class="text-sm font-semibold">
-          {{ newDisposable ? "New disposable chat" : "New channel" }}
-        </h2>
+        <createForm.Field name="disposable">
+          <template #default="{ field: disposable }">
+            <h2 class="text-sm font-semibold">
+              {{ disposable.state.value ? "New disposable chat" : "New channel" }}
+            </h2>
+          </template>
+        </createForm.Field>
         <p class="mt-1 text-xs text-muted-foreground">
           The name becomes the channel's address, so people on other servers can reach it.
         </p>
 
-        <form class="mt-4 space-y-3" @submit.prevent="createRoom">
-          <div>
-            <label for="channel-slug" class="mb-1 block text-xs font-medium">Name</label>
-            <Input
-              id="channel-slug"
-              ref="slugInput"
-              v-model="newSlug"
-              placeholder="general"
-              autocomplete="off"
-            />
-            <p class="mt-1 text-[0.6875rem] text-muted-foreground">
-              Letters, digits, underscore, dot and hyphen.
-            </p>
-          </div>
+        <form class="mt-4 space-y-3" @submit.prevent="createForm.handleSubmit()">
+          <createForm.Field name="slug">
+            <template #default="{ field }">
+              <Field
+                label="Name"
+                hint="Letters, digits, underscore, dot and hyphen."
+                :error="firstError(field)"
+              >
+                <template #default="{ id, invalid, describedBy }">
+                  <Input
+                    :id="id"
+                    ref="slugInput"
+                    :model-value="field.state.value"
+                    placeholder="general"
+                    autocomplete="off"
+                    :invalid="invalid"
+                    :described-by="describedBy"
+                    @update:model-value="field.handleChange($event)"
+                    @blur="field.handleBlur"
+                  />
+                </template>
+              </Field>
+            </template>
+          </createForm.Field>
 
-          <label class="flex cursor-pointer items-start gap-2">
-            <input v-model="newDisposable" type="checkbox" class="mt-0.5 accent-primary" />
-            <span class="min-w-0">
-              <span class="block text-xs font-medium">Disposable</span>
-              <span class="block text-[0.6875rem] text-muted-foreground">
-                Messages are removed after a set time. Everyone in the chat is told before they
-                post.
-              </span>
-            </span>
-          </label>
+          <createForm.Field name="disposable">
+            <template #default="{ field }">
+              <label class="flex cursor-pointer items-start gap-2">
+                <Checkbox
+                  class="mt-0.5"
+                  :model-value="field.state.value"
+                  @update:model-value="field.handleChange($event)"
+                />
+                <span class="min-w-0">
+                  <span class="block text-xs font-medium">Disposable</span>
+                  <span class="block text-[0.6875rem] text-muted-foreground">
+                    Messages are removed after a set time. Everyone in the chat is told before they
+                    post.
+                  </span>
+                </span>
+              </label>
 
-          <div v-if="newDisposable">
-            <label for="channel-lifetime" class="mb-1 block text-xs font-medium">
-              Messages last
-            </label>
-            <Select
-              v-model="newLifetime"
-              label="Messages last"
-              :options="
-                lifetimeChoices.map((choice) => ({ value: choice.seconds, label: choice.label }))
-              "
-            />
-          </div>
+              <div v-if="field.state.value" class="mt-3">
+                <createForm.Field name="lifetime">
+                  <template #default="{ field: lifetime }">
+                    <Field label="Messages last">
+                      <template #default="{ id }">
+                        <Select
+                          :id="id"
+                          :model-value="lifetime.state.value"
+                          label="Messages last"
+                          :options="
+                            lifetimeChoices.map((choice) => ({
+                              value: choice.seconds,
+                              label: choice.label,
+                            }))
+                          "
+                          @update:model-value="
+                            $event !== undefined && lifetime.handleChange($event)
+                          "
+                        />
+                      </template>
+                    </Field>
+                  </template>
+                </createForm.Field>
+              </div>
+            </template>
+          </createForm.Field>
 
           <p v-if="createError" class="text-xs text-destructive" role="alert">
             {{ createError }}
           </p>
 
           <div class="flex gap-2">
-            <Button type="submit" :disabled="!newSlug.trim()"> Create </Button>
+            <Button type="submit">Create</Button>
             <Button variant="ghost" @click="creating = false">Cancel</Button>
           </div>
         </form>
