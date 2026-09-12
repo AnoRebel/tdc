@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AlertCircle, Code, FileText } from "lucide-vue-next";
 import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * A text or markdown attachment, read in place.
@@ -84,14 +85,14 @@ onMounted(load);
       />
       <span class="truncate text-xs font-medium">{{ props.filename }}</span>
 
-      <button
+      <Button
+        variant="ghost"
+        class="ml-auto h-6 text-xs"
         v-if="props.kind === 'markdown'"
-        type="button"
-        class="btn btn-ghost ml-auto h-6 text-xs"
         @click="showSource = !showSource"
       >
         {{ showSource ? "Rendered" : "Source" }}
-      </button>
+      </Button>
     </header>
 
     <div class="min-h-0 flex-1 overflow-auto">

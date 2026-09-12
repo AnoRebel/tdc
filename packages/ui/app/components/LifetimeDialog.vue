@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { MessageLifetime } from "@tdc/types";
 import { Timer } from "lucide-vue-next";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Select } from "#layers/ui/app/components/ui/select";
 
 /**
  * Choosing when a message expires.
@@ -103,11 +105,11 @@ function submit() {
 
         <div v-if="needsDuration">
           <label for="lifetime-duration" class="mb-1 block text-xs font-medium">How long</label>
-          <select id="lifetime-duration" v-model.number="seconds" class="input">
-            <option v-for="choice in durations" :key="choice.seconds" :value="choice.seconds">
-              {{ choice.label }}
-            </option>
-          </select>
+          <Select
+            v-model="seconds"
+            label="How long"
+            :options="durations.map((choice) => ({ value: choice.seconds, label: choice.label }))"
+          />
         </div>
 
         <p class="text-[0.6875rem] text-muted-foreground">
@@ -116,8 +118,8 @@ function submit() {
         </p>
 
         <div class="flex justify-end gap-2">
-          <button type="button" class="btn btn-ghost" @click="emit('cancel')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Set</button>
+          <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
+          <Button type="submit">Set</Button>
         </div>
       </form>
     </div>

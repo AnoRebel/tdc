@@ -2,6 +2,7 @@
 import type { UploadProgress } from "@tdc/types";
 import { AlertCircle, Check, RotateCw, X } from "lucide-vue-next";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * Uploads in flight, shown above the composer.
@@ -132,19 +133,21 @@ function readableSize(bytes: number): string {
           </div>
         </div>
 
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
+          class="shrink-0"
           v-if="upload.status === 'failed'"
-          type="button"
-          class="btn btn-ghost size-6 shrink-0 px-0"
           title="Try again"
           @click="emit('retry', upload.id)"
         >
           <RotateCw class="size-3.5" />
-        </button>
+        </Button>
 
-        <button
-          type="button"
-          class="btn btn-ghost size-6 shrink-0 px-0"
+        <Button
+          variant="ghost"
+          size="icon"
+          class="shrink-0"
           :title="upload.status === 'uploading' ? 'Cancel upload' : 'Remove'"
           @click="
             upload.status === 'uploading' || upload.status === 'waiting'
@@ -153,7 +156,7 @@ function readableSize(bytes: number): string {
           "
         >
           <X class="size-3.5" />
-        </button>
+        </Button>
       </div>
 
       <!-- A line about this file, which is per attachment rather than per

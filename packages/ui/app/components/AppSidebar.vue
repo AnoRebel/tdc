@@ -4,6 +4,7 @@ import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import type { Notification } from "@tdc/types";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -277,10 +278,11 @@ function conversationName(room: Room): string {
           {{ user?.address }}
         </span>
       </span>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="icon"
+        class="relative"
         data-tour="notifications"
-        class="btn btn-ghost relative size-7 px-0"
         :aria-label="
           notifications.unread.value
             ? `Notifications, ${notifications.unread.value} unread`
@@ -299,7 +301,7 @@ function conversationName(room: Room): string {
                new message is noticed without the count becoming unreadable. -->
           <UiCount :value="notifications.unread.value" :max="9" />
         </span>
-      </button>
+      </Button>
 
       <NotificationPanel v-model="showNotifications" @open="goToNotification" />
 

@@ -4,6 +4,9 @@ import { isApiError } from "@tdc/types";
 
 import { chatTour } from "#layers/ui/app/lib/chattour";
 import { readFailure } from "#layers/ui/app/lib/reachability";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Select } from "#layers/ui/app/components/ui/select";
+import { Input } from "#layers/ui/app/components/ui/input";
 
 /*
  * lastSeenRoomsKey holds the conversations somebody is in.
@@ -371,11 +374,10 @@ provide("openSearch", () => {
         <form class="mt-4 space-y-3" @submit.prevent="createRoom">
           <div>
             <label for="channel-slug" class="mb-1 block text-xs font-medium">Name</label>
-            <input
+            <Input
               id="channel-slug"
               ref="slugInput"
               v-model="newSlug"
-              class="input"
               placeholder="general"
               autocomplete="off"
             />
@@ -399,15 +401,13 @@ provide("openSearch", () => {
             <label for="channel-lifetime" class="mb-1 block text-xs font-medium">
               Messages last
             </label>
-            <select id="channel-lifetime" v-model.number="newLifetime" class="input">
-              <option
-                v-for="choice in lifetimeChoices"
-                :key="choice.seconds"
-                :value="choice.seconds"
-              >
-                {{ choice.label }}
-              </option>
-            </select>
+            <Select
+              v-model="newLifetime"
+              label="Messages last"
+              :options="
+                lifetimeChoices.map((choice) => ({ value: choice.seconds, label: choice.label }))
+              "
+            />
           </div>
 
           <p v-if="createError" class="text-xs text-destructive" role="alert">
@@ -415,10 +415,8 @@ provide("openSearch", () => {
           </p>
 
           <div class="flex gap-2">
-            <button type="submit" class="btn btn-primary" :disabled="!newSlug.trim()">
-              Create
-            </button>
-            <button type="button" class="btn btn-ghost" @click="creating = false">Cancel</button>
+            <Button type="submit" :disabled="!newSlug.trim()"> Create </Button>
+            <Button variant="ghost" @click="creating = false">Cancel</Button>
           </div>
         </form>
       </aside>

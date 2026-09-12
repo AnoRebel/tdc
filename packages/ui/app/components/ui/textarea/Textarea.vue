@@ -8,7 +8,12 @@ const props = defineProps<{
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
-  rows?: number;
+  /*
+   * Written as an attribute more often than bound, and an attribute is a
+   * string — `rows="3"` is how anybody would write it, so both are taken
+   * rather than making every call site remember a colon.
+   */
+  rows?: number | string;
   label?: string;
   invalid?: boolean;
   describedBy?: string;

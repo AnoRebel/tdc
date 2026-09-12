@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ShieldOff } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * Who is currently kept out of a channel, and the way back in.
@@ -91,13 +92,13 @@ function until(ban: { expiresAt?: string }): string {
             </span>
           </span>
 
-          <button
-            type="button"
-            class="btn btn-ghost h-7 shrink-0 px-2 text-xs"
+          <Button
+            variant="ghost"
+            class="h-7 shrink-0 px-2 text-xs"
             @click="lifting = { userId: ban.userId, username: ban.username }"
           >
             Lift ban
-          </button>
+          </Button>
         </li>
       </ul>
     </template>

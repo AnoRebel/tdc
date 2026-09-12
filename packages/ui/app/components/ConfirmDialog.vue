@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { AlertTriangle } from "lucide-vue-next";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * Asks before something is destroyed.
@@ -80,16 +81,15 @@ onKeyStroke("Escape", () => emit("cancel"));
         <!-- Cancel first in the source, so it is what Tab reaches first and
              what a reflexive Enter activates. -->
         <div class="mt-5 flex justify-end gap-2">
-          <button ref="cancelButton" type="button" class="btn btn-outline" @click="emit('cancel')">
+          <Button variant="outline" ref="cancelButton" @click="emit('cancel')">
             {{ props.cancelLabel }}
-          </button>
-          <button
-            type="button"
-            class="btn bg-destructive text-destructive-foreground hover:opacity-90"
+          </Button>
+          <Button
+            class="bg-destructive text-destructive-foreground hover:opacity-90"
             @click="emit('confirm')"
           >
             {{ props.confirmLabel }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

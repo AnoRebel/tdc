@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Check, Monitor, Moon, Palette, Sun } from "lucide-vue-next";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * Changing how the interface looks, without going to settings.
@@ -49,16 +50,16 @@ function onKeydown(event: KeyboardEvent) {
 
 <template>
   <div class="relative" @keydown="onKeydown">
-    <button
-      type="button"
-      class="btn btn-ghost size-7 px-0"
+    <Button
+      variant="ghost"
+      size="icon"
       aria-label="Appearance"
       :aria-expanded="open"
       aria-haspopup="menu"
       @click="open = !open"
     >
       <Palette class="size-3.5" />
-    </button>
+    </Button>
 
     <div
       v-if="open"

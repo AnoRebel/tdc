@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Maximize2, Pause, Play, Volume2, VolumeX } from "lucide-vue-next";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * An audio player, rather than the browser's default controls.
@@ -144,16 +145,11 @@ function clock(seconds: number): string {
     />
 
     <div class="flex items-center gap-3">
-      <button
-        type="button"
-        class="btn btn-primary size-9 shrink-0 px-0"
-        :aria-label="playing ? 'Pause' : 'Play'"
-        @click="toggle"
-      >
+      <Button class="size-9 shrink-0 px-0" :aria-label="playing ? 'Pause' : 'Play'" @click="toggle">
         <Spinner v-if="buffering" size="sm" />
         <Pause v-else-if="playing" class="size-4" />
         <Play v-else class="size-4" />
-      </button>
+      </Button>
 
       <span class="tabular shrink-0 text-xs text-muted-foreground">
         {{ clock(currentTime) }}
@@ -196,36 +192,38 @@ function clock(seconds: number): string {
       <!-- Speed cycles rather than opening a menu: four values, one of which
            is almost always wanted, is faster to reach by tapping through than
            by opening something. -->
-      <button
-        type="button"
-        class="btn btn-ghost tabular h-8 shrink-0 px-1.5 text-xs font-medium"
+      <Button
+        variant="ghost"
+        class="tabular h-8 shrink-0 px-1.5 text-xs font-medium"
         :aria-label="`Playback speed, currently ${speed} times`"
         :title="`Speed: ${speed}×`"
         @click="cycleSpeed"
       >
         {{ speed }}×
-      </button>
+      </Button>
 
-      <button
-        type="button"
-        class="btn btn-ghost size-8 shrink-0 px-0"
+      <Button
+        variant="ghost"
+        size="icon"
+        class="shrink-0"
         :aria-label="muted ? 'Unmute' : 'Mute'"
         @click="toggleMute"
       >
         <VolumeX v-if="muted" class="size-4" />
         <Volume2 v-else class="size-4" />
-      </button>
+      </Button>
 
-      <button
+      <Button
+        variant="ghost"
+        size="icon"
+        class="shrink-0"
         v-if="props.expandable"
-        type="button"
-        class="btn btn-ghost size-8 shrink-0 px-0"
         aria-label="Open in the viewer"
         title="Open in the viewer"
         @click="emit('expand')"
       >
         <Maximize2 class="size-3.5" />
-      </button>
+      </Button>
     </div>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Search } from "lucide-vue-next";
 import { emojiGroups, searchEmoji } from "#layers/ui/app/lib/emoji";
+import { Input } from "#layers/ui/app/components/ui/input";
 
 /**
  * Choosing an emoji.
@@ -118,12 +119,11 @@ watch(results, () => {
       <Search
         class="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
       />
-      <input
+      <Input
+        class="h-8 pl-7 text-xs"
         ref="field"
         v-model="query"
-        type="text"
         :placeholder="tab === 'gifs' ? 'Search GIFs' : 'Search emoji'"
-        class="input h-8 pl-7 text-xs"
         :aria-label="tab === 'gifs' ? 'Search GIFs' : 'Search emoji'"
         autocomplete="off"
         @keydown="onKeydown"

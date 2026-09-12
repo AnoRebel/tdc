@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Room } from "@tdc/types";
 import { Forward, Hash, Lock, Search } from "lucide-vue-next";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * Choosing where to forward.
@@ -96,7 +97,7 @@ function iconFor(room: Room) {
       </div>
 
       <footer class="flex justify-end border-t border-border px-4 py-3">
-        <button type="button" class="btn btn-ghost" @click="emit('cancel')">Cancel</button>
+        <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
       </footer>
     </div>
   </div>

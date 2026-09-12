@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ShieldOff } from "lucide-vue-next";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Textarea } from "#layers/ui/app/components/ui/textarea";
 
 /**
  * Banning somebody from one channel.
@@ -63,11 +65,11 @@ function submit() {
       <form class="mt-4 space-y-3" @submit.prevent="submit">
         <div>
           <label for="ban-reason" class="mb-1 block text-xs font-medium"> Reason </label>
-          <textarea
+          <Textarea
+            class="h-auto py-2"
             id="ban-reason"
             v-model="reason"
             rows="2"
-            class="input h-auto py-2"
             placeholder="What happened"
             autofocus
           />
@@ -97,8 +99,8 @@ function submit() {
         </fieldset>
 
         <div class="flex justify-end gap-2">
-          <button type="button" class="btn btn-ghost" @click="emit('cancel')">Cancel</button>
-          <button type="submit" class="btn btn-danger" :disabled="!reason.trim()">Ban</button>
+          <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
+          <Button variant="danger" type="submit" :disabled="!reason.trim()">Ban</Button>
         </div>
       </form>
     </div>

@@ -3,6 +3,7 @@ import { commandKeyLabel } from "#layers/ui/app/lib/platform";
 import { Keyboard } from "lucide-vue-next";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
 import { shortcuts } from "#layers/ui/app/composables/useShortcuts";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * What the keyboard does, for somebody who pressed "?".
@@ -80,7 +81,7 @@ function label(key: string): string {
       </div>
 
       <div class="mt-4 flex justify-end">
-        <button type="button" class="btn btn-ghost" @click="open = false">Close</button>
+        <Button variant="ghost" @click="open = false">Close</Button>
       </div>
     </div>
   </div>

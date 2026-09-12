@@ -7,6 +7,7 @@
  * somebody's decision, so it is a button rather than a consequence.
  */
 import { Interval } from "#bindings/updater/models";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 useHead({ title: "Updates" });
 
@@ -87,9 +88,9 @@ const intervals = [
       -->
       <section class="mt-5">
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" class="btn btn-outline" :disabled="busy" @click="check">
+          <Button variant="outline" :disabled="busy" @click="check">
             {{ state.checking ? "Checking…" : "Check now" }}
-          </button>
+          </Button>
 
           <span v-if="state.available" class="text-sm">
             Version <span class="tabular font-medium">{{ state.available }}</span> is available.
@@ -122,23 +123,11 @@ const intervals = [
             Download {{ state.available }}
           </a>
 
-          <button
-            v-else-if="!state.ready"
-            type="button"
-            class="btn btn-primary"
-            :disabled="busy"
-            @click="download"
-          >
-            Download it
-          </button>
+          <Button v-else-if="!state.ready" :disabled="busy" @click="download"> Download it </Button>
 
           <template v-else>
-            <button type="button" class="btn btn-primary" :disabled="busy" @click="installAndSay">
-              Install it
-            </button>
-            <button type="button" class="btn btn-ghost" :disabled="busy" @click="discard">
-              Not now
-            </button>
+            <Button :disabled="busy" @click="installAndSay"> Install it </Button>
+            <Button variant="ghost" :disabled="busy" @click="discard"> Not now </Button>
           </template>
         </div>
 
@@ -155,17 +144,15 @@ const intervals = [
         </p>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
-          <button
+          <Button
             v-for="option in intervals"
             :key="option.value"
-            type="button"
-            class="btn"
-            :class="settings.every === option.value ? 'btn-primary' : 'btn-outline'"
+            :variant="settings.every === option.value ? 'primary' : 'outline'"
             :aria-pressed="settings.every === option.value"
             @click="changeInterval(option.value)"
           >
             {{ option.label }}
-          </button>
+          </Button>
         </div>
 
         <label class="mt-4 flex items-start gap-2 text-xs">

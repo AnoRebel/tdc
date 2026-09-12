@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RefreshCw, X } from "lucide-vue-next";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * Offers a new version, rather than applying one.
@@ -58,18 +59,18 @@ async function update() {
         <span class="block text-xs text-muted-foreground"> What you have typed is kept. </span>
       </p>
 
-      <button type="button" class="btn btn-primary h-8" :disabled="updating" @click="update">
+      <Button class="h-8" :disabled="updating" @click="update">
         {{ updating ? "Updating" : "Reload" }}
-      </button>
+      </Button>
 
-      <button
-        type="button"
-        class="btn btn-ghost size-8 shrink-0 p-0"
+      <Button
+        variant="ghost"
+        class="size-8 shrink-0 p-0"
         aria-label="Not now"
         @click="dismissed = true"
       >
         <X class="size-3.5" />
-      </button>
+      </Button>
     </div>
   </Transition>
 </template>

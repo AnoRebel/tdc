@@ -2,6 +2,9 @@
 import { isApiError } from "@tdc/types";
 import { ArrowLeft, ShieldAlert, TriangleAlert } from "lucide-vue-next";
 import { Switch } from "#layers/ui/app/components/ui/switch";
+import { Select } from "#layers/ui/app/components/ui/select";
+import { Input } from "#layers/ui/app/components/ui/input";
+import { Textarea } from "#layers/ui/app/components/ui/textarea";
 
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -291,38 +294,37 @@ function bytes(value: number): string {
                 {{ settingLabel(setting.key) }}
               </label>
               <p class="mt-0.5 text-xs text-muted-foreground">{{ setting.description }}</p>
-              <select
+              <Select
                 v-if="choices[setting.key]"
                 :id="setting.key"
-                :value="setting.value"
-                class="input mt-1.5"
+                :model-value="String(setting.value)"
+                class="mt-1.5"
+                :label="settingLabel(setting.key)"
                 :disabled="saving === setting.key"
-                @change="save(setting.key, ($event.target as HTMLSelectElement).value)"
-              >
-                <option
-                  v-for="choice in choices[setting.key]"
-                  :key="choice.value"
-                  :value="choice.value"
-                >
-                  {{ choice.label }}
-                </option>
-              </select>
+                :options="
+                  (choices[setting.key] ?? []).map((choice) => ({
+                    value: String(choice.value),
+                    label: choice.label,
+                  }))
+                "
+                @update:model-value="$event !== undefined && save(setting.key, $event)"
+              />
 
-              <textarea
+              <Textarea
+                class="mt-1.5 h-auto py-2"
                 v-else-if="multiline.has(setting.key)"
                 :id="setting.key"
                 :value="setting.value"
                 rows="3"
-                class="input mt-1.5 h-auto py-2"
                 :disabled="saving === setting.key"
                 @change="save(setting.key, ($event.target as HTMLTextAreaElement).value)"
               />
 
-              <input
+              <Input
+                class="mt-1.5"
                 v-else
                 :id="setting.key"
                 :value="setting.value"
-                class="input mt-1.5"
                 :disabled="saving === setting.key"
                 @change="save(setting.key, ($event.target as HTMLInputElement).value)"
               />

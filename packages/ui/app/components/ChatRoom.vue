@@ -49,6 +49,8 @@ import { Message as MessageRow, MessageGroup } from "#layers/ui/app/components/u
 import { Separator } from "#layers/ui/app/components/ui/separator";
 import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Input } from "#layers/ui/app/components/ui/input";
 
 /*
  * The conversation this shows, given by whichever page renders it.
@@ -1539,14 +1541,15 @@ watch(roomId, load, { immediate: true });
         <!-- Only where the sidebar is a drawer. On a wide screen the channel
              list is already visible and a button to reveal it would do
              nothing. -->
-        <button
-          type="button"
-          class="btn btn-ghost size-8 shrink-0 px-0 md:hidden"
+        <Button
+          variant="ghost"
+          size="icon"
+          class="shrink-0 md:hidden"
           aria-label="Channels"
           @click="navigationOpen = true"
         >
           <Menu class="size-4" />
-        </button>
+        </Button>
 
         <component
           :is="room?.visibility === 'private' ? Lock : Hash"
@@ -1600,16 +1603,16 @@ watch(roomId, load, { immediate: true });
 
           <!-- Only for whoever moderates: a ban that can only be issued is a
                ban nobody reverses, so the way back in lives beside it. -->
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             v-if="can('moderation.restrict')"
-            type="button"
-            class="btn btn-ghost size-7 px-0"
             :aria-label="showBans ? 'Hide bans' : 'Show who is banned'"
             :title="showBans ? 'Hide bans' : 'Show who is banned'"
             @click="showBans = !showBans"
           >
             <ShieldOff class="size-3.5" />
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -1671,17 +1674,15 @@ watch(roomId, load, { immediate: true });
         <span class="font-medium">
           {{ selected.size === 1 ? "1 message selected" : `${selected.size} messages selected` }}
         </span>
-        <button type="button" class="btn btn-ghost h-7 px-2" @click="forwarding = [...selected]">
+        <Button variant="ghost" class="h-7 px-2" @click="forwarding = [...selected]">
           <Forward class="size-3.5" />
           Forward
-        </button>
-        <button type="button" class="btn btn-ghost h-7 px-2" @click="copySelected">
+        </Button>
+        <Button variant="ghost" class="h-7 px-2" @click="copySelected">
           <Copy class="size-3.5" />
           Copy
-        </button>
-        <button type="button" class="btn btn-ghost ml-auto h-7 px-2" @click="clearSelection">
-          Cancel
-        </button>
+        </Button>
+        <Button variant="ghost" class="ml-auto h-7 px-2" @click="clearSelection"> Cancel </Button>
       </div>
 
       <p
@@ -1783,9 +1784,10 @@ watch(roomId, load, { immediate: true });
                        there and this opens the same menu a long press would.
                        Without it, editing and deleting would be unreachable on
                        a phone. -->
-                  <button
-                    type="button"
-                    class="btn btn-ghost size-8 px-0 md:hidden"
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="md:hidden"
                     aria-label="Message actions"
                     @click.stop="
                       contextMenu.show(
@@ -1796,34 +1798,34 @@ watch(roomId, load, { immediate: true });
                     "
                   >
                     <MoreVertical class="size-4" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     v-if="room?.member"
-                    type="button"
-                    class="btn btn-ghost size-6 px-0"
                     title="Reply in thread"
                     @click="openThread(message.id)"
                   >
                     <MessageSquareText class="size-3.5" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     v-if="group.mine"
-                    type="button"
-                    class="btn btn-ghost size-6 px-0"
                     title="Edit"
                     @click="startEditing(message)"
                   >
                     <Pencil class="size-3.5" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="icon"
                     v-if="group.mine"
-                    type="button"
-                    class="btn btn-danger size-6 px-0"
                     title="Delete"
                     @click="confirmDelete(message)"
                   >
                     <Trash2 class="size-3.5" />
-                  </button>
+                  </Button>
                 </div>
 
                 <!-- Only while selecting: a checkbox beside every message all
@@ -1861,9 +1863,9 @@ watch(roomId, load, { immediate: true });
                     :continued="position > 0"
                   >
                     <form v-if="editing === message.id" @submit.prevent="saveEdit(message.id)">
-                      <input
+                      <Input
+                        class="h-8"
                         v-model="editDraft"
-                        class="input h-8"
                         @keydown.esc="editing = null"
                         autofocus
                       />
@@ -1961,14 +1963,14 @@ watch(roomId, load, { immediate: true });
                    Once it reaches the server it is a sent message, and taking
                    it back is a deletion other people may already have seen. -->
                 <div class="group/waiting flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    class="btn btn-ghost size-7 shrink-0 p-0 opacity-0 transition-opacity group-hover/waiting:opacity-100 focus-visible:opacity-100"
+                  <Button
+                    variant="ghost"
+                    class="size-7 shrink-0 p-0 opacity-0 transition-opacity group-hover/waiting:opacity-100 focus-visible:opacity-100"
                     :aria-label="`Do not send: ${message.body}`"
                     @click="unsendWaiting(message.clientToken)"
                   >
                     <X class="size-3.5" />
-                  </button>
+                  </Button>
 
                   <div class="flex w-fit max-w-full flex-col items-end gap-1">
                     <Bubble variant="mine" align="end" :continued="position > 0" class="opacity-60">
@@ -2019,16 +2021,16 @@ watch(roomId, load, { immediate: true });
                for the camera and for documents, and a bare "attach" opens the
                least useful of the three. -->
           <div class="relative shrink-0" data-composer-menu>
-            <button
-              type="button"
-              class="btn btn-ghost size-8 px-0"
+            <Button
+              variant="ghost"
+              size="icon"
               :disabled="room.archived"
               title="Attach"
               aria-label="Attach"
               @click="attaching = !attaching"
             >
               <Paperclip class="size-4" />
-            </button>
+            </Button>
 
             <div
               v-if="attaching"
@@ -2050,10 +2052,10 @@ watch(roomId, load, { immediate: true });
           <!-- The choice sits where the file is picked rather than in
                settings: it is a per-message decision, and someone sharing a
                screenshot whose text must stay sharp needs it to hand. -->
-          <button
-            type="button"
-            class="btn size-8 shrink-0 px-0"
-            :class="sendOriginal ? 'btn-primary' : 'btn-ghost'"
+          <Button
+            size="icon"
+            class="shrink-0"
+            :variant="sendOriginal ? 'primary' : 'ghost'"
             :disabled="room.archived"
             :aria-pressed="sendOriginal"
             :title="
@@ -2064,29 +2066,30 @@ watch(roomId, load, { immediate: true });
             @click="sendOriginal = !sendOriginal"
           >
             <Maximize2 class="size-4" />
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost size-8 shrink-0 px-0"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="shrink-0"
             :disabled="room.archived || !draft.trim()"
             title="Send later"
             aria-label="Send later"
             @click="scheduling = true"
           >
             <Clock class="size-4" />
-          </button>
+          </Button>
 
           <div class="relative shrink-0" data-composer-menu>
-            <button
-              type="button"
-              class="btn btn-ghost size-8 px-0"
+            <Button
+              variant="ghost"
+              size="icon"
               :disabled="room.archived"
               title="Emoji"
               aria-label="Emoji"
               @click="choosingEmoji = !choosingEmoji"
             >
               <Smile class="size-4" />
-            </button>
+            </Button>
 
             <div v-if="choosingEmoji" class="absolute bottom-full left-0 z-20 mb-1">
               <EmojiPicker v-model="choosingEmoji" @pick="insertEmoji" @gif="attachGif" />
@@ -2106,9 +2109,10 @@ watch(roomId, load, { immediate: true });
             "
             @keydown.enter.exact.prevent="send"
           />
-          <button
+          <Button
+            size="icon"
+            class="shrink-0"
             type="submit"
-            class="btn btn-primary size-8 shrink-0 px-0"
             :disabled="
               sending || room.archived || (!draft.trim() && uploads.completed.value.length === 0)
             "
@@ -2116,7 +2120,7 @@ watch(roomId, load, { immediate: true });
           >
             <Spinner v-if="sending" size="sm" />
             <SendHorizontal v-else class="size-4" />
-          </button>
+          </Button>
         </form>
 
         <div
@@ -2124,10 +2128,10 @@ watch(roomId, load, { immediate: true });
           class="flex items-center justify-between gap-4 rounded-xl border bg-surface px-3 py-2.5"
         >
           <p class="text-sm text-muted-foreground">Join this channel to take part.</p>
-          <button type="button" class="btn btn-primary" @click="join">
+          <Button @click="join">
             <Check class="size-3.5" />
             Join
-          </button>
+          </Button>
         </div>
       </footer>
     </section>

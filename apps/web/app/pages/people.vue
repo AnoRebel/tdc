@@ -3,6 +3,9 @@ import { isApiError } from "@tdc/types";
 import { ArrowLeft, Check, Copy, ShieldAlert, UserPlus, UserX } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import type { Person } from "#layers/ui/app/composables/usePeople";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Select } from "#layers/ui/app/components/ui/select";
+import { Textarea } from "#layers/ui/app/components/ui/textarea";
 
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -178,10 +181,10 @@ function when(value: string): string {
                 A link, and a short code for reading aloud. Both last a week.
               </p>
             </div>
-            <button type="button" class="btn btn-primary shrink-0" @click="createInvitation">
+            <Button class="shrink-0" @click="createInvitation">
               <UserPlus class="size-3.5" />
               Invite
-            </button>
+            </Button>
           </div>
 
           <!-- Shown once. The server keeps a hash, so it cannot show this
@@ -193,10 +196,10 @@ function when(value: string): string {
               <code class="min-w-0 flex-1 truncate rounded bg-surface px-2 py-1 font-mono text-xs">
                 {{ issued.url }}
               </code>
-              <button type="button" class="btn btn-outline shrink-0" @click="copyInvitation">
+              <Button variant="outline" class="shrink-0" @click="copyInvitation">
                 <component :is="copied ? Check : Copy" class="size-3.5" />
                 {{ copied ? "Copied" : "Copy" }}
-              </button>
+              </Button>
             </div>
             <p v-if="issued.code" class="mt-2 text-xs text-muted-foreground">
               Or the code <span class="font-mono font-semibold">{{ issued.code }}</span>
@@ -229,14 +232,14 @@ function when(value: string): string {
                   times · issued {{ when(invitation.createdAt) }}
                 </span>
               </span>
-              <button
+              <Button
+                variant="ghost"
+                class="h-7 px-2 text-xs"
                 v-if="invitation.usable"
-                type="button"
-                class="btn btn-ghost h-7 px-2 text-xs"
                 @click="withdrawing = invitation"
               >
                 Withdraw
-              </button>
+              </Button>
             </li>
           </ul>
         </section>
@@ -276,18 +279,18 @@ function when(value: string): string {
                 </span>
               </span>
 
-              <button
+              <Button
+                variant="ghost"
+                class="h-7 shrink-0 px-2 text-xs"
                 v-if="person.suspended"
-                type="button"
-                class="btn btn-ghost h-7 shrink-0 px-2 text-xs"
                 @click="lift(person)"
               >
                 Lift
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                class="h-7 shrink-0 px-2 text-xs text-destructive"
                 v-else
-                type="button"
-                class="btn btn-ghost h-7 shrink-0 px-2 text-xs text-destructive"
                 @click="
                   suspending = person;
                   reason = '';
@@ -296,7 +299,7 @@ function when(value: string): string {
               >
                 <UserX class="size-3.5" />
                 Suspend
-              </button>
+              </Button>
             </li>
           </ul>
         </section>
@@ -324,11 +327,11 @@ function when(value: string): string {
         <form class="mt-3 space-y-3" @submit.prevent="confirmSuspension">
           <div>
             <label for="suspend-reason" class="mb-1 block text-xs font-medium">Why</label>
-            <textarea
+            <Textarea
+              class="h-auto py-2"
               id="suspend-reason"
               v-model="reason"
               rows="3"
-              class="input h-auto py-2"
               placeholder="What they did"
             />
             <!-- Required, because a suspension nobody can explain is one
@@ -340,16 +343,16 @@ function when(value: string): string {
 
           <div>
             <label for="suspend-hours" class="mb-1 block text-xs font-medium">For how long</label>
-            <select id="suspend-hours" v-model.number="hours" class="input">
-              <option v-for="choice in durations" :key="choice.hours" :value="choice.hours">
-                {{ choice.label }}
-              </option>
-            </select>
+            <Select
+              v-model="hours"
+              label="For how long"
+              :options="durations.map((choice) => ({ value: choice.hours, label: choice.label }))"
+            />
           </div>
 
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn btn-ghost" @click="suspending = null">Cancel</button>
-            <button type="submit" class="btn btn-danger" :disabled="!reason.trim()">Suspend</button>
+            <Button variant="ghost" @click="suspending = null">Cancel</Button>
+            <Button variant="danger" type="submit" :disabled="!reason.trim()">Suspend</Button>
           </div>
         </form>
       </div>

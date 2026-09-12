@@ -1,5 +1,12 @@
 <script setup lang="ts">
+import { useForm } from "@tanstack/vue-form";
+import type { AnyFieldApi } from "@tanstack/vue-form";
+import * as v from "valibot";
+
 import { isApiError } from "@tdc/types";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Field } from "#layers/ui/app/components/ui/field";
+import { Input } from "#layers/ui/app/components/ui/input";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
@@ -10,33 +17,68 @@ const { register } = useAuth();
 const router = useRouter();
 const { $localeRoute: localeRoute } = useI18n();
 
-const username = ref("");
-const email = ref("");
-const password = ref("");
-const displayName = ref("");
 const error = ref<string | null>(null);
 const submitting = ref(false);
 
-async function submit() {
-  error.value = null;
-  submitting.value = true;
+/*
+ * What an account needs, stated once.
+ *
+ * The server decides all of this again and has the last word — a client that
+ * checked nothing would still be safe. What this buys is being told before
+ * sending: an address that is not an address, or a password too short to be
+ * accepted, is worth saying at the field rather than after a round trip.
+ *
+ * Optional means optional: an empty display name or email passes, because the
+ * form sends nothing for them rather than an empty string the server would
+ * have to interpret.
+ */
+const account = v.object({
+  username: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, "Choose a username."),
+    v.regex(/^[a-z0-9_.-]+$/i, "Letters, digits, underscore, dot and hyphen."),
+  ),
+  displayName: v.string(),
+  email: v.union([
+    v.literal(""),
+    v.pipe(v.string(), v.trim(), v.email("That is not an email address.")),
+  ]),
+  password: v.pipe(v.string(), v.minLength(12, "At least twelve characters.")),
+});
 
-  try {
-    await register({
-      username: username.value,
-      password: password.value,
-      email: email.value || undefined,
-      displayName: displayName.value || undefined,
-    });
-    await router.push(localeRoute({ name: "index" }));
-  } catch (cause) {
-    // The server names which field is the problem — a taken username, a weak
-    // password — so its message is shown rather than a generic one.
-    error.value = isApiError(cause) ? cause.message : "Could not reach the server.";
-  } finally {
-    submitting.value = false;
-  }
+/** The first thing wrong with a field, once somebody has touched it. */
+function firstError(field: AnyFieldApi): string | undefined {
+  if (!field.state.meta.isTouched) return undefined;
+  const [issue] = field.state.meta.errors;
+  if (!issue) return undefined;
+  return typeof issue === "string" ? issue : (issue as { message?: string }).message;
 }
+
+const form = useForm({
+  defaultValues: { username: "", displayName: "", email: "", password: "" },
+  validators: { onSubmit: account },
+  async onSubmit({ value }) {
+    error.value = null;
+    submitting.value = true;
+
+    try {
+      await register({
+        username: value.username,
+        password: value.password,
+        email: value.email || undefined,
+        displayName: value.displayName || undefined,
+      });
+      await router.push(localeRoute({ name: "index" }));
+    } catch (cause) {
+      // The server names which field is the problem — a taken username, a weak
+      // password — so its message is shown rather than a generic one.
+      error.value = isApiError(cause) ? cause.message : "Could not reach the server.";
+    } finally {
+      submitting.value = false;
+    }
+  },
+});
 </script>
 
 <template>
@@ -46,7 +88,7 @@ async function submit() {
       Your username becomes your address on this server.
     </p>
 
-    <form class="mt-6 space-y-4" @submit.prevent="submit">
+    <form class="mt-6 space-y-4" @submit.prevent="form.handleSubmit()">
       <p
         v-if="error"
         class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
@@ -55,65 +97,89 @@ async function submit() {
         {{ error }}
       </p>
 
-      <div>
-        <label for="username" class="mb-1.5 block text-sm font-medium">Username</label>
-        <input
-          id="username"
-          v-model="username"
-          class="input"
-          name="username"
-          autocomplete="username"
-          required
-          autofocus
-        />
-      </div>
+      <form.Field name="username">
+        <template #default="{ field }">
+          <Field label="Username" :error="firstError(field)" required>
+            <template #default="{ id, invalid, describedBy }">
+              <Input
+                :id="id"
+                :model-value="field.state.value"
+                autocomplete="username"
+                :invalid="invalid"
+                :described-by="describedBy"
+                @update:model-value="field.handleChange($event)"
+                @blur="field.handleBlur"
+              />
+            </template>
+          </Field>
+        </template>
+      </form.Field>
 
-      <div>
-        <label for="displayName" class="mb-1.5 block text-sm font-medium">
-          Display name
-          <span class="font-normal text-muted-foreground">(optional)</span>
-        </label>
-        <input
-          id="displayName"
-          v-model="displayName"
-          class="input"
-          name="displayName"
-          autocomplete="name"
-        />
-      </div>
+      <form.Field name="displayName">
+        <template #default="{ field }">
+          <Field label="Display name" hint="Optional." :error="firstError(field)">
+            <template #default="{ id, invalid, describedBy }">
+              <Input
+                :id="id"
+                :model-value="field.state.value"
+                autocomplete="name"
+                :invalid="invalid"
+                :described-by="describedBy"
+                @update:model-value="field.handleChange($event)"
+                @blur="field.handleBlur"
+              />
+            </template>
+          </Field>
+        </template>
+      </form.Field>
 
-      <div>
-        <label for="email" class="mb-1.5 block text-sm font-medium">
-          Email
-          <span class="font-normal text-muted-foreground">(optional)</span>
-        </label>
-        <input
-          id="email"
-          v-model="email"
-          class="input"
-          name="email"
-          type="email"
-          autocomplete="email"
-        />
-      </div>
+      <form.Field name="email">
+        <template #default="{ field }">
+          <Field label="Email" hint="Optional." :error="firstError(field)">
+            <template #default="{ id, invalid, describedBy }">
+              <Input
+                :id="id"
+                type="email"
+                :model-value="field.state.value"
+                autocomplete="email"
+                :invalid="invalid"
+                :described-by="describedBy"
+                @update:model-value="field.handleChange($event)"
+                @blur="field.handleBlur"
+              />
+            </template>
+          </Field>
+        </template>
+      </form.Field>
 
-      <div>
-        <label for="password" class="mb-1.5 block text-sm font-medium">Password</label>
-        <input
-          id="password"
-          v-model="password"
-          class="input"
-          name="password"
-          type="password"
-          autocomplete="new-password"
-          required
-        />
-      </div>
+      <form.Field name="password">
+        <template #default="{ field }">
+          <Field
+            label="Password"
+            hint="At least twelve characters."
+            :error="firstError(field)"
+            required
+          >
+            <template #default="{ id, invalid, describedBy }">
+              <Input
+                :id="id"
+                type="password"
+                :model-value="field.state.value"
+                autocomplete="new-password"
+                :invalid="invalid"
+                :described-by="describedBy"
+                @update:model-value="field.handleChange($event)"
+                @blur="field.handleBlur"
+              />
+            </template>
+          </Field>
+        </template>
+      </form.Field>
 
-      <button type="submit" class="btn btn-primary h-9 w-full" :disabled="submitting">
+      <Button class="h-9 w-full" type="submit" :disabled="submitting">
         <Spinner v-if="submitting" size="sm" />
         {{ submitting ? "Creating account" : "Create account" }}
-      </button>
+      </Button>
     </form>
 
     <p class="mt-6 text-center text-sm text-muted-foreground">

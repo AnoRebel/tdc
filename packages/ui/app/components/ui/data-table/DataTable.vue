@@ -10,6 +10,8 @@ import {
   useTable,
 } from "@tanstack/vue-table";
 
+import { Button } from "#layers/ui/app/components/ui/button";
+
 /**
  * A table of things, sortable and paginated.
  *
@@ -171,22 +173,22 @@ const pageIndex = computed(() => table.atoms.pagination.get().pageIndex);
       <span class="tabular-nums">Page {{ pageIndex + 1 }} of {{ pageCount }}</span>
 
       <div class="flex gap-1">
-        <button
-          type="button"
-          class="btn btn-ghost h-7 px-2"
+        <Button
+          variant="ghost"
+          class="h-7 px-2"
           :disabled="!table.getCanPreviousPage()"
           @click="table.previousPage()"
         >
           Previous
-        </button>
-        <button
-          type="button"
-          class="btn btn-ghost h-7 px-2"
+        </Button>
+        <Button
+          variant="ghost"
+          class="h-7 px-2"
           :disabled="!table.getCanNextPage()"
           @click="table.nextPage()"
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   </div>

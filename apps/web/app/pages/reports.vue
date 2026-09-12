@@ -3,6 +3,8 @@ import type { Report } from "@tdc/types";
 import { ArrowLeft, Check, Flag, ShieldAlert, X } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { reportReasonLabel } from "#layers/ui/app/lib/reports";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Textarea } from "#layers/ui/app/components/ui/textarea";
 
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -173,14 +175,14 @@ function name(address: string): string {
             </p>
 
             <div class="mt-3 flex flex-wrap gap-2">
-              <button type="button" class="btn btn-outline" @click="decide(report, false)">
+              <Button variant="outline" @click="decide(report, false)">
                 <Check class="size-3.5" />
                 Acted on it
-              </button>
-              <button type="button" class="btn btn-ghost" @click="decide(report, true)">
+              </Button>
+              <Button variant="ghost" @click="decide(report, true)">
                 <X class="size-3.5" />
                 Dismiss
-              </button>
+              </Button>
               <NuxtLink
                 v-if="report.roomId"
                 :to="`/rooms/${report.roomId}`"
@@ -216,20 +218,20 @@ function name(address: string): string {
         </p>
 
         <form class="mt-3 space-y-3" @submit.prevent="record">
-          <textarea
+          <Textarea
+            class="h-auto py-2"
             v-model="note"
             rows="3"
-            class="input h-auto py-2"
             :placeholder="
               deciding.dismissing ? 'Why this needs nothing done' : 'What you did about it'
             "
           />
 
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn btn-ghost" @click="deciding = null">Cancel</button>
-            <button type="submit" class="btn btn-primary" :disabled="busy">
+            <Button variant="ghost" @click="deciding = null">Cancel</Button>
+            <Button type="submit" :disabled="busy">
               {{ busy ? "Recording" : deciding.dismissing ? "Dismiss" : "Record" }}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

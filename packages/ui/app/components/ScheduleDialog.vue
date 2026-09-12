@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Clock } from "lucide-vue-next";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * Choosing when to send a message.
@@ -156,15 +157,10 @@ function describe(when: Date): string {
       </div>
 
       <div class="flex shrink-0 justify-end gap-2 border-t border-border px-4 py-3">
-        <button type="button" class="btn btn-ghost" @click="emit('cancel')">Cancel</button>
-        <button
-          type="button"
-          class="btn btn-primary"
-          :disabled="!customValid"
-          @click="custom && emit('schedule', custom)"
-        >
+        <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
+        <Button :disabled="!customValid" @click="custom && emit('schedule', custom)">
           Schedule
-        </button>
+        </Button>
       </div>
     </div>
   </div>

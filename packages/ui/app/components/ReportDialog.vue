@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Flag } from "lucide-vue-next";
 import { reportReasonLabel } from "#layers/ui/app/lib/reports";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Textarea } from "#layers/ui/app/components/ui/textarea";
 
 /**
  * Reporting something to a moderator.
@@ -91,11 +93,11 @@ function submit() {
           <label for="report-detail" class="mb-1 block text-xs font-medium">
             Anything else? <span class="text-muted-foreground">(optional)</span>
           </label>
-          <textarea
+          <Textarea
+            class="h-auto py-2"
             id="report-detail"
             v-model="detail"
             rows="3"
-            class="input h-auto py-2"
             placeholder="What a moderator should know"
           />
         </div>
@@ -106,8 +108,8 @@ function submit() {
         </p>
 
         <div class="flex justify-end gap-2">
-          <button type="button" class="btn btn-ghost" @click="emit('cancel')">Cancel</button>
-          <button type="submit" class="btn btn-danger" :disabled="!reason">Report</button>
+          <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
+          <Button variant="danger" type="submit" :disabled="!reason">Report</Button>
         </div>
       </form>
     </div>

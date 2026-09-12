@@ -7,6 +7,7 @@ import { Bubble } from "#layers/ui/app/components/ui/bubble";
 import { Separator } from "#layers/ui/app/components/ui/separator";
 import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
+import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * A thread, opened beside the channel.
@@ -82,14 +83,15 @@ function when(value: string): string {
       <span v-if="thread" class="text-xs text-muted-foreground">
         {{ thread.replies.length === 1 ? "1 reply" : `${thread.replies.length} replies` }}
       </span>
-      <button
-        type="button"
-        class="btn btn-ghost ml-auto size-7 px-0"
+      <Button
+        variant="ghost"
+        size="icon"
+        class="ml-auto"
         aria-label="Close thread"
         @click="emit('close')"
       >
         <X class="size-4" />
-      </button>
+      </Button>
     </header>
 
     <p
@@ -170,15 +172,16 @@ function when(value: string): string {
           class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
           autocomplete="off"
         />
-        <button
+        <Button
+          size="icon"
+          class="shrink-0"
           type="submit"
-          class="btn btn-primary size-8 shrink-0 px-0"
           :disabled="sending || !draft.trim()"
           title="Reply"
         >
           <Spinner v-if="sending" size="sm" />
           <SendHorizontal v-else class="size-4" />
-        </button>
+        </Button>
       </form>
     </footer>
   </aside>

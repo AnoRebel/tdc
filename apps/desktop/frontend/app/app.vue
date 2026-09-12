@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from "#layers/ui/app/components/ui/button";
 /*
  * The desktop client.
  *
@@ -109,7 +110,7 @@ const { about, showingAbout, confirmingQuit, quit } = useAppCommands();
       <p class="mt-4 text-xs text-muted-foreground">Free and open source. Self-hosted, always.</p>
 
       <div class="mt-4 flex justify-end">
-        <button type="button" class="btn btn-primary" @click="showingAbout = false">Close</button>
+        <Button @click="showingAbout = false">Close</Button>
       </div>
     </div>
   </div>

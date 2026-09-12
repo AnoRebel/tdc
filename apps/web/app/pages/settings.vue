@@ -17,6 +17,8 @@ import {
   UserX,
 } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Input } from "#layers/ui/app/components/ui/input";
 
 /** Account settings: identity, status, signed-in devices. */
 
@@ -289,16 +291,14 @@ function deviceName(userAgent: string): string {
         </p>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
-          <button
+          <Button
             v-for="status in statuses"
             :key="status.key"
-            type="button"
-            class="btn"
-            :class="currentStatus === status.key ? 'btn-primary' : 'btn-outline'"
+            :variant="currentStatus === status.key ? 'primary' : 'outline'"
             @click="chooseStatus(status.key)"
           >
             {{ status.label }}
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -331,15 +331,14 @@ function deviceName(userAgent: string): string {
                 <time>{{ when(session.lastSeenAt) }}</time>
               </p>
             </div>
-            <button
+            <Button
+              variant="danger"
               v-if="!session.current"
-              type="button"
-              class="btn btn-danger"
               :disabled="busy === session.id"
               @click="endSession(session.id)"
             >
               {{ busy === session.id ? "Ending" : "End session" }}
-            </button>
+            </Button>
           </li>
         </ul>
       </section>
@@ -354,35 +353,31 @@ function deviceName(userAgent: string): string {
         </p>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
-          <button
+          <Button
             v-for="option in themeOptions"
             :key="option.value"
-            type="button"
-            class="btn"
-            :class="theme.preference.value === option.value ? 'btn-primary' : 'btn-outline'"
+            :variant="theme.preference.value === option.value ? 'primary' : 'outline'"
             @click="theme.set(option.value)"
           >
             <component :is="option.icon" class="size-3.5" />
             {{ option.label }}
-          </button>
+          </Button>
         </div>
 
         <h3 class="mt-5 text-xs font-semibold">Colours</h3>
         <p class="mt-1 text-xs text-muted-foreground">Each works in both light and dark.</p>
 
         <div class="mt-2 flex flex-wrap gap-1.5">
-          <button
+          <Button
             v-for="option in paletteOptions"
             :key="option.value"
-            type="button"
-            class="btn"
-            :class="theme.palette.value === option.value ? 'btn-primary' : 'btn-outline'"
+            :variant="theme.palette.value === option.value ? 'primary' : 'outline'"
             :aria-pressed="theme.palette.value === option.value"
             @click="theme.setPalette(option.value)"
           >
             {{ option.label }}
             <span class="text-[0.6875rem] opacity-70">{{ option.description }}</span>
-          </button>
+          </Button>
         </div>
 
         <h3 class="mt-5 text-xs font-semibold">Accent</h3>
@@ -393,25 +388,17 @@ function deviceName(userAgent: string): string {
 
         <div class="mt-2 flex flex-wrap items-start gap-1.5">
           <label class="sr-only" for="accent">Accent colour</label>
-          <input
+          <Input
+            class="w-40"
             id="accent"
             v-model="accentDraft"
-            type="text"
-            class="input w-40"
             placeholder="#4f46e5"
             :aria-invalid="Boolean(accentRefusal)"
             :aria-describedby="accentRefusal ? 'accent-refusal' : undefined"
             @keydown.enter.prevent="applyAccent"
           />
-          <button type="button" class="btn btn-outline" @click="applyAccent">Apply</button>
-          <button
-            v-if="theme.accent.value"
-            type="button"
-            class="btn btn-ghost"
-            @click="clearAccent"
-          >
-            Reset
-          </button>
+          <Button variant="outline" @click="applyAccent">Apply</Button>
+          <Button variant="ghost" v-if="theme.accent.value" @click="clearAccent"> Reset </Button>
         </div>
 
         <!-- The number, not just "that will not work": somebody who is 0.2
@@ -446,16 +433,15 @@ function deviceName(userAgent: string): string {
           {{ push.error.value }}
         </p>
 
-        <button
+        <Button
+          class="mt-3"
           v-if="!push.subscribedHere.value"
-          type="button"
-          class="btn btn-primary mt-3"
           :disabled="push.busy.value"
           @click="push.subscribe()"
         >
           <Bell class="size-3.5" />
           {{ push.busy.value ? "Asking" : "Notify me on this device" }}
-        </button>
+        </Button>
 
         <ul v-if="push.devices.value.length" class="mt-3 space-y-1.5">
           <li
@@ -480,14 +466,14 @@ function deviceName(userAgent: string): string {
                 <template v-else>Not used yet</template>
               </p>
             </div>
-            <button
-              type="button"
-              class="btn btn-ghost h-7 px-2 text-xs"
+            <Button
+              variant="ghost"
+              class="h-7 px-2 text-xs"
               :disabled="push.busy.value"
               @click="push.unsubscribe(device.id)"
             >
               Stop
-            </button>
+            </Button>
           </li>
         </ul>
 
@@ -519,10 +505,10 @@ function deviceName(userAgent: string): string {
           The short introduction to the application, if you would like it again.
         </p>
 
-        <button type="button" class="btn btn-ghost mt-3" @click="showTourAgain">
+        <Button variant="ghost" class="mt-3" @click="showTourAgain">
           <Compass class="size-3.5" />
           Show me around
-        </button>
+        </Button>
       </section>
 
       <section>
@@ -583,13 +569,9 @@ function deviceName(userAgent: string): string {
                 @{{ person.username }}
               </span>
             </span>
-            <button
-              type="button"
-              class="btn btn-ghost h-7 px-2 text-xs"
-              @click="unblocking = person"
-            >
+            <Button variant="ghost" class="h-7 px-2 text-xs" @click="unblocking = person">
               Unblock
-            </button>
+            </Button>
           </li>
         </ul>
       </section>
@@ -643,10 +625,10 @@ function deviceName(userAgent: string): string {
       </section>
 
       <section class="border-t pt-6">
-        <button type="button" class="btn btn-danger" @click="leave">
+        <Button variant="danger" @click="leave">
           <LogOut class="size-3.5" />
           Sign out
-        </button>
+        </Button>
       </section>
     </div>
   </div>
