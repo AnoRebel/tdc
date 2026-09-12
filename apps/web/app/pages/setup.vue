@@ -108,6 +108,7 @@ const form = useForm({
             <template #default="{ id, invalid, describedBy }">
               <Input
                 :id="id"
+                autofocus
                 autocomplete="username"
                 :model-value="field.state.value"
                 :invalid="invalid"

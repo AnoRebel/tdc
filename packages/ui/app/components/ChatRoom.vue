@@ -1542,7 +1542,7 @@ watch(roomId, load, { immediate: true });
           variant="ghost"
           size="icon"
           class="shrink-0 md:hidden"
-          aria-label="Channels"
+          label="Channels"
           @click="navigationOpen = true"
         >
           <Menu class="size-4" />
@@ -1604,7 +1604,7 @@ watch(roomId, load, { immediate: true });
             variant="ghost"
             size="icon"
             v-if="can('moderation.restrict')"
-            :aria-label="showBans ? 'Hide bans' : 'Show who is banned'"
+            :label="showBans ? 'Hide bans' : 'Show who is banned'"
             :title="showBans ? 'Hide bans' : 'Show who is banned'"
             @click="showBans = !showBans"
           >
@@ -1785,7 +1785,7 @@ watch(roomId, load, { immediate: true });
                     variant="ghost"
                     size="icon"
                     class="md:hidden"
-                    aria-label="Message actions"
+                    label="Message actions"
                     @click.stop="
                       contextMenu.show(
                         ($event.currentTarget as HTMLElement).getBoundingClientRect().left,
@@ -1874,9 +1874,13 @@ watch(roomId, load, { immediate: true });
                     <template v-else>
                       <template v-if="message.removed">This message was removed</template>
                       <MessageBody v-else :body="message.body" />
+                      <!-- Dimmed, but not below what can be read. At 60% this
+                           fell under 4.5:1 against a sender's own bubble,
+                           which axe caught and an eye would forgive until it
+                           is the only thing saying a message was changed. -->
                       <span
                         v-if="message.edited && !message.removed"
-                        class="ml-1 align-baseline text-[0.6875rem] opacity-60"
+                        class="ml-1 align-baseline text-[0.6875rem] opacity-85"
                       >
                         edited
                       </span>
@@ -1963,7 +1967,7 @@ watch(roomId, load, { immediate: true });
                   <Button
                     variant="ghost"
                     class="size-7 shrink-0 p-0 opacity-0 transition-opacity group-hover/waiting:opacity-100 focus-visible:opacity-100"
-                    :aria-label="`Do not send: ${message.body}`"
+                    :label="`Do not send: ${message.body}`"
                     @click="unsendWaiting(message.clientToken)"
                   >
                     <X class="size-3.5" />
@@ -2023,7 +2027,7 @@ watch(roomId, load, { immediate: true });
               size="icon"
               :disabled="room.archived"
               title="Attach"
-              aria-label="Attach"
+              label="Attach"
               @click="attaching = !attaching"
             >
               <Paperclip class="size-4" />
@@ -2070,7 +2074,7 @@ watch(roomId, load, { immediate: true });
             class="shrink-0"
             :disabled="room.archived || !draft.trim()"
             title="Send later"
-            aria-label="Send later"
+            label="Send later"
             @click="scheduling = true"
           >
             <Clock class="size-4" />
@@ -2082,7 +2086,7 @@ watch(roomId, load, { immediate: true });
               size="icon"
               :disabled="room.archived"
               title="Emoji"
-              aria-label="Emoji"
+              label="Emoji"
               @click="choosingEmoji = !choosingEmoji"
             >
               <Smile class="size-4" />

@@ -88,7 +88,7 @@ function when(value: string): string {
         variant="ghost"
         size="icon"
         class="ml-auto"
-        aria-label="Close thread"
+        label="Close thread"
         @click="emit('close')"
       >
         <X class="size-4" />

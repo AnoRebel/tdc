@@ -283,7 +283,7 @@ function conversationName(room: Room): string {
         size="icon"
         class="relative"
         data-tour="notifications"
-        :aria-label="
+        :label="
           notifications.unread.value
             ? `Notifications, ${notifications.unread.value} unread`
             : 'Notifications'

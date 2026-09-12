@@ -63,12 +63,7 @@ async function update() {
         {{ updating ? "Updating" : "Reload" }}
       </Button>
 
-      <Button
-        variant="ghost"
-        class="size-8 shrink-0 p-0"
-        aria-label="Not now"
-        @click="dismissed = true"
-      >
+      <Button variant="ghost" class="size-8 shrink-0 p-0" label="Not now" @click="dismissed = true">
         <X class="size-3.5" />
       </Button>
     </div>

@@ -53,7 +53,7 @@ function onKeydown(event: KeyboardEvent) {
     <Button
       variant="ghost"
       size="icon"
-      aria-label="Appearance"
+      label="Appearance"
       :aria-expanded="open"
       aria-haspopup="menu"
       @click="open = !open"

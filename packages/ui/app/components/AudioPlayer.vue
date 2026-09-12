@@ -145,7 +145,7 @@ function clock(seconds: number): string {
     />
 
     <div class="flex items-center gap-3">
-      <Button class="size-9 shrink-0 px-0" :aria-label="playing ? 'Pause' : 'Play'" @click="toggle">
+      <Button class="size-9 shrink-0 px-0" :label="playing ? 'Pause' : 'Play'" @click="toggle">
         <Spinner v-if="buffering" size="sm" />
         <Pause v-else-if="playing" class="size-4" />
         <Play v-else class="size-4" />
@@ -195,7 +195,7 @@ function clock(seconds: number): string {
       <Button
         variant="ghost"
         class="tabular h-8 shrink-0 px-1.5 text-xs font-medium"
-        :aria-label="`Playback speed, currently ${speed} times`"
+        :label="`Playback speed, currently ${speed} times`"
         :title="`Speed: ${speed}×`"
         @click="cycleSpeed"
       >
@@ -206,7 +206,7 @@ function clock(seconds: number): string {
         variant="ghost"
         size="icon"
         class="shrink-0"
-        :aria-label="muted ? 'Unmute' : 'Mute'"
+        :label="muted ? 'Unmute' : 'Mute'"
         @click="toggleMute"
       >
         <VolumeX v-if="muted" class="size-4" />
@@ -218,7 +218,7 @@ function clock(seconds: number): string {
         size="icon"
         class="shrink-0"
         v-if="props.expandable"
-        aria-label="Open in the viewer"
+        label="Open in the viewer"
         title="Open in the viewer"
         @click="emit('expand')"
       >

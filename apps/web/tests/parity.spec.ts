@@ -172,9 +172,11 @@ test.describe("a conversation in use", () => {
     /*
      * The edit box autofocuses, and it is the focused element that matters —
      * targeting "the last textbox" found the composer instead and sent a new
-     * message, which looked like an edit that did not mark itself.
+     * message, which looked like an edit that did not mark itself. Asking for
+     * the focused element rather than a class also survives the markup moving
+     * onto a component, which a class selector did not.
      */
-    const editor = page.locator("form input.input").last();
+    const editor = page.locator("input:focus");
     await editor.waitFor();
     await editor.fill(`${body} changed`);
     await editor.press("Enter");
@@ -267,12 +269,29 @@ test.describe("the rest of the list", () => {
     await expect(page.getByText(body).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test("4: signing out returns to sign-in", async ({ page }) => {
-    await page.goto("/settings");
-    const out = page.getByRole("button", { name: /sign out/i }).first();
-    await out.click();
-    const confirm = page.getByRole("dialog").getByRole("button", { name: /sign out/i });
-    if (await confirm.count()) await confirm.click();
-    await expect(page).toHaveURL(/\/signin/, { timeout: 10000 });
+  /*
+   * Its own sign-in, because signing out revokes the session — and every other
+   * test in this suite reuses one. Left sharing, this test passed and took the
+   * four that ran after it down with it, each reporting that it could not find
+   * a control on a page it was never signed in to see.
+   */
+  test.describe("signing out", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test("4: signing out returns to sign-in", async ({ page }) => {
+      await page.goto("/signin");
+      await page.getByLabel("Username or email").fill("founder");
+      await page.getByLabel("Password").fill("correct horse battery staple");
+      await page.getByRole("button", { name: "Sign in" }).click();
+      await page.waitForURL((url) => !url.pathname.startsWith("/signin"));
+      await page.keyboard.press("Escape");
+
+      await page.goto("/settings");
+      const out = page.getByRole("button", { name: /sign out/i }).first();
+      await out.click();
+      const confirm = page.getByRole("dialog").getByRole("button", { name: /sign out/i });
+      if (await confirm.count()) await confirm.click();
+      await expect(page).toHaveURL(/\/signin/, { timeout: 10000 });
+    });
   });
 });

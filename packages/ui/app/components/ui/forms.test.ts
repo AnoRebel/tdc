@@ -30,9 +30,59 @@ describe("the button", () => {
    */
   it("gives its label to assistive technology, not only to a tooltip", () => {
     expect(source, "a label that only becomes a title is a tooltip, not a name").toMatch(
-      /:aria-label="props\.label"/,
+      /:aria-label="props\.label/,
     );
-    expect(source).toMatch(/:title="props\.label"/);
+    expect(source).toMatch(/:title="props\.label/);
+  });
+
+  /*
+   * And a caller names it through the prop, not the attribute.
+   *
+   * The component binds aria-label from its own prop, so an aria-label passed
+   * as an attribute is overridden by the prop's absence and the button ends up
+   * with no name at all. That is exactly what happened while moving the
+   * controls over: six files kept their aria-label, and the appearance toggle
+   * became a button nothing could find — four tests failed on a control that
+   * had simply lost its name.
+   */
+  it("is named through the prop rather than the attribute", async () => {
+    const { existsSync, readdirSync, readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+
+    const roots = [
+      join(HERE, "..", ".."),
+      join(HERE, "..", "..", "..", "..", "apps", "web", "app"),
+      join(HERE, "..", "..", "..", "..", "apps", "desktop", "frontend", "app"),
+    ];
+
+    const offenders: string[] = [];
+    const walk = (directory: string, root: string) => {
+      if (!existsSync(directory)) return;
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+        const full = join(directory, entry.name);
+        if (entry.isDirectory()) {
+          walk(full, root);
+          continue;
+        }
+        if (!entry.name.endsWith(".vue")) continue;
+        if (full.includes(join("components", "ui", "button"))) continue;
+
+        const contents = readFileSync(full, "utf8");
+        for (const tag of contents.matchAll(/<Button\b[^>]*?>/gs)) {
+          if (/aria-label=/.test(tag[0])) {
+            offenders.push(full.slice(root.length + 1));
+            break;
+          }
+        }
+      }
+    };
+    for (const root of roots) walk(root, root);
+
+    expect(
+      offenders.sort(),
+      "the component binds aria-label from its label prop, so an attribute here is overridden — use label",
+    ).toEqual([]);
   });
 
   it("dims and refuses a press when disabled", () => {
@@ -155,5 +205,47 @@ describe("every vendored component", () => {
     }
 
     expect(offenders.sort(), "these colours are fixed, whatever the theme says").toEqual([]);
+  });
+});
+
+/*
+ * The first field of a sign-in screen takes focus.
+ *
+ * A screen whose only purpose is one form should not ask somebody to click
+ * before typing. This was lost when the controls moved onto components — the
+ * attribute was on the markup, the component did not have the prop, and it
+ * simply vanished. Nothing type-checked differently; the keyboard test noticed,
+ * eventually, by which point four other tests were failing for reasons that
+ * looked unrelated.
+ */
+describe("a screen that exists to be typed into", () => {
+  it("puts the cursor in the first field", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+
+    /*
+     * The repository root, found rather than counted.
+     *
+     * Counting "../" from a nested directory is how this test spent two runs
+     * looking for the applications inside packages/.
+     */
+    const REPO = join(HERE, "..", "..", "..", "..", "..");
+
+    const forms = [
+      join(REPO, "apps", "web", "app", "pages", "signin.vue"),
+      join(REPO, "apps", "web", "app", "pages", "register.vue"),
+      join(REPO, "apps", "web", "app", "pages", "setup.vue"),
+      join(REPO, "apps", "desktop", "frontend", "app", "pages", "signin.vue"),
+    ];
+
+    const offenders: string[] = [];
+    for (const path of forms) {
+      const contents = readFileSync(path, "utf8");
+      if (!/autofocus/.test(contents)) offenders.push(path.split("/").slice(-3).join("/"));
+    }
+
+    expect(offenders.sort(), "somebody arriving here has to click before they can type").toEqual(
+      [],
+    );
   });
 });

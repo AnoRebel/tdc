@@ -59,8 +59,8 @@ const sizes: Record<Size, string> = {
   <button
     :type="props.type"
     :disabled="props.disabled"
-    :aria-label="props.label"
-    :title="props.label"
+    :aria-label="props.label ?? undefined"
+    :title="props.label ?? undefined"
     :class="
       cn(
         'inline-flex items-center justify-center gap-1.5 rounded-md text-[0.8125rem] font-medium whitespace-nowrap',

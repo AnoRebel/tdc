@@ -118,6 +118,7 @@ const form = useForm({
               <Input
                 :id="id"
                 :model-value="field.state.value"
+                autofocus
                 autocomplete="username"
                 :invalid="invalid"
                 :described-by="describedBy"

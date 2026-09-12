@@ -21,6 +21,15 @@ const props = defineProps<{
   autocomplete?: string;
   /** The field's name, for a screen reader where no visible label sits by it. */
   label?: string;
+  /**
+   * Takes focus when the screen opens.
+   *
+   * For the first field of a screen whose only purpose is that form — a sign-in
+   * page, where anything else somebody might want to do is secondary to
+   * typing. Not for a field inside a page that has other business, where
+   * stealing focus moves somebody who was reading.
+   */
+  autofocus?: boolean;
   /** Whether what is in it was refused, and the message saying why. */
   invalid?: boolean;
   describedBy?: string;
@@ -38,6 +47,7 @@ const model = defineModel<string>({ default: "" });
     :disabled="props.disabled"
     :required="props.required"
     :autocomplete="props.autocomplete"
+    :autofocus="props.autofocus"
     :aria-label="props.label"
     :aria-invalid="props.invalid || undefined"
     :aria-describedby="props.describedBy"
