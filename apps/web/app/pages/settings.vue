@@ -19,6 +19,7 @@ import {
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
+import { fully } from "#layers/ui/app/lib/dates";
 
 /** Account settings: identity, status, signed-in devices. */
 
@@ -207,7 +208,7 @@ async function leave() {
 }
 
 function when(value: string): string {
-  return new Date(value).toLocaleString();
+  return fully(value);
 }
 
 /**

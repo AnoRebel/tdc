@@ -2,6 +2,7 @@
 import { ShieldOff } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
+import { onDayAtTime } from "#layers/ui/app/lib/dates";
 
 /**
  * Who is currently kept out of a channel, and the way back in.
@@ -38,12 +39,7 @@ function until(ban: { expiresAt?: string }): string {
   const when = new Date(ban.expiresAt);
   if (when.getTime() <= Date.now()) return "Expired";
 
-  return `Until ${when.toLocaleString([], {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
+  return `Until ${onDayAtTime(when)}`;
 }
 </script>
 

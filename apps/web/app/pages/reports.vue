@@ -5,6 +5,7 @@ import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { reportReasonLabel } from "#layers/ui/app/lib/reports";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
+import { onDayAtTime } from "#layers/ui/app/lib/dates";
 
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -68,12 +69,7 @@ async function record() {
 }
 
 function when(value: number): string {
-  return new Date(value).toLocaleString([], {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return onDayAtTime(value);
 }
 
 /** The local part of an address, which is what a person is called here. */

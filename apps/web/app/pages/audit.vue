@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { isApiError } from "@tdc/types";
 import { ArrowLeft, Download, ShieldAlert } from "lucide-vue-next";
+import { fully } from "#layers/ui/app/lib/dates";
 
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -77,7 +78,7 @@ try {
 const exportUrl = computed(() => `${useRuntimeConfig().public.apiBase}/api/admin/audit/export`);
 
 function when(value: string): string {
-  return new Date(value).toLocaleString();
+  return fully(value);
 }
 </script>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Clock } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
+import { onWeekdayAtTime } from "#layers/ui/app/lib/dates";
 
 /**
  * Choosing when to send a message.
@@ -70,11 +71,7 @@ const customValid = computed(() => !!custom.value && custom.value.getTime() > Da
 const earliest = computed(() => new Date(Date.now() + 60_000));
 
 function describe(when: Date): string {
-  return when.toLocaleString([], {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return onWeekdayAtTime(when);
 }
 </script>
 

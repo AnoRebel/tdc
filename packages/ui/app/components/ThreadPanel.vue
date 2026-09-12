@@ -8,6 +8,7 @@ import { Separator } from "#layers/ui/app/components/ui/separator";
 import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
+import { atTime } from "#layers/ui/app/lib/dates";
 
 /**
  * A thread, opened beside the channel.
@@ -72,7 +73,7 @@ function shortName(address: string): string {
 }
 
 function when(value: string): string {
-  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return atTime(value);
 }
 </script>
 

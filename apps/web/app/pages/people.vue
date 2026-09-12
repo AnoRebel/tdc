@@ -6,6 +6,7 @@ import type { Person } from "#layers/ui/app/composables/usePeople";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Select } from "#layers/ui/app/components/ui/select";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
+import { onDate, onDayAtTime } from "#layers/ui/app/lib/dates";
 
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -115,20 +116,11 @@ async function copyInvitation() {
 function until(person: Person): string {
   if (!person.suspendedUntil) return "Until somebody lifts it";
 
-  return `Until ${new Date(person.suspendedUntil).toLocaleString([], {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
+  return `Until ${onDayAtTime(person.suspendedUntil)}`;
 }
 
 function when(value: string): string {
-  return new Date(value).toLocaleDateString([], {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return onDate(value);
 }
 </script>
 
