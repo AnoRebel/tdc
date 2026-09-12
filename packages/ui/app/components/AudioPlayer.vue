@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Maximize2, Pause, Play, Volume2, VolumeX } from "lucide-vue-next";
+import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
 /**
  * An audio player, rather than the browser's default controls.

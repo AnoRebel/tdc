@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { AlertCircle, Code, FileText } from "lucide-vue-next";
+import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 
 /**
  * A text or markdown attachment, read in place.

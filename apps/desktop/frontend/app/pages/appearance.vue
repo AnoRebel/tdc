@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
+
 /**
  * How the application looks.
  *
@@ -77,33 +80,29 @@ onMounted(async () => {
 
       <h3 class="mt-4 text-xs font-semibold">Light or dark</h3>
       <div class="mt-2 flex flex-wrap gap-1.5">
-        <button
+        <Button
           v-for="option in appearances"
           :key="option.value"
-          type="button"
-          class="btn"
-          :class="theme.preference.value === option.value ? 'btn-primary' : 'btn-outline'"
+          :variant="theme.preference.value === option.value ? 'primary' : 'outline'"
           :aria-pressed="theme.preference.value === option.value"
           @click="theme.set(option.value)"
         >
           {{ option.label }}
-        </button>
+        </Button>
       </div>
 
       <h3 class="mt-4 text-xs font-semibold">Palette</h3>
       <div class="mt-2 flex flex-wrap gap-1.5">
-        <button
+        <Button
           v-for="option in palettes"
           :key="option.value"
-          type="button"
-          class="btn"
-          :class="theme.palette.value === option.value ? 'btn-primary' : 'btn-outline'"
+          :variant="theme.palette.value === option.value ? 'primary' : 'outline'"
           :aria-pressed="theme.palette.value === option.value"
           @click="theme.setPalette(option.value)"
         >
           {{ option.label }}
           <span class="text-[0.6875rem] opacity-70">{{ option.description }}</span>
-        </button>
+        </Button>
       </div>
     </section>
 
@@ -150,11 +149,10 @@ onMounted(async () => {
       </p>
 
       <label class="mt-3 flex items-start gap-2 text-xs">
-        <input
-          type="checkbox"
+        <Checkbox
           class="mt-0.5"
-          :checked="startup.atLogin.value"
-          @change="startup.setAtLogin(($event.target as HTMLInputElement).checked)"
+          :model-value="startup.atLogin.value"
+          @update:model-value="startup.setAtLogin($event)"
         />
         <span>
           Open TDC when I log in
@@ -163,11 +161,10 @@ onMounted(async () => {
       </label>
 
       <label class="mt-2 flex items-start gap-2 text-xs">
-        <input
-          type="checkbox"
+        <Checkbox
           class="mt-0.5"
-          :checked="startup.hidden.value"
-          @change="startup.setHidden(($event.target as HTMLInputElement).checked)"
+          :model-value="startup.hidden.value"
+          @update:model-value="startup.setHidden($event)"
         />
         <span>
           Start in the tray, without a window

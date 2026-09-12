@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Input } from "#layers/ui/app/components/ui/input";
 import * as Api from "#bindings/api";
 
 const { $localeRoute: localeRoute } = useI18n();
@@ -85,20 +87,20 @@ async function useAndSignIn(url: string) {
 
       <form class="mt-6 flex gap-2" @submit.prevent="addServer">
         <label class="sr-only" for="address">Server address</label>
-        <input
+        <Input
           id="address"
           v-model="typed"
-          type="text"
-          class="input flex-1"
+          class="flex-1"
           placeholder="tdc.or.tz"
           autocomplete="off"
-          :aria-invalid="Boolean(refusal)"
-          :aria-describedby="refusal ? 'refusal' : undefined"
+          label="Server address"
+          :invalid="Boolean(refusal)"
+          :described-by="refusal ? 'refusal' : undefined"
           :disabled="loading"
         />
-        <button type="submit" class="btn btn-primary" :disabled="loading || !typed.trim()">
+        <Button type="submit" :disabled="loading || !typed.trim()">
           {{ loading ? "Checking…" : "Add" }}
-        </button>
+        </Button>
       </form>
 
       <!-- The server's own words. It refused for a reason it knows and this
@@ -135,26 +137,28 @@ async function useAndSignIn(url: string) {
           >
             Sign in
           </NuxtLink>
-          <button
+          <Button
             v-else
-            type="button"
-            class="btn btn-outline shrink-0 text-xs"
+            variant="outline"
+            size="small"
+            class="shrink-0"
             @click="useAndSignIn(server.url)"
           >
             Sign in
-          </button>
+          </Button>
 
           <!-- Removing a server takes its session with it, which is said here
                rather than only in the code: somebody expecting to stay signed
                in would be surprised, and on a shared machine that matters. -->
-          <button
-            type="button"
-            class="btn btn-ghost shrink-0 text-xs text-destructive"
-            :aria-label="`Remove ${server.url} and sign out of it`"
+          <Button
+            variant="danger"
+            size="small"
+            class="shrink-0"
+            :label="`Remove ${server.url} and sign out of it`"
             @click="removing = server"
           >
             Remove
-          </button>
+          </Button>
         </li>
       </ul>
 
