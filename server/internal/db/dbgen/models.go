@@ -58,16 +58,18 @@ type ChannelBan struct {
 }
 
 type Credential struct {
-	ID         uuid.UUID
-	UserID     uuid.UUID
-	Kind       string
-	Label      string
-	Secret     []byte
-	ExternalID *string
-	Provider   *string
-	SignCount  int64
-	CreatedAt  time.Time
-	LastUsedAt *time.Time
+	ID                    uuid.UUID
+	UserID                uuid.UUID
+	Kind                  string
+	Label                 string
+	Secret                []byte
+	ExternalID            *string
+	Provider              *string
+	SignCount             int64
+	CreatedAt             time.Time
+	LastUsedAt            *time.Time
+	ExternalEmail         *string
+	ExternalEmailVerified bool
 }
 
 type Event struct {
@@ -162,6 +164,17 @@ type NotificationPreference struct {
 	Level     string
 	Muted     bool
 	UpdatedAt time.Time
+}
+
+type OauthAuthorization struct {
+	ID         uuid.UUID
+	StateHash  []byte
+	Verifier   string
+	Provider   string
+	RedirectTo string
+	UserID     *uuid.UUID
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
 }
 
 type PinnedMessage struct {

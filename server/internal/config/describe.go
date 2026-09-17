@@ -21,6 +21,14 @@ type Setting struct {
 	Secret bool
 }
 
+// settingValue is one row of the listing below: the key, what it currently is,
+// and what it would have been had nobody set it.
+type settingValue struct {
+	key      string
+	current  string
+	fallback string
+}
+
 // secretKeys are settings whose values must be redacted wherever configuration
 // is displayed, logged or exported.
 var secretKeys = map[string]bool{
@@ -40,6 +48,32 @@ var secretKeys = map[string]bool{
 		conceal nothing while making a misconfiguration harder to diagnose.
 	*/
 	"push.vapid_private": true,
+	/*
+		The GIF provider's API key. It is billed to whoever holds it, so it is
+		redacted for the same reason the storage credentials are.
+	*/
+	"gifs.api_key": true,
+}
+
+/*
+isSecret says whether a setting must be redacted wherever configuration is
+shown.
+
+Most secrets are a fixed list, but a sign-in provider's client secret is not:
+the key contains the provider's own name, so "oauth.github.client_secret" and
+"oauth.forgejo.client_secret" are different keys naming the same kind of thing.
+Matching the ending rather than the whole key means a provider added later is
+redacted without anybody remembering to come back here.
+
+The client_id is left visible on purpose. It is handed to every browser that
+starts a sign-in, so hiding it would conceal nothing while making a
+misconfiguration harder to see.
+*/
+func isSecret(key string) bool {
+	if secretKeys[key] {
+		return true
+	}
+	return strings.HasPrefix(key, "oauth.") && strings.HasSuffix(key, ".client_secret")
 }
 
 // Redact returns a value safe to display.
@@ -48,7 +82,7 @@ var secretKeys = map[string]bool{
 // checking configuration needs to confirm the host and database name, and
 // replacing the whole value would defeat that.
 func Redact(key, value string) string {
-	if value == "" || !secretKeys[key] {
+	if value == "" || !isSecret(key) {
 		return value
 	}
 
@@ -74,11 +108,7 @@ func (c Config) Describe(path string) []Setting {
 	}
 
 	defaults := Default()
-	values := []struct {
-		key      string
-		current  string
-		fallback string
-	}{
+	values := []settingValue{
 		{"server.name", c.Server.Name, defaults.Server.Name},
 		{"server.description", c.Server.Description, defaults.Server.Description},
 		{"server.canonical_address", c.Server.CanonicalAddress, defaults.Server.CanonicalAddress},
@@ -107,8 +137,31 @@ func (c Config) Describe(path string) []Setting {
 		{"push.vapid_public", c.Push.VAPIDPublic, defaults.Push.VAPIDPublic},
 		{"push.vapid_private", c.Push.VAPIDPrivate, defaults.Push.VAPIDPrivate},
 		{"push.subject", c.Push.Subject, defaults.Push.Subject},
+		{"gifs.provider", c.GIFs.Provider, defaults.GIFs.Provider},
+		{"gifs.api_key", c.GIFs.APIKey, defaults.GIFs.APIKey},
 		{"log.level", c.Log.Level, defaults.Log.Level},
 		{"log.format", c.Log.Format, defaults.Log.Format},
+	}
+
+	/*
+		Each configured sign-in provider contributes its own settings.
+
+		They are appended rather than listed above because there is no fixed set
+		of them: which keys exist depends on what oauth.providers names. The
+		secret among them is redacted by isSecret, which matches the ending of
+		the key rather than the whole of it for exactly this reason.
+	*/
+	for _, provider := range c.OAuth.Providers {
+		at := "oauth." + provider.Name + "."
+		values = append(values,
+			settingValue{at + "label", provider.Label, ""},
+			settingValue{at + "client_id", provider.ClientID, ""},
+			settingValue{at + "client_secret", provider.ClientSecret, ""},
+			settingValue{at + "auth_url", provider.AuthURL, ""},
+			settingValue{at + "token_url", provider.TokenURL, ""},
+			settingValue{at + "user_url", provider.UserURL, ""},
+			settingValue{at + "scopes", strings.Join(provider.Scopes, ","), ""},
+		)
 	}
 
 	settings := make([]Setting, 0, len(values))
@@ -117,7 +170,7 @@ func (c Config) Describe(path string) []Setting {
 			Key:    v.key,
 			Value:  Redact(v.key, v.current),
 			Source: sourceOf(v.key, fileValues),
-			Secret: secretKeys[v.key],
+			Secret: isSecret(v.key),
 		})
 	}
 

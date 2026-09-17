@@ -20,6 +20,62 @@ type Config struct {
 	Log         LogConfig
 	GIFs        GIFsConfig
 	Push        PushConfig
+	OAuth       OAuthConfig
+}
+
+/*
+OAuthConfig is the set of providers an operator has configured.
+
+Named rather than enumerated: this project will not ship a list of commercial
+providers with a blessed few at the top. An operator names whichever they run
+or trust — a self-hosted Gitea or Keycloak, or a commercial one if they want
+one — and each is configured the same way. Nothing here knows the difference.
+
+Empty is a working state, and the common one: a server with no providers uses
+passwords, which is what every server does today.
+*/
+type OAuthConfig struct {
+	// Providers, in the order they should be offered.
+	Providers []OAuthProvider
+}
+
+/*
+OAuthProvider is one provider, described entirely by configuration.
+
+The endpoints are given rather than discovered. Discovery would be one more
+network call at startup that can fail, and an operator who can paste a client
+id can paste two URLs — which also means a provider that does not publish a
+discovery document works exactly like one that does.
+*/
+type OAuthProvider struct {
+	/*
+		Name identifies the provider in URLs and in the interface.
+
+		Lowercase and URL-safe, because it appears in the callback address the
+		operator registers with the provider: a name that needed escaping would
+		be a name somebody typed wrongly into a form they cannot see.
+	*/
+	Name string
+	// Label is what somebody reads on the button: "Sign in with Gitea".
+	Label string
+
+	ClientID     string
+	ClientSecret string
+
+	// AuthURL is where somebody is sent to approve.
+	AuthURL string
+	// TokenURL is where the code is exchanged, server to server.
+	TokenURL string
+	// UserURL returns the account: its identifier, and an email if it has one.
+	UserURL string
+
+	/*
+		Scopes to request, which differ between providers for the same thing.
+
+		Defaulted to the two every provider understands rather than left empty:
+		a provider asked for no scopes returns a token that can read nothing.
+	*/
+	Scopes []string
 }
 
 /*

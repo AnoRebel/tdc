@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -220,6 +221,8 @@ func Load(path string) (Config, error) {
 	cfg.Attachments.MediaSidecarAddress = l.str("attachments.media_sidecar_address", d.Attachments.MediaSidecarAddress)
 	cfg.Attachments.MediaSidecarTimeout = l.duration("attachments.media_sidecar_timeout", d.Attachments.MediaSidecarTimeout)
 
+	cfg.OAuth = l.oauth()
+
 	cfg.Log.Level = l.oneOf("log.level", d.Log.Level, "debug", "info", "warn", "error")
 	cfg.Log.Format = l.oneOf("log.format", d.Log.Format, "json", "text")
 
@@ -314,3 +317,93 @@ var errMissingFile = errors.New("configuration file not found")
 // IsMissingFile reports whether err is a missing configuration file, so a
 // caller can distinguish "no file" from "a bad file".
 func IsMissingFile(err error) bool { return errors.Is(err, errMissingFile) }
+
+/*
+ * Reading the sign-in providers.
+ *
+ * The names come first, from oauth.providers, and each name opens a namespace
+ * of its own: a provider called "github" is configured under oauth.github.*,
+ * which is TDC_OAUTH_GITHUB_CLIENT_SECRET in the environment. Nothing is
+ * discovered over the network — the endpoints are stated — so a self-hosted
+ * Forgejo or Keycloak is configured exactly like a commercial provider, and an
+ * offline server starts as readily as a connected one.
+ */
+func (l *loader) oauth() OAuthConfig {
+	names := l.list("oauth.providers")
+	if len(names) == 0 {
+		return OAuthConfig{}
+	}
+
+	seen := make(map[string]bool, len(names))
+	providers := make([]OAuthProvider, 0, len(names))
+
+	for _, name := range names {
+		folded := strings.ToLower(name)
+		if !providerName.MatchString(folded) {
+			l.problem("oauth.providers", "%q is not a usable provider name (letters, digits, hyphen and underscore only)", name)
+			continue
+		}
+		if seen[folded] {
+			l.problem("oauth.providers", "%q is listed more than once", name)
+			continue
+		}
+		seen[folded] = true
+
+		at := func(setting string) string { return "oauth." + folded + "." + setting }
+
+		provider := OAuthProvider{
+			Name:         folded,
+			Label:        l.str(at("label"), name),
+			ClientID:     l.str(at("client_id"), ""),
+			ClientSecret: l.str(at("client_secret"), ""),
+			AuthURL:      l.str(at("auth_url"), ""),
+			TokenURL:     l.str(at("token_url"), ""),
+			UserURL:      l.str(at("user_url"), ""),
+			Scopes:       l.list(at("scopes")),
+		}
+
+		// Every one of these is needed to complete a sign-in, so a provider
+		// missing any of them is named here rather than at the moment somebody
+		// clicks the button and gets a page that cannot work.
+		required := []struct {
+			setting string
+			value   string
+			hint    string
+		}{
+			{"client_id", provider.ClientID, "the application's identifier from the provider"},
+			{"client_secret", provider.ClientSecret, "the application's secret from the provider"},
+			{"auth_url", provider.AuthURL, "where somebody is sent to approve the sign-in"},
+			{"token_url", provider.TokenURL, "where the approval is exchanged for a token"},
+			{"user_url", provider.UserURL, "where the signed-in account is read from"},
+		}
+		for _, r := range required {
+			if strings.TrimSpace(r.value) == "" {
+				l.problem(at(r.setting), "is required — %s", r.hint)
+			}
+		}
+
+		for _, endpoint := range []struct{ setting, value string }{
+			{"auth_url", provider.AuthURL},
+			{"token_url", provider.TokenURL},
+			{"user_url", provider.UserURL},
+		} {
+			if strings.TrimSpace(endpoint.value) == "" {
+				continue
+			}
+			// Plain HTTP would put the secret and the returned token on the
+			// wire in the clear, so it is refused rather than warned about.
+			if !strings.HasPrefix(endpoint.value, "https://") {
+				l.problem(at(endpoint.setting), "must be an https:// URL, got %q", endpoint.value)
+			}
+		}
+
+		providers = append(providers, provider)
+	}
+
+	return OAuthConfig{Providers: providers}
+}
+
+// providerName is what may appear in oauth.providers. It is deliberately
+// narrow: the name becomes part of a settings key, an environment variable and
+// a callback path, and all three are happier without surprises in them.
+var providerName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)

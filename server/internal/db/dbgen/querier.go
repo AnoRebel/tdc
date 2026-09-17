@@ -97,6 +97,7 @@ type Querier interface {
 	// and actor. Two people reacting to the same message are two things worth
 	// hearing about; the same person reacting twice is one.
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
+	CreateOAuthCredential(ctx context.Context, arg CreateOAuthCredentialParams) (Credential, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
@@ -107,6 +108,7 @@ type Querier interface {
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
+	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) error
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
@@ -170,6 +172,7 @@ type Querier interface {
 	// otherwise. Ordered so the specific row wins, which is what "override"
 	// means: a channel setting beats the default rather than merging with it.
 	GetNotificationPreference(ctx context.Context, arg GetNotificationPreferenceParams) (GetNotificationPreferenceRow, error)
+	GetOAuthCredential(ctx context.Context, arg GetOAuthCredentialParams) (Credential, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	GetReport(ctx context.Context, id uuid.UUID) (Report, error)
@@ -240,6 +243,7 @@ type Querier interface {
 	// without a query per message.
 	ListLifetimesForEvents(ctx context.Context, eventIds []string) ([]MessageLifetime, error)
 	ListNotificationPreferences(ctx context.Context, userID uuid.UUID) ([]ListNotificationPreferencesRow, error)
+	ListOAuthCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	// The moderation queue: oldest first, so nothing waits indefinitely behind
 	// newer arrivals.
 	ListOpenReports(ctx context.Context, limit int32) ([]Report, error)
@@ -471,9 +475,13 @@ type Querier interface {
 	// conversation share a room by definition, which would make 'shared' mean
 	// 'anyone who has ever written to me'.
 	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
+	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error
 	StopTyping(ctx context.Context, arg StopTypingParams) error
 	SuspendUser(ctx context.Context, arg SuspendUserParams) error
+	// Taking the authorization consumes it: the row is deleted as it is read, so a
+	// state value cannot be presented twice even if two callbacks arrive at once.
+	TakeOAuthAuthorization(ctx context.Context, stateHash []byte) (OauthAuthorization, error)
 	// Storage in use, for the operator's capacity limit.
 	//
 	// Counted by distinct stored object rather than by attachment: the same file
@@ -494,6 +502,9 @@ type Querier interface {
 	UnmarkAttachmentSensitive(ctx context.Context, arg UnmarkAttachmentSensitiveParams) (int64, error)
 	UnpinMessage(ctx context.Context, arg UnpinMessageParams) error
 	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error
+	// The provider's claim about the account may change between sign-ins, so it is
+	// refreshed rather than left at whatever it was the first time.
+	UpdateOAuthCredentialEmail(ctx context.Context, arg UpdateOAuthCredentialEmailParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
 }

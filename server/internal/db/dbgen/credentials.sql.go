@@ -25,7 +25,7 @@ func (q *Queries) CountCredentialsForUser(ctx context.Context, userID uuid.UUID)
 const createCredential = `-- name: CreateCredential :one
 INSERT INTO credentials (id, user_id, kind, label, secret, external_id, provider, sign_count)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at
+RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified
 `
 
 type CreateCredentialParams struct {
@@ -62,6 +62,8 @@ func (q *Queries) CreateCredential(ctx context.Context, arg CreateCredentialPara
 		&i.SignCount,
 		&i.CreatedAt,
 		&i.LastUsedAt,
+		&i.ExternalEmail,
+		&i.ExternalEmailVerified,
 	)
 	return i, err
 }
@@ -81,7 +83,7 @@ func (q *Queries) DeleteCredential(ctx context.Context, arg DeleteCredentialPara
 }
 
 const getCredentialByExternalID = `-- name: GetCredentialByExternalID :one
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified FROM credentials
 WHERE kind = $1 AND provider = $2 AND external_id = $3
 `
 
@@ -105,12 +107,14 @@ func (q *Queries) GetCredentialByExternalID(ctx context.Context, arg GetCredenti
 		&i.SignCount,
 		&i.CreatedAt,
 		&i.LastUsedAt,
+		&i.ExternalEmail,
+		&i.ExternalEmailVerified,
 	)
 	return i, err
 }
 
 const getPasswordCredential = `-- name: GetPasswordCredential :one
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified FROM credentials
 WHERE user_id = $1 AND kind = 'password'
 `
 
@@ -128,12 +132,14 @@ func (q *Queries) GetPasswordCredential(ctx context.Context, userID uuid.UUID) (
 		&i.SignCount,
 		&i.CreatedAt,
 		&i.LastUsedAt,
+		&i.ExternalEmail,
+		&i.ExternalEmailVerified,
 	)
 	return i, err
 }
 
 const listCredentialsForUser = `-- name: ListCredentialsForUser :many
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified FROM credentials
 WHERE user_id = $1
 ORDER BY created_at
 `
@@ -158,6 +164,8 @@ func (q *Queries) ListCredentialsForUser(ctx context.Context, userID uuid.UUID) 
 			&i.SignCount,
 			&i.CreatedAt,
 			&i.LastUsedAt,
+			&i.ExternalEmail,
+			&i.ExternalEmailVerified,
 		); err != nil {
 			return nil, err
 		}
@@ -174,7 +182,7 @@ INSERT INTO credentials (id, user_id, kind, label, secret)
 VALUES ($1, $2, 'password', '', $3)
 ON CONFLICT (user_id) WHERE kind = 'password'
 DO UPDATE SET secret = EXCLUDED.secret
-RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at
+RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified
 `
 
 type ReplacePasswordCredentialParams struct {
@@ -197,6 +205,8 @@ func (q *Queries) ReplacePasswordCredential(ctx context.Context, arg ReplacePass
 		&i.SignCount,
 		&i.CreatedAt,
 		&i.LastUsedAt,
+		&i.ExternalEmail,
+		&i.ExternalEmailVerified,
 	)
 	return i, err
 }
