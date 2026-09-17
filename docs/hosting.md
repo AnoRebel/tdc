@@ -122,6 +122,44 @@ reference for what each costs and what is lost by leaving it off. The short
 version is that only link previews reaches outside the machine by default, and
 that can be turned off too.
 
+### Signing in through another service
+
+Nothing is configured by default: a stock server signs people in with a username
+and a password and involves nobody else. Providers are added by naming them in
+`oauth.providers`, and each name opens a namespace of its own — a provider
+called `forgejo` is configured under `oauth.forgejo.*`, which is
+`TDC_OAUTH_FORGEJO_*` in the environment.
+
+| Setting                      | What it is                                         |
+| ---------------------------- | -------------------------------------------------- |
+| `oauth.providers`            | Comma-separated names, e.g. `forgejo,github`       |
+| `oauth.<name>.label`         | What appears on the button; defaults to the name   |
+| `oauth.<name>.client_id`     | The application identifier the provider issued you |
+| `oauth.<name>.client_secret` | The secret it issued you                           |
+| `oauth.<name>.auth_url`      | Where somebody is sent to approve                  |
+| `oauth.<name>.token_url`     | Where the approval is exchanged for a token        |
+| `oauth.<name>.user_url`      | Where the signed-in account is read from           |
+| `oauth.<name>.scopes`        | Comma-separated, e.g. `openid,email`               |
+
+All five of the required settings must be present and every endpoint must be
+`https`, or the server names what is missing and refuses to start. The endpoints
+are stated rather than discovered, which is why a self-hosted Forgejo, Gitea or
+Keycloak is configured exactly like a commercial provider, and why a server with
+no outbound connection at startup starts anyway.
+
+**The redirect URL to register with the provider** is your canonical address
+followed by `/api/auth/oauth/callback`. It is built from
+`server.canonical_address` and never from a request header, so it stays right
+behind a proxy — and so nobody can choose where an authorization code is
+delivered.
+
+**What happens when an email matches an existing account.** If the provider says
+it has verified the address, the person is offered the chance to connect the two
+and must sign in to the existing account once to accept. If the provider has not
+verified it, nothing is linked and they get a new account. That second case is
+not a limitation to work around: a provider where anybody can set an unverified
+address to anything would otherwise be a way into any account on your server.
+
 ### Policy, which changes without a restart
 
 Configuration is plumbing — where the database is, what port to listen on. It is
