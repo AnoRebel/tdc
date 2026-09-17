@@ -65,6 +65,46 @@ A user MUST NOT be able to remove their last remaining authentication method.
 - **WHEN** a user revokes a passkey
 - **THEN** subsequent authentication attempts with that credential fail
 
+### Requirement: Multi-factor authentication
+
+The server SHALL support an optional second factor on an account that signs in with a password. A user MUST be able to enable it for themselves, and an operator MUST be able to require it of everybody or of administrators only.
+
+Supported factors SHALL include time-based one-time codes (TOTP), a passkey acting as a second factor, and single-use recovery codes. An emailed code MAY be offered where the operator has configured mail.
+
+Recovery codes MUST be issued when a second factor is first enabled, MUST be single-use, and MUST be stored so that a database read does not yield working ones.
+
+No second factor may require a paid service.
+
+A second factor MUST NOT be requested where the first factor already proves possession of a device — signing in with a passkey alone SHALL NOT then ask for a second factor.
+
+#### Scenario: Somebody enables a second factor
+
+- **WHEN** a user enables TOTP
+- **THEN** subsequent sign-ins with their password require a current code
+- **AND** they are given recovery codes at the moment it is enabled
+
+#### Scenario: Recovery code is single-use
+
+- **WHEN** a user signs in with a recovery code
+- **THEN** that code no longer works
+- **AND** the remaining codes are unaffected
+
+#### Scenario: Operator requires a second factor
+
+- **WHEN** an operator requires MFA of everybody
+- **THEN** a user without one is asked to enrol before they can use the server
+- **AND** an existing session does not bypass the requirement
+
+#### Scenario: A passkey is already a second factor
+
+- **WHEN** a user with MFA enabled signs in with a passkey
+- **THEN** no further factor is requested
+
+#### Scenario: Wrong code does not disclose more than a wrong password
+
+- **WHEN** a second factor is entered incorrectly
+- **THEN** the refusal does not say whether the first factor was right
+
 ### Requirement: OAuth2 authentication
 
 The server SHALL support authenticating through OAuth2 providers configured by the operator, including self-hostable providers, so that no external commercial account is required.

@@ -228,6 +228,7 @@ Goal: everything needed for TDC and others to actually deploy and adopt it.
 
 - [x] 10.1 Implement OAuth2 authentication with operator-configured providers and verified-email linking; verify an unverified email does not auto-link to an existing account (`identity/authentication`)
 - [ ] 10.2 Implement passkey/WebAuthn enrolment and login via `go-webauthn` with multiple credentials per user; verify the last remaining authentication method cannot be removed (`identity/authentication`)
+- [ ] 10.2a Implement optional MFA: TOTP, a passkey as second factor, and single-use recovery codes, with an operator setting requiring it of everybody or of administrators; verify a recovery code works once, that a passkey sign-in is not asked for a second factor, and that a wrong code does not disclose whether the password was right (`identity/authentication`)
 - [ ] 10.3 Implement account recovery with single-use time-limited tokens over self-hosted mail; verify a token cannot be reused and recovery does not disclose account existence (`identity/authentication`)
 - [ ] 10.4 Implement the Valkey `Cache` implementation and shared rate-limiter counters; verify a multi-node deployment enforces one shared limit rather than one per process (`design.md` — Caching)
 - [ ] 10.5 Implement multi-node fanout over Postgres `LISTEN`/`NOTIFY` behind the broker interface; verify cross-process delivery works and a single node needs no broker (`messaging/realtime`)
