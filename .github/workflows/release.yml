@@ -1,0 +1,231 @@
+# What a release is, and what makes one trustworthy.
+#
+# The desktop client refuses an update it cannot prove came from here. That
+# proof is a sigstore bundle, signed with no key at all: GitHub vouches for the
+# workflow through OIDC, sigstore records the certificate in a public
+# transparency log, and the client checks the certificate names this repository
+# and this issuer. There is no signing key to leak, rotate or lose, and no
+# maintainer holds one.
+#
+# The client's side of that contract is in apps/desktop/internal/updater —
+# certIdentityIssuer and certIdentitySANRegex — and the two have to agree. A
+# rename of this repository breaks verification until both are changed, which is
+# the correct outcome: an artifact from somewhere else should not install.
+name: Release
+
+on:
+  push:
+    # Only a tag. A release is a deliberate act, not something a branch does.
+    tags: ["v*"]
+  # So the workflow can be exercised without cutting a release.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, without a leading v"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.27.0"
+
+jobs:
+  # What is being released, decided once so every job agrees.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: pick
+        name: Work out the version
+        # A tag is the source of truth when there is one; a manual run says so
+        # itself. Either way it is checked against VERSION, because a tag that
+        # disagrees with the file produces a binary that reports one version and
+        # is published as another.
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+
+          declared=$(cat VERSION)
+          if [ "$version" != "$declared" ]; then
+            echo "The tag says $version and VERSION says $declared."
+            echo "One of them is wrong; a binary that reports a version it was not published as is worse than a failed release."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    strategy:
+      # One platform failing should not cancel the others: knowing that Linux
+      # and macOS built and Windows did not is more useful than knowing the
+      # matrix stopped.
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      # Sigstore's keyless signing: the token is what the certificate attests to.
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: apps/desktop/go.sum
+
+      - name: Install the webview's dependencies
+        if: matrix.goos == 'linux'
+        # GTK4 and WebKitGTK 6.0, which is the default build path. The legacy
+        # gtk3 variant is 10.10's business, not this workflow's.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the frontend
+        # Before the Go build, which embeds its output.
+        run: bun run --cwd apps/desktop/frontend build
+
+      - name: Build
+        working-directory: apps/desktop
+        env:
+          # Reproducibility: the commit's own timestamp rather than the moment
+          # the runner happened to start, so two builds of one commit agree.
+          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+        run: go run github.com/wailsapp/wails/v3/cmd/wails3 task build
+
+      - name: Name the artifact
+        id: artifact
+        shell: bash
+        # One name carrying the version and the platform, so a directory of
+        # downloads is readable and nothing collides.
+        run: |
+          name="tdc-${{ needs.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            mv apps/desktop/bin/tdc.exe "$name.exe"
+            echo "path=$name.exe" >> "$GITHUB_OUTPUT"
+          else
+            mv apps/desktop/bin/tdc "$name"
+            echo "path=$name" >> "$GITHUB_OUTPUT"
+          fi
+          echo "key=${{ matrix.goos }}/${{ matrix.goarch }}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign it
+        uses: sigstore/gh-action-sigstore-python@v3.0.0
+        with:
+          inputs: ${{ steps.artifact.outputs.path }}
+          # The bundle beside the artifact, which is what the client fetches and
+          # checks. Nothing is uploaded to a release without one.
+          upload-signing-artifacts: false
+
+      - name: Keep the artifact and its proof together
+        uses: actions/upload-artifact@v5
+        with:
+          name: tdc-${{ matrix.goos }}-${{ matrix.goarch }}
+          # The bundle's name is the artifact's with .sigstore.json appended,
+          # which is what the feed below points at.
+          path: |
+            ${{ steps.artifact.outputs.path }}
+            ${{ steps.artifact.outputs.path }}.sigstore.json
+          if-no-files-found: error
+
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      # Creating the release and writing the feed to it.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v6
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Write the feed
+        id: feed
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        # The document the client asks "is there something newer". It carries no
+        # signature of its own, deliberately: a feed vouching for itself would be
+        # proving something about itself. What makes an update trustworthy is the
+        # bundle beside the artifact, checked after the download.
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, datetime
+
+          version = os.environ["VERSION"]
+          base = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/v{version}"
+
+          artifacts = {}
+          for binary in sorted(pathlib.Path("artifacts").iterdir()):
+              if binary.name.endswith(".sigstore.json"):
+                  continue
+              bundle = binary.with_name(binary.name + ".sigstore.json")
+              if not bundle.exists():
+                  # An artifact with no proof is one the client would refuse, so
+                  # leaving it out says the same thing earlier and more clearly.
+                  print(f"skipping {binary.name}: no sigstore bundle beside it")
+                  continue
+
+              # tdc-1.2.3-linux-amd64 -> linux/amd64
+              stem = binary.name.removesuffix(".exe")
+              _, _, platform = stem.partition(f"-{version}-")
+              goos, _, goarch = platform.partition("-")
+
+              artifacts[f"{goos}/{goarch}"] = {
+                  "url": f"{base}/{binary.name}",
+                  "bundleUrl": f"{base}/{bundle.name}",
+                  "size": binary.stat().st_size,
+              }
+
+          if not artifacts:
+              raise SystemExit("nothing signed to publish")
+
+          feed = {
+              "version": version,
+              "published": datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
+              "artifacts": artifacts,
+          }
+          pathlib.Path("latest.json").write_text(json.dumps(feed, indent=2) + "\n")
+          print(json.dumps(feed, indent=2))
+          PY
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          # Every binary, every bundle, and the feed the client reads.
+          files: |
+            artifacts/*
+            latest.json
+          fail_on_unmatched_files: true

@@ -422,6 +422,46 @@ written from the `VERSION` file at the repository root by
 `scripts/sync-version.ts`. Do not edit it by hand — two places claiming a
 version is one place being wrong.
 
+## Cutting a release
+
+Set `VERSION`, run `bun run version:sync`, commit, and push a tag that matches:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` does the rest. It refuses outright if the tag
+and `VERSION` disagree — a binary that reports one version and is published as
+another is worse than a release that did not happen.
+
+What it produces, per platform: the binary, a sigstore bundle beside it, and
+`latest.json` — the feed this client asks whether there is anything newer.
+
+**Nothing is signed with a key.** GitHub vouches for the workflow through OIDC,
+sigstore records the certificate in a public transparency log, and the client
+checks that the certificate names this repository and that issuer. There is no
+key to leak, rotate or lose, and no maintainer holds one. The client's half of
+that contract is `certIdentityIssuer` and `certIdentitySANRegex` in
+`internal/updater/verify.go`, and the two have to agree: renaming this
+repository breaks verification until both change, which is the correct
+outcome — an artifact from somewhere else should not install.
+
+The feed carries no signature of its own, deliberately. A document vouching for
+itself proves nothing; what makes an update trustworthy is the bundle beside the
+artifact, checked after the download and before anything is written.
+
+`internal/updater/testdata/workflow-feed.json` is the workflow's own output, and
+a test parses it with the same types the client uses. Two languages describe
+that document — Python writes it, Go reads it — and nothing else makes them
+agree. Regenerate it if the workflow's shape changes.
+
+### The trust root
+
+`build/trust/sigstore-root.json` is still a placeholder, so this build verifies
+nothing and installs nothing — it says so rather than pretending. Replace it
+with sigstore's real trusted root before the first signed release, or every
+update will be refused for a reason that has nothing to do with the artifact.
+
 ## Platforms
 
 Built for Linux, macOS and Windows. Phones and tablets are the progressive
