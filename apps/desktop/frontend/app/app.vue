@@ -29,6 +29,44 @@ useAppearanceSync();
 useNotificationOpens();
 
 /*
+ * The state those commands act on, shared with the application shell.
+ *
+ * The shell is a layout below this component, so nothing here can reach into
+ * it — these are the same pieces of Nuxt state the layout reads, which is how a
+ * menu item at the root opens a palette rendered several levels down.
+ */
+const searching = useState("search.open", () => false);
+const creatingChannel = useState("channel.creating", () => false);
+const showingShortcuts = useState("shortcuts.open", () => false);
+
+/*
+ * The View menu, answered.
+ *
+ * Here rather than on a screen, for the reason the About and quit handlers are:
+ * a menu item can be chosen from any of them, and a listener living on one page
+ * hears nothing from the rest.
+ *
+ * Search is the one that matters most, and the one that looked broken. The menu
+ * carries Ctrl+K as an accelerator, and GTK claims an accelerator before the
+ * webview is offered the keystroke — so the shared layer's own binding never
+ * fires on this client, however well it works in a browser. The menu is
+ * therefore the only thing that can open the palette from that key, and this is
+ * what connects it.
+ */
+
+useMenuCommands({
+  search: () => {
+    searching.value = true;
+  },
+  newChannel: () => {
+    creatingChannel.value = true;
+  },
+  keyboardHelp: () => {
+    showingShortcuts.value = true;
+  },
+});
+
+/*
  * The page's ground, painted at the same alpha as the window.
  *
  * Here rather than on a screen: every screen sits on this ground, and one that

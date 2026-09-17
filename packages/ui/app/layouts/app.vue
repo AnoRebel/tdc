@@ -73,7 +73,14 @@ watch(
   () => (navigationOpen.value = false),
 );
 
-const creating = ref(false);
+/*
+ * Whether the new-channel panel is open, and whether the shortcut reference is.
+ *
+ * Shared state for the same reason the search palette is: on the desktop these
+ * are menu items, and the menu is rendered above this layout where a local ref
+ * cannot be reached.
+ */
+const creating = useState("channel.creating", () => false);
 
 /*
  * A disposable chat, whose messages the server removes after a chosen time.
@@ -174,8 +181,17 @@ function restoreRooms() {
   }
 }
 
-const searching = ref(false);
-const showingShortcuts = ref(false);
+/*
+ * Whether the search palette is open.
+ *
+ * Shared state rather than a local ref, because something outside this layout
+ * has to be able to open it: on the desktop the menu bar owns Ctrl+K — GTK
+ * claims the accelerator before the webview sees the keystroke — so the menu
+ * emits an event that the application root turns into this. A ref here would
+ * be unreachable from there, which is why the menu item did nothing.
+ */
+const searching = useState("search.open", () => false);
+const showingShortcuts = useState("shortcuts.open", () => false);
 
 /*
  * What the conversation can do, registered by whichever page is showing.
