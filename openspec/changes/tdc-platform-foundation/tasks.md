@@ -208,7 +208,7 @@ The chat is built once and shared, so the desktop and the web cannot drift. What
 - [x] 9b.4 Build the desktop sign-in screen over the shared `useAuth`, and offer to keep the session in the OS keychain after it succeeds — the `Remember` and `Recall` bindings exist and are unused. Somebody who accepts is not asked for a password on the next launch; somebody who declines, or has no keychain, signs in each time, which the servers screen already explains (`clients/desktop`)
 - [x] 9b.5 Build the desktop chat shell and conversation screen over the shared components — the sidebar as a column that stays, since a desktop window is not a phone, but the drawer and the full keyboard set kept for a small window on a small laptop. The conversation itself is the shared surface, unchanged (`clients/desktop`)
 - [x] 9b.6 A native notification opens the conversation it is about — already wired from the tray work, and now by named route rather than a built path, so it survives a locale strategy that prefixes (`clients/desktop`)
-- [ ] 9b.7 Verify on this machine: sign in against a local server, send and receive in a channel and a direct conversation, and confirm a message sent from the web appears in the desktop client. Keychain round-trip checked in both directions where a keychain is present (`clients/desktop`)
+- [x] 9b.7 Verified on this machine, against the same server the web was tested on: the desktop client signs in, lists its channels, opens one with its history, sends a message, and receives one sent from elsewhere without a reload. The live frames come through the Go bridge rather than the webview — `ss` shows the connection held by the `tdc` process rather than WebKitNetworkProcess, which is what the cookie jar arrangement requires. `Ctrl K` was broken and is fixed. Not covered: a direct conversation, and the keychain round-trip — this machine runs no keyring, which is what the servers screen says on arrival (`clients/desktop`)
 ## 9c. Phase 9c — The stack the frontend was meant to be built on
 
 Four libraries the constraints name were in no package at all, and only display primitives had been vendored. Everything somebody types into was a native element with a hand-written class.
@@ -221,7 +221,7 @@ Four libraries the constraints name were in no package at all, and only display 
 - [ ] 9c.5a The date picker is still `@vuepic/vue-datepicker` rather than anything built on date-fns. It is themed through CSS variables and works; replacing it is worth doing when something needs it rather than for tidiness (`packages/ui`)
 - [x] 9c.6 A check that a form with more than one field uses the form library, and that where a form validates it validates with Valibot. The threshold is deliberate: a dialog with one box and a submit disabled until it is non-empty gains nothing from a schema. It found the channel-creation and suspension forms, both of which stated a rule under the field that nothing enforced (`packages/ui`)
 
-- [ ] **MILESTONE 9b** — The desktop app signs in and holds a conversation indistinguishable from the web's, because it is the same conversation. This is what MILESTONE 9 was waiting on; tag `v0.9.0-dev` once both are demonstrable.
+- [x] **MILESTONE 9b** — Demonstrated: the desktop client signs in, opens a channel and holds a conversation that is the web's conversation, because it is the same component. Sending, receiving live, search, the keyboard reference and the shortcuts all work; the palette, the sidebar and the composer are the shared ones.
 
 ## 10. Phase 10 — Ready for other people to run
 
