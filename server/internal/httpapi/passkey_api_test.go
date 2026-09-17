@@ -1,11 +1,10 @@
 package httpapi_test
 
 import (
-	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/descope/virtualwebauthn"
@@ -63,8 +62,9 @@ func enrolPasskey(
 	answer := virtualwebauthn.CreateAttestationResponse(
 		passkeyRelyingParty, authenticator, credential, *options)
 
-	finished := callWithHeaders(t, handler, http.MethodPost, "/api/me/passkeys/finish",
-		json.RawMessage(answer), token, map[string]string{"X-Passkey-Label": label})
+	finished := call(t, handler, http.MethodPost,
+		"/api/me/passkeys/finish?label="+url.QueryEscape(label),
+		json.RawMessage(answer), token)
 	if finished.Code != http.StatusCreated {
 		t.Fatalf("finishing enrolment: status %d, body %s", finished.Code, finished.Body.String())
 	}
@@ -344,46 +344,4 @@ func decodeList(t *testing.T, recorder *httptest.ResponseRecorder) []any {
 		t.Fatalf("decode response %q: %v", recorder.Body.String(), err)
 	}
 	return body
-}
-
-/*
-callWithHeaders is call, with headers the passkey routes need.
-
-The enrolment's name travels in a header because the body is the authenticator's
-own response, parsed by the library from the request itself; adding a field to
-it would mean reshaping what the browser made.
-*/
-func callWithHeaders(
-	t *testing.T,
-	handler http.Handler,
-	method, path string,
-	body any,
-	token string,
-	headers map[string]string,
-) *httptest.ResponseRecorder {
-	t.Helper()
-
-	var reader io.Reader
-	if body != nil {
-		encoded, err := json.Marshal(body)
-		if err != nil {
-			t.Fatalf("encode body: %v", err)
-		}
-		reader = bytes.NewReader(encoded)
-	}
-
-	request := httptest.NewRequest(method, path, reader)
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	if token != "" {
-		request.Header.Set("Authorization", "Bearer "+token)
-	}
-	for name, value := range headers {
-		request.Header.Set(name, value)
-	}
-
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, request)
-	return recorder
 }

@@ -89,14 +89,19 @@ func (s *Server) handleFinishPasskeyEnrolment(c *echo.Context) error {
 	}
 
 	/*
-		The name goes in a header rather than the body.
+		The name goes in the query rather than the body.
 
 		The body is the authenticator's response, exactly as the browser
-		produced it, and the library parses it from the request itself. Adding
-		a field to it would mean either reshaping what the browser made or
-		reading the body twice.
+		produced it, and the library parses it from the request itself; adding
+		a field would mean reshaping what the browser made or reading the body
+		twice. A header would do as well, but the shared transport both clients
+		use carries a method, a path and a body — and widening that contract for
+		one string is a worse trade than putting the string in the path.
+
+		Not sensitive: it is a name somebody chose for their own device, and it
+		goes to the same server in the same request as the credential itself.
 	*/
-	label := c.Request().Header.Get("X-Passkey-Label")
+	label := c.QueryParam("label")
 
 	stored, err := s.passkeys.FinishEnrolment(ctx, c.Request(), label)
 	if errors.Is(err, passkeys.ErrCeremonyInvalid) {

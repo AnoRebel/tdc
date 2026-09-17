@@ -120,3 +120,14 @@ export interface OAuthResult {
   /** Where they were going before this started, if anywhere. */
   redirectTo?: string;
 }
+
+/** One passkey as the person who enrolled it sees it. */
+export interface Passkey {
+  id: string;
+  /** What they called it, so three of them are distinguishable a year later. */
+  label: string;
+  /** ISO-8601. */
+  added: string;
+  /** Absent on one that has never signed anybody in. */
+  lastUsed?: string;
+}

@@ -61,6 +61,17 @@ export interface ServerInfo {
    * button; nothing here is secret.
    */
   signInProviders?: SignInProvider[];
+  /**
+   * Whether this server signs people in with passkeys.
+   *
+   * A passkey is bound to a hostname, so a server with no canonical address
+   * cannot offer them — and a button for something that answers 404 is worse
+   * than no button.
+   *
+   * Optional here rather than required, because an older server does not send
+   * it and absent must read as "no" rather than as a type error.
+   */
+  passkeys?: boolean;
 }
 
 /** A way of signing in that this server offers through somebody else. */

@@ -54,6 +54,12 @@ async function chooseProvider(provider: string) {
   }
 }
 
+/** Somebody signed in with a passkey, which is already a session. */
+async function signedInWithPasskey() {
+  await refresh();
+  await router.push(intendedNext() || localeRoute({ name: "index" }));
+}
+
 /** Somebody signed in through a provider, one way or another. */
 async function signedInThroughProvider(result: OAuthResult) {
   returned.value = null;
@@ -180,6 +186,11 @@ const form = useForm({
     <template v-else>
       <h1 class="text-xl font-semibold">Sign in</h1>
       <p class="mt-1 text-sm text-muted-foreground">Welcome back.</p>
+
+      <!-- Above the password fields, because for somebody who has a passkey
+           this is the whole sign-in and the form beneath is the fallback.
+           Draws nothing where either side cannot do it. -->
+      <SignInWithPasskey @done="signedInWithPasskey" />
 
       <form class="mt-6 space-y-4" @submit.prevent="form.handleSubmit()">
         <p

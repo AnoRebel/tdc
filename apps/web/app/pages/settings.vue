@@ -320,6 +320,11 @@ function deviceName(userAgent: string): string {
         </div>
       </section>
 
+      <!-- Before the devices, because both are about who can reach this
+           account and this is the one that changes it. Draws nothing where the
+           server cannot offer passkeys. -->
+      <PasskeyManager />
+
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <Monitor class="size-3.5 text-muted-foreground" />

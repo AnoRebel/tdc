@@ -113,6 +113,12 @@ async function waitForProvider(state: string) {
   waitingForProvider.value = false;
 }
 
+/** Somebody signed in with a passkey, which is already a session. */
+async function signedInWithPasskey() {
+  await refresh();
+  await router.push(localeRoute({ name: "index" }));
+}
+
 /** Somebody signed in through a provider, one way or another. */
 async function signedInThroughProvider(result: OAuthResult) {
   returned.value = null;
@@ -252,6 +258,11 @@ const form = useForm({
     />
 
     <div v-else>
+      <!-- Draws nothing where either side cannot do it. On the desktop the
+           authenticator prompt is the operating system's, which is the one
+           place this client does not have to be a browser to be trusted. -->
+      <SignInWithPasskey @done="signedInWithPasskey" />
+
       <div class="mb-6 text-center">
         <h2 class="text-base font-semibold">Sign in</h2>
         <p v-if="server" class="mt-1 truncate text-xs text-muted-foreground">{{ server }}</p>
