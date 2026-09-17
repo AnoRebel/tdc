@@ -12,6 +12,28 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+const collectOAuthOutcome = `-- name: CollectOAuthOutcome :one
+DELETE FROM oauth_outcomes
+WHERE handle_hash = $1 AND expires_at > NOW()
+RETURNING id, handle_hash, status, detail, created_at, expires_at
+`
+
+// Collected once: the row is deleted as it is read, so a handle presented twice
+// yields nothing the second time.
+func (q *Queries) CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error) {
+	row := q.db.QueryRow(ctx, collectOAuthOutcome, handleHash)
+	var i OauthOutcome
+	err := row.Scan(
+		&i.ID,
+		&i.HandleHash,
+		&i.Status,
+		&i.Detail,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
 const createOAuthCredential = `-- name: CreateOAuthCredential :one
 INSERT INTO credentials (
     id, user_id, kind, label, external_id, provider,
@@ -65,6 +87,18 @@ DELETE FROM oauth_authorizations WHERE expires_at <= NOW()
 
 func (q *Queries) DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredOAuthAuthorizations)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteExpiredOAuthOutcomes = `-- name: DeleteExpiredOAuthOutcomes :execrows
+DELETE FROM oauth_outcomes WHERE expires_at <= NOW()
+`
+
+func (q *Queries) DeleteExpiredOAuthOutcomes(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredOAuthOutcomes)
 	if err != nil {
 		return 0, err
 	}
@@ -138,6 +172,40 @@ func (q *Queries) ListOAuthCredentialsForUser(ctx context.Context, userID uuid.U
 		return nil, err
 	}
 	return items, nil
+}
+
+const parkOAuthOutcome = `-- name: ParkOAuthOutcome :one
+INSERT INTO oauth_outcomes (id, handle_hash, status, detail, expires_at)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, handle_hash, status, detail, created_at, expires_at
+`
+
+type ParkOAuthOutcomeParams struct {
+	ID         uuid.UUID
+	HandleHash []byte
+	Status     string
+	Detail     []byte
+	ExpiresAt  time.Time
+}
+
+func (q *Queries) ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomeParams) (OauthOutcome, error) {
+	row := q.db.QueryRow(ctx, parkOAuthOutcome,
+		arg.ID,
+		arg.HandleHash,
+		arg.Status,
+		arg.Detail,
+		arg.ExpiresAt,
+	)
+	var i OauthOutcome
+	err := row.Scan(
+		&i.ID,
+		&i.HandleHash,
+		&i.Status,
+		&i.Detail,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
 }
 
 const startOAuthAuthorization = `-- name: StartOAuthAuthorization :one

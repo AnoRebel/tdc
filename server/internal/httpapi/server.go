@@ -25,6 +25,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/invitations"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
+	"github.com/AnoRebel/tdc/server/internal/oauth"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
@@ -116,6 +117,7 @@ type Server struct {
 	gifs        *gifs.Service
 	settings    *settings.Service
 	invitations *invitations.Service
+	oauth       *oauth.Service
 	queries     *dbgen.Queries
 	presence    *presence.Service
 	push        *push.Service
@@ -151,6 +153,10 @@ type Services struct {
 	Settings    *settings.Service
 	Invitations *invitations.Service
 	Presence    *presence.Service
+	// OAuth is nil, or configured with no providers, on a server whose
+	// operator has not set any up. That is the ordinary state: usernames and
+	// passwords, and nobody else involved in signing in.
+	OAuth *oauth.Service
 	// Push is nil, or configured with no keys, on a server whose operator has
 	// not enabled notifications to closed browsers. That is a working state:
 	// notifications are still stored and shown in the application.
@@ -187,6 +193,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		gifs:        services.GIFs,
 		settings:    services.Settings,
 		invitations: services.Invitations,
+		oauth:       services.OAuth,
 		queries:     dbgen.New(pool),
 		presence:    services.Presence,
 		push:        services.Push,
@@ -267,6 +274,19 @@ func (s *Server) Run(ctx context.Context) error {
 	listener, err := net.Listen("tcp", s.config.Address)
 	if err != nil {
 		return err
+	}
+
+	/*
+		Sign-ins nobody came back for.
+
+		Started here rather than left to the command, so a server that offers
+		providers always sweeps what they leave behind — a sweep that has to be
+		remembered at the call site is a sweep that is eventually forgotten.
+		Rows are deleted as they are used, so this only collects the abandoned
+		ones.
+	*/
+	if s.oauth != nil && s.oauth.Enabled() {
+		go s.sweepOAuthPeriodically(ctx)
 	}
 
 	serveErr := make(chan error, 1)

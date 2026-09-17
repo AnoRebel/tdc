@@ -63,6 +63,15 @@ type NewUser struct {
 	// or an external identity as its only credential.
 	Password    string
 	DisplayName string
+	/*
+		EmailVerified marks the address as already proved.
+
+		Only ever true when something else did the proving — today, an OAuth2
+		provider that says it verified the address. Ordinary registration leaves
+		it false, because typing an address into a form proves nothing about
+		holding it.
+	*/
+	EmailVerified bool
 }
 
 // CreateUser registers an account.
@@ -104,7 +113,7 @@ func (s *Service) CreateUser(ctx context.Context, input NewUser) (dbgen.User, er
 		Username:       username,
 		UsernameFolded: NormaliseUsername(username),
 		DisplayName:    displayName,
-		EmailVerified:  false,
+		EmailVerified:  input.EmailVerified && email != "",
 	}
 	if email != "" {
 		params.Email = &email

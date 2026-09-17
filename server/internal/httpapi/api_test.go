@@ -26,6 +26,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/invitations"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
+	"github.com/AnoRebel/tdc/server/internal/oauth"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
@@ -85,6 +86,28 @@ func newTestAPIWithScanner(t *testing.T, address string, failOpen bool) http.Han
 	})
 }
 
+/*
+oauthProvidersForTest and oauthClientForTest configure sign-in providers for
+the handler built next.
+
+Package-level for the same reason webRootForTest is: threading two more
+parameters through would change every call site for a case only a few tests
+need. Both are restored by the helper that sets them.
+*/
+var (
+	oauthProvidersForTest []config.OAuthProvider
+	oauthClientForTest    *http.Client
+)
+
+// oauthForTest builds the sign-in service the handler gets, or nil when no
+// test asked for one.
+func oauthForTest(queries *dbgen.Queries, logger *slog.Logger) *oauth.Service {
+	if len(oauthProvidersForTest) == 0 {
+		return nil
+	}
+	return oauth.NewService(oauthProvidersForTest, queries, oauthClientForTest, logger)
+}
+
 // webRootForTest is set by newTestAPIWithWebRoot for the handler it builds.
 //
 // A package-level value rather than another parameter, because threading one
@@ -142,6 +165,10 @@ func newTestAPIConfigured(
 			// room or a user, so unlike most rows they survive into the next test.
 			"DELETE FROM reports",
 			"DELETE FROM user_blocks", "DELETE FROM user_privacy",
+			// Sign-ins in flight, and ones resolved but not collected. Both
+			// outlive the user rows they may reference only by value, so they
+			// would otherwise carry into the next test.
+			"DELETE FROM oauth_authorizations", "DELETE FROM oauth_outcomes",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)
@@ -200,6 +227,9 @@ func newTestAPIConfigured(
 		Settings:    settings.NewService(pool, logger),
 		Invitations: invitations.NewService(pool, logger),
 		Presence:    presence.NewService(queries),
+		// Nil on almost every test, which is the ordinary server: no provider
+		// configured and the routes answering 404.
+		OAuth: oauthForTest(queries, logger),
 	}, logger)
 
 	t.Cleanup(func() {

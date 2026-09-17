@@ -38,6 +38,9 @@ type Querier interface {
 	// later action from the person who set it.
 	ClearExpiredStatuses(ctx context.Context) error
 	ClearExpiredTyping(ctx context.Context) error
+	// Collected once: the row is deleted as it is read, so a handle presented twice
+	// yields nothing the second time.
+	CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error)
 	// GREATEST keeps the count from going negative if a close is somehow counted
 	// twice, which would otherwise leave someone permanently "present".
 	ConnectionClosed(ctx context.Context, userID uuid.UUID) error
@@ -109,6 +112,7 @@ type Querier interface {
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
+	DeleteExpiredOAuthOutcomes(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) error
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
@@ -354,6 +358,7 @@ type Querier interface {
 	// The UPDATE takes a row lock, so two concurrent writers serialise here rather
 	// than both reading the same maximum and colliding.
 	NextRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
+	ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomeParams) (OauthOutcome, error)
 	// Pinning something already pinned updates who pinned it and when, rather than
 	// failing: the second person's intent is the current one.
 	PinMessage(ctx context.Context, arg PinMessageParams) error

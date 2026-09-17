@@ -10,6 +10,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
+	"github.com/AnoRebel/tdc/server/internal/oauth"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 )
 
@@ -34,6 +35,26 @@ func (s *Server) routes() {
 	s.echo.POST("/api/auth/register", s.handleRegister)
 	s.echo.POST("/api/auth/signin", s.handleSignIn)
 	s.echo.POST("/api/auth/signout", s.handleSignOut, requireAuthentication)
+
+	/*
+		Signing in through a provider somebody else runs.
+
+		Unauthenticated, all three, because signing in is what they are for. The
+		start reads a session if one is there — that is somebody already signed
+		in adding a provider to their account rather than signing in — but it
+		does not require one, so requireAuthentication would be wrong here.
+
+		The callback is a browser navigation from the provider, not a client
+		call, which is why it is a GET that answers with a redirect.
+
+		No middleware on the start: s.authenticate already runs for every
+		request and leaves the user on the context when there is one, so the
+		handler can tell the two cases apart without a route that refuses
+		either.
+	*/
+	s.echo.GET("/api/auth/oauth/:provider/start", s.handleOAuthStart)
+	s.echo.GET("/api/auth/oauth/callback", s.handleOAuthCallback)
+	s.echo.POST("/api/auth/oauth/finish", s.handleOAuthFinish)
 
 	// The signed-in user's own account and sessions.
 	me := s.echo.Group("/api/me", requireAuthentication)
@@ -373,6 +394,19 @@ type serverInfoResponse struct {
 		still shows which server it is talking to.
 	*/
 	Branding brandingResponse `json:"branding"`
+
+	/*
+		The sign-in providers this server offers, if any.
+
+		Unauthenticated because the sign-in screen needs it before anybody has
+		signed in, and it is not a secret: a name and a label, which is what a
+		button needs and nothing more.
+
+		Absent rather than empty on a server with none configured, so a client
+		can tell "no providers" from "an older server that does not know about
+		them".
+	*/
+	SignInProviders []oauth.Offered `json:"signInProviders,omitempty"`
 }
 
 // brandingResponse is what an operator may change about how this server looks.
@@ -468,6 +502,7 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		DefaultLanguage:       s.config.DefaultLanguage,
 		ObscureSensitiveMedia: s.obscureSensitiveMedia(c.Request().Context()),
 		Branding:              s.branding(c.Request().Context()),
+		SignInProviders:       s.signInProviders(),
 	})
 }
 
@@ -541,4 +576,12 @@ func initialsOf(name string) string {
 		return "?"
 	}
 	return string(initials)
+}
+
+// signInProviders is what a sign-in screen draws its buttons from.
+func (s *Server) signInProviders() []oauth.Offered {
+	if s.oauth == nil {
+		return nil
+	}
+	return s.oauth.Offered()
 }

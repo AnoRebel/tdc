@@ -177,6 +177,15 @@ type OauthAuthorization struct {
 	ExpiresAt  time.Time
 }
 
+type OauthOutcome struct {
+	ID         uuid.UUID
+	HandleHash []byte
+	Status     string
+	Detail     []byte
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+}
+
 type PinnedMessage struct {
 	RoomID          uuid.UUID
 	EventID         string

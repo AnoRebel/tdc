@@ -112,9 +112,19 @@ every spelling is read and the first one present wins, which means a provider
 nobody here has heard of usually works without new code.
 */
 type account struct {
-	Sub   json.Number `json:"sub"`
-	ID    json.Number `json:"id"`
-	Email string      `json:"email"`
+	/*
+		The subject, which may arrive as either a JSON string or a number.
+
+		OpenID Connect defines "sub" as a string and most providers send one
+		that is not numeric; GitHub and GitLab send "id" as a bare number. A
+		string type would refuse the number and a number type would refuse the
+		string, so the raw value is kept and read either way below. Getting this
+		wrong fails at the last step of a sign-in that otherwise worked, which
+		is a bad place to discover it.
+	*/
+	Sub   json.RawMessage `json:"sub"`
+	ID    json.RawMessage `json:"id"`
+	Email string          `json:"email"`
 
 	// OpenID Connect spells this email_verified; GitLab and others use
 	// confirmed_at, a timestamp that is present only once confirmed.
@@ -161,7 +171,7 @@ func (s *Service) fetchIdentity(ctx context.Context, provider config.OAuthProvid
 		return Identity{}, fmt.Errorf("%w: the account response was not JSON", ErrProviderRefused)
 	}
 
-	subject := firstOf(parsed.Sub.String(), parsed.ID.String())
+	subject := firstOf(identifier(parsed.Sub), identifier(parsed.ID))
 	if subject == "" {
 		// Without a stable identifier there is nothing to key a credential on,
 		// and keying it on the email would mean the account moves whenever the
@@ -206,4 +216,33 @@ func firstOf(candidates ...string) string {
 		}
 	}
 	return ""
+}
+
+/*
+identifier reads a subject that may be a JSON string or a JSON number.
+
+Quoted, it is a string and the quotes come off. Unquoted, it is a number and its
+digits are the identifier. Anything else — an object, an array, null — is not an
+identifier and yields nothing, which the caller treats as a provider that named
+nobody.
+*/
+func identifier(raw json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" || trimmed == "null" {
+		return ""
+	}
+
+	if strings.HasPrefix(trimmed, `"`) {
+		var text string
+		if err := json.Unmarshal(raw, &text); err != nil {
+			return ""
+		}
+		return strings.TrimSpace(text)
+	}
+
+	var number json.Number
+	if err := json.Unmarshal(raw, &number); err != nil {
+		return ""
+	}
+	return number.String()
 }

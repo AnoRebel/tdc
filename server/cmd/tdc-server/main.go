@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -32,6 +33,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/invitations"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
+	"github.com/AnoRebel/tdc/server/internal/oauth"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
@@ -207,6 +209,20 @@ func run() error {
 		// the configuration file that decides how the process is wired.
 		Settings:    settingsService,
 		Invitations: invitations.NewService(pool, log),
+		/*
+			Off unless an operator configured a provider. Endpoints are stated
+			rather than discovered, so this needs no network at startup and a
+			self-hosted provider is set up exactly like a commercial one.
+
+			The same guarded dialer as link previews and GIF search: a
+			provider's hostname resolving to a private address is how a
+			configured endpoint becomes a way to reach this server's own
+			network, and the day one does is the day this matters.
+		*/
+		OAuth: oauth.NewService(cfg.OAuth.Providers, queries, &http.Client{
+			Timeout:   oauthTimeout,
+			Transport: &http.Transport{DialContext: unfurl.DialContext},
+		}, log),
 		// Off unless an operator configured a provider and a key. Searches are
 		// proxied through this server, so the key stays here and the provider
 		// sees one server rather than everybody using it.
@@ -411,6 +427,16 @@ it in five minutes is not one anybody can perceive — and a pass that finds
 nothing still costs a query.
 */
 const retentionInterval = 5 * time.Minute
+
+/*
+oauthTimeout bounds a request to a sign-in provider.
+
+Two requests happen inside somebody's callback — a token exchange and reading
+the account — and a provider that hangs must not hold that request open. Fifteen
+seconds is long enough for a slow self-hosted provider on a slow link and short
+enough that a dead one fails rather than lingers.
+*/
+const oauthTimeout = 15 * time.Second
 
 // retentionBatch bounds one pass.
 //
