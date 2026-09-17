@@ -31,9 +31,26 @@ subscriptions — stays in the webview. This is only the socket it was missing.
 // The emitter is how a frame reaches the webview; kept as an interface so the
 // pump can be tested without a running application. In the application it is
 // the Wails event processor.
+// Notifier is the part of the system notifier this bridge uses.
+//
+// An interface rather than the concrete type so the pump can be tested without
+// a desktop session behind it: showing a banner needs a notification daemon,
+// and a test that required one would not run anywhere useful.
+type Notifier interface {
+	Show(title, body string, target Target) error
+}
+
+// Target is where a notification takes somebody when it is pressed.
+type Target struct {
+	Server  string `json:"server"`
+	Room    string `json:"room"`
+	Message string `json:"message,omitempty"`
+}
+
 type LiveBridge struct {
-	service *Service
-	emit    func(name string, data ...any) bool
+	service  *Service
+	emit     func(name string, data ...any) bool
+	notifier Notifier
 
 	mu     sync.Mutex
 	conn   *websocket.Conn
@@ -49,9 +66,14 @@ const (
 	LiveCloseEvent = "tdc:live:close"
 )
 
-// NewLiveBridge builds the bridge over a service and an emitter.
-func NewLiveBridge(service *Service, emit func(name string, data ...any) bool) *LiveBridge {
-	return &LiveBridge{service: service, emit: emit}
+/*
+NewLiveBridge builds the bridge over a service, an emitter and a notifier.
+
+The notifier may be nil, which is how a build without one behaves rather than a
+special case to test for: no banners, everything else unchanged.
+*/
+func NewLiveBridge(service *Service, emit func(name string, data ...any) bool, notifier Notifier) *LiveBridge {
+	return &LiveBridge{service: service, emit: emit, notifier: notifier}
 }
 
 // ErrNotConnected is what sending before the socket is open reports.
@@ -129,6 +151,7 @@ func (b *LiveBridge) pump(ctx context.Context, conn *websocket.Conn) {
 			return
 		}
 		b.emit(LiveFrameEvent, string(data))
+		b.notify(data)
 	}
 }
 
@@ -171,4 +194,80 @@ func (b *LiveBridge) Close() {
 		// Normal closure; the webview asked, or is replacing this connection.
 		_ = conn.Close(websocket.StatusNormalClosure, "")
 	}
+}
+
+/*
+What a frame has to be before it is worth interrupting somebody.
+
+Only the body of a message somebody else sent. Everything else the socket
+carries — a reaction, an edit, a receipt, the control frames — is either not
+about a person saying something or is already visible to somebody looking at
+the conversation.
+*/
+type liveFrame struct {
+	Type    string `json:"type"`
+	RoomID  string `json:"roomId"`
+	Payload struct {
+		ID      string `json:"id"`
+		Type    string `json:"type"`
+		Sender  string `json:"sender"`
+		Content struct {
+			Body string `json:"body"`
+		} `json:"content"`
+		Redacted bool `json:"redacted"`
+	} `json:"payload"`
+}
+
+/*
+notify raises a banner for a message from somebody else.
+
+Here rather than in the webview, which is the whole reason it works: a window
+that has been closed to the tray has no page running, so a notification asked
+for by JavaScript would never be asked for at all. Go is still holding the
+socket, and this is what it is holding it for.
+
+Whether the conversation is on screen is the server's decision, not this one —
+it knows which room each socket is watching and does not send an event the
+person is looking at arrive. What is decided here is narrower: that this is a
+message, that it has words in it, and that somebody else wrote it.
+*/
+func (b *LiveBridge) notify(data []byte) {
+	if b.notifier == nil {
+		return
+	}
+
+	var frame liveFrame
+	if err := json.Unmarshal(data, &frame); err != nil {
+		return
+	}
+
+	if frame.Type != "event" || frame.Payload.Type != "message.sent" {
+		return
+	}
+	// A removed message has no body to show, and announcing one would be
+	// telling somebody about something that is no longer there.
+	if frame.Payload.Redacted {
+		return
+	}
+	if strings.TrimSpace(frame.Payload.Content.Body) == "" {
+		return
+	}
+	// A banner for something this person just typed is the interruption that
+	// teaches people to switch notifications off.
+	if b.service.isMe(frame.Payload.Sender) {
+		return
+	}
+
+	b.service.mu.RLock()
+	server := b.service.current
+	b.service.mu.RUnlock()
+
+	// The sender's own address is the title: the room's name is not in the
+	// frame, and "someone@server" says more about whether to look than a
+	// channel identifier would.
+	_ = b.notifier.Show(frame.Payload.Sender, frame.Payload.Content.Body, Target{
+		Server:  server,
+		Room:    frame.RoomID,
+		Message: frame.Payload.ID,
+	})
 }

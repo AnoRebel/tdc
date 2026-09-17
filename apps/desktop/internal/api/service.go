@@ -98,6 +98,10 @@ type Service struct {
 		gone — being signed out of a server is not the same as not having it.
 	*/
 	order []string
+
+	// Who the webview signed in as, so a message this person sent does not
+	// raise a banner on their own machine. See whoami.go.
+	who identity
 }
 
 // ErrNoServer is what a request before choosing a server gets.

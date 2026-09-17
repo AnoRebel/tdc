@@ -106,6 +106,28 @@ func windowSettingsPath() string {
 	return filepath.Join(config, "tdc", "window.json")
 }
 
+/*
+bannersFor lets the live bridge raise a system notification.
+
+The two packages describe the same thing — where a notification takes somebody
+when it is pressed — and neither imports the other, so the translation happens
+here, where they meet. Keeping them apart is what lets the bridge be tested
+without a notification daemon, and the notifier without a socket.
+*/
+func bannersFor(notifier *notify.Notifier) api.Notifier {
+	return bannerAdapter{notifier}
+}
+
+type bannerAdapter struct{ notifier *notify.Notifier }
+
+func (b bannerAdapter) Show(title, body string, target api.Target) error {
+	return b.notifier.Show(title, body, notify.Target{
+		Server:  target.Server,
+		Room:    target.Room,
+		Message: target.Message,
+	})
+}
+
 func main() {
 	/*
 		Declared before the options because the second-instance callback
@@ -322,7 +344,9 @@ func main() {
 		api service's cookie jar, so the socket it opens carries the session the
 		webview cannot.
 	*/
-	app.RegisterService(application.NewService(api.NewLiveBridge(apiService, app.Event.Emit)))
+	app.RegisterService(application.NewService(
+		api.NewLiveBridge(apiService, app.Event.Emit, bannersFor(notifier)),
+	))
 
 	/*
 		What the close button does, which is a question rather than an answer.
