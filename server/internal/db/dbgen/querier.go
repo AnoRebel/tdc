@@ -104,6 +104,7 @@ type Querier interface {
 	// hearing about; the same person reacting twice is one.
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
 	CreateOAuthCredential(ctx context.Context, arg CreateOAuthCredentialParams) (Credential, error)
+	CreatePasskeyCredential(ctx context.Context, arg CreatePasskeyCredentialParams) (Credential, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
@@ -117,6 +118,7 @@ type Querier interface {
 	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
 	DeleteExpiredOAuthOutcomes(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) error
+	DeleteExpiredWebauthnCeremonies(ctx context.Context) (int64, error)
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
 	DeleteLapsedBans(ctx context.Context) (int64, error)
@@ -130,6 +132,10 @@ type Querier interface {
 	// do, and a message already sent is a message, not a plan.
 	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
+	// Establishing the handle when somebody enrols their first passkey. Only ever
+	// set once: it is what the authenticator remembers, and changing it would
+	// orphan every passkey already enrolled.
+	EnsureWebauthnHandle(ctx context.Context, arg EnsureWebauthnHandleParams) ([]byte, error)
 	// Redacts messages past their channel's retention period.
 	//
 	// The channel's own period where it has one, and the server's default
@@ -180,6 +186,7 @@ type Querier interface {
 	// means: a channel setting beats the default rather than merging with it.
 	GetNotificationPreference(ctx context.Context, arg GetNotificationPreferenceParams) (GetNotificationPreferenceRow, error)
 	GetOAuthCredential(ctx context.Context, arg GetOAuthCredentialParams) (Credential, error)
+	GetPasskeyByCredentialID(ctx context.Context, externalID *string) (Credential, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	GetReport(ctx context.Context, id uuid.UUID) (Report, error)
@@ -200,6 +207,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
+	GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []byte) (User, error)
 	HasBlocked(ctx context.Context, arg HasBlockedParams) (bool, error)
 	HasUsedInvitation(ctx context.Context, arg HasUsedInvitationParams) (bool, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
@@ -256,6 +264,7 @@ type Querier interface {
 	ListOpenReports(ctx context.Context, limit int32) ([]Report, error)
 	// Attachments that never became part of a message, oldest first.
 	ListOrphanedAttachments(ctx context.Context, arg ListOrphanedAttachmentsParams) ([]Attachment, error)
+	ListPasskeysForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	// Just the identifiers, so a timeline can mark which messages are pinned
 	// without fetching them a second time.
 	ListPinnedEventIDs(ctx context.Context, roomID uuid.UUID) ([]string, error)
@@ -399,6 +408,7 @@ type Querier interface {
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	RemoveRolePermission(ctx context.Context, arg RemoveRolePermissionParams) error
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) error
+	RenamePasskey(ctx context.Context, arg RenamePasskeyParams) (Credential, error)
 	RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
 	// Clears presence for connections that ended without a clean close, which is
@@ -485,11 +495,15 @@ type Querier interface {
 	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error
+	StartWebauthnCeremony(ctx context.Context, arg StartWebauthnCeremonyParams) (WebauthnCeremony, error)
 	StopTyping(ctx context.Context, arg StopTypingParams) error
 	SuspendUser(ctx context.Context, arg SuspendUserParams) error
 	// Taking the authorization consumes it: the row is deleted as it is read, so a
 	// state value cannot be presented twice even if two callbacks arrive at once.
 	TakeOAuthAuthorization(ctx context.Context, stateHash []byte) (OauthAuthorization, error)
+	// Taking it consumes it, so a challenge cannot be answered twice even if two
+	// responses arrive at once.
+	TakeWebauthnCeremony(ctx context.Context, arg TakeWebauthnCeremonyParams) (WebauthnCeremony, error)
 	// Storage in use, for the operator's capacity limit.
 	//
 	// Counted by distinct stored object rather than by attachment: the same file

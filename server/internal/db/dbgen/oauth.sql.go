@@ -64,7 +64,7 @@ INSERT INTO credentials (
     external_email, external_email_verified
 )
 VALUES ($1, $2, 'oauth2', $3, $4, $5, $6, $7)
-RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified
+RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey
 `
 
 type CreateOAuthCredentialParams struct {
@@ -101,6 +101,7 @@ func (q *Queries) CreateOAuthCredential(ctx context.Context, arg CreateOAuthCred
 		&i.LastUsedAt,
 		&i.ExternalEmail,
 		&i.ExternalEmailVerified,
+		&i.Passkey,
 	)
 	return i, err
 }
@@ -130,7 +131,7 @@ func (q *Queries) DeleteExpiredOAuthOutcomes(ctx context.Context) (int64, error)
 }
 
 const getOAuthCredential = `-- name: GetOAuthCredential :one
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey FROM credentials
 WHERE kind = 'oauth2' AND provider = $1 AND external_id = $2
 `
 
@@ -155,12 +156,13 @@ func (q *Queries) GetOAuthCredential(ctx context.Context, arg GetOAuthCredential
 		&i.LastUsedAt,
 		&i.ExternalEmail,
 		&i.ExternalEmailVerified,
+		&i.Passkey,
 	)
 	return i, err
 }
 
 const listOAuthCredentialsForUser = `-- name: ListOAuthCredentialsForUser :many
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey FROM credentials
 WHERE user_id = $1 AND kind = 'oauth2'
 ORDER BY created_at
 `
@@ -187,6 +189,7 @@ func (q *Queries) ListOAuthCredentialsForUser(ctx context.Context, userID uuid.U
 			&i.LastUsedAt,
 			&i.ExternalEmail,
 			&i.ExternalEmailVerified,
+			&i.Passkey,
 		); err != nil {
 			return nil, err
 		}

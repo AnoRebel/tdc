@@ -26,7 +26,7 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, username, username_folded, display_name, email, email_folded, email_verified)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle
 `
 
 type CreateUserParams struct {
@@ -71,6 +71,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.AppearanceMode,
 		&i.AppearanceAccent,
 		&i.TourProgress,
+		&i.WebauthnHandle,
 	)
 	return i, err
 }
@@ -114,7 +115,7 @@ func (q *Queries) GetTourProgress(ctx context.Context, id uuid.UUID) ([]byte, er
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress FROM users WHERE email_folded = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle FROM users WHERE email_folded = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, emailFolded *string) (User, error) {
@@ -141,12 +142,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, emailFolded *string) (User
 		&i.AppearanceMode,
 		&i.AppearanceAccent,
 		&i.TourProgress,
+		&i.WebauthnHandle,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress FROM users WHERE id = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -173,12 +175,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.AppearanceMode,
 		&i.AppearanceAccent,
 		&i.TourProgress,
+		&i.WebauthnHandle,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress FROM users WHERE username_folded = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle FROM users WHERE username_folded = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, usernameFolded string) (User, error) {
@@ -205,6 +208,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, usernameFolded string) 
 		&i.AppearanceMode,
 		&i.AppearanceAccent,
 		&i.TourProgress,
+		&i.WebauthnHandle,
 	)
 	return i, err
 }
@@ -225,7 +229,7 @@ func (q *Queries) LiftUserSuspension(ctx context.Context, id uuid.UUID) error {
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress FROM users
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle FROM users
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -265,6 +269,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.AppearanceMode,
 			&i.AppearanceAccent,
 			&i.TourProgress,
+			&i.WebauthnHandle,
 		); err != nil {
 			return nil, err
 		}
@@ -345,7 +350,7 @@ UPDATE users
 SET display_name = $2,
     updated_at   = NOW()
 WHERE id = $1
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle
 `
 
 type UpdateUserProfileParams struct {
@@ -377,6 +382,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.AppearanceMode,
 		&i.AppearanceAccent,
 		&i.TourProgress,
+		&i.WebauthnHandle,
 	)
 	return i, err
 }

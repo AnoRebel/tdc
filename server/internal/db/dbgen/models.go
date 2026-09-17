@@ -70,6 +70,7 @@ type Credential struct {
 	LastUsedAt            *time.Time
 	ExternalEmail         *string
 	ExternalEmailVerified bool
+	Passkey               []byte
 }
 
 type Event struct {
@@ -380,6 +381,7 @@ type User struct {
 	AppearanceMode        string
 	AppearanceAccent      string
 	TourProgress          []byte
+	WebauthnHandle        []byte
 }
 
 type UserBlock struct {
@@ -410,4 +412,14 @@ type UserRole struct {
 	RoleID    uuid.UUID
 	GrantedAt time.Time
 	GrantedBy *uuid.UUID
+}
+
+type WebauthnCeremony struct {
+	ID            uuid.UUID
+	ChallengeHash []byte
+	Session       []byte
+	Purpose       string
+	UserID        *uuid.UUID
+	CreatedAt     time.Time
+	ExpiresAt     time.Time
 }
