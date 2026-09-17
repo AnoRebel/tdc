@@ -52,6 +52,23 @@ export interface ServerInfo {
    * address above is not part of it and cannot be changed by it.
    */
   branding: Branding;
+  /**
+   * The sign-in providers this server offers, if any.
+   *
+   * Absent rather than empty on a server whose operator has configured none,
+   * so a client can tell "no providers" from an older server that does not
+   * know about them. A name to put in the URL and a label to show on the
+   * button; nothing here is secret.
+   */
+  signInProviders?: SignInProvider[];
+}
+
+/** A way of signing in that this server offers through somebody else. */
+export interface SignInProvider {
+  /** The configured name, which is what identifies it in a request. */
+  name: string;
+  /** What appears on the button. */
+  label: string;
 }
 
 /** What an operator may change about how their server looks. */

@@ -3,6 +3,7 @@ import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 
+import type { OAuthResult } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
@@ -13,12 +14,54 @@ definePageMeta({ layout: "auth" });
 
 useHead({ title: "Sign in" });
 
-const { signIn, setupStatus } = useAuth();
+const { signIn, setupStatus, refresh } = useAuth();
 const router = useRouter();
 const { $localeRoute: localeRoute } = useI18n();
 
 const error = ref<string | null>(null);
 const submitting = ref(false);
+
+const { begin, pendingHandle, finish } = useOAuth();
+
+/*
+ * Signing in through a provider, which has two moments on this page.
+ *
+ * Leaving: a button hands the browser to the provider. Returning: the callback
+ * sends it back here with a handle in the fragment, and what that handle stands
+ * for may be a session, or a question.
+ */
+const openingProvider = ref<string | null>(null);
+const returned = ref<OAuthResult | null>(null);
+const returnedHandle = ref("");
+
+/** Where they were trying to reach before any of this started. */
+function intendedNext(): string | undefined {
+  const next = router.currentRoute.value.query.next;
+  return typeof next === "string" ? next : undefined;
+}
+
+async function chooseProvider(provider: string) {
+  error.value = null;
+  openingProvider.value = provider;
+  try {
+    const start = await begin(provider, intendedNext());
+    // Replacing rather than pushing: coming back from the provider should not
+    // land somebody on this page twice in their history.
+    window.location.replace(start.url);
+  } catch (cause) {
+    openingProvider.value = null;
+    error.value = isApiError(cause) ? cause.message : "Could not reach the server.";
+  }
+}
+
+/** Somebody signed in through a provider, one way or another. */
+async function signedInThroughProvider(result: OAuthResult) {
+  returned.value = null;
+  // The cookie is already set; this is what tells the rest of the application
+  // who is here.
+  await refresh();
+  await router.push(result.redirectTo || intendedNext() || localeRoute({ name: "index" }));
+}
 
 /*
  * What a sign-in needs before it is worth sending.
@@ -60,6 +103,29 @@ try {
   // more usefully, against something the person actually did.
 }
 
+/*
+ * Returning from a provider.
+ *
+ * Collected here rather than on a page of its own, because the answer may be a
+ * question and the place to ask it is where somebody was already signing in.
+ * The handle is spent in the reading, so a reload shows the form rather than
+ * failing to collect something that has already been collected.
+ */
+const handle = pendingHandle();
+if (handle) {
+  try {
+    const result = await finish({ handle });
+    if (result.status === "signed-in" || result.status === "linked") {
+      await signedInThroughProvider(result);
+    } else {
+      returnedHandle.value = handle;
+      returned.value = result;
+    }
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : "That sign-in could not be completed.";
+  }
+}
+
 const form = useForm({
   defaultValues: { username: "", password: "" },
   validators: { onSubmit: credentials },
@@ -99,70 +165,88 @@ const form = useForm({
 
 <template>
   <div>
-    <h1 class="text-xl font-semibold">Sign in</h1>
-    <p class="mt-1 text-sm text-muted-foreground">Welcome back.</p>
+    <!-- Returning from a provider with a question to answer. The sign-in form
+         is not shown underneath it: there is one thing to do here, and offering
+         two is how somebody answers the wrong one. -->
+    <template v-if="returned">
+      <SignInProviderReturn
+        :handle="returnedHandle"
+        :result="returned"
+        @done="signedInThroughProvider"
+        @cancel="returned = null"
+      />
+    </template>
 
-    <form class="mt-6 space-y-4" @submit.prevent="form.handleSubmit()">
-      <p
-        v-if="error"
-        class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        role="alert"
-      >
-        {{ error }}
+    <template v-else>
+      <h1 class="text-xl font-semibold">Sign in</h1>
+      <p class="mt-1 text-sm text-muted-foreground">Welcome back.</p>
+
+      <form class="mt-6 space-y-4" @submit.prevent="form.handleSubmit()">
+        <p
+          v-if="error"
+          class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
+        >
+          {{ error }}
+        </p>
+
+        <form.Field name="username">
+          <template #default="{ field }">
+            <Field label="Username or email" :error="firstError(field)" required>
+              <template #default="{ id, invalid, describedBy }">
+                <Input
+                  :id="id"
+                  :model-value="field.state.value"
+                  autofocus
+                  autocomplete="username"
+                  :invalid="invalid"
+                  :described-by="describedBy"
+                  @update:model-value="field.handleChange($event)"
+                  @blur="field.handleBlur"
+                />
+              </template>
+            </Field>
+          </template>
+        </form.Field>
+
+        <form.Field name="password">
+          <template #default="{ field }">
+            <Field label="Password" :error="firstError(field)" required>
+              <template #default="{ id, invalid, describedBy }">
+                <Input
+                  :id="id"
+                  type="password"
+                  :model-value="field.state.value"
+                  autocomplete="current-password"
+                  :invalid="invalid"
+                  :described-by="describedBy"
+                  @update:model-value="field.handleChange($event)"
+                  @blur="field.handleBlur"
+                />
+              </template>
+            </Field>
+          </template>
+        </form.Field>
+
+        <Button class="h-9 w-full" type="submit" :disabled="submitting">
+          <Spinner v-if="submitting" size="sm" />
+          {{ submitting ? "Signing in" : "Sign in" }}
+        </Button>
+      </form>
+
+      <!-- Draws nothing when the server offers no providers, which is most of
+           them, so this needs no condition around it here. -->
+      <SignInProviders :busy="openingProvider" @choose="chooseProvider" />
+
+      <p class="mt-6 text-center text-sm text-muted-foreground">
+        No account yet?
+        <NuxtLink
+          :to="localeRoute({ name: 'register' })"
+          class="font-medium text-primary hover:underline"
+        >
+          Create one
+        </NuxtLink>
       </p>
-
-      <form.Field name="username">
-        <template #default="{ field }">
-          <Field label="Username or email" :error="firstError(field)" required>
-            <template #default="{ id, invalid, describedBy }">
-              <Input
-                :id="id"
-                :model-value="field.state.value"
-                autofocus
-                autocomplete="username"
-                :invalid="invalid"
-                :described-by="describedBy"
-                @update:model-value="field.handleChange($event)"
-                @blur="field.handleBlur"
-              />
-            </template>
-          </Field>
-        </template>
-      </form.Field>
-
-      <form.Field name="password">
-        <template #default="{ field }">
-          <Field label="Password" :error="firstError(field)" required>
-            <template #default="{ id, invalid, describedBy }">
-              <Input
-                :id="id"
-                type="password"
-                :model-value="field.state.value"
-                autocomplete="current-password"
-                :invalid="invalid"
-                :described-by="describedBy"
-                @update:model-value="field.handleChange($event)"
-                @blur="field.handleBlur"
-              />
-            </template>
-          </Field>
-        </template>
-      </form.Field>
-
-      <Button class="h-9 w-full" type="submit" :disabled="submitting">
-        <Spinner v-if="submitting" size="sm" />
-        {{ submitting ? "Signing in" : "Sign in" }}
-      </Button>
-    </form>
-
-    <p class="mt-6 text-center text-sm text-muted-foreground">
-      No account yet?
-      <NuxtLink
-        :to="localeRoute({ name: 'register' })"
-        class="font-medium text-primary hover:underline"
-      >
-        Create one
-      </NuxtLink>
-    </p>
+    </template>
   </div>
 </template>
