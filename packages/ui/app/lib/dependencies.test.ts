@@ -60,6 +60,17 @@ describe("packages that must exist once", () => {
    * Vue itself, which is the same failure with a wider blast radius: two
    * copies means two reactivity systems, and components from one that simply
    * do not update inside the other.
+   *
+   * The way this breaks in practice is a VueUse upgrade. reka-ui — which every
+   * vendored shadcn component is built on — and @vuepic/vue-datepicker both
+   * require @vueuse/core ^14, so raising the catalog to 15 does not replace
+   * VueUse: it resolves 15 alongside 14, and 14 brings its own Vue. The
+   * catalog is held at 14 for that reason, and should move only once reka-ui
+   * accepts 15.
+   *
+   * Note that this counts directories, which bun does not prune. A version
+   * that has genuinely gone can linger on disk from a previous install, so
+   * confirm a failure against a clean node_modules before chasing it.
    */
   it("resolves one copy of Vue", () => {
     const versions = versionsOf("vue");
