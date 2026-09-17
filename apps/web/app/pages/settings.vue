@@ -190,6 +190,23 @@ async function chooseStatus(key: string) {
   }
 }
 
+/*
+ * The session somebody is ending, held until they confirm.
+ *
+ * Ending one signs that device out where it stands, and whoever is holding it
+ * is not told why — they simply find themselves signed out mid-sentence. That
+ * is the right power to have over a device somebody has lost; it is the wrong
+ * thing to do by a misplaced press on a list where every row looks alike.
+ */
+const ending = ref<Session | null>(null);
+
+async function confirmEnding() {
+  const session = ending.value;
+  if (!session) return;
+  ending.value = null;
+  await endSession(session.id);
+}
+
 async function endSession(id: string) {
   busy.value = id;
   try {
@@ -336,7 +353,7 @@ function deviceName(userAgent: string): string {
               variant="danger"
               v-if="!session.current"
               :disabled="busy === session.id"
-              @click="endSession(session.id)"
+              @click="ending = session"
             >
               {{ busy === session.id ? "Ending" : "End session" }}
             </Button>
@@ -633,6 +650,15 @@ function deviceName(userAgent: string): string {
       </section>
     </div>
   </div>
+
+  <ConfirmDialog
+    v-if="ending"
+    title="End this session?"
+    :detail="`${deviceName(ending.userAgent)} will be signed out straight away, in the middle of whatever it is doing. Whoever is using it is not told why, and will have to sign in again.`"
+    confirm-label="End session"
+    @cancel="ending = null"
+    @confirm="confirmEnding"
+  />
 
   <ConfirmDialog
     v-if="unblocking"
