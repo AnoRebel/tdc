@@ -75,6 +75,12 @@ A sign-in through another service is stored as that service's identifier for
 you. **No recoverable secret is stored for any of them.** Each record carries a
 label you chose, when it was created, and when it was last used.
 
+If you enrol a passkey, your account also gains a WebAuthn handle: a random
+value your authenticator stores so it can offer this account when you sign in
+without typing anything. It is deliberately unrelated to your account id or your
+username, because the specification asks for a value that cannot be correlated
+with anything else about you.
+
 ### Your sessions
 
 Every device you are signed in on has a session, holding the browser or client

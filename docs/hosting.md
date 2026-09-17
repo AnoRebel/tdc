@@ -160,6 +160,28 @@ verified it, nothing is linked and they get a new account. That second case is
 not a limitation to work around: a provider where anybody can set an unverified
 address to anything would otherwise be a way into any account on your server.
 
+### Passkeys
+
+Nothing to configure, and nothing to turn on. A server signs people in with
+passkeys as soon as `server.canonical_address` is set, which it must be anyway.
+
+That requirement is not incidental. A passkey is bound to the hostname it was
+enrolled against, so one made at `chat.example.org` works only there — which is
+the point, since it is what makes a passkey unphishable. It also means the
+hostname must be right and must stay right: **changing your canonical address
+invalidates every passkey already enrolled**, and everybody who relied on one
+will need their password to get back in and enrol again. Decide the address
+before people start using it.
+
+A server with no canonical address offers none rather than binding them to a
+guess, and says so in `/api/server` so clients do not draw a button that cannot
+work.
+
+Somebody may enrol several — a phone, a laptop, a hardware key — and remove any
+of them, except the one that would leave them no way in at all. That last
+refusal counts across every kind of credential, so a passkey beside a password
+can always be removed.
+
 ### Policy, which changes without a restart
 
 Configuration is plumbing — where the database is, what port to listen on. It is
