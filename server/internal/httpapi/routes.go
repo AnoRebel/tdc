@@ -56,6 +56,23 @@ func (s *Server) routes() {
 	s.echo.GET("/api/auth/oauth/callback", s.handleOAuthCallback)
 	s.echo.POST("/api/auth/oauth/finish", s.handleOAuthFinish)
 
+	/*
+		Passkeys.
+
+		The sign-in pair is unauthenticated, because it is how somebody gets in.
+		The enrolment pair is not: adding a passkey adds a way into an account,
+		so it is done by somebody who has already proved they hold it.
+	*/
+	s.echo.POST("/api/auth/passkey/signin/begin", s.handleBeginPasskeySignIn)
+	s.echo.POST("/api/auth/passkey/signin/finish", s.handleFinishPasskeySignIn)
+
+	passkeys := s.echo.Group("/api/me/passkeys", requireAuthentication)
+	passkeys.GET("", s.handleListPasskeys)
+	passkeys.POST("/begin", s.handleBeginPasskeyEnrolment)
+	passkeys.POST("/finish", s.handleFinishPasskeyEnrolment)
+	passkeys.PATCH("/:id", s.handleRenamePasskey)
+	passkeys.DELETE("/:id", s.handleRevokePasskey)
+
 	// The signed-in user's own account and sessions.
 	me := s.echo.Group("/api/me", requireAuthentication)
 	me.GET("", s.handleCurrentUser)
@@ -407,6 +424,19 @@ type serverInfoResponse struct {
 		them".
 	*/
 	SignInProviders []oauth.Offered `json:"signInProviders,omitempty"`
+
+	/*
+		Whether this server signs people in with passkeys.
+
+		A client needs it before the sign-in form is drawn — a button offering
+		something the server cannot do is worse than no button — and it is not
+		a secret: anybody may ask for a challenge.
+
+		False rather than absent, unlike the providers above: this is one
+		boolean with a meaningful default, where an empty list and an older
+		server reading nothing are genuinely different things.
+	*/
+	Passkeys bool `json:"passkeys"`
 }
 
 // brandingResponse is what an operator may change about how this server looks.
@@ -503,6 +533,7 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		ObscureSensitiveMedia: s.obscureSensitiveMedia(c.Request().Context()),
 		Branding:              s.branding(c.Request().Context()),
 		SignInProviders:       s.signInProviders(),
+		Passkeys:              s.passkeys.Enabled(),
 	})
 }
 

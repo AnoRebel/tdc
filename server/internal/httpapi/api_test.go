@@ -27,6 +27,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/oauth"
+	"github.com/AnoRebel/tdc/server/internal/passkeys"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
@@ -99,6 +100,26 @@ var (
 	oauthClientForTest    *http.Client
 )
 
+// passkeysForTest builds the passkey service, or nil where this test's server
+// has no canonical address to bind passkeys to.
+func passkeysForTest(t *testing.T, queries *dbgen.Queries, logger *slog.Logger) *passkeys.Service {
+	t.Helper()
+
+	service, err := passkeys.NewService(passkeys.Settings{
+		DisplayName:      "Test Server",
+		CanonicalAddress: canonicalAddressForTest,
+		Origins:          passkeyOriginsForTest,
+	}, queries, logger)
+	if err != nil {
+		t.Fatalf("building passkeys: %v", err)
+	}
+	return service
+}
+
+// passkeyOriginsForTest is where the browser claims to be, for the tests that
+// drive a whole ceremony.
+var passkeyOriginsForTest []string
+
 // oauthForTest builds the sign-in service the handler gets, or nil when no
 // test asked for one.
 func oauthForTest(queries *dbgen.Queries, logger *slog.Logger) *oauth.Service {
@@ -169,6 +190,9 @@ func newTestAPIConfigured(
 			// outlive the user rows they may reference only by value, so they
 			// would otherwise carry into the next test.
 			"DELETE FROM oauth_authorizations", "DELETE FROM oauth_outcomes",
+			// Passkey ceremonies cascade from users, but a ceremony with no
+			// user attached — a sign-in — does not, so it is cleared here.
+			"DELETE FROM webauthn_ceremonies",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)
@@ -230,6 +254,14 @@ func newTestAPIConfigured(
 		// Nil on almost every test, which is the ordinary server: no provider
 		// configured and the routes answering 404.
 		OAuth: oauthForTest(queries, logger),
+		/*
+			Nil unless the test gave the server a canonical address.
+
+			That is not a convenience: a passkey is bound to a hostname, so a
+			server without one genuinely cannot offer them, and most tests here
+			exercise exactly that server.
+		*/
+		Passkeys: passkeysForTest(t, queries, logger),
 	}, logger)
 
 	t.Cleanup(func() {

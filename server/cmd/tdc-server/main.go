@@ -34,6 +34,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/oauth"
+	"github.com/AnoRebel/tdc/server/internal/passkeys"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
@@ -194,6 +195,23 @@ func run() error {
 	go expirePeriodically(ctx, moderationService, settingsService,
 		attachmentService, auditRecorder, pushService, log)
 
+	/*
+		Passkeys, or nothing.
+
+		Nil on a server with no canonical address: a passkey is bound to a
+		hostname, and binding one to a guess produces passkeys that enrol and
+		then stop working when the guess changes. The routes answer as if the
+		feature were not there, which is the truth.
+	*/
+	passkeyService, err := passkeys.NewService(passkeys.Settings{
+		DisplayName:      serverName(cfg),
+		CanonicalAddress: cfg.Server.CanonicalAddress,
+		Origins:          cfg.Server.AllowedOrigins,
+	}, queries, log)
+	if err != nil {
+		return err
+	}
+
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
@@ -239,6 +257,7 @@ func run() error {
 			unfurl.Settings{Enabled: cfg.Attachments.LinkPreviews}, log),
 		Presence: presenceService,
 		Push:     pushService,
+		Passkeys: passkeyService,
 	}
 
 	// Messages written now and sent later. The pass takes a row lock and skips

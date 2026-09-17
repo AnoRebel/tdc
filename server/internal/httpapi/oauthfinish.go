@@ -519,6 +519,16 @@ func (s *Server) sweepOAuth(ctx context.Context) {
 	}
 }
 
+// sweepPasskeys removes ceremonies nobody answered.
+func (s *Server) sweepPasskeys(ctx context.Context) {
+	if !s.passkeys.Enabled() {
+		return
+	}
+	if _, err := s.passkeys.SweepExpired(ctx); err != nil {
+		s.log.Warn("sweeping expired passkey ceremonies", "error", err)
+	}
+}
+
 func randomHandle() (string, error) {
 	buffer := make([]byte, 32)
 	if _, err := rand.Read(buffer); err != nil {
@@ -533,17 +543,17 @@ func hashHandle(handle string) []byte {
 }
 
 /*
-oauthSweepInterval is how often abandoned sign-ins are cleared.
+ceremonySweepInterval is how often abandoned sign-ins are cleared.
 
 Longer than either lifetime, because nothing depends on the sweep being prompt:
 an expired row is already refused by the query that would have read it, so this
 reclaims space rather than enforcing anything.
 */
-const oauthSweepInterval = 5 * time.Minute
+const ceremonySweepInterval = 5 * time.Minute
 
-// sweepOAuthPeriodically clears abandoned sign-ins until the context ends.
-func (s *Server) sweepOAuthPeriodically(ctx context.Context) {
-	ticker := time.NewTicker(oauthSweepInterval)
+// sweepCeremoniesPeriodically clears abandoned sign-ins until the context ends.
+func (s *Server) sweepCeremoniesPeriodically(ctx context.Context) {
+	ticker := time.NewTicker(ceremonySweepInterval)
 	defer ticker.Stop()
 
 	for {
@@ -552,6 +562,7 @@ func (s *Server) sweepOAuthPeriodically(ctx context.Context) {
 			return
 		case <-ticker.C:
 			s.sweepOAuth(ctx)
+			s.sweepPasskeys(ctx)
 		}
 	}
 }

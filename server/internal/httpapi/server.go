@@ -26,6 +26,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/oauth"
+	"github.com/AnoRebel/tdc/server/internal/passkeys"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
@@ -118,6 +119,7 @@ type Server struct {
 	settings    *settings.Service
 	invitations *invitations.Service
 	oauth       *oauth.Service
+	passkeys    *passkeys.Service
 	queries     *dbgen.Queries
 	presence    *presence.Service
 	push        *push.Service
@@ -157,6 +159,10 @@ type Services struct {
 	// operator has not set any up. That is the ordinary state: usernames and
 	// passwords, and nobody else involved in signing in.
 	OAuth *oauth.Service
+	// Passkeys is nil on a server with no canonical address, which has no
+	// relying party identifier to bind them to. That is a working state: the
+	// routes answer as if they were not there.
+	Passkeys *passkeys.Service
 	// Push is nil, or configured with no keys, on a server whose operator has
 	// not enabled notifications to closed browsers. That is a working state:
 	// notifications are still stored and shown in the application.
@@ -194,6 +200,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		settings:    services.Settings,
 		invitations: services.Invitations,
 		oauth:       services.OAuth,
+		passkeys:    services.Passkeys,
 		queries:     dbgen.New(pool),
 		presence:    services.Presence,
 		push:        services.Push,
@@ -277,16 +284,16 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	/*
-		Sign-ins nobody came back for.
+		Sign-ins nobody came back for, of either kind.
 
 		Started here rather than left to the command, so a server that offers
-		providers always sweeps what they leave behind — a sweep that has to be
+		either always sweeps what it leaves behind — a sweep that has to be
 		remembered at the call site is a sweep that is eventually forgotten.
 		Rows are deleted as they are used, so this only collects the abandoned
 		ones.
 	*/
-	if s.oauth != nil && s.oauth.Enabled() {
-		go s.sweepOAuthPeriodically(ctx)
+	if (s.oauth != nil && s.oauth.Enabled()) || s.passkeys.Enabled() {
+		go s.sweepCeremoniesPeriodically(ctx)
 	}
 
 	serveErr := make(chan error, 1)

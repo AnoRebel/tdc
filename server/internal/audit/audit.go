@@ -29,7 +29,17 @@ const (
 	ActionSignedOut       Action = "auth.signout"
 	ActionSessionRevoked  Action = "auth.session.revoked"
 	ActionPasswordChanged Action = "auth.password.changed"
-	ActionRateLimited     Action = "auth.rate_limited"
+	/*
+		A way into an account gained or lost.
+
+		Recorded because it is the change somebody would most want to find
+		afterwards: a credential added by an attacker is how they keep an
+		account after the password is changed, and a log that did not say so
+		would leave nothing to notice.
+	*/
+	ActionCredentialAdded   Action = "auth.credential.added"
+	ActionCredentialRemoved Action = "auth.credential.removed"
+	ActionRateLimited       Action = "auth.rate_limited"
 
 	ActionUserCreated    Action = "user.created"
 	ActionUserSuspended  Action = "user.suspended"

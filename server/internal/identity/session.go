@@ -249,6 +249,24 @@ func (s *Service) RevokeAllSessions(ctx context.Context, userID uuid.UUID) error
 //
 // Ending the others is the point: someone changing their password after a
 // suspected compromise expects it to evict whoever else was signed in.
+/*
+RevokeOtherSessions ends every session but the one making the request.
+
+What a revoked credential requires: a session it established outliving it would
+mean whoever holds that session still has what the revocation was meant to take
+away. The caller's own session is kept, because somebody removing a credential
+has not asked to be signed out of the thing they are doing it from.
+*/
+func (s *Service) RevokeOtherSessions(ctx context.Context, userID, keepSessionID uuid.UUID) error {
+	if err := s.store.RevokeOtherSessionsForUser(ctx, dbgen.RevokeOtherSessionsForUserParams{
+		UserID: userID,
+		ID:     keepSessionID,
+	}); err != nil {
+		return fmt.Errorf("revoke other sessions: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, newPassword string, keepSessionID uuid.UUID) error {
 	hash, err := HashPassword(newPassword)
 	if err != nil {
@@ -263,14 +281,9 @@ func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, newPassw
 		return fmt.Errorf("replace password: %w", err)
 	}
 
-	if err := s.store.RevokeOtherSessionsForUser(ctx, dbgen.RevokeOtherSessionsForUserParams{
-		UserID: userID,
-		ID:     keepSessionID,
-	}); err != nil {
-		return fmt.Errorf("revoke other sessions: %w", err)
-	}
-
-	return nil
+	// The same rule a revoked credential gets: a session established with the
+	// old password must not outlive it.
+	return s.RevokeOtherSessions(ctx, userID, keepSessionID)
 }
 
 // newSessionToken returns a fresh, unguessable session token.
