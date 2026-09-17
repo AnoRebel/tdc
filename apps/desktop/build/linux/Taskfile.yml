@@ -176,9 +176,8 @@ tasks:
       # Without it a desktop environment shows the running application as a
       # second, nameless icon rather than highlighting the one somebody
       # launched it from — and pinning it to a dock pins something that never
-      # lights up. The generator has no flag for it, and the class is set by
-      # the toolkit as org.wails.<Name> rather than by anything here, so it is
-      # appended rather than configured.
+      # lights up. The generator has no flag for it, so it is appended rather
+      # than configured.
       - grep -q StartupWMClass "{{.ROOT_DIR}}/build/linux/{{.APP_NAME}}.desktop" || echo "StartupWMClass={{.WM_CLASS}}" >> "{{.ROOT_DIR}}/build/linux/{{.APP_NAME}}.desktop"
     vars:
       APP_NAME: '{{.APP_NAME}}'
@@ -196,11 +195,12 @@ tasks:
       # The template's default is 'wails', which is the tool this was built
       # with rather than anything somebody would type.
       KEYWORDS: 'chat;messaging;team;community;tdc;'
-      # Set by the toolkit, not configurable from here, and case-sensitive
-      # when a desktop environment matches it — so it is taken from a running
-      # window (`hyprctl clients`, `xprop WM_CLASS`) rather than guessed from
-      # the application name, which is capitalised and this is not.
-      WM_CLASS: 'org.wails.tdc'
+      # The application id the window carries, which the desktop matches
+      # case-sensitively. It was org.wails.<Name> while the toolkit built the
+      # id itself; beta.23 lets it be set, so this, the id in main.go and the
+      # icons all say the same thing now. Worth confirming against a running
+      # window (`hyprctl clients`, `xprop WM_CLASS`) rather than assumed.
+      WM_CLASS: 'net.anorebel.tdc'
       # What this is, to somebody searching their applications menu. The
       # template's default is Development, which is what the tool was built
       # with rather than what this is: people look for a chat application under

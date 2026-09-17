@@ -275,17 +275,23 @@ does not produce forty banners for the same channel.
 
 ## Identity
 
-`net.anorebel.tdc` — the bundle identifier, the keychain service name, and the
-Linux program name.
+`net.anorebel.tdc`, everywhere: the bundle identifier, the keychain service
+name, the GTK application id, the Wayland surface's app_id, the name the icons
+are installed under, and the desktop entry's `StartupWMClass`.
 
-The window class is not this. Wails builds a GTK application id of
-`org.wails.<Name>` itself and does not expose it, so the window reports
-`org.wails.tdc` and the desktop entry's `StartupWMClass` has to say so or the
-running window will not associate with the launcher entry. Both are set
-deliberately: when Wails allows the id to be configured, the three become one.
+They have to agree. When they do not, a desktop environment cannot match the
+running window to the entry that launched it — the application shows up as a
+second, nameless icon, and pinning it to a dock pins something that never
+lights up.
 
-That value is case-sensitive and taken from a running window rather than
-guessed — the application is named "TDC" and the class is lowercase.
+It was not always one name. Wails built the id as `org.wails.<Name>` and did
+not expose it, so the window reported `org.wails.tdc` and `StartupWMClass` had
+to say so too. Since beta.23 the id is an option, and all of it says the same
+thing.
+
+The value is case-sensitive, and worth reading off a running window rather than
+assuming — `hyprctl clients` on Wayland, `xprop WM_CLASS` on X11. The
+application is named "TDC"; the id is lowercase.
 
 ## Staying signed in
 

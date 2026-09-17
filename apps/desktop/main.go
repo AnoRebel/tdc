@@ -191,20 +191,26 @@ func main() {
 		},
 		Linux: application.LinuxOptions{
 			/*
-				What the window manager calls this program.
+				What this application is called, everywhere the desktop looks.
 
-				Set so a desktop environment can match the running window to
-				the .desktop entry that launched it — without which the
-				application appears as a second, nameless icon and pinning it
-				to a dock pins something that never lights up.
+				One name in three places that all have to agree: the GTK
+				application id, the program name the Wayland surface takes its
+				app_id from, and the StartupWMClass in the .desktop entry. When
+				they disagree, the running window is not matched with the entry
+				that launched it — the application shows up as a second,
+				nameless icon, and pinning it to a dock pins something that
+				never lights up.
 
-				The GTK application id is org.wails.<Name>, which Wails builds
-				itself and does not expose. So this and StartupWMClass are both
-				set to what the toolkit actually produces; when Wails allows
-				the id to be configured, all three become net.anorebel.tdc
-				together.
+				The id used to be org.wails.<Name>, built by the toolkit and not
+				exposed, so this and StartupWMClass were both set to what the
+				toolkit produced rather than to what this application is called.
+				beta.23 lets the id be set, so all three are net.anorebel.tdc
+				now, which is also what the icons and the package are named.
+
+				ProgramName is left to follow: Wails defaults it to the
+				application id precisely so the two cannot drift.
 			*/
-			ProgramName: "net.anorebel.tdc",
+			ApplicationID: "net.anorebel.tdc",
 		},
 		Mac: application.MacOptions{
 			// Closing the last window quits, which is what somebody means by
