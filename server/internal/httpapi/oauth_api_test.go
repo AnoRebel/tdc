@@ -565,3 +565,127 @@ func TestAProviderThatNamesNobodyIsRefused(t *testing.T) {
 		t.Errorf("a provider naming nobody resolved to %v, want failed", status)
 	}
 }
+
+/*
+TestAClientWithNoBrowserClaimsItsOwnSignIn.
+
+The desktop opens the system browser and stays where it is, so the callback
+resolves somewhere it cannot see and the redirect lands in a page it is not
+showing. What it holds is the state it was given when the sign-in began, and
+that has to be enough to collect the outcome of that sign-in.
+*/
+func TestAClientWithNoBrowserClaimsItsOwnSignIn(t *testing.T) {
+	provider := newFakeProvider(t, map[string]any{
+		"sub": "desktop-1", "preferred_username": "desktop",
+	})
+	handler := withProvider(t, provider)
+	completeSetup(t, handler)
+
+	state := begin(t, handler, "")
+
+	// Nothing has happened yet, which is what a poll finds while somebody is
+	// still at the provider. It must not read as a failure.
+	waiting := decode(t, finish(t, handler, map[string]any{"state": state}))
+	if waiting["status"] != "waiting" {
+		t.Errorf("polling before the provider answered gave %v, want waiting", waiting["status"])
+	}
+
+	// The browser completes the sign-in somewhere this client cannot see.
+	callback(t, handler, state)
+
+	result := decode(t, finish(t, handler, map[string]any{"state": state}))
+	if result["status"] != "signed-in" {
+		t.Fatalf("claiming by state gave %v, want signed-in", result["status"])
+	}
+	if token, _ := result["token"].(string); token == "" {
+		t.Error("claiming by state issued no session token, which is all this client has")
+	}
+
+	// And it is claimed once, like everything else here.
+	second := decode(t, finish(t, handler, map[string]any{"state": state}))
+	if second["status"] != "waiting" {
+		t.Errorf("claiming twice gave %v; the outcome must be gone", second["status"])
+	}
+}
+
+/*
+TestAStateBelongingToSomebodyElseCollectsNothing.
+
+The state is what identifies a sign-in to a client that never saw the redirect,
+so it is the thing worth guessing. A state nobody issued must yield the same
+nothing as one whose sign-in has not finished.
+*/
+func TestAStateBelongingToSomebodyElseCollectsNothing(t *testing.T) {
+	provider := newFakeProvider(t, map[string]any{"sub": "other-1"})
+	handler := withProvider(t, provider)
+	completeSetup(t, handler)
+
+	callback(t, handler, begin(t, handler, ""))
+
+	result := decode(t, finish(t, handler, map[string]any{"state": "not-a-state-this-server-issued"}))
+	if result["status"] != "waiting" {
+		t.Errorf("an invented state gave %v, want the same nothing as an unfinished sign-in",
+			result["status"])
+	}
+	if _, present := result["token"]; present {
+		t.Error("an invented state produced a session")
+	}
+}
+
+// TestCollectingNeedsOneIdentifier: a request carrying both, or neither, is a
+// caller guessing rather than a client that knows which it has.
+func TestCollectingNeedsOneIdentifier(t *testing.T) {
+	provider := newFakeProvider(t, map[string]any{"sub": "both-1"})
+	handler := withProvider(t, provider)
+	completeSetup(t, handler)
+
+	for name, body := range map[string]map[string]any{
+		"neither": {},
+		"both":    {"handle": "a", "state": "b"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if recorder := finish(t, handler, body); recorder.Code != http.StatusBadRequest {
+				t.Errorf("status %d, want %d", recorder.Code, http.StatusBadRequest)
+			}
+		})
+	}
+}
+
+/*
+TestAReplayedCallbackDoesNotReviveASignIn.
+
+A callback replayed with a state that already produced an outcome collides with
+the unique index that makes claim-by-state safe. That index is doing its job:
+the sign-in has been resolved and claimed, and a second row under the same state
+would let it be claimed a second time.
+
+The replay is told the sign-in expired, which it has, and the already-claimed
+outcome stays claimed.
+*/
+func TestAReplayedCallbackDoesNotReviveASignIn(t *testing.T) {
+	provider := newFakeProvider(t, map[string]any{
+		"sub": "replay-1", "preferred_username": "replay",
+	})
+	handler := withProvider(t, provider)
+	completeSetup(t, handler)
+
+	state := begin(t, handler, "")
+	callback(t, handler, state)
+
+	// The desktop claims its sign-in, as it would.
+	if status := decode(t, finish(t, handler, map[string]any{"state": state}))["status"]; status != "signed-in" {
+		t.Fatalf("claiming gave %v, want signed-in", status)
+	}
+
+	// The same callback again. It must not be a server error, and it must not
+	// leave anything claimable under that state.
+	recorder := call(t, handler, http.MethodGet,
+		"/api/auth/oauth/callback?state="+url.QueryEscape(state)+"&code=granted", nil, "")
+	if recorder.Code != http.StatusFound {
+		t.Fatalf("replayed callback: status %d, body %s", recorder.Code, recorder.Body.String())
+	}
+
+	if status := decode(t, finish(t, handler, map[string]any{"state": state}))["status"]; status != "waiting" {
+		t.Errorf("after a replay the state yields %v; it must yield nothing claimable", status)
+	}
+}

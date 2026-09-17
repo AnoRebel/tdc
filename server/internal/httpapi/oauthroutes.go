@@ -130,6 +130,10 @@ func (s *Server) handleOAuthCallback(c *echo.Context) error {
 	ctx := c.Request().Context()
 	address := requestIP(c)
 
+	// Carried onto every outcome below, so a client with no browser to receive
+	// the redirect can claim the sign-in it started.
+	state := c.QueryParam("state")
+
 	if address.IsValid() {
 		decision, err := s.limiter.Allow(ctx, "oauth:callback:"+address.String(), oauthCallbackPerAddress)
 		if err != nil {
@@ -145,29 +149,29 @@ func (s *Server) handleOAuthCallback(c *echo.Context) error {
 	// happen.
 	if refusal := c.QueryParam("error"); refusal != "" {
 		s.log.Info("a sign-in was declined at the provider", "error", refusal)
-		return s.finishAtClient(c, oauthOutcome{Status: "declined"})
+		return s.finishAtClient(c, oauthOutcome{Status: "declined", State: state})
 	}
 
-	completed, err := s.oauth.Complete(ctx, c.QueryParam("state"), c.QueryParam("code"), s.oauthCallbackURL())
+	completed, err := s.oauth.Complete(ctx, state, c.QueryParam("code"), s.oauthCallbackURL())
 	switch {
 	case errors.Is(err, oauth.ErrAuthorizationInvalid):
-		return s.finishAtClient(c, oauthOutcome{Status: "expired"})
+		return s.finishAtClient(c, oauthOutcome{Status: "expired", State: state})
 	case errors.Is(err, oauth.ErrProviderRefused), errors.Is(err, oauth.ErrUnknownProvider):
 		s.log.Warn("a sign-in through a provider could not be completed", "error", err)
-		return s.finishAtClient(c, oauthOutcome{Status: "failed"})
+		return s.finishAtClient(c, oauthOutcome{Status: "failed", State: state})
 	case err != nil:
 		return err
 	}
 
 	resolution, err := s.oauth.Resolve(ctx, s.queries, completed)
 	if errors.Is(err, oauth.ErrIdentityBelongsToAnother) {
-		return s.finishAtClient(c, oauthOutcome{Status: "already-attached", RedirectTo: completed.RedirectTo})
+		return s.finishAtClient(c, oauthOutcome{Status: "already-attached", RedirectTo: completed.RedirectTo, State: state})
 	}
 	if err != nil {
 		return err
 	}
 
-	outcome := oauthOutcome{RedirectTo: completed.RedirectTo, Identity: resolution.Identity}
+	outcome := oauthOutcome{RedirectTo: completed.RedirectTo, Identity: resolution.Identity, State: state}
 
 	switch resolution.Outcome {
 	case oauth.OutcomeSignedIn, oauth.OutcomeLinked:

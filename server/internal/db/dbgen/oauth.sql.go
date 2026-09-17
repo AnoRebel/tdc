@@ -12,10 +12,33 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+const claimOAuthOutcomeByState = `-- name: ClaimOAuthOutcomeByState :one
+DELETE FROM oauth_outcomes
+WHERE state_hash = $1 AND expires_at > NOW()
+RETURNING id, handle_hash, status, detail, created_at, expires_at, state_hash
+`
+
+// Claiming by the state the client already holds, for a client with no browser
+// to receive the redirect. Consumed as it is read, exactly as the handle is.
+func (q *Queries) ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error) {
+	row := q.db.QueryRow(ctx, claimOAuthOutcomeByState, stateHash)
+	var i OauthOutcome
+	err := row.Scan(
+		&i.ID,
+		&i.HandleHash,
+		&i.Status,
+		&i.Detail,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.StateHash,
+	)
+	return i, err
+}
+
 const collectOAuthOutcome = `-- name: CollectOAuthOutcome :one
 DELETE FROM oauth_outcomes
 WHERE handle_hash = $1 AND expires_at > NOW()
-RETURNING id, handle_hash, status, detail, created_at, expires_at
+RETURNING id, handle_hash, status, detail, created_at, expires_at, state_hash
 `
 
 // Collected once: the row is deleted as it is read, so a handle presented twice
@@ -30,6 +53,7 @@ func (q *Queries) CollectOAuthOutcome(ctx context.Context, handleHash []byte) (O
 		&i.Detail,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.StateHash,
 	)
 	return i, err
 }
@@ -175,9 +199,9 @@ func (q *Queries) ListOAuthCredentialsForUser(ctx context.Context, userID uuid.U
 }
 
 const parkOAuthOutcome = `-- name: ParkOAuthOutcome :one
-INSERT INTO oauth_outcomes (id, handle_hash, status, detail, expires_at)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, handle_hash, status, detail, created_at, expires_at
+INSERT INTO oauth_outcomes (id, handle_hash, status, detail, expires_at, state_hash)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, handle_hash, status, detail, created_at, expires_at, state_hash
 `
 
 type ParkOAuthOutcomeParams struct {
@@ -186,6 +210,7 @@ type ParkOAuthOutcomeParams struct {
 	Status     string
 	Detail     []byte
 	ExpiresAt  time.Time
+	StateHash  []byte
 }
 
 func (q *Queries) ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomeParams) (OauthOutcome, error) {
@@ -195,6 +220,7 @@ func (q *Queries) ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomePara
 		arg.Status,
 		arg.Detail,
 		arg.ExpiresAt,
+		arg.StateHash,
 	)
 	var i OauthOutcome
 	err := row.Scan(
@@ -204,6 +230,7 @@ func (q *Queries) ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomePara
 		&i.Detail,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.StateHash,
 	)
 	return i, err
 }

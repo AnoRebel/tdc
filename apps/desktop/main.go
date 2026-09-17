@@ -349,6 +349,16 @@ func main() {
 	))
 
 	/*
+		How a sign-in through a provider leaves this application.
+
+		Wired here because it needs the application. It goes to the system
+		browser rather than this window on purpose: there the address bar shows
+		whose page is asking for the password and the password manager knows the
+		site, and in a webview neither is true.
+	*/
+	api.UseOpener(apiService, app.Browser)
+
+	/*
 		What the close button does, which is a question rather than an answer.
 
 		For a chat client left open all day, closing usually means "off my

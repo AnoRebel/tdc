@@ -38,8 +38,8 @@ SET external_email = $2, external_email_verified = $3, last_used_at = NOW()
 WHERE id = $1 AND kind = 'oauth2';
 
 -- name: ParkOAuthOutcome :one
-INSERT INTO oauth_outcomes (id, handle_hash, status, detail, expires_at)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO oauth_outcomes (id, handle_hash, status, detail, expires_at, state_hash)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- Collected once: the row is deleted as it is read, so a handle presented twice
@@ -47,6 +47,13 @@ RETURNING *;
 -- name: CollectOAuthOutcome :one
 DELETE FROM oauth_outcomes
 WHERE handle_hash = $1 AND expires_at > NOW()
+RETURNING *;
+
+-- Claiming by the state the client already holds, for a client with no browser
+-- to receive the redirect. Consumed as it is read, exactly as the handle is.
+-- name: ClaimOAuthOutcomeByState :one
+DELETE FROM oauth_outcomes
+WHERE state_hash = $1 AND expires_at > NOW()
 RETURNING *;
 
 -- name: DeleteExpiredOAuthOutcomes :execrows

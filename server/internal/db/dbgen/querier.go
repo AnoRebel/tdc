@@ -34,6 +34,9 @@ type Querier interface {
 	// a moderator extending a ban means the new terms, not an error.
 	BanFromChannel(ctx context.Context, arg BanFromChannelParams) error
 	BlockUser(ctx context.Context, arg BlockUserParams) error
+	// Claiming by the state the client already holds, for a client with no browser
+	// to receive the redirect. Consumed as it is read, exactly as the handle is.
+	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
 	// A status with an expiry reverts on its own, so a temporary one needs no
 	// later action from the person who set it.
 	ClearExpiredStatuses(ctx context.Context) error

@@ -3,11 +3,13 @@ import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 
+import type { OAuthResult } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
+import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import * as Api from "#bindings/api";
 
 /**
@@ -25,7 +27,7 @@ import * as Api from "#bindings/api";
 definePageMeta({ layout: "auth" });
 useHead({ title: "Sign in" });
 
-const { signIn } = useAuth();
+const { signIn, refresh } = useAuth();
 const router = useRouter();
 const { $localeRoute: localeRoute } = useI18n();
 
@@ -33,6 +35,95 @@ const server = ref("");
 const remember = ref(false);
 const error = ref<string | null>(null);
 const submitting = ref(false);
+
+const { begin, finish } = useOAuth();
+
+/*
+ * Signing in through a provider, which works differently here.
+ *
+ * The web navigates to the provider and the callback brings the same browser
+ * back. This client has no browser to send: it hands the URL to the system one,
+ * where the address bar shows whose page is asking for the password, and stays
+ * where it is. The callback then resolves somewhere this window cannot see.
+ *
+ * What it holds is the state the server issued, which is enough to collect the
+ * outcome of its own sign-in afterwards — so it asks, at intervals, until the
+ * answer arrives or the sign-in expires.
+ */
+const openingProvider = ref<string | null>(null);
+const waitingForProvider = ref(false);
+const returned = ref<OAuthResult | null>(null);
+const returnedState = ref("");
+
+/*
+ * How often to ask, and for how long.
+ *
+ * Every two seconds is prompt enough that somebody returning to this window
+ * finds it already signed in, and rare enough to be nothing. The sign-in itself
+ * expires after ten minutes at the server, so asking past that would be asking
+ * about something that no longer exists.
+ */
+const askInterval = 2000;
+const giveUpAfter = 10 * 60 * 1000;
+
+async function chooseProvider(provider: string) {
+  error.value = null;
+  openingProvider.value = provider;
+
+  try {
+    const start = await begin(provider);
+    await Api.Service.OpenSignIn(start.url);
+    openingProvider.value = null;
+    await waitForProvider(start.state);
+  } catch (cause) {
+    openingProvider.value = null;
+    waitingForProvider.value = false;
+    error.value = isApiError(cause)
+      ? cause.message
+      : "Could not open the browser for that sign-in.";
+  }
+}
+
+/** Ask for the outcome of this sign-in until there is one. */
+async function waitForProvider(state: string) {
+  waitingForProvider.value = true;
+  const until = Date.now() + giveUpAfter;
+
+  while (waitingForProvider.value && Date.now() < until) {
+    const result = await finish({ state });
+
+    if (result.status === "waiting") {
+      await new Promise((resolve) => setTimeout(resolve, askInterval));
+      continue;
+    }
+
+    waitingForProvider.value = false;
+
+    if (result.status === "signed-in" || result.status === "linked") {
+      await signedInThroughProvider(result);
+      return;
+    }
+
+    // A question, or a way it did not happen. Either way it is shown here.
+    returnedState.value = state;
+    returned.value = result;
+    return;
+  }
+
+  waitingForProvider.value = false;
+}
+
+/** Somebody signed in through a provider, one way or another. */
+async function signedInThroughProvider(result: OAuthResult) {
+  returned.value = null;
+  await refresh();
+  await router.push(result.redirectTo || localeRoute({ name: "index" }));
+}
+
+// Nothing is waited for once this screen is gone.
+onBeforeUnmount(() => {
+  waitingForProvider.value = false;
+});
 
 /*
  * What a sign-in needs before it is worth sending.
@@ -150,76 +241,103 @@ const form = useForm({
 
 <template>
   <div>
-    <div class="mb-6 text-center">
-      <h2 class="text-base font-semibold">Sign in</h2>
-      <p v-if="server" class="mt-1 truncate text-xs text-muted-foreground">{{ server }}</p>
-    </div>
+    <!-- Returning from a provider with a question to answer. The sign-in form
+         is not shown underneath it: there is one thing to do here. -->
+    <SignInProviderReturn
+      v-if="returned"
+      :state="returnedState"
+      :result="returned"
+      @done="signedInThroughProvider"
+      @cancel="returned = null"
+    />
 
-    <form class="space-y-4" @submit.prevent="form.handleSubmit()">
+    <div v-else>
+      <div class="mb-6 text-center">
+        <h2 class="text-base font-semibold">Sign in</h2>
+        <p v-if="server" class="mt-1 truncate text-xs text-muted-foreground">{{ server }}</p>
+      </div>
+
+      <form class="space-y-4" @submit.prevent="form.handleSubmit()">
+        <p
+          v-if="error"
+          class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
+        >
+          {{ error }}
+        </p>
+
+        <form.Field name="username">
+          <template #default="{ field }">
+            <Field label="Username or email" :error="firstError(field)" required>
+              <template #default="{ id, invalid, describedBy }">
+                <Input
+                  :id="id"
+                  :model-value="field.state.value"
+                  autofocus
+                  autocomplete="username"
+                  :invalid="invalid"
+                  :described-by="describedBy"
+                  @update:model-value="field.handleChange($event)"
+                  @blur="field.handleBlur"
+                />
+              </template>
+            </Field>
+          </template>
+        </form.Field>
+
+        <form.Field name="password">
+          <template #default="{ field }">
+            <Field label="Password" :error="firstError(field)" required>
+              <template #default="{ id, invalid, describedBy }">
+                <Input
+                  :id="id"
+                  type="password"
+                  :model-value="field.state.value"
+                  autocomplete="current-password"
+                  :invalid="invalid"
+                  :described-by="describedBy"
+                  @update:model-value="field.handleChange($event)"
+                  @blur="field.handleBlur"
+                />
+              </template>
+            </Field>
+          </template>
+        </form.Field>
+
+        <label v-if="keychain" class="flex cursor-pointer items-center gap-2">
+          <Checkbox v-model="remember" />
+          <span class="text-sm">Keep me signed in on this machine</span>
+        </label>
+
+        <Button type="submit" class="h-9 w-full" :disabled="submitting">
+          {{ submitting ? "Signing in" : "Sign in" }}
+        </Button>
+      </form>
+
+      <!-- Draws nothing when the server offers no providers. -->
+      <SignInProviders :busy="openingProvider" @choose="chooseProvider" />
+
+      <!-- The browser is open somewhere else, and this window is waiting for
+           it. Said plainly, because a window that looks idle while something is
+           happening reads as a window that did nothing. -->
       <p
-        v-if="error"
-        class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        role="alert"
+        v-if="waitingForProvider"
+        class="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground"
+        role="status"
       >
-        {{ error }}
+        <Spinner size="sm" />
+        Waiting for your browser. You can come back here when you are done.
       </p>
 
-      <form.Field name="username">
-        <template #default="{ field }">
-          <Field label="Username or email" :error="firstError(field)" required>
-            <template #default="{ id, invalid, describedBy }">
-              <Input
-                :id="id"
-                :model-value="field.state.value"
-                autofocus
-                autocomplete="username"
-                :invalid="invalid"
-                :described-by="describedBy"
-                @update:model-value="field.handleChange($event)"
-                @blur="field.handleBlur"
-              />
-            </template>
-          </Field>
-        </template>
-      </form.Field>
-
-      <form.Field name="password">
-        <template #default="{ field }">
-          <Field label="Password" :error="firstError(field)" required>
-            <template #default="{ id, invalid, describedBy }">
-              <Input
-                :id="id"
-                type="password"
-                :model-value="field.state.value"
-                autocomplete="current-password"
-                :invalid="invalid"
-                :described-by="describedBy"
-                @update:model-value="field.handleChange($event)"
-                @blur="field.handleBlur"
-              />
-            </template>
-          </Field>
-        </template>
-      </form.Field>
-
-      <label v-if="keychain" class="flex cursor-pointer items-center gap-2">
-        <Checkbox v-model="remember" />
-        <span class="text-sm">Keep me signed in on this machine</span>
-      </label>
-
-      <Button type="submit" class="h-9 w-full" :disabled="submitting">
-        {{ submitting ? "Signing in" : "Sign in" }}
-      </Button>
-    </form>
-
-    <p class="mt-6 text-center text-xs text-muted-foreground">
-      Signing in to a different server?
-      <NuxtLink
-        :to="localeRoute({ name: 'servers' })"
-        class="font-medium text-primary hover:underline"
-      >
-        Choose one
-      </NuxtLink>
-    </p>
+      <p class="mt-6 text-center text-xs text-muted-foreground">
+        Signing in to a different server?
+        <NuxtLink
+          :to="localeRoute({ name: 'servers' })"
+          class="font-medium text-primary hover:underline"
+        >
+          Choose one
+        </NuxtLink>
+      </p>
+    </div>
   </div>
 </template>

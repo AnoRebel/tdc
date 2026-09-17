@@ -85,6 +85,16 @@ type Service struct {
 	*/
 	clients map[string]*http.Client
 
+	/*
+		How a URL leaves this application for the system browser.
+
+		Nil in tests and until main wires it. A sign-in through a provider is
+		refused rather than attempted when there is nothing to open it with,
+		which is better than opening it in this window — see browser.go for why
+		that window is the wrong place for it.
+	*/
+	opener Opener
+
 	// Which server requests currently go to. Empty until somebody has chosen
 	// one; a request before then is refused rather than sent somewhere
 	// arbitrary.

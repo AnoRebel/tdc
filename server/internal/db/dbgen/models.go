@@ -184,6 +184,7 @@ type OauthOutcome struct {
 	Detail     []byte
 	CreatedAt  time.Time
 	ExpiresAt  time.Time
+	StateHash  []byte
 }
 
 type PinnedMessage struct {

@@ -23,11 +23,32 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
  */
 
 const props = defineProps<{
-  /** The handle the callback left, which this collects. */
-  handle: string;
+  /**
+   * The handle the callback left, for a client whose browser received the
+   * redirect. Empty on the desktop, which never saw one.
+   */
+  handle?: string;
+  /**
+   * The state this sign-in began with, for a client that collects its own
+   * outcome instead. Empty on the web, which has a handle.
+   *
+   * One or the other, never both: they name the same sign-in by two routes,
+   * and the server refuses a request carrying both.
+   */
+  state?: string;
   /** What collecting it said, once. */
   result: OAuthResult;
 }>();
+
+/**
+ * How this client names the sign-in it is finishing.
+ *
+ * Whichever it was given, so the three calls below say it once rather than
+ * each deciding again.
+ */
+const claim = computed(() =>
+  props.handle ? { handle: props.handle } : { state: props.state ?? "" },
+);
 
 const emit = defineEmits<{
   /** Signed in. The parent takes it from here. */
@@ -80,7 +101,7 @@ const linkForm = useForm({
     error.value = null;
     submitting.value = true;
     try {
-      emit("done", await finish({ handle: props.handle, accept: true, password: value.password }));
+      emit("done", await finish({ ...claim.value, accept: true, password: value.password }));
     } catch (cause) {
       report(cause);
     } finally {
@@ -115,7 +136,7 @@ const accountForm = useForm({
       emit(
         "done",
         await finish({
-          handle: props.handle,
+          ...claim.value,
           username: value.username,
           displayName: value.displayName,
         }),
@@ -138,7 +159,7 @@ async function declineLink() {
   error.value = null;
   submitting.value = true;
   try {
-    emit("done", await finish({ handle: props.handle, accept: false }));
+    emit("done", await finish({ ...claim.value, accept: false }));
   } catch (cause) {
     report(cause);
   } finally {

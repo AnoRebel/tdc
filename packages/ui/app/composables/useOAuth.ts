@@ -76,7 +76,13 @@ export function useOAuth() {
    * applies to an outcome that asked nothing, and sending them does no harm.
    */
   async function finish(request: {
-    handle: string;
+    /** For a client whose browser received the redirect. */
+    handle?: string;
+    /**
+     * For a client that never saw one, and collects its own sign-in by the
+     * state it was issued. One or the other, never both.
+     */
+    state?: string;
     accept?: boolean;
     password?: string;
     username?: string;

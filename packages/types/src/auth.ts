@@ -88,7 +88,18 @@ export type OAuthStatus =
   /** The provider did not complete the exchange. */
   | "failed"
   /** That provider account is already attached to a different account here. */
-  | "already-attached";
+  | "already-attached"
+  /**
+   * Nothing has been decided yet.
+   *
+   * Only ever seen by a client that collects its own sign-in by state — the
+   * desktop, asking while somebody is still at the provider. A client holding a
+   * handle never sees it: the handle exists only because an outcome was parked.
+   *
+   * It also covers a state nobody issued, deliberately: a sign-in that was
+   * abandoned and one that never existed answer alike.
+   */
+  | "waiting";
 
 /** Where a sign-in through a provider begins. */
 export interface OAuthStart {

@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
@@ -44,6 +46,16 @@ type oauthOutcome struct {
 	User      *dbgen.User
 	// LinkTo is the account a link is being offered for.
 	LinkTo *dbgen.User
+	/*
+		State is the value this sign-in began with, recorded so a client with no
+		browser to receive the redirect can claim its own outcome.
+
+		The web client never needs it — the redirect reaches the browser that
+		started the sign-in — but it is recorded for every sign-in rather than
+		only some, because the callback cannot tell which kind of client began
+		one and guessing would strand the desktop.
+	*/
+	State string
 }
 
 // parkedDetail is the JSON shape stored beside the status.
@@ -102,14 +114,52 @@ func (s *Server) finishAtClient(c *echo.Context, outcome oauthOutcome) error {
 		return fmt.Errorf("encode the outcome: %w", err)
 	}
 
-	if _, err := s.queries.ParkOAuthOutcome(c.Request().Context(), dbgen.ParkOAuthOutcomeParams{
+	parked := dbgen.ParkOAuthOutcomeParams{
 		ID:         uuid.New(),
 		HandleHash: hashHandle(handle),
 		Status:     outcome.Status,
 		Detail:     encoded,
 		ExpiresAt:  time.Now().Add(outcomeLifetime),
-	}); err != nil {
-		return fmt.Errorf("park the outcome: %w", err)
+	}
+	/*
+		Only an outcome that resolved something is claimable by its state.
+
+		A client waiting on a state is waiting for its own sign-in. A callback
+		that resolved nothing — a replay, a forged state, one that expired —
+		carries the state it was called with but decided nothing about it, and
+		parking that as claimable would answer a client that has already
+		succeeded with news that it failed.
+
+		Those still reach the browser in front of them by handle, which is how
+		they are said to whoever is actually looking at a page.
+	*/
+	if outcome.State != "" && decidedSomething(outcome.Status) {
+		parked.StateHash = hashHandle(outcome.State)
+	}
+
+	if _, err := s.queries.ParkOAuthOutcome(c.Request().Context(), parked); err != nil {
+		/*
+			One outcome per state, enforced by a unique index.
+
+			A callback replayed with a state that already produced one collides
+			here, and that is the index doing its job: the sign-in it named has
+			already been resolved and claimed, and a second row under the same
+			state would let it be claimed again.
+
+			So the outcome is parked without a state instead of refused. It is
+			still reachable by its handle, which is what the browser in front of
+			this redirect holds, and the replay is told the sign-in expired —
+			which it has. Failing outright would answer a browser navigation
+			with a server error for something that is not one.
+		*/
+		if !isUniqueViolation(err) || parked.StateHash == nil {
+			return fmt.Errorf("park the outcome: %w", err)
+		}
+
+		parked.StateHash = nil
+		if _, err := s.queries.ParkOAuthOutcome(c.Request().Context(), parked); err != nil {
+			return fmt.Errorf("park the outcome: %w", err)
+		}
 	}
 
 	return c.Redirect(http.StatusFound, "/signin#oauth="+url.QueryEscape(handle))
@@ -118,6 +168,18 @@ func (s *Server) finishAtClient(c *echo.Context, outcome oauthOutcome) error {
 // oauthFinishRequest is the client collecting what the callback decided.
 type oauthFinishRequest struct {
 	Handle string `json:"handle"`
+	/*
+		State identifies the sign-in for a client that never saw the redirect.
+
+		The desktop opens the system browser and stays where it is, so the
+		callback resolves somewhere it cannot see. What it does hold is the
+		state it was given when the sign-in began, and that is enough to claim
+		the outcome of that sign-in and no other.
+
+		One of Handle or State, never both: they identify the same thing by two
+		routes, and a request carrying both would be a caller guessing.
+	*/
+	State string `json:"state,omitempty"`
 	// Accept is the answer to a link offer. Sent only in reply to one, and
 	// meaningless otherwise.
 	Accept bool `json:"accept,omitempty"`
@@ -150,14 +212,43 @@ func (s *Server) handleOAuthFinish(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
-	if request.Handle == "" {
+	if (request.Handle == "") == (request.State == "") {
 		return echo.NewHTTPError(http.StatusBadRequest, "this sign-in cannot be completed")
 	}
 
-	parked, err := s.queries.CollectOAuthOutcome(ctx, hashHandle(request.Handle))
+	/*
+		Claiming by handle or by state.
+
+		Both consume the row as they read it, so either way an outcome is
+		collected once. The desktop polls this while somebody is at the
+		provider, and every poll before they finish finds nothing — which is
+		the same answer as a sign-in that never happened, deliberately.
+	*/
+	var parked dbgen.OauthOutcome
+	var err error
+	if request.Handle != "" {
+		parked, err = s.queries.CollectOAuthOutcome(ctx, hashHandle(request.Handle))
+	} else {
+		parked, err = s.queries.ClaimOAuthOutcomeByState(ctx, hashHandle(request.State))
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		// Unknown, already collected, or expired. One answer for all three, for
-		// the same reason authentication failures are one answer.
+		/*
+			Nothing to collect.
+
+			For a client claiming by state this is the ordinary answer while
+			somebody is still at the provider, so it is not an error: the client
+			is told to keep waiting, and the same reply covers a sign-in that
+			was abandoned. It stops waiting when the state it holds expires,
+			which it knows without asking.
+
+			For a client holding a handle there is nothing to wait for — the
+			handle only exists because an outcome was parked — so unknown,
+			already collected and expired are one refusal, for the same reason
+			authentication failures are one refusal.
+		*/
+		if request.State != "" {
+			return c.JSON(http.StatusOK, map[string]any{"status": "waiting"})
+		}
 		return echo.NewHTTPError(http.StatusBadRequest, "this sign-in has already been completed, or has expired")
 	}
 	if err != nil {
@@ -463,4 +554,32 @@ func (s *Server) sweepOAuthPeriodically(ctx context.Context) {
 			s.sweepOAuth(ctx)
 		}
 	}
+}
+
+/*
+decidedSomething says whether an outcome resolved the sign-in it names.
+
+The four that did are a session, an account gaining a provider, a question about
+linking, and an account to create. The rest are ways it did not happen, and none
+of them is news about a particular state — a forged one names no sign-in at all.
+*/
+func decidedSomething(status string) bool {
+	switch status {
+	case string(oauth.OutcomeSignedIn), string(oauth.OutcomeLinked),
+		string(oauth.OutcomeLinkOffered), string(oauth.OutcomeNewAccount):
+		return true
+	default:
+		return false
+	}
+}
+
+/*
+isUniqueViolation reports a row the database refused as a duplicate.
+
+Read from the error code rather than its text, which is localised and changes
+between releases.
+*/
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation
 }
