@@ -1,0 +1,502 @@
+# Using TDC
+
+What the application does, from the point of view of somebody using it rather
+than running it. Everything here is in the software today; where a capability
+depends on a choice your server's operator made, that is said.
+
+There are two applications and they are the same application. The web client
+runs in a browser and installs to a phone or a desktop like any other app; the
+desktop client wraps the same interface in a native window and adds the few
+things a browser will not do. What you read and type is the same code in both,
+so they cannot drift apart.
+
+## Getting an account
+
+How you get one depends on your server's registration policy. It may be open to
+anybody, restricted to people holding an invitation, restricted to particular
+email domains, or closed entirely, in which case the operator makes accounts.
+
+If you were sent an invitation, it is either a link or a short code, and either
+one is entered during registration. An invitation may expire, may be usable a
+limited number of times, and may be bound to one email address so that
+forwarding it to somebody else does not work.
+
+If an invitation does not work, the server will not tell you why. Expired,
+already used up, revoked, meant for somebody else and never having existed all
+produce the same refusal, because a response that distinguished them would tell
+somebody guessing codes when they had guessed right.
+
+**There is no password reset.** Account recovery is not built yet — no reset
+email, no recovery codes. An account that has lost its password needs an
+administrator. Choose a password you will keep, and keep it somewhere.
+
+Signing in is a username and a password. Signing in with an external account —
+Google, GitHub and the like — is not implemented, and neither are passkeys.
+
+### Your sessions
+
+Every device you sign in on is a session, and you can see all of them: when each
+was created, when it was last used, and which one you are looking at. Any of
+them can be revoked, which signs that device out immediately.
+
+Ending a session asks first and says what will happen, because signing a device
+out is not something to do by accident.
+
+Changing your password invalidates every other session. That is the behaviour
+you want if you are changing it because you think somebody else has it.
+
+## Conversations
+
+### Channels
+
+A channel is a named conversation. It may be **public**, which anybody on the
+server can find and join, or **private**, which only its members can see.
+
+A private channel is genuinely invisible rather than merely locked. Somebody who
+is not a member cannot tell the difference between a channel they are not
+allowed into and one that does not exist, anywhere in the application or the
+API. That is deliberate — a refusal that distinguished the two would confirm
+that the channel is there.
+
+Channels can be archived, which keeps all the history readable and refuses new
+messages, and restored, which resumes posting. Nothing is lost either way.
+
+Creating a channel takes a permission. On most servers ordinary members have it;
+on some the operator keeps it.
+
+### Direct messages
+
+A direct conversation is between you and one other person. Start one by finding
+them in the search box — `Ctrl K` — and choosing them; there is no separate "new
+message" button.
+
+The server can hold a conversation between several people, and the API accepts
+it, but no control in either client opens one yet. Group direct messages are in
+practice not yet available.
+
+**Administrators cannot read them.** Not "should not" — an administrator using
+the ordinary endpoints cannot retrieve other people's direct messages, and that
+is enforced on the server rather than being a rule somebody might not follow.
+
+You control who may open one with you: **anyone**, **only people who share a
+channel with you**, or **nobody**. Narrowing it does not close the conversations
+you already have. Somebody refused is not told which setting refused them, and
+moderators can still reach you, because a moderation problem you can make
+unreachable is not one anybody can deal with.
+
+### Threads
+
+Any message can become a thread. Replies live in a panel beside the
+conversation rather than in the main timeline, so a long tangent does not bury
+everything else, and the thread inherits the channel's permissions and
+visibility — there is no way for a thread to be more open than the channel it is
+in.
+
+The conversation shows how many replies each thread has, so you can see what is
+worth opening without opening it.
+
+### Disposable chats
+
+A conversation that deletes its own contents after a period the creator sets.
+The expiry is enforced by the server, so a client that was offline through the
+whole lifetime of a message never receives it — the content is gone, not merely
+hidden by whatever happened to be displaying it.
+
+## Messages
+
+Writing, editing and deleting all work as you would expect, with two things
+worth knowing.
+
+**An edited message says it was edited.** Not the old text, but a marker that
+the message is not what was originally sent.
+
+**A deleted message leaves a placeholder.** The content goes; evidence that
+something was there and was removed stays. A conversation where messages can
+silently cease to have existed is one nobody can trust, and quoting somebody who
+can then make the original disappear is the specific problem this avoids.
+
+### What you can do to a message
+
+- **React** to it with an emoji, from the picker. The picker is searchable, and
+  carries a GIF tab as well where your operator has configured a provider —
+  sending a GIF works regardless, since it uploads like any other file.
+- **Reply in a thread**, which is what turns it into one.
+- **Pin** it, if you have the permission. Pinned messages are the channel's,
+  listed together, and pinning speaks for the channel rather than for you — so
+  it takes a permission where reading what is pinned does not.
+- **Forward** it to another conversation.
+- **Report** it, if it needs a moderator.
+- **Give it an expiry** — see below.
+
+Right-clicking a message opens these, and so does a long press on a touch
+screen. Everything in that menu is reachable another way too: a context menu is
+a shortcut, never the only route to something.
+
+### Writing now and sending later
+
+A message can be written now and sent at a chosen time — the clock in the
+composer, which offers a few presets and a picker. At least ten seconds ahead
+and at most a year. Whether this is available at all is one of the capabilities
+your operator can switch off.
+
+Reviewing and cancelling what you have scheduled is in the server and the API
+but has no control in either client yet, so a scheduled message currently cannot
+be called back.
+
+### Keeping a conversation to hand
+
+Pinning conversations to the top of your own list — a private bookmark rather
+than an announcement — is built on the server but has no control in either
+client yet. Pinning a _message_ is the other thing entirely, that one speaks for
+the channel, and it works.
+
+### Messages that expire
+
+You can put a lifetime on a single message, in a conversation that otherwise
+keeps everything. Three ways to reckon it:
+
+- **A fixed time from sending** — it goes after that period whether or not
+  anybody read it.
+- **Once everybody has seen it** — it goes as soon as every other participant
+  has read it.
+- **A period after each person first sees it** — everybody gets the same window
+  from their own first reading, and it goes when the last of those runs out.
+
+Only the person who sent a message may set this, or a moderator. And a lifetime
+can be **shortened but never extended**. Somebody who sent something meaning it
+to disappear in an hour should not find that it now lasts a week.
+
+When an expiring message goes, its attachments go with it.
+
+### Links
+
+Message text is plain text. Links, addresses and phone numbers in it are
+detected and made clickable; there is no Markdown or other formatting in a
+message body today. Nothing you can type into a message becomes markup, which is
+what makes that safe: the text is escaped in full and links are inserted only
+around what the application matched itself.
+
+Markdown is rendered for text files somebody attaches, where a README arrives
+looking like a README rather than like its source.
+
+A link posted in a conversation may be shown with a preview of what it points
+at. That depends on two things: whether your operator has link previews on at
+all, and whether you want them — there is a setting of your own. With either
+off, the server makes no outbound request for your links.
+
+## Files
+
+Files are uploaded to the conversation and then sent with a message, which is
+why a refused upload costs you nothing but the upload and a message that fails
+to send does not lose the file.
+
+While a file is uploading you see real progress — the actual transfer, not an
+animation — and you can cancel it, or retry without choosing the file again. The
+conversation stays usable throughout.
+
+The server enforces its own size and type limits regardless of what the client
+checked, and a refusal names the limit you exceeded rather than failing vaguely.
+A file's type is determined from its contents rather than from its name or what
+the uploader claimed, and everything is served in a way that cannot execute in
+the application.
+
+**Images are reduced before sending by default**, and you can choose to send the
+original instead. The application says which it is sending, and tells you if the
+original is too large for the server's limit.
+
+Each file can carry its own caption, so several sent together can each say
+something different.
+
+Images, animated images, video, audio and PDFs open in a viewer over the
+conversation, with the keyboard to dismiss it and to move between the files on
+one message. A type that cannot be displayed still shows its name, size and type
+with a download.
+
+### Sensitive media
+
+Anybody can mark their own upload as sensitive, and a moderator can mark
+anybody's. Marked media is covered until the viewer chooses to see it. Whether
+covering happens at all is the operator's policy rather than each client's, so
+that the same server behaves the same way in every client.
+
+## Knowing what happened
+
+### Presence and status
+
+Whether somebody is around is derived from whether they are connected, so it is
+right without anybody maintaining it. There are two states, **online** and
+**offline** — a connection that drops without saying goodbye reads as offline
+within a couple of minutes rather than leaving somebody apparently present for
+ever.
+
+Separately from that, you can set a status: **Available**, **Busy**, **Away** or
+**Appear offline**. Busy and Appear offline withhold notifications. These four
+are seeded when a server is created and there is no interface for changing the
+list, so in practice they are what every server has.
+
+The server supports giving a status an expiry so that it reverts by itself, and
+supports appearing offline while connected, but neither has a control in the
+clients yet.
+
+### Typing indicators
+
+You see who is composing, and the indicator disappears by itself when it stops
+being refreshed rather than sticking around after somebody wandered off
+mid-sentence.
+
+The server honours a per-person preference not to send yours, and respects it
+wherever it is set — but there is no control for it in either client yet, so in
+practice everybody sends one today.
+
+### Unread state
+
+Unread state is kept on your account rather than in each browser, so it converges
+across every device you are signed in on. Reading something on your phone clears
+it on your laptop, and a device that was offline catches up when it reconnects.
+
+Convergence happens when the other device next asks rather than being pushed
+along the live connection, so the second device catches up within moments rather
+than instantaneously.
+
+### Notifications
+
+You are notified about direct messages and mentions of you, about reactions,
+replies and forwards of your messages, and about a message being pinned or
+somebody joining. A reply notifies whoever started the thread. Never your own
+actions.
+
+Some things happen without being asked for, because they are what make
+notifications bearable:
+
+- Nothing is raised for the conversation you are currently looking at.
+- A notification is withdrawn when you read the thing elsewhere.
+- A burst of messages arrives as one batched notification rather than one each.
+- A status that suppresses notifications suppresses them.
+
+Notifications also reach you with the browser closed, where your operator has
+configured that. **You can choose to hide the content** in those, so a push for
+a private conversation says that something arrived without saying what. That
+switch is in your settings, and it fails closed — a push it cannot be sure about
+conceals the sender rather than guessing.
+
+Muting a single conversation is in the server and the API but has no control in
+either client yet, and it is a plain on or off rather than a duration. Following
+a thread you were not part of is not implemented.
+
+### Search
+
+One box searches messages, channels and people together, rather than making you
+choose first and search three times.
+
+Results are ordered by recency with the matching part highlighted. Typing
+partial words works — searching for the beginning of a word finds it.
+
+**Search never returns anything you cannot otherwise read.** Messages from
+channels you are not in do not appear, and a channel you could not discover is
+not returned.
+
+There is no search syntax to learn, and none to remember. There is no `from:`,
+no `in:`, no date filter — type what you are looking for. Whatever you type is
+treated as words to find rather than as a query language, so nothing you can
+write produces an error.
+
+## Invitations
+
+Inviting somebody to a channel takes a permission, and being a member of that
+channel is not enough on its own — an invitation admits somebody to a
+conversation, and that is treated as the channel's decision rather than any
+member's. The permission is granted at server level, so on most servers this is
+something moderators and administrators do.
+
+An invitation is a link, a short code, or both. The code is opt-in, and exists
+for reading aloud.
+
+Every invitation can carry an expiry, a limit on how many times it may be used,
+and a binding to one person so that forwarding it achieves nothing.
+
+Revoking one takes effect immediately. Somebody already holding the link cannot
+be un-sent it, so the only withdrawal that means anything is the server refusing
+to honour it.
+
+A channel invitation admits somebody to that channel and nothing else.
+
+Pasting an invitation link somewhere that renders previews shows an invitation
+to the server and never names the channel — an invitation posted into a group
+chat is previewed for everybody in it, not only the person being invited. It
+also previews identically whether it is valid, revoked or invented, so nobody
+can test invitations by pasting them.
+
+## When something is wrong
+
+### Blocking
+
+Blocking somebody is a personal boundary rather than an exercise of authority,
+so it needs no permission and **the person blocked is never told**. Moderators
+keep their full view, because a moderation problem that can be hidden from
+moderators is not one anybody can deal with.
+
+### Reporting
+
+Anybody signed in can file a report, including about something they saw in a
+channel they have since left. **The person reported never learns who reported
+them.** Reports are rate limited, for the obvious reason.
+
+### What moderators can do
+
+Remove a message. Remove a channel. Suspend an account, which invalidates its
+sessions immediately. Restrict somebody from posting, temporarily or
+permanently. Ban somebody from one channel, which is confined to that channel
+and leaves their other memberships alone.
+
+Everything on that list is recorded in the audit log, with its reason and its
+duration, and everything on it is reversible. Temporary restrictions expire by
+themselves rather than needing somebody to remember.
+
+Your operator may also have a word filter configured, which can flag a message
+for a human, mask the word, or block the message outright. It is off unless
+somebody set it up.
+
+## Making it yours
+
+### Appearance
+
+Light or dark, following your system by default. Two colour palettes ship,
+offered as **Cool** and **Warm**, and the accent colour is yours to choose
+independently of the palette — pick a colour and the application derives a
+readable shade for light and for dark rather than accepting or refusing what you
+picked. A colour that cannot be made readable is refused.
+
+**Your choice is stored on your account**, so it follows you to another browser
+or to the desktop client rather than living in one browser's storage. Your
+operator sets the server's default, and clearing your own choice returns you to
+it.
+
+### Language
+
+English and Kiswahili translations ship, and your operator sets the server's
+default. The interface does not yet read from them, though — the text on screen
+is English whichever you choose. The translations are written and waiting on the
+components being wired to them.
+
+### The keyboard
+
+| Keys              | What it does                                 |
+| ----------------- | -------------------------------------------- |
+| `Ctrl K`          | Search messages, channels and people         |
+| `?`               | Show the shortcut list                       |
+| `Ctrl Shift K`    | Switch channel                               |
+| `Alt ↑` / `Alt ↓` | Previous and next channel                    |
+| `C`               | Write a message                              |
+| `T`               | Open the thread on the last message          |
+| `Esc`             | Close what is open, or leave the message box |
+
+On a Mac, `Ctrl` here is the command key.
+
+The unmodified shortcuts do nothing while you are typing — a shortcut that stole
+a letter mid-sentence would cost more trust than every shortcut is worth.
+Shortcuts carrying a modifier work anywhere, because nobody types `Ctrl K` into
+a sentence.
+
+The list under `?` is generated from what the application actually binds, so it
+cannot drift from the real behaviour.
+
+### Getting started
+
+A short guided tour introduces the conversation view. It is skippable, and
+resumable if you leave it half-way — somebody interrupted at step four has
+already read the first three. A tour you have finished or deliberately skipped
+is not offered again, and that is remembered on your account, so the
+introduction you saw on the web client is not shown to you again on the desktop
+one. One tour exists today.
+
+## On a phone
+
+The web application installs to a home screen and behaves as an app: its own
+icon, no browser furniture, notifications with the browser closed.
+
+It tolerates being offline. A message you compose with no connection is queued
+and sent when one returns — or reported as failed, rather than silently
+vanishing — and the queue survives the tab being closed, because a message
+written on a train is still a message somebody wrote.
+
+Be clear about what "offline" covers, though. A conversation already open stays
+readable when the connection drops, and attachments you have seen are cached.
+Reloading while offline does not bring the history back: messages are fetched
+from the server rather than kept in the browser, so a cold start with no
+connection gets you the application and no conversations.
+
+Swiping does the obvious things: swipe a message to reply, swipe between
+channels, pull to refresh. Every one of those is reachable another way, because
+a gesture nobody discovers is not a feature.
+
+Nothing is pointer-only. Every action that appears on hover is reachable by
+touch, and the whole application works at phone width without sideways
+scrolling.
+
+## On the desktop
+
+The desktop client is optional. On a phone or tablet the installed web app is
+the one to use; the desktop client exists for what a browser will not do.
+
+**It is installed once and pointed at a server**, because TDC is self-hosted and
+the application cannot know which server is yours. You can add more than one —
+your community's and your employer's — and each keeps its own session, so
+switching is picking a different one rather than signing in again. Removing a
+server takes its session with it.
+
+A server reached over plain HTTP must be on your own machine. Everything you
+send travels over that connection, and on a network somebody else can see, plain
+HTTP hands all of it to anybody on the same wire. Typing a bare hostname gets
+`https://`; an address written explicitly as `http://` is never silently
+upgraded, because quietly changing what somebody asked for is how people end up
+trusting the wrong thing.
+
+What the desktop client adds:
+
+- **Notifications from the operating system**, which respect system quiet modes
+  and open the conversation they are about when you activate them.
+- **Your session in the OS keychain**, so you are not asked for a password every
+  launch. Where there is no keychain it says so and asks each time. It never
+  falls back to storing anything in plain text.
+- **A tray icon** carrying the unread count, with the few things you want
+  without opening the window: show or hide it, mute for fifteen minutes, an
+  hour, or until tomorrow, jump to a recent conversation, add a server or a
+  channel, or quit. Whether closing the window quits or hides it is yours to
+  set.
+- **Launching at login**, off unless you turn it on, and your window's position
+  restored — adjusted if the display it was on has gone.
+- **Updates that verify what they downloaded** and discard anything that fails
+  the check rather than installing it.
+
+## Asking before it is too late
+
+Anything irreversible asks first, in both clients, and the question says what
+will be lost rather than only whether to continue. Deleting a message, banning
+or blocking somebody, removing a server, signing out, ending a session, quitting
+with unsent messages.
+
+The confirming button is never the one focus lands on, so a reflexive press of
+the space bar cannot destroy anything. Reversible actions do not interrupt you —
+a dialog that appears for everything is a dialog nobody reads.
+
+## What is not here yet
+
+So that nothing above is read as implying more than it says:
+
+- **Federation.** Servers do not exchange messages. Addresses name a home server
+  and every event is signed, so the groundwork exists, but your conversations
+  are with people on your own server.
+- **Voice and video calls.**
+- **Project management and the developer directory.** Both are part of what TDC
+  is for and neither is built.
+- **Signing in with another account, and passkeys.**
+- **Account recovery.** There is no password reset.
+- **Message formatting.** No bold, italic, lists or code blocks in a message.
+
+Several capabilities are finished on the server and are waiting only for a
+control in the clients. They are noted where they belong above, and collected
+here so that nobody goes looking: group direct messages, muting one
+conversation, pinning conversations to your own list, reviewing or cancelling a
+scheduled message, giving a status an expiry, appearing offline while connected,
+and turning off your own typing indicator. The translations are in the same
+position — written, and not yet read by the interface.
