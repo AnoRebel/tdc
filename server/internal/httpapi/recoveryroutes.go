@@ -222,3 +222,146 @@ func (s *Server) sweepRecovery(ctx context.Context) {
 		s.log.Warn("sweeping expired recovery tokens", "error", err)
 	}
 }
+
+/*
+confirmationPerUser bounds how often somebody may ask for a confirmation.
+
+Each one sends mail to an address they typed, which may not be theirs — so an
+unbounded form is a way to send mail through this server at anybody who can be
+named. Counted per account rather than per address, because the account is what
+is doing the asking.
+*/
+var confirmationPerUser = cache.RateLimit{
+	Attempts: 5,
+	Window:   time.Hour,
+}
+
+type confirmEmailRequest struct {
+	Email string `json:"email"`
+}
+
+/*
+handleRequestEmailConfirmation records an address and sends a link proving it.
+
+The account keeps whatever address it already had until the link is used, so
+somebody who mistypes does not lose the address that was working — which for an
+account with no other way in is the difference between a typo and a lockout.
+*/
+func (s *Server) handleRequestEmailConfirmation(c *echo.Context) error {
+	if s.recovery == nil || !s.recovery.Available() {
+		return echo.NewHTTPError(http.StatusNotFound, "this server cannot send mail")
+	}
+
+	ctx := c.Request().Context()
+	user, ok := currentUser(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "sign in first")
+	}
+
+	decision, err := s.limiter.Allow(ctx, "confirm-email:"+user.ID.String(), confirmationPerUser)
+	if err != nil {
+		return err
+	}
+	if !decision.Allowed {
+		return retryAfter(c, decision.RetryAfter)
+	}
+
+	var request confirmEmailRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	pending, err := s.recovery.StartConfirmation(ctx, user.ID, request.Email)
+	switch {
+	case errors.Is(err, recovery.ErrAddressTaken):
+		/*
+			Said out loud, unlike recovery.
+
+			The person is signed in and choosing their own address. Silence
+			would leave them waiting for a message that is never coming, and
+			what they learn — that this address is in use — they could learn by
+			trying to register with it.
+		*/
+		return echo.NewHTTPError(http.StatusConflict, "that address is already on another account")
+	case errors.Is(err, identity.ErrInvalidEmail):
+		return echo.NewHTTPError(http.StatusBadRequest, "that does not look like an email address")
+	case err != nil:
+		return err
+	}
+
+	// Nothing to send means the address is already theirs and already proved.
+	if pending.Nothing() {
+		return c.JSON(http.StatusOK, map[string]any{
+			"message": "That address is already confirmed on your account.",
+		})
+	}
+
+	s.inBackground(ctx, "confirmation mail", func(ctx context.Context) {
+		if err := s.mail.Send(ctx, pending.Message); err != nil {
+			s.log.Error("sending a confirmation message", "error", err)
+		}
+	})
+
+	return c.JSON(http.StatusAccepted, map[string]any{
+		"message": "Check that address for a link. Your account keeps its current address until you use it.",
+	})
+}
+
+type redeemConfirmationRequest struct {
+	Token string `json:"token"`
+}
+
+/*
+handleConfirmEmail spends a link and puts the address in place.
+
+Unauthenticated, because the link arrives in a mail client that may not be on
+the machine that asked — and the token is what proves the address, which is the
+only thing being proved here.
+*/
+func (s *Server) handleConfirmEmail(c *echo.Context) error {
+	if s.recovery == nil || !s.recovery.Available() {
+		return echo.NewHTTPError(http.StatusNotFound, "this server cannot send mail")
+	}
+
+	ctx := c.Request().Context()
+
+	var request redeemConfirmationRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	user, err := s.recovery.Confirm(ctx, request.Token)
+	switch {
+	case errors.Is(err, recovery.ErrTokenInvalid):
+		return echo.NewHTTPError(http.StatusNotFound, "that link has been used already, or has expired")
+	case errors.Is(err, recovery.ErrAddressTaken):
+		// Somebody else proved it in the meantime.
+		return echo.NewHTTPError(http.StatusConflict, "that address is now on another account")
+	case err != nil:
+		return err
+	}
+
+	if err := s.audit.Record(ctx, audit.Entry{
+		ActorID:    &user.ID,
+		ActorLabel: user.Username,
+		Action:     audit.ActionEmailConfirmed,
+		SourceIP:   requestIP(c),
+		UserAgent:  c.Request().UserAgent(),
+	}); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"message": "That address is confirmed. Your account can now be recovered through it.",
+	})
+}
+
+// sweepConfirmations removes links nobody used.
+func (s *Server) sweepConfirmations(ctx context.Context) {
+	if s.recovery == nil {
+		return
+	}
+	if _, err := s.recovery.SweepExpiredConfirmations(ctx); err != nil {
+		s.log.Warn("sweeping expired confirmation links", "error", err)
+	}
+}

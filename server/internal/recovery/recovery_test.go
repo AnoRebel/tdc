@@ -373,3 +373,164 @@ func TestAServerWithNoMailOffersNothing(t *testing.T) {
 		t.Errorf("requesting on a server with no mail gave %v", err)
 	}
 }
+
+/*
+TestConfirmingAnAddressMakesAnAccountRecoverable.
+
+The whole point of confirmation, and the thing 10.3 could not do without it: an
+address typed into a form is a claim, and recovery refuses to mail a claim.
+*/
+func TestConfirmingAnAddressMakesAnAccountRecoverable(t *testing.T) {
+	h := newHarness(t)
+
+	user, err := h.people.CreateUser(context.Background(), identity.NewUser{
+		Username: "juma",
+		Email:    "juma@example.test",
+		Password: "correct horse battery staple",
+		// Unverified, as registration leaves it.
+	})
+	if err != nil {
+		t.Fatalf("creating the account: %v", err)
+	}
+
+	// Before confirming, recovery will not mail it.
+	if pending, _ := h.service.Request(context.Background(), "juma@example.test", netip.Addr{}); !pending.Nothing() {
+		t.Fatal("an unconfirmed address was mailed a way into the account")
+	}
+
+	pending, err := h.service.StartConfirmation(context.Background(), user.ID, "juma@example.test")
+	if err != nil {
+		t.Fatalf("starting confirmation: %v", err)
+	}
+	if pending.Nothing() {
+		t.Fatal("no confirmation message was produced")
+	}
+	if err := h.post.Send(context.Background(), pending.Message); err != nil {
+		t.Fatalf("sending: %v", err)
+	}
+
+	if _, err := h.service.Confirm(context.Background(), tokenFrom(t, h.post.delivered()[0])); err != nil {
+		t.Fatalf("confirming: %v", err)
+	}
+
+	// And now it is.
+	if pending, _ := h.service.Request(context.Background(), "juma@example.test", netip.Addr{}); pending.Nothing() {
+		t.Error("a confirmed address still cannot be recovered")
+	}
+}
+
+/*
+TestTheOldAddressSurvivesAMistypedNewOne.
+
+The reason a pending address is kept apart from the working one. Somebody with a
+recoverable account who mistypes a new address would otherwise lose the one that
+worked the moment they pressed save — and with it their only way back in, should
+they then forget the password.
+*/
+func TestTheOldAddressSurvivesAMistypedNewOne(t *testing.T) {
+	h := newHarness(t)
+	user := h.withAccount(t, "amina", "amina@example.test")
+
+	if _, err := h.service.StartConfirmation(context.Background(), user.ID, "amina@typo.test"); err != nil {
+		t.Fatalf("starting confirmation for the new address: %v", err)
+	}
+
+	// The account still has the address it had, and it still works.
+	reloaded, err := h.queries.GetUserByID(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("reloading: %v", err)
+	}
+	if reloaded.Email == nil || *reloaded.Email != "amina@example.test" {
+		t.Errorf("the account's address became %v before the new one was proved", reloaded.Email)
+	}
+	if !reloaded.EmailVerified {
+		t.Error("the account stopped being recoverable while a new address was pending")
+	}
+
+	if pending, _ := h.service.Request(context.Background(), "amina@example.test", netip.Addr{}); pending.Nothing() {
+		t.Error("the working address stopped working while a new one was pending")
+	}
+}
+
+// TestSomebodyElsesAddressIsRefusedOutLoud: unlike recovery, the person is
+// signed in and choosing their own address, and silence would leave them
+// waiting for a message that is never coming.
+func TestSomebodyElsesAddressIsRefusedOutLoud(t *testing.T) {
+	h := newHarness(t)
+	h.withAccount(t, "amina", "amina@example.test")
+	juma := h.withAccount(t, "juma", "juma@example.test")
+
+	if _, err := h.service.StartConfirmation(context.Background(), juma.ID, "amina@example.test"); !errors.Is(err, recovery.ErrAddressTaken) {
+		t.Errorf("taking another account's address gave %v, want a refusal", err)
+	}
+}
+
+/*
+TestALinkForAnAddressNoLongerWantedDoesNothing.
+
+Somebody who asks about one address, changes their mind and asks about another,
+must not have the first link complete. The account is waiting on the second.
+
+Two things refuse it and this fails only when both are removed: asking again
+invalidates the outstanding links, and the promotion is conditional on the
+address still being the one the account is waiting on. They are kept together
+because they fail for different reasons — the first is about the token, the
+second about the account — and a change that defeats one is unlikely to defeat
+the other.
+*/
+func TestALinkForAnAddressNoLongerWantedDoesNothing(t *testing.T) {
+	h := newHarness(t)
+	user := h.withAccount(t, "amina", "amina@example.test")
+
+	first, err := h.service.StartConfirmation(context.Background(), user.ID, "amina@first.test")
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	if err := h.post.Send(context.Background(), first.Message); err != nil {
+		t.Fatalf("sending: %v", err)
+	}
+	firstToken := tokenFrom(t, h.post.delivered()[0])
+
+	if _, err := h.service.StartConfirmation(context.Background(), user.ID, "amina@second.test"); err != nil {
+		t.Fatalf("second: %v", err)
+	}
+
+	if _, err := h.service.Confirm(context.Background(), firstToken); !errors.Is(err, recovery.ErrTokenInvalid) {
+		t.Errorf("the abandoned link still worked: %v", err)
+	}
+
+	// And the account has neither yet: it is waiting on the second.
+	reloaded, _ := h.queries.GetUserByID(context.Background(), user.ID)
+	if reloaded.Email != nil && *reloaded.Email == "amina@first.test" {
+		t.Error("the abandoned address was put in place")
+	}
+}
+
+// TestAConfirmationIsGoodOnce, like every other token here.
+func TestAConfirmationIsGoodOnce(t *testing.T) {
+	h := newHarness(t)
+
+	user, err := h.people.CreateUser(context.Background(), identity.NewUser{
+		Username: "juma", Email: "juma@example.test",
+		Password: "correct horse battery staple",
+	})
+	if err != nil {
+		t.Fatalf("creating: %v", err)
+	}
+
+	pending, err := h.service.StartConfirmation(context.Background(), user.ID, "juma@example.test")
+	if err != nil {
+		t.Fatalf("starting: %v", err)
+	}
+	if err := h.post.Send(context.Background(), pending.Message); err != nil {
+		t.Fatalf("sending: %v", err)
+	}
+	token := tokenFrom(t, h.post.delivered()[0])
+
+	if _, err := h.service.Confirm(context.Background(), token); err != nil {
+		t.Fatalf("confirming: %v", err)
+	}
+	if _, err := h.service.Confirm(context.Background(), token); !errors.Is(err, recovery.ErrTokenInvalid) {
+		t.Errorf("reusing a confirmation gave %v, want a refusal", err)
+	}
+}

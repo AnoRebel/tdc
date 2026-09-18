@@ -45,6 +45,7 @@ type Querier interface {
 	// Collected once: the row is deleted as it is read, so a handle presented twice
 	// yields nothing the second time.
 	CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error)
+	ConfirmEmail(ctx context.Context, arg ConfirmEmailParams) (User, error)
 	// Confirming enrolment: the person proved their app holds the secret. The
 	// period is recorded at the same moment, so the code that confirmed it cannot
 	// then be replayed to sign in.
@@ -101,6 +102,7 @@ type Querier interface {
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
+	CreateEmailConfirmation(ctx context.Context, arg CreateEmailConfirmationParams) (EmailConfirmation, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
 	// Raises a notification, once.
 	//
@@ -124,6 +126,7 @@ type Querier interface {
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
+	DeleteExpiredEmailConfirmations(ctx context.Context) (int64, error)
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
 	DeleteExpiredOAuthOutcomes(ctx context.Context) (int64, error)
@@ -240,6 +243,9 @@ type Querier interface {
 	HasConfirmedSecondFactor(ctx context.Context, userID uuid.UUID) (bool, error)
 	HasUsedInvitation(ctx context.Context, arg HasUsedInvitationParams) (bool, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
+	// Issuing a new one invalidates the old, so somebody who asks twice is not left
+	// holding two working links.
+	InvalidateEmailConfirmations(ctx context.Context, userID uuid.UUID) (int64, error)
 	InvalidateRecoveryTokens(ctx context.Context, userID uuid.UUID) (int64, error)
 	// Asked before joining and before posting.
 	//
@@ -509,6 +515,9 @@ type Querier interface {
 	// expires_at is supplied by the caller for 'after_sending', which knows it at
 	// once, and left null for the seen-based kinds until reading decides it.
 	SetMessageLifetime(ctx context.Context, arg SetMessageLifetimeParams) (MessageLifetime, error)
+	// Recording an address somebody has asked to prove, which does not touch the
+	// one they already have.
+	SetPendingEmail(ctx context.Context, arg SetPendingEmailParams) error
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.
@@ -524,6 +533,7 @@ type Querier interface {
 	// conversation share a room by definition, which would make 'shared' mean
 	// 'anyone who has ever written to me'.
 	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
+	SpendEmailConfirmation(ctx context.Context, tokenHash []byte) (EmailConfirmation, error)
 	SpendRecoveryCode(ctx context.Context, arg SpendRecoveryCodeParams) (Credential, error)
 	SpendRecoveryToken(ctx context.Context, tokenHash []byte) (RecoveryToken, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)

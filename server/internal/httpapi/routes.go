@@ -83,6 +83,15 @@ func (s *Server) routes() {
 	s.echo.GET("/api/auth/recover", s.handleCheckRecovery)
 	s.echo.POST("/api/auth/recover/redeem", s.handleRedeemRecovery)
 
+	/*
+		Proving an address, which is what makes recovery reach anybody.
+
+		The link is unauthenticated because it arrives in a mail client that may
+		not be on the machine that asked — and the token is what proves the
+		address, which is all that is being proved.
+	*/
+	s.echo.POST("/api/auth/confirm-email", s.handleConfirmEmail)
+
 	s.echo.POST("/api/auth/passkey/signin/begin", s.handleBeginPasskeySignIn)
 	s.echo.POST("/api/auth/passkey/signin/finish", s.handleFinishPasskeySignIn)
 
@@ -121,6 +130,9 @@ func (s *Server) routes() {
 	me := s.echo.Group("/api/me", requireAuthentication)
 	me.GET("", s.handleCurrentUser)
 	me.GET("/permissions", s.handleCurrentPermissions)
+	// Adding or changing the address the account can be recovered through. The
+	// account keeps its current one until the link is used.
+	me.POST("/email", s.handleRequestEmailConfirmation)
 	me.GET("/sessions", s.handleListSessions)
 	me.DELETE("/sessions/:id", s.handleRevokeSession)
 

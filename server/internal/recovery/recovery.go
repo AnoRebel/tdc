@@ -58,8 +58,17 @@ in. The specification asks for time-limited; this is what that means here.
 */
 const tokenLifetime = time.Hour
 
-// Store is the database surface this package needs.
+/*
+Store is the database surface this package needs.
+
+Both halves of it: the recovery tokens, and the confirmations that make recovery
+reach anybody at all. One interface because they are one service — the same mail,
+the same token shape, and an address that is confirmed is the thing recovery
+depends on.
+*/
 type Store interface {
+	ConfirmationStore
+
 	CreateRecoveryToken(ctx context.Context, arg dbgen.CreateRecoveryTokenParams) (dbgen.RecoveryToken, error)
 	InvalidateRecoveryTokens(ctx context.Context, userID uuid.UUID) (int64, error)
 	GetRecoveryToken(ctx context.Context, tokenHash []byte) (dbgen.RecoveryToken, error)

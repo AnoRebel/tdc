@@ -17,6 +17,15 @@ const (
 // ErrInvalidUsername reports a username that cannot be accepted.
 var ErrInvalidUsername = errors.New("invalid username")
 
+/*
+ErrInvalidEmail reports an address that cannot be accepted.
+
+Wrapped by every refusal below, so a caller can tell "they typed it wrong" —
+which is worth saying to somebody's face — from a database failure, which is
+not.
+*/
+var ErrInvalidEmail = errors.New("invalid email address")
+
 // reservedUsernames cannot be registered.
 //
 // These would either impersonate the server itself or collide with routes and
@@ -101,16 +110,16 @@ func ValidateEmail(email string) error {
 
 	at := strings.LastIndex(trimmed, "@")
 	if at <= 0 || at == len(trimmed)-1 {
-		return errors.New("email address must contain a local part and a domain")
+		return fmt.Errorf("%w: it needs a local part and a domain", ErrInvalidEmail)
 	}
 	if strings.ContainsAny(trimmed, " \t\r\n") {
-		return errors.New("email address must not contain whitespace")
+		return fmt.Errorf("%w: it must not contain spaces", ErrInvalidEmail)
 	}
 	if !strings.Contains(trimmed[at+1:], ".") {
-		return errors.New("email domain must contain a dot")
+		return fmt.Errorf("%w: the domain needs a dot in it", ErrInvalidEmail)
 	}
 	if len(trimmed) > 254 {
-		return errors.New("email address is too long")
+		return fmt.Errorf("%w: it is too long", ErrInvalidEmail)
 	}
 
 	return nil

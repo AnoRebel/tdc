@@ -76,6 +76,16 @@ type Credential struct {
 	ConfirmedAt           *time.Time
 }
 
+type EmailConfirmation struct {
+	ID        uuid.UUID
+	TokenHash []byte
+	UserID    uuid.UUID
+	Address   string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+}
+
 type Event struct {
 	ID            string
 	RoomID        uuid.UUID
@@ -407,6 +417,7 @@ type User struct {
 	AppearanceAccent      string
 	TourProgress          []byte
 	WebauthnHandle        []byte
+	PendingEmail          *string
 }
 
 type UserBlock struct {

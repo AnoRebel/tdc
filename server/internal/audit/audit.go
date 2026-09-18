@@ -46,6 +46,14 @@ const (
 	*/
 	ActionRecoveryRequested Action = "auth.recovery.requested"
 
+	/*
+		An address was proved to belong to the account claiming it.
+
+		Recorded because it is what makes that account recoverable: afterwards,
+		somebody holding that mailbox can set its password.
+	*/
+	ActionEmailConfirmed Action = "auth.email.confirmed"
+
 	ActionCredentialAdded   Action = "auth.credential.added"
 	ActionCredentialRemoved Action = "auth.credential.removed"
 	ActionRateLimited       Action = "auth.rate_limited"
