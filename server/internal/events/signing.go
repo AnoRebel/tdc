@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -57,6 +58,98 @@ func KeyPairFromSeed(id string, seed []byte) (*KeyPair, error) {
 		private:   private,
 		CreatedAt: time.Now(),
 	}, nil
+}
+
+/*
+PublishedKey is a key as another server receives it.
+
+Public half only, which is the point: a peer needs enough to check a signature
+and nothing that would let it make one. What a server publishes about itself is
+exactly this, and nothing here is secret.
+*/
+type PublishedKey struct {
+	ID string `json:"id"`
+	// PublicKey is base64url, as PublicKeyBase64 produces it.
+	PublicKey string `json:"publicKey"`
+	// Retired marks a key that no longer signs but still verifies what it
+	// signed. A peer must keep accepting those or history stops verifying.
+	Retired bool `json:"retired,omitempty"`
+}
+
+/*
+VerifyOnlyKey builds a key that can check a signature and cannot make one.
+
+What a server does with somebody else's published key. The private half is
+absent rather than zeroed, so signing with it is impossible rather than
+unwise — there is nothing to sign with.
+*/
+func VerifyOnlyKey(published PublishedKey) (*KeyPair, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(published.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("decode the published key %q: %w", published.ID, err)
+	}
+	if len(raw) != ed25519.PublicKeySize {
+		return nil, fmt.Errorf("the published key %q is %d bytes, expected %d",
+			published.ID, len(raw), ed25519.PublicKeySize)
+	}
+
+	key := &KeyPair{
+		ID:        published.ID,
+		Public:    ed25519.PublicKey(raw),
+		CreatedAt: time.Now(),
+	}
+	if published.Retired {
+		retired := time.Now()
+		key.RetiredAt = &retired
+	}
+	return key, nil
+}
+
+/*
+KeyringFromPublished builds a keyring that can verify another server's events
+and sign nothing.
+
+This is the whole of what federation asks for on the receiving side: given a
+peer's published keys and an event, decide whether the peer really signed it —
+without a connection to that peer, a shared secret, or anything in its database.
+*/
+func KeyringFromPublished(published []PublishedKey) (*Keyring, error) {
+	ring := &Keyring{keys: make(map[string]*KeyPair, len(published))}
+
+	for _, entry := range published {
+		key, err := VerifyOnlyKey(entry)
+		if err != nil {
+			return nil, err
+		}
+		ring.keys[key.ID] = key
+	}
+
+	if len(ring.keys) == 0 {
+		return nil, errors.New("no published keys, so nothing could be verified")
+	}
+	return ring, nil
+}
+
+/*
+Published is what this server tells its peers about its keys.
+
+Every key, retired ones included: a peer that dropped a retired key would stop
+being able to verify everything that key ever signed, which is history becoming
+unverifiable because of a rotation.
+*/
+func (r *Keyring) Published() []PublishedKey {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	published := make([]PublishedKey, 0, len(r.keys))
+	for _, key := range r.keys {
+		published = append(published, PublishedKey{
+			ID:        key.ID,
+			PublicKey: key.PublicKeyBase64(),
+			Retired:   key.Retired(),
+		})
+	}
+	return published
 }
 
 // Seed returns the private seed, for storage. It is a secret: anything holding
@@ -150,7 +243,7 @@ func (r *Keyring) Sign(event *Event) error {
 		return err
 	}
 
-	canonical, err := event.canonical()
+	canonical, err := event.canonicalForID()
 	if err != nil {
 		return err
 	}
@@ -176,6 +269,25 @@ func (r *Keyring) Verify(event Event) error {
 		return fmt.Errorf("%w: event is not signed", ErrSignatureInvalid)
 	}
 
+	/*
+		Content that is present must match the digest that is recorded.
+
+		Verification is otherwise over the digest, which is what makes it
+		survive the database normalising the content and the content being
+		removed. The cost is that the content itself would no longer be
+		checked — so somebody editing the stored content would change what
+		people read while the event still verified, which is precisely the
+		tampering the log exists to detect.
+
+		A redacted event is exempt: its content is gone, and the whole point is
+		that it still verifies without it.
+	*/
+	if !event.Redacted() && event.ContentHash != "" {
+		if HashContent(event.Content) != event.ContentHash {
+			return fmt.Errorf("%w: content does not match its recorded digest", ErrSignatureInvalid)
+		}
+	}
+
 	expectedID, err := event.DeriveID()
 	if err != nil {
 		return err
@@ -196,7 +308,7 @@ func (r *Keyring) Verify(event Event) error {
 		return fmt.Errorf("%w: signature is not valid base64", ErrSignatureInvalid)
 	}
 
-	canonical, err := event.canonical()
+	canonical, err := event.canonicalForID()
 	if err != nil {
 		return err
 	}

@@ -8,12 +8,19 @@ VALUES ($1, 2)
 ON CONFLICT (room_id) DO UPDATE SET next_seq = room_sequences.next_seq + 1
 RETURNING (next_seq - 1)::bigint;
 
+/*
+Appending an event, with the digest of the content exactly as it was signed.
+
+content_hash is passed in rather than computed here, because what was signed is
+the bytes the signing code produced — and jsonb normalises what it stores, so a
+digest computed from the column would be of something nobody signed.
+*/
 -- name: AppendEvent :one
 INSERT INTO events (
     id, room_id, sequence, sender_id, sender_address, room_address,
-    origin_server, type, content, created_at, nonce, signature, key_id
+    origin_server, type, content, content_hash, created_at, nonce, signature, key_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: GetEventByID :one
@@ -40,9 +47,16 @@ SELECT COALESCE(MAX(sequence), 0)::bigint FROM events WHERE room_id = $1;
 -- gap and telling the client to resynchronise.
 SELECT COUNT(*) FROM events WHERE room_id = $1 AND sequence > $2;
 
+/*
+Removing content while leaving the event in place.
+
+Ordering is untouched — the row, its sequence and its neighbours stay where they
+are — and the event stays verifiable, because content_hash was recorded when the
+event was written and is deliberately not touched here. That digest is what the
+identifier and signature were computed over, so an event with its content
+removed still reproduces both.
+*/
 -- name: RedactEvent :exec
--- Removes content while leaving the event in place, so ordering and the
--- surrounding events stay verifiable.
 UPDATE events
 SET content = '{}'::jsonb, redacted_at = NOW(), redacted_by = $2
 WHERE id = $1 AND redacted_at IS NULL;

@@ -84,6 +84,26 @@ type Event struct {
 	// KeyID names which of the origin's keys signed this, so a key can be
 	// rotated without invalidating history.
 	KeyID string `json:"keyId,omitempty"`
+
+	/*
+		ContentHash is what the content was, for an event whose content is gone.
+
+		Empty on an ordinary event, where the content is present and the
+		identifier is derived from it directly. Set when an event is redacted,
+		and it is what keeps a redacted event verifiable: the identifier and the
+		signature were computed over content that no longer exists, so without
+		this they could never be reproduced and the event would read as tampered
+		with rather than as deliberately emptied.
+
+		A hash rather than the content, obviously. It discloses nothing about
+		what was said — recovering the body from it means guessing the body —
+		while still proving that whatever was signed hashed to this.
+
+		Not part of the canonical form. It describes the content rather than
+		being content, and including it would change the identifier of every
+		event that has one.
+	*/
+	ContentHash string `json:"contentHash,omitempty"`
 }
 
 // Errors callers are expected to handle.
@@ -93,32 +113,45 @@ var (
 	ErrUnknownKey       = errors.New("event was signed by an unknown key")
 )
 
-// canonical returns the bytes that are signed and hashed.
-//
-// Identifier and signature are excluded: the identifier is derived from this
-// form, and the signature is over it. Sequence is excluded too, because it is
-// assigned by the home server when the event is accepted, and an event's
-// identity must not change at that moment.
-//
-// Go's encoding/json sorts map keys and emits struct fields in declaration
-// order, so this is deterministic for a given struct definition.
-func (e Event) canonical() ([]byte, error) {
+/*
+canonicalForID is what the identifier and the signature are computed over.
+
+The content appears as its own digest rather than in full, which is the whole
+mechanism by which a redacted event stays verifiable: an event that still has
+its content hashes it here, and one whose content has been removed uses the
+digest recorded when it was removed. Both reach the same bytes, so both derive
+the same identifier and check against the same signature.
+
+The alternative — signing the content directly — means a redacted event can
+never reproduce what was signed, so a deliberate redaction is indistinguishable
+from tampering. That is the distinction the log exists to keep.
+*/
+func (e Event) canonicalForID() ([]byte, error) {
+	hash := e.ContentHash
+	if hash == "" {
+		hash = HashContent(e.Content)
+	}
+	return e.canonicalWithHash(hash)
+}
+
+// canonicalWithHash is the canonical form with a given content digest in it.
+func (e Event) canonicalWithHash(contentHash string) ([]byte, error) {
 	form := struct {
-		Room      string          `json:"room"`
-		Sender    string          `json:"sender"`
-		Origin    string          `json:"origin"`
-		Type      Type            `json:"type"`
-		CreatedAt int64           `json:"createdAt"`
-		Nonce     string          `json:"nonce"`
-		Content   json.RawMessage `json:"content"`
+		Room        string `json:"room"`
+		Sender      string `json:"sender"`
+		Origin      string `json:"origin"`
+		Type        Type   `json:"type"`
+		CreatedAt   int64  `json:"createdAt"`
+		Nonce       string `json:"nonce"`
+		ContentHash string `json:"contentHash"`
 	}{
-		Room:      e.Room,
-		Sender:    e.Sender,
-		Origin:    e.Origin,
-		Type:      e.Type,
-		CreatedAt: e.CreatedAt,
-		Nonce:     e.Nonce,
-		Content:   e.Content,
+		Room:        e.Room,
+		Sender:      e.Sender,
+		Origin:      e.Origin,
+		Type:        e.Type,
+		CreatedAt:   e.CreatedAt,
+		Nonce:       e.Nonce,
+		ContentHash: contentHash,
 	}
 
 	encoded, err := json.Marshal(form)
@@ -128,6 +161,59 @@ func (e Event) canonical() ([]byte, error) {
 	return encoded, nil
 }
 
+/*
+HashContent is the digest of an event's content.
+
+Over a canonical form of the JSON — keys sorted, no insignificant whitespace —
+rather than the bytes as they happen to be written. That matters because the
+content makes a round trip through Postgres's jsonb, which reorders keys and
+respaces: the bytes that come back are not the bytes that went in, and hashing
+them directly would mean no stored event ever matched its own signature.
+
+Canonicalising means the digest is a property of what the content *says* rather
+than how it was typed, so it survives the database, and a redacted event's
+recorded digest is the same value its content would still produce.
+*/
+func HashContent(content json.RawMessage) string {
+	sum := sha256.Sum256(canonicalJSON(content))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+/*
+canonicalJSON reduces JSON to one form per value.
+
+Go's encoding/json sorts map keys when it marshals a map, so decoding into
+interface{} and re-encoding produces sorted keys and minimal whitespace — which
+is exactly the canonicalisation wanted, without hand-written traversal.
+
+Content that will not parse is hashed as it stands. It cannot have come from
+this server, and refusing to hash it would turn a malformed event into an error
+in a place that has no way to report one; verification will reject it anyway.
+*/
+func canonicalJSON(content json.RawMessage) []byte {
+	var value any
+	if err := json.Unmarshal(content, &value); err != nil {
+		return content
+	}
+
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return content
+	}
+	return encoded
+}
+
+/*
+Redacted says whether this event's content has been removed.
+
+Decided from the content rather than from the presence of a digest: every event
+carries a digest now, so a digest says nothing about whether the content is
+still there. An empty JSON object is what redaction leaves behind.
+*/
+func (e Event) Redacted() bool {
+	return len(canonicalJSON(e.Content)) <= len("{}")
+}
+
 // DeriveID computes the content-derived identifier.
 //
 // Because it covers every signed field, two events differing in any of them
@@ -135,7 +221,16 @@ func (e Event) canonical() ([]byte, error) {
 // wrong — which is what makes tampering detectable without re-verifying every
 // signature.
 func (e Event) DeriveID() (string, error) {
-	canonical, err := e.canonical()
+	/*
+		A redacted event derives its identifier from what its content was.
+
+		The identifier and the signature were both computed over content this
+		event no longer carries. Deriving from the empty content it carries now
+		would produce a different identifier and make a deliberate redaction
+		indistinguishable from tampering — which is exactly the distinction the
+		log exists to keep.
+	*/
+	canonical, err := e.canonicalForID()
 	if err != nil {
 		return "", err
 	}

@@ -245,3 +245,12 @@ func (s *Service) RequireMembership(ctx context.Context, roomID, userID uuid.UUI
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "SQLSTATE 23505")
 }
+
+/*
+Keyring is what this server signs with, and publishes.
+
+Exposed so that verification can be done outside this package — by a federation
+peer holding only the published half, and by the tests that prove an event can
+be checked without the database it came from.
+*/
+func (s *Service) Keyring() *events.Keyring { return s.keyring }

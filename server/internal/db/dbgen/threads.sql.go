@@ -18,7 +18,7 @@ INSERT INTO events (
     thread_root_id
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id
+RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash
 `
 
 type AppendThreadedEventParams struct {
@@ -74,6 +74,7 @@ func (q *Queries) AppendThreadedEvent(ctx context.Context, arg AppendThreadedEve
 		&i.RedactedBy,
 		&i.Nonce,
 		&i.ThreadRootID,
+		&i.ContentHash,
 	)
 	return i, err
 }
@@ -270,7 +271,7 @@ func (q *Queries) ListRoomThreadSummaries(ctx context.Context, roomID uuid.UUID)
 }
 
 const listRoomTimelineExcludingReplies = `-- name: ListRoomTimelineExcludingReplies :many
-SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events
+SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash FROM events
 WHERE room_id = $1 AND thread_root_id IS NULL
 ORDER BY sequence DESC
 LIMIT $2
@@ -309,6 +310,7 @@ func (q *Queries) ListRoomTimelineExcludingReplies(ctx context.Context, arg List
 			&i.RedactedBy,
 			&i.Nonce,
 			&i.ThreadRootID,
+			&i.ContentHash,
 		); err != nil {
 			return nil, err
 		}
@@ -321,7 +323,7 @@ func (q *Queries) ListRoomTimelineExcludingReplies(ctx context.Context, arg List
 }
 
 const listThreadReplies = `-- name: ListThreadReplies :many
-SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events
+SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash FROM events
 WHERE thread_root_id = $1
 ORDER BY sequence
 `
@@ -352,6 +354,7 @@ func (q *Queries) ListThreadReplies(ctx context.Context, threadRootID *string) (
 			&i.RedactedBy,
 			&i.Nonce,
 			&i.ThreadRootID,
+			&i.ContentHash,
 		); err != nil {
 			return nil, err
 		}

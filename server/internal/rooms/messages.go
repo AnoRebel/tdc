@@ -71,10 +71,13 @@ func (s *Service) append(
 		OriginServer:  event.Origin,
 		Type:          string(event.Type),
 		Content:       content,
-		CreatedAt:     event.CreatedAt,
-		Nonce:         event.Nonce,
-		Signature:     event.Signature,
-		KeyID:         event.KeyID,
+		// The digest of what was signed, before Postgres normalises the
+		// content and makes it un-hashable back to the same value.
+		ContentHash: pointerTo(events.HashContent(content)),
+		CreatedAt:   event.CreatedAt,
+		Nonce:       event.Nonce,
+		Signature:   event.Signature,
+		KeyID:       event.KeyID,
 	})
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
@@ -340,3 +343,6 @@ func (s *Service) Event(ctx context.Context, eventID string) (dbgen.Event, error
 	}
 	return event, nil
 }
+
+// pointerTo is for the optional columns sqlc generates as pointers.
+func pointerTo[T any](value T) *T { return &value }

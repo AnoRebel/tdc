@@ -39,7 +39,7 @@ func (q *Queries) ListPinnedEventIDs(ctx context.Context, roomID uuid.UUID) ([]s
 }
 
 const listPinnedMessages = `-- name: ListPinnedMessages :many
-SELECT e.id, e.room_id, e.sequence, e.sender_id, e.sender_address, e.room_address, e.origin_server, e.type, e.content, e.created_at, e.signature, e.key_id, e.redacted_at, e.redacted_by, e.nonce, e.thread_root_id, p.pinned_by_address, p.pinned_at
+SELECT e.id, e.room_id, e.sequence, e.sender_id, e.sender_address, e.room_address, e.origin_server, e.type, e.content, e.created_at, e.signature, e.key_id, e.redacted_at, e.redacted_by, e.nonce, e.thread_root_id, e.content_hash, p.pinned_by_address, p.pinned_at
 FROM pinned_messages p
 JOIN events e ON e.id = p.event_id
 WHERE p.room_id = $1
@@ -84,6 +84,7 @@ func (q *Queries) ListPinnedMessages(ctx context.Context, roomID uuid.UUID) ([]L
 			&i.Event.RedactedBy,
 			&i.Event.Nonce,
 			&i.Event.ThreadRootID,
+			&i.Event.ContentHash,
 			&i.PinnedByAddress,
 			&i.PinnedAt,
 		); err != nil {

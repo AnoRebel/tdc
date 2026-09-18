@@ -103,6 +103,7 @@ type Event struct {
 	RedactedBy    *uuid.UUID
 	Nonce         string
 	ThreadRootID  *string
+	ContentHash   *string
 }
 
 type EventIdempotency struct {

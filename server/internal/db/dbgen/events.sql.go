@@ -13,12 +13,19 @@ import (
 )
 
 const appendEvent = `-- name: AppendEvent :one
+/*
+Appending an event, with the digest of the content exactly as it was signed.
+
+content_hash is passed in rather than computed here, because what was signed is
+the bytes the signing code produced — and jsonb normalises what it stores, so a
+digest computed from the column would be of something nobody signed.
+*/
 INSERT INTO events (
     id, room_id, sequence, sender_id, sender_address, room_address,
-    origin_server, type, content, created_at, nonce, signature, key_id
+    origin_server, type, content, content_hash, created_at, nonce, signature, key_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash
 `
 
 type AppendEventParams struct {
@@ -31,6 +38,7 @@ type AppendEventParams struct {
 	OriginServer  string
 	Type          string
 	Content       []byte
+	ContentHash   *string
 	CreatedAt     int64
 	Nonce         string
 	Signature     string
@@ -48,6 +56,7 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (Event
 		arg.OriginServer,
 		arg.Type,
 		arg.Content,
+		arg.ContentHash,
 		arg.CreatedAt,
 		arg.Nonce,
 		arg.Signature,
@@ -71,6 +80,7 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (Event
 		&i.RedactedBy,
 		&i.Nonce,
 		&i.ThreadRootID,
+		&i.ContentHash,
 	)
 	return i, err
 }
@@ -186,7 +196,7 @@ func (q *Queries) FindIdempotentSubmission(ctx context.Context, arg FindIdempote
 }
 
 const getEventByID = `-- name: GetEventByID :one
-SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events WHERE id = $1
+SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash FROM events WHERE id = $1
 `
 
 func (q *Queries) GetEventByID(ctx context.Context, id string) (Event, error) {
@@ -209,6 +219,7 @@ func (q *Queries) GetEventByID(ctx context.Context, id string) (Event, error) {
 		&i.RedactedBy,
 		&i.Nonce,
 		&i.ThreadRootID,
+		&i.ContentHash,
 	)
 	return i, err
 }
@@ -225,7 +236,7 @@ func (q *Queries) LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int
 }
 
 const listRecentRoomEvents = `-- name: ListRecentRoomEvents :many
-SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events
+SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash FROM events
 WHERE room_id = $1
 ORDER BY sequence DESC
 LIMIT $2
@@ -263,6 +274,7 @@ func (q *Queries) ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEv
 			&i.RedactedBy,
 			&i.Nonce,
 			&i.ThreadRootID,
+			&i.ContentHash,
 		); err != nil {
 			return nil, err
 		}
@@ -275,7 +287,7 @@ func (q *Queries) ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEv
 }
 
 const listRoomEvents = `-- name: ListRoomEvents :many
-SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id FROM events
+SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash FROM events
 WHERE room_id = $1 AND sequence > $2 AND sequence <= $3
 ORDER BY sequence
 `
@@ -313,6 +325,7 @@ func (q *Queries) ListRoomEvents(ctx context.Context, arg ListRoomEventsParams) 
 			&i.RedactedBy,
 			&i.Nonce,
 			&i.ThreadRootID,
+			&i.ContentHash,
 		); err != nil {
 			return nil, err
 		}
@@ -360,6 +373,15 @@ func (q *Queries) RecordIdempotentSubmission(ctx context.Context, arg RecordIdem
 }
 
 const redactEvent = `-- name: RedactEvent :exec
+/*
+Removing content while leaving the event in place.
+
+Ordering is untouched — the row, its sequence and its neighbours stay where they
+are — and the event stays verifiable, because content_hash was recorded when the
+event was written and is deliberately not touched here. That digest is what the
+identifier and signature were computed over, so an event with its content
+removed still reproduces both.
+*/
 UPDATE events
 SET content = '{}'::jsonb, redacted_at = NOW(), redacted_by = $2
 WHERE id = $1 AND redacted_at IS NULL
@@ -370,8 +392,6 @@ type RedactEventParams struct {
 	RedactedBy *uuid.UUID
 }
 
-// Removes content while leaving the event in place, so ordering and the
-// surrounding events stay verifiable.
 func (q *Queries) RedactEvent(ctx context.Context, arg RedactEventParams) error {
 	_, err := q.db.Exec(ctx, redactEvent, arg.ID, arg.RedactedBy)
 	return err

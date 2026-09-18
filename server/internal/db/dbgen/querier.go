@@ -438,8 +438,6 @@ type Querier interface {
 	RecordMessageView(ctx context.Context, arg RecordMessageViewParams) error
 	RecordPushFailure(ctx context.Context, endpoint string) error
 	RecordPushSuccess(ctx context.Context, endpoint string) error
-	// Removes content while leaving the event in place, so ordering and the
-	// surrounding events stay verifiable.
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
 	RemoveReaction(ctx context.Context, arg RemoveReactionParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
