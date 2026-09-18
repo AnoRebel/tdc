@@ -130,8 +130,15 @@ type Server struct {
 	presence     *presence.Service
 	push         *push.Service
 	hub          *realtime.Hub
-	realtime     *realtime.Server
-	config       Config
+	/*
+		How this node tells the others about an event, and hears about theirs.
+
+		Nil on a single-node server, where the connections that should see a
+		message are in the same memory as the code that stored it.
+	*/
+	broker   realtime.Broker
+	realtime *realtime.Server
+	config   Config
 
 	// shell is the built application's index.html, held in memory so social
 	// metadata can be inserted per request.
@@ -161,6 +168,9 @@ type Services struct {
 	Settings    *settings.Service
 	Invitations *invitations.Service
 	Presence    *presence.Service
+	// Broker carries events between nodes. Nil, or Alone, on a server running
+	// by itself — which is the ordinary deployment and needs nothing.
+	Broker realtime.Broker
 	// OAuth is nil, or configured with no providers, on a server whose
 	// operator has not set any up. That is the ordinary state: usernames and
 	// passwords, and nobody else involved in signing in.
@@ -222,6 +232,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		recovery:     services.Recovery,
 		queries:      dbgen.New(pool),
 		presence:     services.Presence,
+		broker:       services.Broker,
 		push:         services.Push,
 		config:       cfg,
 	}
@@ -319,6 +330,27 @@ func (s *Server) Run(ctx context.Context) error {
 	*/
 	if (s.oauth != nil && s.oauth.Enabled()) || s.passkeys.Enabled() || s.secondFactor != nil || s.recovery != nil {
 		go s.sweepCeremoniesPeriodically(ctx)
+	}
+
+	/*
+		Events from the other nodes, where there are any.
+
+		Started before listening for requests, so a node is hearing about other
+		people's messages by the time it serves its first one. The broker for a
+		single-node server blocks until shutdown and delivers nothing, which is
+		correct: there is nobody else to hear from.
+	*/
+	if s.broker != nil {
+		go func() {
+			if err := s.broker.Listen(ctx, func(announcement realtime.Announcement) {
+				s.inBackground(ctx, "announced event", func(ctx context.Context) {
+					s.deliverAnnounced(ctx, announcement)
+				})
+			}); err != nil && ctx.Err() == nil {
+				s.log.Error("stopped listening for events from other nodes",
+					slog.String("error", err.Error()))
+			}
+		}()
 	}
 
 	serveErr := make(chan error, 1)

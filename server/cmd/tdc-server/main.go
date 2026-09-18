@@ -38,6 +38,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/passkeys"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/push"
+	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/recovery"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
@@ -260,6 +261,27 @@ func run() error {
 	recoveryService := recovery.NewService(queries, mailService,
 		cfg.Server.CanonicalAddress, serverName(cfg), log)
 
+	/*
+		How this node hears about events stored by another.
+
+		Alone unless an operator says otherwise: a single-node server has
+		nothing to hear from, and a broker there would be a connection held open
+		and a round trip through the database to show somebody their own
+		message.
+
+		The multi-node broker is Postgres's own LISTEN and NOTIFY rather than a
+		queue to install — the operator this is for already runs Postgres, and
+		asking them to run and maintain a broker as well would be asking more
+		than the problem is worth.
+	*/
+	var broker realtime.Broker = realtime.Alone{}
+	if cfg.Server.MultiNode {
+		node := realtime.NodeID()
+		log.Info("expecting other nodes; events will be shared through the database",
+			"node", node)
+		broker = realtime.NewPostgresBroker(pool.Pool, node, log)
+	}
+
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
@@ -304,6 +326,7 @@ func run() error {
 		Unfurl: unfurl.NewService(sharedCache,
 			unfurl.Settings{Enabled: cfg.Attachments.LinkPreviews}, log),
 		Presence: presenceService,
+		Broker:   broker,
 		Push:     pushService,
 		Passkeys: passkeyService,
 		// Always present: optional per account rather than per server, and an

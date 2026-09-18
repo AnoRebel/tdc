@@ -143,6 +143,70 @@ func (s *Server) publishEvent(ctx context.Context, event dbgen.Event) {
 		return
 	}
 	s.hub.Publish(ctx, event.RoomID, frame)
+
+	/*
+		And every other node, where there is one.
+
+		Announced after delivering locally, so the people on this node see their
+		own conversation at once rather than after a round trip through the
+		database. On a single-node server the broker does nothing at all.
+
+		Failure is logged rather than returned, for the same reason the local
+		delivery is: the event is in the log, so anybody who misses the live
+		frame receives it on reconnection. A message must not fail to send
+		because a fanout did.
+	*/
+	if s.broker != nil {
+		if err := s.broker.Announce(ctx, realtime.Announcement{
+			EventID: event.ID,
+			RoomID:  event.RoomID.String(),
+		}); err != nil {
+			s.log.Warn("could not tell the other nodes about an event",
+				"eventId", event.ID, "error", err)
+		}
+	}
+}
+
+/*
+deliverAnnounced shows this node's connections an event another node stored.
+
+The announcement carries identifiers rather than the event, because NOTIFY
+cannot carry a long message — so the event is read from the database both nodes
+share, and rendered exactly as the node that stored it did.
+*/
+func (s *Server) deliverAnnounced(ctx context.Context, announcement realtime.Announcement) {
+	roomID, err := uuid.Parse(announcement.RoomID)
+	if err != nil {
+		s.log.Warn("an announcement named no room", "room", announcement.RoomID)
+		return
+	}
+
+	/*
+		Nothing is read unless somebody here is watching.
+
+		Every node hears every announcement, and most concern rooms this node
+		has no connection to. Checking first turns a database read per event per
+		node into a read only where there is somebody to deliver to.
+	*/
+	if s.hub == nil || !s.hub.AnyoneWatching(roomID) {
+		return
+	}
+
+	event, err := s.rooms.Event(ctx, announcement.EventID)
+	if err != nil {
+		s.log.Warn("could not read an event another node announced",
+			"eventId", announcement.EventID, "error", err)
+		return
+	}
+
+	frame, err := eventFrame(event, roomReplayer{attachments: s.attachments}.attachmentsFor(ctx, event.ID))
+	if err != nil {
+		s.log.Error("cannot render an announced event for delivery",
+			"eventId", event.ID, "error", err)
+		return
+	}
+
+	s.hub.Publish(ctx, event.RoomID, frame)
 }
 
 // attachmentsFor collects a message's attachments for a live frame.

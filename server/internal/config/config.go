@@ -320,6 +320,24 @@ type ServerConfig struct {
 	SecureCookies bool
 	// SessionLifetime is how long a session lasts without being renewed.
 	SessionLifetime time.Duration
+	/*
+		MultiNode says other processes serve this same database.
+
+		Off by default, because almost every deployment is one process and a
+		broker there costs a held connection and a round trip through the
+		database to show somebody their own message.
+
+		Switched on, a node announces every event it stores and hears about
+		every event the others store — without which somebody connected to the
+		second node sees nothing from the first until they reload, and the only
+		symptom is a conversation that appears to have stopped.
+
+		It goes with cache.address: two nodes sharing events but not rate-limit
+		counters is a server that fans out correctly and enforces half of every
+		limit.
+	*/
+	MultiNode bool
+
 	// Keepalive is how often an idle live connection is pinged. Configurable
 	// because the right interval depends on what sits between client and
 	// server, and because a phone on metered data pays for every one.

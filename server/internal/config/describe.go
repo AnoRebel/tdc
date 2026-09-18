@@ -146,6 +146,7 @@ func (c Config) Describe(path string) []Setting {
 		{"push.vapid_public", c.Push.VAPIDPublic, defaults.Push.VAPIDPublic},
 		{"push.vapid_private", c.Push.VAPIDPrivate, defaults.Push.VAPIDPrivate},
 		{"push.subject", c.Push.Subject, defaults.Push.Subject},
+		{"server.multi_node", fmt.Sprint(c.Server.MultiNode), fmt.Sprint(defaults.Server.MultiNode)},
 		{"cache.address", c.Cache.Address, defaults.Cache.Address},
 		{"cache.username", c.Cache.Username, defaults.Cache.Username},
 		{"cache.password", c.Cache.Password, defaults.Cache.Password},
@@ -219,6 +220,22 @@ func (c Config) Warnings() []string {
 		warnings = append(warnings,
 			"server.expose_internal_errors is on: internal error detail is returned to callers. Use only for local development.")
 	}
+	/*
+		Sharing events but not counters.
+
+		A warning rather than a refusal: the server works, and an operator may
+		be part way through setting the second node up. What it would do
+		silently is enforce every rate limit once per node — five sign-in
+		attempts becoming five per node — which is the kind of thing nobody
+		notices until it is being exploited.
+	*/
+	if c.Server.MultiNode && c.Cache.Address == "" {
+		warnings = append(warnings,
+			"server.multi_node is on but cache.address is not set: events will reach every node, "+
+				"and rate limits will be counted separately by each one — so a limit of five attempts "+
+				"is five per node.")
+	}
+
 	if c.Server.CanonicalAddress == "" {
 		warnings = append(warnings,
 			"server.canonical_address is not set: the server cannot state a stable address for clients or federated peers.")

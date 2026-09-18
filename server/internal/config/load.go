@@ -210,6 +210,7 @@ func Load(path string) (Config, error) {
 	cfg.Server.SecureCookies = l.boolean("server.secure_cookies", d.Server.SecureCookies)
 	cfg.Server.SessionLifetime = l.duration("server.session_lifetime", d.Server.SessionLifetime)
 	cfg.Server.Keepalive = l.duration("server.keepalive", d.Server.Keepalive)
+	cfg.Server.MultiNode = l.boolean("server.multi_node", d.Server.MultiNode)
 
 	cfg.Database.URL = l.str("database.url", d.Database.URL)
 	cfg.Database.MaxConnections = l.int32Value("database.max_connections", d.Database.MaxConnections)

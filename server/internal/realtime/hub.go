@@ -259,6 +259,26 @@ func (h *Hub) IsWatching(userID, roomID uuid.UUID) bool {
 }
 
 // Count reports how many connections are open, for diagnostics.
+/*
+AnyoneWatching says whether any connection here is subscribed to a room.
+
+Asked before reading an event another node announced. Every node hears every
+announcement and most concern rooms this node holds no connection to, so
+checking first turns a database read per event per node into a read only where
+there is somebody to deliver to.
+*/
+func (h *Hub) AnyoneWatching(roomID uuid.UUID) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for _, conn := range h.connections {
+		if conn.SubscribedTo(roomID) {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *Hub) Count() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

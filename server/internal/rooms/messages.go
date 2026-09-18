@@ -320,3 +320,23 @@ func (s *Service) EventsSince(
 
 	return missed, nil
 }
+
+/*
+Event reads one event by its identifier.
+
+For the fanout between nodes: an announcement carries an identifier rather than
+the event, because a notification cannot carry a long message, so the node that
+hears it reads the event from the database they share.
+
+No membership check, deliberately. The caller is the hub, which decides who sees
+this by asking who is in the room and who is subscribed — the same decision it
+makes for an event stored on its own node. A check here would be a second,
+different answer to a question already answered.
+*/
+func (s *Service) Event(ctx context.Context, eventID string) (dbgen.Event, error) {
+	event, err := s.store.GetEventByID(ctx, eventID)
+	if err != nil {
+		return dbgen.Event{}, fmt.Errorf("read event: %w", err)
+	}
+	return event, nil
+}
