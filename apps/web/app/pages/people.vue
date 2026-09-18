@@ -327,6 +327,13 @@ function when(value: string): string {
       </template>
     </div>
 
+    <!-- A modal backdrop: role="dialog" with aria-modal, dismissed by
+         clicking outside it or pressing Escape. The rule wants an
+         interactive element, but a dialog is not a button — the role is
+         what tells assistive technology what this is, and the Escape
+         handler beside the click is the keyboard path it exists to
+         require. -->
+    <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -->
     <div
       v-if="suspending"
       class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"

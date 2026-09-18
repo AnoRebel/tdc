@@ -148,6 +148,9 @@ onMounted(async () => {
         Neither of these is on unless you turn it on.
       </p>
 
+      <!-- The label wraps its control, which is how HTML associates the
+           two. The rule cannot see the input inside <Checkbox>. -->
+      <!-- eslint-disable-next-line vuejs-accessibility/label-has-for -->
       <label class="mt-3 flex items-start gap-2 text-xs">
         <Checkbox
           class="mt-0.5"
@@ -160,6 +163,9 @@ onMounted(async () => {
         </span>
       </label>
 
+      <!-- The label wraps its control, which is how HTML associates the
+           two. The rule cannot see the input inside <Checkbox>. -->
+      <!-- eslint-disable-next-line vuejs-accessibility/label-has-for -->
       <label class="mt-2 flex items-start gap-2 text-xs">
         <Checkbox
           class="mt-0.5"

@@ -48,15 +48,6 @@ func currentPermissions(c *echo.Context) authz.Permissions {
 	return permissions
 }
 
-// actorLabel names the requester for the audit log, falling back to something
-// meaningful when the request is unauthenticated.
-func actorLabel(c *echo.Context) string {
-	if user, ok := currentUser(c); ok {
-		return user.Username
-	}
-	return "unauthenticated"
-}
-
 // requestIP returns the client's address.
 //
 // Echo's extractor is used because it applies the operator's configured trust

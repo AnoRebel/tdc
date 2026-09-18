@@ -342,6 +342,9 @@ const form = useForm({
           </template>
         </form.Field>
 
+        <!-- The label wraps its control, which is how HTML associates the
+             two. The rule cannot see the input inside <Checkbox>. -->
+        <!-- eslint-disable-next-line vuejs-accessibility/label-has-for -->
         <label v-if="keychain" class="flex cursor-pointer items-center gap-2">
           <Checkbox v-model="remember" />
           <span class="text-sm">Keep me signed in on this machine</span>

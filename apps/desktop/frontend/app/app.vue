@@ -117,6 +117,11 @@ const { about, showingAbout, confirmingQuit, quit } = useAppCommands();
 
   <!-- What this is, which is the first thing anybody reporting a problem is
        asked for. -->
+  <!-- A modal backdrop: role="dialog" with aria-modal, dismissed by clicking
+       outside it or pressing Escape. A dialog is not a button; the role is
+       what names it to assistive technology, and the Escape handler beside
+       the click is the keyboard path the rule exists to require. -->
+  <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -->
   <div
     v-if="showingAbout && about"
     class="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"

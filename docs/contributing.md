@@ -187,8 +187,21 @@ bun run test          # the front-end suites
 cd server
 gofmt -l .            # must print nothing
 go vet ./...
+golangci-lint run     # the linters in server/.golangci.yml
 go test ./...
 ```
+
+The Go linters are chosen by running each candidate against this codebase
+rather than by reputation, and [`server/.golangci.yml`](../server/.golangci.yml)
+says why each is there. Beyond the defaults it adds `errorlint`, which catches
+an error compared with `==` that will stop matching the day it reaches the
+comparison wrapped; `errname`, so a sentinel can be found by the name people
+look for; and `predeclared`. Two real bugs came out of enabling it.
+
+If a finding is wrong rather than inconvenient, silence that one line with a
+`//nolint:<linter> // <reason>` comment saying why, rather than widening the
+configuration — an exclusion that covers a whole file also hides the next
+finding in it.
 
 The Go tests need a Postgres. `docker compose up -d database` provides one, and
 [`.env.example`](../.env.example) carries the connection string they expect —

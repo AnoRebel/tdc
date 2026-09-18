@@ -100,7 +100,7 @@ func (c *ClamAVScanner) Scan(ctx context.Context, content io.Reader, size int64)
 	var dialer net.Dialer
 	connection, err := dialer.DialContext(ctx, "tcp", c.address)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrScannerUnavailable, err)
+		return fmt.Errorf("%w: %w", ErrScannerUnavailable, err)
 	}
 	defer connection.Close()
 
@@ -111,7 +111,7 @@ func (c *ClamAVScanner) Scan(ctx context.Context, content io.Reader, size int64)
 	}
 
 	if _, err := connection.Write([]byte("zINSTREAM\x00")); err != nil {
-		return fmt.Errorf("%w: %v", ErrScannerUnavailable, err)
+		return fmt.Errorf("%w: %w", ErrScannerUnavailable, err)
 	}
 
 	buffer := make([]byte, chunkSize)
@@ -123,10 +123,10 @@ func (c *ClamAVScanner) Scan(ctx context.Context, content io.Reader, size int64)
 				byte(read >> 24), byte(read >> 16), byte(read >> 8), byte(read),
 			}
 			if _, err := connection.Write(header); err != nil {
-				return fmt.Errorf("%w: %v", ErrScannerUnavailable, err)
+				return fmt.Errorf("%w: %w", ErrScannerUnavailable, err)
 			}
 			if _, err := connection.Write(buffer[:read]); err != nil {
-				return fmt.Errorf("%w: %v", ErrScannerUnavailable, err)
+				return fmt.Errorf("%w: %w", ErrScannerUnavailable, err)
 			}
 		}
 
@@ -140,13 +140,15 @@ func (c *ClamAVScanner) Scan(ctx context.Context, content io.Reader, size int64)
 
 	// A zero-length frame ends the stream.
 	if _, err := connection.Write([]byte{0, 0, 0, 0}); err != nil {
-		return fmt.Errorf("%w: %v", ErrScannerUnavailable, err)
+		return fmt.Errorf("%w: %w", ErrScannerUnavailable, err)
 	}
 
 	reply := make([]byte, 512)
 	read, err := connection.Read(reply)
-	if err != nil && err != io.EOF {
-		return fmt.Errorf("%w: %v", ErrScannerUnavailable, err)
+	// errors.Is rather than ==: a wrapped EOF is a complete reply, and treating
+	// it as a failure would refuse an upload the scanner actually approved.
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("%w: %w", ErrScannerUnavailable, err)
 	}
 
 	return interpretClamAVReply(string(reply[:read]))

@@ -8,6 +8,7 @@ package notify
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -412,7 +413,10 @@ func (s *Service) preferenceFor(ctx context.Context, userID, roomID uuid.UUID) P
 		dbgen.GetNotificationPreferenceParams{UserID: userID, RoomID: roomID})
 
 	if err != nil {
-		if err != pgx.ErrNoRows {
+		// errors.Is rather than ==: a wrapped ErrNoRows would otherwise be
+		// logged as a failure on every read of a preference nobody has set,
+		// which is most of them.
+		if !errors.Is(err, pgx.ErrNoRows) {
 			s.log.Debug("cannot read a notification preference", "error", err)
 		}
 		// Nothing configured: mentions only, which is the setting that annoys

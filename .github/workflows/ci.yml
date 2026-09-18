@@ -211,6 +211,16 @@ jobs:
         working-directory: server
         run: go vet ./...
 
+      # What vet does not: an error compared with == that will stop matching
+      # the day it arrives wrapped, a sentinel nobody can find because it is
+      # not named Err, a function nothing calls any more. The set is in
+      # server/.golangci.yml, chosen by running each candidate against this
+      # codebase rather than by reputation.
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: server
+
       - name: Test
         working-directory: server
         run: go test -race ./...

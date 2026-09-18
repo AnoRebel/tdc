@@ -59,6 +59,7 @@
     "@types/node": "^26.6.1",
     "eslint": "catalog:tooling",
     "eslint-plugin-vue": "catalog:tooling",
+    "eslint-plugin-vuejs-accessibility": "^2.6.0",
     "globals": "catalog:tooling",
     "lefthook": "^2.1.14",
     "prettier": "catalog:tooling",

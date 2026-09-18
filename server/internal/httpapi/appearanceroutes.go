@@ -259,9 +259,16 @@ func oklchToRGB(lightness, chroma, hueDegrees float64) rgb {
 	a := chroma * math.Cos(hue)
 	b := chroma * math.Sin(hue)
 
-	l := math.Pow(lightness+0.3963377774*a+0.2158037573*b, 3)
-	m := math.Pow(lightness-0.1055613458*a-0.0638541728*b, 3)
-	s := math.Pow(lightness-0.0894841775*a-1.291485548*b, 3)
+	// The spec cubes each of these. Written as a multiplication rather than
+	// math.Pow: for an integer exponent Pow is both slower and less exact, and
+	// this runs for every colour a theme defines.
+	lRoot := lightness + 0.3963377774*a + 0.2158037573*b
+	mRoot := lightness - 0.1055613458*a - 0.0638541728*b
+	sRoot := lightness - 0.0894841775*a - 1.291485548*b
+
+	l := lRoot * lRoot * lRoot
+	m := mRoot * mRoot * mRoot
+	s := sRoot * sRoot * sRoot
 
 	return rgb{
 		r: gamma(4.0767416621*l - 3.3077115913*m + 0.2309699292*s),

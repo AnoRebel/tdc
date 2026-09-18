@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import accessibility from "eslint-plugin-vuejs-accessibility";
 import vue from "eslint-plugin-vue";
 import globals from "globals";
 import typescript from "typescript-eslint";
@@ -33,6 +34,17 @@ export default typescript.config(
   js.configs.recommended,
   ...typescript.configs.recommended,
   ...vue.configs["flat/recommended"],
+
+  /*
+   * Template accessibility, checked where it is written.
+   *
+   * The Playwright suite runs axe against the built application and catches
+   * more than this can — it sees computed contrast and real focus order. This
+   * catches a smaller set earlier: a label with no control, an image with no
+   * alt text, a click handler on a div. The two overlap and neither replaces
+   * the other; a rule here fires in the editor, before the branch is pushed.
+   */
+  ...accessibility.configs["flat/recommended"],
 
   {
     languageOptions: {
@@ -94,6 +106,41 @@ export default typescript.config(
       // An optional pass-through `class` has no sensible default — undefined
       // is exactly what the class merger expects when nothing is given.
       "vue/require-default-prop": "off",
+
+      /*
+       * A label wrapping its control is associated with it.
+       *
+       * The rule defaults to demanding `for` as well, which is belt and
+       * braces rather than a fix: nesting is how HTML associates a label, and
+       * every assistive technology follows it. Requiring both would mean
+       * inventing an id for every checkbox in a list to satisfy a linter.
+       */
+      /*
+       * A label wrapping its control is associated with it.
+       *
+       * "some" rather than the default "every": nesting is how HTML
+       * associates a label, and every assistive technology follows it.
+       * Demanding `for` as well would mean inventing an id for each checkbox
+       * in a list to satisfy a linter.
+       *
+       * It still cannot see through a component — a label wrapping our
+       * <Checkbox> reads as empty to it, because the <input> is inside the
+       * component's own template — so those carry a scoped disable naming
+       * the component rather than being rewritten into markup that is worse.
+       */
+      "vuejs-accessibility/label-has-for": ["error", { required: { some: ["nesting", "id"] } }],
+
+      /*
+       * autofocus on the first field of a single-purpose form.
+       *
+       * The rule's concern is a page that moves focus somewhere unexpected
+       * while somebody is reading it. The four pages that use it — sign in,
+       * register, first-run setup, recover — exist to be filled in and
+       * contain nothing else, so focusing the field the page is about is
+       * where a sighted person would click anyway. Anywhere it would be a
+       * surprise, it is not used.
+       */
+      "vuejs-accessibility/no-autofocus": "off",
       // v-html is genuinely dangerous and the warning is right to exist, but
       // the rule cannot see that a value was sanitised. It stays a warning
       // rather than an error so that each use has to be justified in review

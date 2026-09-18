@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
-	"log/slog"
 	"net"
 	"strings"
 	"testing"
@@ -13,10 +11,6 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 )
-
-func quietLogger() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
-}
 
 // fakeClamd answers INSTREAM requests with a fixed reply, so the protocol and
 // the policy can be tested without a real scanner.

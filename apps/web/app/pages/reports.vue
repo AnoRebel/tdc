@@ -192,6 +192,13 @@ function name(address: string): string {
       </template>
     </div>
 
+    <!-- A modal backdrop: role="dialog" with aria-modal, dismissed by
+         clicking outside it or pressing Escape. The rule wants an
+         interactive element, but a dialog is not a button — the role is
+         what tells assistive technology what this is, and the Escape
+         handler beside the click is the keyboard path it exists to
+         require. -->
+    <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -->
     <div
       v-if="deciding"
       class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
@@ -214,7 +221,14 @@ function name(address: string): string {
         </p>
 
         <form class="mt-3 space-y-3" @submit.prevent="record">
+          <!-- A placeholder is not a label: it disappears the moment somebody
+               starts typing, so anybody who looks away loses what the field
+               was for, and a screen reader may never announce it at all. -->
+          <label class="sr-only" for="moderation-note">
+            {{ deciding.dismissing ? "Why this needs nothing done" : "What you did about it" }}
+          </label>
           <Textarea
+            id="moderation-note"
             class="h-auto py-2"
             v-model="note"
             rows="3"

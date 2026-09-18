@@ -71,6 +71,10 @@ func recoverPanic(log *slog.Logger) echo.MiddlewareFunc {
 				if r == nil {
 					return
 				}
+				// Compared by identity, not with errors.Is: r is the `any`
+				// the runtime panicked with, and this is the exact sentinel
+				// net/http panics to abort a response. Wrapping never applies.
+				//nolint:errorlint // a recovered panic value, not an error chain
 				if r == http.ErrAbortHandler {
 					// The handler deliberately aborted; let it propagate.
 					panic(r)
