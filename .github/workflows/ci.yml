@@ -559,7 +559,18 @@ jobs:
   ci-success:
     name: CI
     if: always()
-    needs: [web, accessibility, server, desktop, licences, vulnerabilities, migrations, memory]
+    needs:
+      [
+        web,
+        accessibility,
+        server,
+        desktop,
+        licences,
+        vulnerabilities,
+        migrations,
+        memory,
+        reproducible,
+      ]
     runs-on: ubuntu-latest
     steps:
       - name: Verify every job succeeded or was skipped
