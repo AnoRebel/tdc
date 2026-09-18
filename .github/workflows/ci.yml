@@ -381,6 +381,60 @@ jobs:
           # it again to check the runner is idempotent.
           go test ./internal/db/ -run TestMigrationsApplyFromEmpty -v
 
+  # Two builds of one commit are the same bytes.
+  #
+  # Reproducibility is what lets somebody check that a published binary was built
+  # from the source it claims — they build it themselves and compare. That only
+  # works while it stays true, and it stops being true quietly: a timestamp
+  # embedded by a new dependency, a path that leaks through, a build ID nobody
+  # asked for. This notices the day it happens rather than the day somebody
+  # tries to verify a release.
+  reproducible:
+    name: A build is the same twice
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - name: Build it twice and compare
+        working-directory: server
+        env:
+          CGO_ENABLED: "0"
+          # Fixed, because the point is that everything else is deterministic:
+          # a release sets this from the commit, and a build that disagreed
+          # between two runs would disagree here for the same reason.
+          SOURCE_DATE_EPOCH: "1700000000"
+        run: |
+          build() {
+            go build -trimpath \
+              -ldflags="-s -w -buildid=" \
+              -o "$1" ./cmd/tdc-server
+          }
+
+          build /tmp/first
+          # A clean cache for the second, so a cached artifact cannot make two
+          # different builds look alike.
+          go clean -cache
+          build /tmp/second
+
+          if ! cmp -s /tmp/first /tmp/second; then
+            echo "Two builds of this commit produced different binaries."
+            echo "Something non-deterministic has got into the build — a timestamp,"
+            echo "an absolute path, or a build ID. A published binary can no longer"
+            echo "be checked against its source."
+            sha256sum /tmp/first /tmp/second
+            exit 1
+          fi
+
+          echo "Identical: $(sha256sum /tmp/first | cut -d" " -f1)"
+
   # What the server costs to run, measured rather than assumed.
   #
   # The design puts a 1 GB target on a server for a community of this size, which
