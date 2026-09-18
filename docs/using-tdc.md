@@ -515,6 +515,9 @@ So that nothing above is read as implying more than it says:
 - **Changing your own username or display name.** Neither has a control or an
   endpoint, so both are whatever they were when the account was made. The
   server can already change a display name; nothing asks it to.
+- **Choosing who may do what, from the interface.** Roles and permissions are
+  managed through the API rather than a screen, so an administrator setting up
+  a moderator is doing it with a tool rather than a form.
 - **Voice and video calls.** The permission list mentions starting and joining
   one; nothing enforces those and no call can be made. They are names waiting
   for a feature, not a feature waiting to be switched on.

@@ -160,6 +160,34 @@ verified it, nothing is linked and they get a new account. That second case is
 not a limitation to work around: a provider where anybody can set an unverified
 address to anything would otherwise be a way into any account on your server.
 
+### Roles
+
+Two exist without you doing anything. `Administrator` carries
+`server.administer`, which implies every other permission, and goes to the
+account created during first-run setup. `Member` goes to every account as it
+registers, and grants creating a channel and inviting somebody to one.
+
+`Member` is an ordinary role. A server where only administrators make channels
+is one withdrawal away:
+
+```
+PUT /api/admin/roles/{id}/permissions
+{ "permission": "channel.create", "granted": false }
+```
+
+Both are built-in, meaning they cannot be deleted — the accounts holding them
+would be left holding nothing — but their permissions are yours to change. Roles
+beyond them are yours to make, under `/api/admin/roles`.
+
+The server refuses two changes however they are asked for: one that would leave
+it with no administrator at all, and one that would remove the authority of the
+person making it. The second can be overridden — somebody stepping down
+deliberately is a real thing — by repeating the request with `confirmed`.
+
+Thirteen of the twenty-three catalogued permissions are enforced; the rest are
+names waiting for features. Notably `channel.post` is not enforced: who may
+speak in a channel is governed by membership, bans and posting restrictions.
+
 ### Mail, and the account recovery that depends on it
 
 Nothing is configured by default, and a server that sends no mail runs perfectly

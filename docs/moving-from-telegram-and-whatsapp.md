@@ -55,26 +55,31 @@ matter when planning a move:
 - `server.configure` and `server.administer` — changing policy and granting
   permissions. These are the accounts worth attacking.
 
-**Two things about this are rough today, and both affect the move directly.**
+**Two roles exist without you doing anything.** `Administrator`, carrying
+`server.administer`, goes to the first account during first-run setup.
+`Member` goes to every account as it registers, and grants two things: creating
+a channel, and inviting somebody to one.
 
-First, **a newly registered account holds no permissions at all.** One role is
-created automatically, ever: an `Administrator` role carrying
-`server.administer`, granted to the first account during first-run setup.
-Registration assigns no role to anybody else. A member who joins your server can
-read the channels they are in, post in them, reply, react and send direct
-messages — but cannot create a channel, because `channel.create` is enforced and
-nobody has it.
+That default is a choice, not a fact. If your community would rather channels
+were an organiser's business, take `channel.create` away from `Member` — one
+call, and nothing else about the server changes:
 
-Second, **there is no interface or API for creating roles or assigning them.**
-The permission catalogue can be read; roles cannot be created, edited or handed
-out through the application. Building a "Moderator" role, or giving ordinary
-members the ability to create channels, means writing rows into the database by
-hand.
+```
+PUT /api/admin/roles/{member-role-id}/permissions
+{ "permission": "channel.create", "granted": false }
+```
 
-The practical consequence for a move: plan for the administrator to create the
-channels, and expect requests for new ones to come to you rather than being
-self-service. If that is unacceptable for your community, this is the thing to
-resolve before the move rather than after.
+Roles beyond those two are yours to make. A `Moderator` who can suspend accounts
+but not reconfigure the server is a role, two granted permissions and an
+assignment — which is worth setting up before the move, so that the people who
+moderated your Telegram group are moderating here on the first day rather than
+asking you to do it for them.
+
+Note what a role does **not** cover. Thirteen of the twenty-three catalogued
+permissions are enforced anywhere; the rest are names waiting for the features
+they belong to. `channel.post` is one of the unenforced ones, so posting is
+governed by membership, bans and posting restrictions rather than by a role — a
+read-only announcement channel is still the awkward case described below.
 
 Decide who holds what before the move rather than during it. An organiser who
 was an admin in Telegram is not automatically anything here.
