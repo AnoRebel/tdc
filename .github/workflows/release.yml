@@ -362,6 +362,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The whole history and every tag, because the release notes are the
+          # commits since the previous release and a shallow clone has neither
+          # the commits nor the tag to measure from.
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v8
         with:
@@ -435,10 +440,59 @@ jobs:
           sha256sum $(ls | grep -v '\.sigstore\.json$' | sort) > SHA256SUMS
           cat SHA256SUMS
 
+      - name: Write the release notes
+        id: notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        # The commit subjects since the previous release, as they were written.
+        #
+        # No parsing, no categories, no "feat:" prefixes to strip: the subjects
+        # in this repository are already sentences saying what changed for
+        # somebody using it, which is what release notes are. Reformatting them
+        # into a taxonomy would lose the one thing that makes them readable.
+        #
+        # Merge commits are left out — they say which branch met which, not what
+        # changed — and so is the release commit itself where there is one.
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'v*' --exclude '*-dev' "v${VERSION}^" 2>/dev/null || true)
+
+          {
+            if [ -n "$previous" ]; then
+              echo "## What changed since ${previous}"
+              echo
+              git log --no-merges --format='- %s' "${previous}..v${VERSION}"
+              echo
+              echo "**Full log:** https://github.com/${GITHUB_REPOSITORY}/compare/${previous}...v${VERSION}"
+            else
+              # The first release. There is no "since" to describe, and a list
+              # of every commit ever made is not release notes.
+              echo "## The first release"
+              echo
+              echo "See the [documentation](https://github.com/${GITHUB_REPOSITORY}/tree/v${VERSION}/docs) for what this is and how to run it."
+            fi
+
+            echo
+            echo "### Verifying what you downloaded"
+            echo
+            echo "Every artifact is signed with sigstore, keylessly — there is no signing key, and no maintainer holds one."
+            echo "\`SHA256SUMS\` covers the same files, for checking a download that may have been truncated."
+            echo
+            echo "\`\`\`"
+            echo "cosign verify-blob \\"
+            echo "  --bundle <artifact>.sigstore.json \\"
+            echo "  --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/' \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
+            echo "  <artifact>"
+            echo "\`\`\`"
+          } > release-notes.md
+
+          cat release-notes.md
+
       - name: Publish
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ needs.version.outputs.version }}
+          body_path: release-notes.md
           # Every binary, every bundle, and the feed the client reads.
           files: |
             artifacts/*
