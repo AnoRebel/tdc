@@ -61,17 +61,33 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-  build:
+  # The desktop client, one binary per platform.
+  desktop:
     needs: version
     strategy:
       # One platform failing should not cancel the others: knowing that Linux
       # and macOS built and Windows did not is more useful than knowing the
       # matrix stopped.
+      #
+      # It does still fail the release. fail-fast governs whether the siblings
+      # are cancelled, not whether the job succeeds — a failed leg fails the
+      # matrix, and publish needs this job, so nothing is published. That is the
+      # intended outcome: a release missing a platform is one where those people
+      # silently get no update.
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             goos: linux
+            goarch: amd64
+          # A native arm64 runner rather than cross-compilation: the webview is
+          # cgo against the platform's own GTK and WebKit, which cannot be
+          # cross-compiled without a sysroot nobody wants to maintain.
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - os: macos-13
+            goos: darwin
             goarch: amd64
           - os: macos-latest
             goos: darwin
@@ -79,6 +95,9 @@ jobs:
           - os: windows-latest
             goos: windows
             goarch: amd64
+          - os: windows-11-arm
+            goos: windows
+            goarch: arm64
 
     runs-on: ${{ matrix.os }}
     permissions:
@@ -156,8 +175,186 @@ jobs:
             ${{ steps.artifact.outputs.path }}.sigstore.json
           if-no-files-found: error
 
+  # The server, which unlike the desktop client cross-compiles.
+  #
+  # CGO is off, so one runner produces every platform: no webview, no system
+  # libraries, nothing that needs the target's own toolchain. That is also what
+  # makes the binary static and the container image able to be distroless.
+  server:
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the web application
+        # The server serves it from its own origin, so it is part of the
+        # release rather than a separate download. Empty base means "wherever
+        # this was served from", which is the only answer that is right at
+        # every address an operator might run this on.
+        env:
+          NUXT_PUBLIC_API_BASE: ""
+        run: bun run --cwd apps/web generate
+
+      - name: Build
+        working-directory: server
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          # The commit's own timestamp, so two builds of one commit agree.
+          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+        run: |
+          go build \
+            -trimpath \
+            -ldflags="-s -w -buildid= \
+              -X github.com/AnoRebel/tdc/server/internal/buildinfo.Commit=${GITHUB_SHA} \
+              -X github.com/AnoRebel/tdc/server/internal/buildinfo.BuildTime=${SOURCE_DATE_EPOCH}" \
+            -o ../tdc-server ./cmd/tdc-server
+
+      - name: Package it
+        id: artifact
+        # The binary and the web application together, since the server needs
+        # both and an operator downloading one file should get a working
+        # server rather than half of one.
+        run: |
+          name="tdc-server-${{ needs.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          mkdir -p "$name/web"
+          cp -r apps/web/.output/public/. "$name/web/"
+          cp VERSION "$name/"
+
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            mv tdc-server "$name/tdc-server.exe"
+          else
+            mv tdc-server "$name/tdc-server"
+          fi
+
+          tar --sort=name --mtime="@${SOURCE_DATE_EPOCH:-0}" \
+              --owner=0 --group=0 --numeric-owner \
+              -czf "$name.tar.gz" "$name"
+
+          echo "path=$name.tar.gz" >> "$GITHUB_OUTPUT"
+        env:
+          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+
+      - name: Sign it
+        uses: sigstore/gh-action-sigstore-python@v3.5.0
+        with:
+          inputs: ${{ steps.artifact.outputs.path }}
+          upload-signing-artifacts: false
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tdc-server-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            ${{ steps.artifact.outputs.path }}
+            ${{ steps.artifact.outputs.path }}.sigstore.json
+          if-no-files-found: error
+
+  # The container image, for the operators who deploy that way.
+  #
+  # Two architectures under one tag, so `docker run` on a Raspberry Pi and on a
+  # rented amd64 box both pull something that runs — rather than the operator
+  # having to know which suffix their machine wants.
+  image:
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      # Pushing to this repository's own registry namespace.
+      packages: write
+      contents: read
+      # Sigstore again: an image is as much a thing to be forged as a binary.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # QEMU for the architecture this runner is not, since the image is built
+      # rather than cross-compiled: the Go build inside it sets CGO_ENABLED=0,
+      # but bun and the base image still run as the target architecture.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out the tags
+        id: tags
+        # The version, and `latest` — but only for a real release. A manual run
+        # exercising the workflow must not move the tag everybody pulls.
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/tdc-server"
+          tags="$image:${{ needs.version.outputs.version }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tags="$tags,$image:latest"
+          fi
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.pushed_at }}
+          # The commit's timestamp rather than the build's, so two builds of one
+          # commit produce the same layers.
+          provenance: mode=max
+          sbom: true
+
+      - name: Sign the image
+        # By digest rather than tag: a tag can be moved afterwards, and a
+        # signature that followed it would attest to whatever it was moved to.
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE: ${{ steps.tags.outputs.image }}
+        run: |
+          go install github.com/sigstore/cosign/v2/cmd/cosign@latest
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+
   publish:
-    needs: [version, build]
+    needs: [version, desktop, server, image]
     runs-on: ubuntu-latest
     permissions:
       # Creating the release and writing the feed to it.
@@ -190,6 +387,12 @@ jobs:
           for binary in sorted(pathlib.Path("artifacts").iterdir()):
               if binary.name.endswith(".sigstore.json"):
                   continue
+              # The feed is what the desktop client reads to find its own
+              # update. The server's tarballs are published in the same release
+              # and are not that, so they are left out rather than offered to a
+              # client that would try to run one.
+              if not binary.name.startswith(f"tdc-{version}-"):
+                  continue
               bundle = binary.with_name(binary.name + ".sigstore.json")
               if not bundle.exists():
                   # An artifact with no proof is one the client would refuse, so
@@ -219,6 +422,18 @@ jobs:
           pathlib.Path("latest.json").write_text(json.dumps(feed, indent=2) + "\n")
           print(json.dumps(feed, indent=2))
           PY
+
+      - name: Write the checksums
+        # One file covering every artifact, so somebody who downloaded over a
+        # bad connection can tell. It is not a substitute for the signatures —
+        # a checksum file alongside the downloads proves nothing an attacker
+        # who replaced both could not also have written — which is why the
+        # signatures exist and why this is a convenience rather than the
+        # security story.
+        working-directory: artifacts
+        run: |
+          sha256sum $(ls | grep -v '\.sigstore\.json$' | sort) > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Publish
         uses: softprops/action-gh-release@v3

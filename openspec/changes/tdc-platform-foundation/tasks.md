@@ -242,11 +242,11 @@ Goal: everything needed for TDC and others to actually deploy and adopt it.
 - [ ] 10.11 Configure reproducible builds with `SOURCE_DATE_EPOCH` from the commit timestamp and `-trimpath`; verify two builds of one commit produce identical binaries
 - [ ] 10.12 Add release-notes generation from changes since the previous tag; verify notes are attached to a test release
 - [ ] 10.13 Add server memory measurement to CI reporting against the 1 GB target with the delta from baseline; verify the figures are reported on every change and an increase is surfaced for justification rather than blocking (`platform/foundation`)
-- [ ] 10.14 Write the hosting guide covering deployment, TLS, backup, restore, and upgrade; verify an operator following it end to end succeeds without reading source (`platform/foundation`)
-- [ ] 10.15 Write the user guide covering every user-facing capability shipped; verify coverage against the milestone list
-- [ ] 10.16 Write the contribution guide covering the Apache-2.0 requirement, the prohibition on importing GPL code from other TDC repositories, the commit-message convention (describe the software change and its reason; do not reference internal task or specification identifiers, planning artifacts, or tooling used), and the policy that AI-assisted contributions are welcome but must be disclosed and must carry a rationale; verify each is stated explicitly and a pull request template prompts for the rationale and disclosure
-- [ ] 10.17 Write the integration guide documenting the API surface and authentication; verify the documented examples run against a live server
-- [ ] 10.18 Write the upgrade and migration guide including skipped-release upgrades; verify the documented procedure works across two releases
+- [x] 10.14 Write the hosting guide covering deployment, TLS, backup, restore, and upgrade; verify an operator following it end to end succeeds without reading source (`platform/foundation`)
+- [x] 10.15 Write the user guide covering every user-facing capability shipped; verify coverage against the milestone list
+- [x] 10.16 Write the contribution guide covering the Apache-2.0 requirement, the prohibition on importing GPL code from other TDC repositories, the commit-message convention (describe the software change and its reason; do not reference internal task or specification identifiers, planning artifacts, or tooling used), and the policy that AI-assisted contributions are welcome but must be disclosed and must carry a rationale; verify each is stated explicitly and a pull request template prompts for the rationale and disclosure
+- [x] 10.17 Write the integration guide documenting the API surface and authentication; verify the documented examples run against a live server
+- [x] 10.18 Write the upgrade and migration guide including skipped-release upgrades; verify the documented procedure works across two releases
 - [ ] 10.19 Write the Telegram and WhatsApp migration guide for TDC members; verify it addresses account creation, channel setup, and expectations differing from those tools
 - [ ] **MILESTONE 10** — Demonstrate: a person who has never seen the repository deploys a server from the published container image following only the hosting guide, invites a second person, and both exchange messages from the web and desktop apps. Tag `v1.0.0-rc.1`.
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -42,7 +43,13 @@ func TestTheReleaseWorkflowsFeedIsReadable(t *testing.T) {
 		producing one of these would leave those people on an old version with
 		nothing saying why.
 	*/
-	for _, platform := range []string{"linux/amd64", "darwin/arm64", "windows/amd64"} {
+	expected := map[string]bool{
+		"linux/amd64": true, "linux/arm64": true,
+		"darwin/amd64": true, "darwin/arm64": true,
+		"windows/amd64": true, "windows/arm64": true,
+	}
+
+	for platform := range expected {
 		artifact, ok := release.Artifacts[platform]
 		if !ok {
 			t.Errorf("no artifact for %s", platform)
@@ -58,6 +65,29 @@ func TestTheReleaseWorkflowsFeedIsReadable(t *testing.T) {
 		}
 		if artifact.Size == 0 {
 			t.Errorf("%s: no size, so a download cannot be bounded", platform)
+		}
+
+	}
+
+	/*
+		And nothing else is in it.
+
+		The release carries the server's tarballs in the same directory, named
+		alike enough that a generator matching too loosely picks them up. They do
+		not land on the six keys above — a tarball becomes "linux/amd64.tar.gz",
+		which no client asks for — so a loop over expected platforms cannot see
+		them. What catches it is looking at everything the feed contains.
+
+		Harmless-looking, and not: ForThisPlatform keys on GOOS/GOARCH, so the
+		day one of these names happens to match is the day a desktop client
+		downloads a server, verifies it, and tries to run it as itself.
+	*/
+	for platform, artifact := range release.Artifacts {
+		if strings.Contains(artifact.URL, "tdc-server-") {
+			t.Errorf("the feed carries a server artifact under %q: %s", platform, artifact.URL)
+		}
+		if !expected[platform] {
+			t.Errorf("the feed carries %q, which is not a platform this client runs on", platform)
 		}
 	}
 }
