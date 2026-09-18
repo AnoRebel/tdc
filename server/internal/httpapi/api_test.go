@@ -31,6 +31,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
+	"github.com/AnoRebel/tdc/server/internal/secondfactor"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/AnoRebel/tdc/server/internal/storage"
 )
@@ -193,6 +194,10 @@ func newTestAPIConfigured(
 			// Passkey ceremonies cascade from users, but a ceremony with no
 			// user attached — a sign-in — does not, so it is cleared here.
 			"DELETE FROM webauthn_ceremonies",
+			// Tickets cascade from users, so this is belt and braces — but a
+			// ticket surviving into the next test would be a session waiting
+			// to be claimed by it.
+			"DELETE FROM pending_sign_ins",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)
@@ -262,6 +267,9 @@ func newTestAPIConfigured(
 			exercise exactly that server.
 		*/
 		Passkeys: passkeysForTest(t, queries, logger),
+		// Always present, as on a real server: optional per account, and the
+		// operator's policy decides whether it is required.
+		SecondFactor: secondfactor.NewService("Test Server", queries, logger),
 	}, logger)
 
 	t.Cleanup(func() {

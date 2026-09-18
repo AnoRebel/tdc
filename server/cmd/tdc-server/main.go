@@ -39,6 +39,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
+	"github.com/AnoRebel/tdc/server/internal/secondfactor"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/AnoRebel/tdc/server/internal/storage"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
@@ -258,6 +259,9 @@ func run() error {
 		Presence: presenceService,
 		Push:     pushService,
 		Passkeys: passkeyService,
+		// Always present: optional per account rather than per server, and an
+		// operator may require it of everybody or of administrators.
+		SecondFactor: secondfactor.NewService(serverName(cfg), queries, log),
 	}
 
 	// Messages written now and sent later. The pass takes a row lock and skips

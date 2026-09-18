@@ -117,6 +117,56 @@ func (s *Service) Authenticate(
 	return s.StartSession(ctx, user.ID, device, lifetime)
 }
 
+/*
+VerifyPasswordOnly checks a password and stops there.
+
+Authenticate above ends by issuing a session, which is right when the password
+is the whole of the sign-in. Where a second factor is owed it is not: a session
+that exists before the second factor has been proved is a session somebody could
+use, and every route would then have to know that this particular one is not
+finished yet.
+
+So this does the same checks and returns the account instead. The caller either
+issues a session itself, or asks for the second factor first.
+
+Deliberately the same single error, and the same dummy comparison for an account
+that does not exist or has no password, so which path a failure took is not
+visible from outside.
+*/
+func (s *Service) VerifyPasswordOnly(ctx context.Context, creds Credentials) (dbgen.User, error) {
+	user, found, err := s.lookupForAuthentication(ctx, creds.Username)
+	if err != nil {
+		return dbgen.User{}, err
+	}
+
+	var storedHash string
+	if found {
+		credential, err := s.store.GetPasswordCredential(ctx, user.ID)
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+		case err != nil:
+			return dbgen.User{}, fmt.Errorf("read password credential: %w", err)
+		default:
+			storedHash = string(credential.Secret)
+		}
+	}
+
+	if storedHash == "" {
+		_, _ = VerifyPassword(creds.Password, dummyPasswordHash)
+		return dbgen.User{}, ErrAuthenticationFailed
+	}
+
+	match, err := VerifyPassword(creds.Password, storedHash)
+	if err != nil {
+		return dbgen.User{}, fmt.Errorf("verify password: %w", err)
+	}
+	if !match || isSuspended(user) {
+		return dbgen.User{}, ErrAuthenticationFailed
+	}
+
+	return user, nil
+}
+
 // lookupForAuthentication finds an account by username or email address.
 //
 // A miss is reported as found=false rather than an error, because the caller

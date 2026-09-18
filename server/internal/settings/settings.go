@@ -102,6 +102,24 @@ const (
 	ObscureSensitiveMedia Key = "moderation.obscure_sensitive_media"
 
 	/*
+		SecondFactorPolicy decides of whom a second factor is required.
+
+		"optional" — anybody may set one up, nobody must. The default, because
+		requiring one of a community that has not been told is a community
+		locked out of its own server on a Tuesday morning.
+		"administrators" — required of anybody holding administrative
+		permissions. Those are the accounts worth attacking, and the people
+		holding them are the few an operator can reasonably ask.
+		"everybody" — required of everyone.
+
+		Under either requirement somebody without a second factor is asked to
+		set one up before they can use the server, rather than refused: the
+		point is that the account becomes protected, not that it becomes
+		unreachable.
+	*/
+	SecondFactorPolicy Key = "auth.second_factor.policy"
+
+	/*
 		RetentionSeconds is how long messages are kept server-wide, or zero to
 		keep them indefinitely.
 
@@ -240,6 +258,19 @@ var definitions = map[Key]definition{
 				return fmt.Errorf(`%w: expected "flag", "mask" or "block"`, ErrInvalidValue)
 			}
 			return nil
+		},
+	},
+	SecondFactorPolicy: {
+		fallback: "optional",
+		description: `Of whom a second factor is required: "optional", ` +
+			`"administrators" or "everybody".`,
+		validate: func(value string) error {
+			switch value {
+			case "optional", "administrators", "everybody":
+				return nil
+			default:
+				return fmt.Errorf(`%w: expected "optional", "administrators" or "everybody"`, ErrInvalidValue)
+			}
 		},
 	},
 	BrandName: {

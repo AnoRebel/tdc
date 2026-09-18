@@ -202,11 +202,18 @@ func (s *Server) handleSignIn(c *echo.Context) error {
 		}
 	}
 
-	session, err := s.identity.Authenticate(ctx,
-		identity.Credentials{Username: request.Username, Password: request.Password},
-		identity.DeviceContext{UserAgent: c.Request().UserAgent(), IPAddress: address},
-		s.config.SessionLifetime,
-	)
+	/*
+		The password, and nothing more yet.
+
+		Verified without issuing a session, because an account with a second
+		factor has not finished signing in: a session that existed before the
+		second factor was proved would be one somebody could use, and every
+		route would then have to know that this particular session is not
+		finished. The session is issued below, once there is nothing left to
+		ask.
+	*/
+	user, err := s.identity.VerifyPasswordOnly(ctx,
+		identity.Credentials{Username: request.Username, Password: request.Password})
 	if err != nil {
 		if !errors.Is(err, identity.ErrAuthenticationFailed) {
 			return err
@@ -231,7 +238,36 @@ func (s *Server) handleSignIn(c *echo.Context) error {
 		return err
 	}
 
-	user, err := s.identity.UserByID(ctx, session.Record.UserID)
+	/*
+		A second factor, where the account has one.
+
+		Asked after the password rather than instead of it, and the response
+		says only that something more is needed — not what, and not whose
+		account it belongs to beyond what the caller already typed.
+	*/
+	owed, err := s.secondFactorOwed(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	if owed {
+		pending, err := s.secondFactor.Begin(ctx, user.ID, c.Request().UserAgent(), address)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, map[string]any{
+			"secondFactorRequired": true,
+			"ticket":               pending.Ticket,
+			"expiresAt":            pending.ExpiresAt,
+			// So a client can warn somebody who is nearly out of recovery
+			// codes before they need one rather than after.
+			"recoveryCodesLeft": pending.RecoveryCodesLeft,
+		})
+	}
+
+	session, err := s.identity.StartSession(ctx, user.ID,
+		identity.DeviceContext{UserAgent: c.Request().UserAgent(), IPAddress: address},
+		s.config.SessionLifetime)
 	if err != nil {
 		return err
 	}

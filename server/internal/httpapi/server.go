@@ -32,6 +32,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
+	"github.com/AnoRebel/tdc/server/internal/secondfactor"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
@@ -101,31 +102,32 @@ type Config struct {
 
 // Server owns the HTTP listener and the routes mounted on it.
 type Server struct {
-	echo        *echo.Echo
-	http        *http.Server
-	log         *slog.Logger
-	db          *db.Pool
-	identity    *identity.Service
-	authz       *authz.Service
-	audit       *audit.Recorder
-	limiter     *cache.Limiter
-	rooms       *rooms.Service
-	attachments *attachments.Service
-	unfurl      *unfurl.Service
-	search      *search.Service
-	notify      *notify.Service
-	moderation  *moderation.Service
-	gifs        *gifs.Service
-	settings    *settings.Service
-	invitations *invitations.Service
-	oauth       *oauth.Service
-	passkeys    *passkeys.Service
-	queries     *dbgen.Queries
-	presence    *presence.Service
-	push        *push.Service
-	hub         *realtime.Hub
-	realtime    *realtime.Server
-	config      Config
+	echo         *echo.Echo
+	http         *http.Server
+	log          *slog.Logger
+	db           *db.Pool
+	identity     *identity.Service
+	authz        *authz.Service
+	audit        *audit.Recorder
+	limiter      *cache.Limiter
+	rooms        *rooms.Service
+	attachments  *attachments.Service
+	unfurl       *unfurl.Service
+	search       *search.Service
+	notify       *notify.Service
+	moderation   *moderation.Service
+	gifs         *gifs.Service
+	settings     *settings.Service
+	invitations  *invitations.Service
+	oauth        *oauth.Service
+	passkeys     *passkeys.Service
+	secondFactor *secondfactor.Service
+	queries      *dbgen.Queries
+	presence     *presence.Service
+	push         *push.Service
+	hub          *realtime.Hub
+	realtime     *realtime.Server
+	config       Config
 
 	// shell is the built application's index.html, held in memory so social
 	// metadata can be inserted per request.
@@ -163,6 +165,9 @@ type Services struct {
 	// relying party identifier to bind them to. That is a working state: the
 	// routes answer as if they were not there.
 	Passkeys *passkeys.Service
+	// SecondFactor is always present: it is optional per account rather than
+	// per server, and an operator may require it.
+	SecondFactor *secondfactor.Service
 	// Push is nil, or configured with no keys, on a server whose operator has
 	// not enabled notifications to closed browsers. That is a working state:
 	// notifications are still stored and shown in the application.
@@ -183,28 +188,29 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 	e.HTTPErrorHandler = echo.DefaultHTTPErrorHandler(cfg.ExposeInternalErrors)
 
 	s := &Server{
-		echo:        e,
-		log:         log,
-		db:          pool,
-		identity:    services.Identity,
-		authz:       services.Authz,
-		audit:       services.Audit,
-		limiter:     services.Limiter,
-		rooms:       services.Rooms,
-		attachments: services.Attachments,
-		unfurl:      services.Unfurl,
-		search:      services.Search,
-		notify:      services.Notify,
-		moderation:  services.Moderation,
-		gifs:        services.GIFs,
-		settings:    services.Settings,
-		invitations: services.Invitations,
-		oauth:       services.OAuth,
-		passkeys:    services.Passkeys,
-		queries:     dbgen.New(pool),
-		presence:    services.Presence,
-		push:        services.Push,
-		config:      cfg,
+		echo:         e,
+		log:          log,
+		db:           pool,
+		identity:     services.Identity,
+		authz:        services.Authz,
+		audit:        services.Audit,
+		limiter:      services.Limiter,
+		rooms:        services.Rooms,
+		attachments:  services.Attachments,
+		unfurl:       services.Unfurl,
+		search:       services.Search,
+		notify:       services.Notify,
+		moderation:   services.Moderation,
+		gifs:         services.GIFs,
+		settings:     services.Settings,
+		invitations:  services.Invitations,
+		oauth:        services.OAuth,
+		passkeys:     services.Passkeys,
+		secondFactor: services.SecondFactor,
+		queries:      dbgen.New(pool),
+		presence:     services.Presence,
+		push:         services.Push,
+		config:       cfg,
 	}
 
 	// The hub reads membership from the rooms service at delivery time, which
@@ -256,6 +262,12 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 	// authentication is the job of requireAuthentication on the routes that
 	// need it.
 	e.Use(s.authenticate)
+	/*
+		After authentication, because it needs to know who is asking, and before
+		the routes, because an operator requiring a second factor means of every
+		route rather than of the ones somebody remembered to mark.
+	*/
+	e.Use(s.requireSecondFactorEnrolment)
 
 	s.routes()
 
@@ -292,7 +304,7 @@ func (s *Server) Run(ctx context.Context) error {
 		Rows are deleted as they are used, so this only collects the abandoned
 		ones.
 	*/
-	if (s.oauth != nil && s.oauth.Enabled()) || s.passkeys.Enabled() {
+	if (s.oauth != nil && s.oauth.Enabled()) || s.passkeys.Enabled() || s.secondFactor != nil {
 		go s.sweepCeremoniesPeriodically(ctx)
 	}
 

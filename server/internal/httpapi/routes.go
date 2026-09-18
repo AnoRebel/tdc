@@ -63,8 +63,31 @@ func (s *Server) routes() {
 		The enrolment pair is not: adding a passkey adds a way into an account,
 		so it is done by somebody who has already proved they hold it.
 	*/
+	/*
+		The second half of a sign-in that owes a second factor.
+
+		Unauthenticated, because there is no session yet — that is the thing
+		being earned. What stands in for one is the ticket, which buys nothing
+		except the right to try a code for the account it names.
+	*/
+	s.echo.POST("/api/auth/second-factor", s.handleSecondFactor)
+
 	s.echo.POST("/api/auth/passkey/signin/begin", s.handleBeginPasskeySignIn)
 	s.echo.POST("/api/auth/passkey/signin/finish", s.handleFinishPasskeySignIn)
+
+	/*
+		Somebody's own second factor.
+
+		Every one of these needs a session: setting one up, proving it, and
+		removing it are all things done by somebody who has already signed in —
+		and removing it needs the password again besides.
+	*/
+	secondFactor := s.echo.Group("/api/me/second-factor", requireAuthentication)
+	secondFactor.GET("", s.handleSecondFactorStatus)
+	secondFactor.POST("/begin", s.handleBeginSecondFactor)
+	secondFactor.POST("/confirm", s.handleConfirmSecondFactor)
+	secondFactor.POST("/recovery-codes", s.handleReissueRecoveryCodes)
+	secondFactor.DELETE("", s.handleDisableSecondFactor)
 
 	passkeys := s.echo.Group("/api/me/passkeys", requireAuthentication)
 	passkeys.GET("", s.handleListPasskeys)

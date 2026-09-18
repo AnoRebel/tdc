@@ -519,6 +519,16 @@ func (s *Server) sweepOAuth(ctx context.Context) {
 	}
 }
 
+// sweepSecondFactors removes tickets nobody finished.
+func (s *Server) sweepSecondFactors(ctx context.Context) {
+	if s.secondFactor == nil {
+		return
+	}
+	if _, err := s.secondFactor.SweepExpired(ctx); err != nil {
+		s.log.Warn("sweeping expired second-factor tickets", "error", err)
+	}
+}
+
 // sweepPasskeys removes ceremonies nobody answered.
 func (s *Server) sweepPasskeys(ctx context.Context) {
 	if !s.passkeys.Enabled() {
@@ -563,6 +573,7 @@ func (s *Server) sweepCeremoniesPeriodically(ctx context.Context) {
 		case <-ticker.C:
 			s.sweepOAuth(ctx)
 			s.sweepPasskeys(ctx)
+			s.sweepSecondFactors(ctx)
 		}
 	}
 }
