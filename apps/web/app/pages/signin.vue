@@ -3,8 +3,8 @@ import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 
-import type { OAuthResult } from "@tdc/types";
-import { isApiError } from "@tdc/types";
+import type { OAuthResult, SecondFactorRequired } from "@tdc/types";
+import { isApiError, needsSecondFactor } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
@@ -30,6 +30,15 @@ const { begin, pendingHandle, finish } = useOAuth();
  * sends it back here with a handle in the fragment, and what that handle stands
  * for may be a session, or a question.
  */
+/*
+ * A sign-in that stopped short of a session.
+ *
+ * Set when the password was right and the account owes a second factor. The
+ * form is replaced rather than supplemented: there is one thing to do, and
+ * offering two is how somebody answers the wrong one.
+ */
+const awaitingSecondFactor = ref<SecondFactorRequired | null>(null);
+
 const openingProvider = ref<string | null>(null);
 const returned = ref<OAuthResult | null>(null);
 const returnedHandle = ref("");
@@ -52,6 +61,12 @@ async function chooseProvider(provider: string) {
     openingProvider.value = null;
     error.value = isApiError(cause) ? cause.message : "Could not reach the server.";
   }
+}
+
+/** Somebody finished a sign-in that owed a second factor. */
+async function signedInWithSecondFactor() {
+  awaitingSecondFactor.value = null;
+  await router.push(intendedNext() || localeRoute({ name: "index" }));
 }
 
 /** Somebody signed in with a passkey, which is already a session. */
@@ -140,7 +155,12 @@ const form = useForm({
     submitting.value = true;
 
     try {
-      await signIn({ username: value.username, password: value.password });
+      const outcome = await signIn({ username: value.username, password: value.password });
+
+      if (needsSecondFactor(outcome)) {
+        awaitingSecondFactor.value = outcome;
+        return;
+      }
 
       /*
        * Back to whatever they were trying to reach.
@@ -182,6 +202,14 @@ const form = useForm({
         @cancel="returned = null"
       />
     </template>
+
+    <!-- The password was right, and something more is needed. -->
+    <SecondFactorPrompt
+      v-else-if="awaitingSecondFactor"
+      :pending="awaitingSecondFactor"
+      @done="signedInWithSecondFactor"
+      @cancel="awaitingSecondFactor = null"
+    />
 
     <template v-else>
       <h1 class="text-xl font-semibold">Sign in</h1>

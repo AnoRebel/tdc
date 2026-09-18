@@ -1,12 +1,15 @@
 import type {
   CurrentPermissions,
   RegisterRequest,
+  SecondFactorResult,
   Session,
   SetupStatus,
+  SignInOutcome,
   SignInRequest,
   SignInResult,
   User,
 } from "@tdc/types";
+import { needsSecondFactor } from "@tdc/types";
 
 import { readFailure } from "#layers/ui/app/lib/reachability";
 
@@ -113,8 +116,43 @@ export function useAuth() {
     }
   }
 
-  async function signIn(credentials: SignInRequest): Promise<void> {
-    const result = await api.post<SignInResult>("/api/auth/signin", credentials);
+  /**
+   * Signing in, which does not always finish.
+   *
+   * Where the account has a second factor the password is only the first half,
+   * and what comes back is a ticket rather than a session. The outcome is
+   * returned rather than swallowed so a caller can tell the two apart — a
+   * caller that assumed a session would carry on as though somebody were
+   * signed in when they are not.
+   */
+  async function signIn(credentials: SignInRequest): Promise<SignInOutcome> {
+    const outcome = await api.post<SignInOutcome>("/api/auth/signin", credentials);
+
+    if (needsSecondFactor(outcome)) return outcome;
+
+    await adopt(outcome);
+    return outcome;
+  }
+
+  /**
+   * Completing a sign-in that owed a second factor.
+   *
+   * The ticket identifies which sign-in; the code is either the app's six
+   * digits or one off the printed list, and the server tries both rather than
+   * asking somebody in the middle of an emergency to say which they are using.
+   */
+  async function completeSecondFactor(ticket: string, code: string): Promise<SecondFactorResult> {
+    const result = await api.post<SecondFactorResult>("/api/auth/second-factor", {
+      ticket,
+      code,
+    });
+
+    await adopt(result);
+    return result;
+  }
+
+  /** Taking on a session the server has just issued. */
+  async function adopt(result: SignInResult) {
     user.value = result.user;
     remember(result.user);
     const held = await api.get<CurrentPermissions>("/api/me/permissions");
@@ -123,6 +161,8 @@ export function useAuth() {
 
   async function register(details: RegisterRequest): Promise<void> {
     await api.post<User>("/api/auth/register", details);
+    // A brand-new account cannot already have a second factor, so this cannot
+    // come back owing one.
     await signIn({ username: details.username, password: details.password });
   }
 
@@ -167,6 +207,7 @@ export function useAuth() {
     can,
     refresh,
     signIn,
+    completeSecondFactor,
     register,
     signOut,
     setupStatus,

@@ -210,7 +210,7 @@ func TestTurningItOffNeedsThePassword(t *testing.T) {
 	token := secondFactorAccount(t, handler, "amina")
 	enrolSecondFactor(t, handler, token)
 
-	if recorder := call(t, handler, http.MethodDelete, "/api/me/second-factor",
+	if recorder := call(t, handler, http.MethodPost, "/api/me/second-factor/disable",
 		map[string]string{"password": "not the password"}, token); recorder.Code != http.StatusUnauthorized {
 		t.Errorf("removing with the wrong password: status %d, want %d",
 			recorder.Code, http.StatusUnauthorized)
@@ -222,7 +222,7 @@ func TestTurningItOffNeedsThePassword(t *testing.T) {
 		t.Error("the refused removal took it off anyway")
 	}
 
-	if recorder := call(t, handler, http.MethodDelete, "/api/me/second-factor",
+	if recorder := call(t, handler, http.MethodPost, "/api/me/second-factor/disable",
 		map[string]string{"password": testPassword}, token); recorder.Code != http.StatusNoContent {
 		t.Fatalf("removing with the right password: status %d, body %s",
 			recorder.Code, recorder.Body.String())
@@ -303,7 +303,7 @@ func TestARequiredFactorCannotBeTurnedOff(t *testing.T) {
 		t.Fatalf("setting the policy: status %d, body %s", recorder.Code, recorder.Body.String())
 	}
 
-	if recorder := call(t, handler, http.MethodDelete, "/api/me/second-factor",
+	if recorder := call(t, handler, http.MethodPost, "/api/me/second-factor/disable",
 		map[string]string{"password": testPassword}, member); recorder.Code != http.StatusConflict {
 		t.Errorf("removing a required factor: status %d, want %d", recorder.Code, http.StatusConflict)
 	}

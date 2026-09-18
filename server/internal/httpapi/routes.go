@@ -87,7 +87,17 @@ func (s *Server) routes() {
 	secondFactor.POST("/begin", s.handleBeginSecondFactor)
 	secondFactor.POST("/confirm", s.handleConfirmSecondFactor)
 	secondFactor.POST("/recovery-codes", s.handleReissueRecoveryCodes)
-	secondFactor.DELETE("", s.handleDisableSecondFactor)
+	/*
+		A POST rather than a DELETE, because turning this off carries a
+		password.
+
+		A DELETE with a body is legal but awkward: the shared transport both
+		clients use gives DELETE no body, and widening that contract for one
+		route is a worse trade than naming the action. It is an action anyway —
+		prove who you are, then remove the factor — rather than a plain
+		deletion of a thing at a path.
+	*/
+	secondFactor.POST("/disable", s.handleDisableSecondFactor)
 
 	passkeys := s.echo.Group("/api/me/passkeys", requireAuthentication)
 	passkeys.GET("", s.handleListPasskeys)

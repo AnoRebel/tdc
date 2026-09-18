@@ -131,3 +131,50 @@ export interface Passkey {
   /** Absent on one that has never signed anybody in. */
   lastUsed?: string;
 }
+
+/**
+ * What a sign-in returns when the password was right but is not the whole of it.
+ *
+ * Distinct from {@link SignInResult}, which carries a session: this carries a
+ * ticket, which is worth nothing except the right to try a code for the account
+ * it stands for.
+ */
+export interface SecondFactorRequired {
+  secondFactorRequired: true;
+  ticket: string;
+  expiresAt: string;
+  /** So somebody nearly out of recovery codes is warned before they need one. */
+  recoveryCodesLeft: number;
+}
+
+/** A sign-in either finished, or needs a second factor. */
+export type SignInOutcome = SignInResult | SecondFactorRequired;
+
+/** Whether a sign-in stopped short of a session. */
+export function needsSecondFactor(outcome: SignInOutcome): outcome is SecondFactorRequired {
+  return (outcome as SecondFactorRequired).secondFactorRequired === true;
+}
+
+/** What completing a second factor returns: a session, and what it cost. */
+export interface SecondFactorResult extends SignInResult {
+  /** True when a code from the printed list was spent rather than the app. */
+  usedRecoveryCode: boolean;
+  recoveryCodesLeft: number;
+}
+
+/** Somebody's own second-factor state, for their settings screen. */
+export interface SecondFactorStatus {
+  /** Whether they have set one up and proved it works. */
+  enrolled: boolean;
+  /** Whether this server requires one of them, so they are told why. */
+  required: boolean;
+  recoveryCodesLeft: number;
+}
+
+/** What setting up an authenticator app needs. */
+export interface SecondFactorEnrolment {
+  /** Shown so it can be typed where a camera will not work. */
+  secret: string;
+  /** The otpauth:// value, which the client renders as a QR code. */
+  url: string;
+}

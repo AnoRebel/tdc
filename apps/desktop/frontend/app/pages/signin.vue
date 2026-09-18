@@ -3,8 +3,8 @@ import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 
-import type { OAuthResult } from "@tdc/types";
-import { isApiError } from "@tdc/types";
+import type { OAuthResult, SecondFactorRequired } from "@tdc/types";
+import { isApiError, needsSecondFactor } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 import { Field } from "#layers/ui/app/components/ui/field";
@@ -50,6 +50,9 @@ const { begin, finish } = useOAuth();
  * outcome of its own sign-in afterwards — so it asks, at intervals, until the
  * answer arrives or the sign-in expires.
  */
+// A sign-in that stopped short of a session, as on the web.
+const awaitingSecondFactor = ref<SecondFactorRequired | null>(null);
+
 const openingProvider = ref<string | null>(null);
 const waitingForProvider = ref(false);
 const returned = ref<OAuthResult | null>(null);
@@ -111,6 +114,12 @@ async function waitForProvider(state: string) {
   }
 
   waitingForProvider.value = false;
+}
+
+/** Somebody finished a sign-in that owed a second factor. */
+async function signedInWithSecondFactor() {
+  awaitingSecondFactor.value = null;
+  await router.push(localeRoute({ name: "index" }));
 }
 
 /** Somebody signed in with a passkey, which is already a session. */
@@ -208,7 +217,12 @@ const form = useForm({
     submitting.value = true;
 
     try {
-      await signIn({ username: value.username, password: value.password });
+      const outcome = await signIn({ username: value.username, password: value.password });
+
+      if (needsSecondFactor(outcome)) {
+        awaitingSecondFactor.value = outcome;
+        return;
+      }
 
       // Kept only if asked, and only where there is a keychain to keep it in.
       // The session token stays on the Go side; what is handed over is what the
@@ -255,6 +269,13 @@ const form = useForm({
       :result="returned"
       @done="signedInThroughProvider"
       @cancel="returned = null"
+    />
+
+    <SecondFactorPrompt
+      v-else-if="awaitingSecondFactor"
+      :pending="awaitingSecondFactor"
+      @done="signedInWithSecondFactor"
+      @cancel="awaitingSecondFactor = null"
     />
 
     <div v-else>

@@ -320,9 +320,12 @@ function deviceName(userAgent: string): string {
         </div>
       </section>
 
-      <!-- Before the devices, because both are about who can reach this
-           account and this is the one that changes it. Draws nothing where the
-           server cannot offer passkeys. -->
+      <!-- Both are about who can reach this account, and both come before the
+           list of devices that already do. The second factor first, since it is
+           the one that protects the password everybody already has. -->
+      <SecondFactorManager />
+
+      <!-- Draws nothing where the server cannot offer passkeys. -->
       <PasskeyManager />
 
       <section>
