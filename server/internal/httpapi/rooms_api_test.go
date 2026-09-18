@@ -254,11 +254,27 @@ func TestCannotEditAnothersMessage(t *testing.T) {
 	}
 }
 
-// Creating a room requires the permission, so an ordinary member cannot.
+/*
+Creating a room is governed by the permission, and says so when it refuses.
+
+Deliberately not asserting that an ordinary member lacks it. Members hold it by
+default, because a server where only the first administrator can make a channel
+is one person doing setup by hand for a whole community — but that is the
+operator's to change, and a test that assumed either answer would fail the day
+they changed it. What must hold is that the permission decides.
+*/
 func TestCreatingARoomRequiresPermission(t *testing.T) {
 	handler := newTestAPI(t)
-	completeSetup(t, handler)
+	admin := completeSetup(t, handler)
 	ordinary := registerAndSignIn(t, handler, "ordinary")
+
+	// Taken away, which is how an operator makes this server one where
+	// channels are an administrator's business.
+	memberRole := roleNamed(t, handler, admin, "Member")
+	mustCall(t, handler, http.MethodPut,
+		"/api/admin/roles/"+memberRole+"/permissions",
+		map[string]any{"permission": "channel.create", "granted": false},
+		admin, http.StatusNoContent)
 
 	recorder := call(t, handler, http.MethodPost, "/api/rooms", map[string]string{
 		"slug": "unauthorised", "name": "Unauthorised",

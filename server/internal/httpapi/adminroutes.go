@@ -76,6 +76,31 @@ func (s *Server) handleCompleteSetup(c *echo.Context) error {
 // Done as part of setup because the first administrator would otherwise have
 // no authority and no way to grant themselves any: there is nobody else to do
 // it.
+/*
+grantMembership puts a new account in the role every account holds.
+
+Called from every path that creates one, because an account with no role holds
+no permissions — and on a server where channel.create is enforced, that is an
+account that cannot do the first thing anybody joining a community wants to do.
+
+A failure here is logged rather than returned. The account exists and the person
+can sign in; what they lack is a permission an administrator can grant. Undoing
+the registration over it would be worse, and so would refusing the sign-in they
+have just earned.
+*/
+func (s *Server) grantMembership(ctx context.Context, userID uuid.UUID) {
+	role, err := s.authz.EnsureDefaultRole(ctx)
+	if err != nil {
+		s.log.Error("could not find the default role", "error", err)
+		return
+	}
+
+	if err := s.authz.AssignRole(ctx, userID, role.ID, nil); err != nil {
+		s.log.Error("could not put a new account in the default role",
+			"user", userID, "error", err)
+	}
+}
+
 func (s *Server) grantAdministration(ctx context.Context, userID uuid.UUID) error {
 	const roleName = "Administrator"
 

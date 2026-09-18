@@ -453,6 +453,9 @@ func (s *Server) createAccountFromIdentity(
 		return err
 	}
 
+	// The same membership an account made with a password gets.
+	s.grantMembership(ctx, user.ID)
+
 	if err := s.audit.Record(ctx, audit.Entry{
 		ActorID:    &user.ID,
 		ActorLabel: user.Username,

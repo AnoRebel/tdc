@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -320,6 +321,79 @@ func (s *Service) administratorCount(ctx context.Context) (int64, error) {
 //
 // Used for the built-in roles a server needs to function, most importantly the
 // administrator role created during first-run setup.
+// ErrRoleNameTaken reports a name another role already has.
+var ErrRoleNameTaken = errors.New("a role already has that name")
+
+// ErrInvalidRoleName reports a name that cannot be used. Narrow on purpose: a
+// role's name is what an administrator picks it out by in a list.
+var ErrInvalidRoleName = errors.New("that is not a usable role name")
+
+// ListRoles is every role on this server.
+func (s *Service) ListRoles(ctx context.Context) ([]dbgen.Role, error) {
+	return s.store.ListRoles(ctx)
+}
+
+/*
+CreateRole makes a role with no permissions at all.
+
+Empty deliberately: a role that arrived carrying something would be a role
+somebody granted without deciding to. Permissions are added one at a time, each
+its own decision and its own audit entry.
+*/
+func (s *Service) CreateRole(ctx context.Context, name, description string) (dbgen.Role, error) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" || len(trimmed) > 64 {
+		return dbgen.Role{}, fmt.Errorf("%w: between one and sixty-four characters", ErrInvalidRoleName)
+	}
+
+	if _, err := s.store.GetRoleByName(ctx, trimmed); err == nil {
+		return dbgen.Role{}, ErrRoleNameTaken
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return dbgen.Role{}, fmt.Errorf("look up role: %w", err)
+	}
+
+	role, err := s.store.CreateRole(ctx, dbgen.CreateRoleParams{
+		ID:          uuid.New(),
+		Name:        trimmed,
+		Description: strings.TrimSpace(description),
+		// Not built-in: an operator made it, and an operator may remove it.
+		BuiltIn: false,
+	})
+	if err != nil {
+		return dbgen.Role{}, fmt.Errorf("create role: %w", err)
+	}
+	return role, nil
+}
+
+/*
+DefaultRoleName is the role every account holds.
+
+An account with no role holds no permissions, which on a server where
+channel.create is enforced means only the first administrator can make a
+channel. For a community of hundreds moving from somewhere else, that is not a
+detail — it is one person doing setup by hand for everybody.
+
+So there is a role, and registration puts people in it. What it grants is
+deliberately small: making a channel, and inviting somebody to one. Neither is
+destructive, both are what an ordinary member of a developer community does
+without asking, and an operator who disagrees can take either away — it is an
+ordinary role, and taking a permission from it is one call.
+*/
+const DefaultRoleName = "Member"
+
+/*
+EnsureDefaultRole creates the role every account holds, if it does not exist.
+
+Built-in, so it cannot be deleted out from under the accounts that hold it.
+Its permissions can be changed freely: an operator who wants a server where only
+administrators make channels withdraws channel.create and nothing else breaks.
+*/
+func (s *Service) EnsureDefaultRole(ctx context.Context) (dbgen.Role, error) {
+	return s.EnsureRole(ctx, DefaultRoleName,
+		"What every member can do",
+		PermChannelCreate, PermChannelInvite)
+}
+
 func (s *Service) EnsureRole(
 	ctx context.Context,
 	name, description string,

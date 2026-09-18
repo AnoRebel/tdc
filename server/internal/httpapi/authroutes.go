@@ -127,6 +127,10 @@ func (s *Server) handleRegister(c *echo.Context) error {
 		return registrationError(err)
 	}
 
+	// What every account holds, so somebody who has just joined can make a
+	// channel rather than waiting for an administrator to notice them.
+	s.grantMembership(ctx, user.ID)
+
 	// The invitation is claimed once the account exists, since there was
 	// nobody to record as having used it before. A failure here costs the use
 	// count, not the account.

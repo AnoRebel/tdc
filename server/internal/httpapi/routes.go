@@ -340,6 +340,28 @@ func (s *Server) routes() {
 	admin := s.echo.Group("/api/admin", requireAuthentication)
 	admin.GET("/permissions", s.handlePermissionCatalogue,
 		requirePermission(authz.PermRoleManage))
+
+	/*
+		Roles, and who holds them.
+
+		All under role.manage, which is administrative: deciding who may do what
+		is the authority that confers every other one. The service beneath has
+		been complete since the authorization work — what was missing was any
+		way to reach it, which left a server with one role and one person able
+		to use it.
+	*/
+	admin.GET("/roles", s.handleListRoles,
+		requirePermission(authz.PermRoleManage))
+	admin.POST("/roles", s.handleCreateRole,
+		requirePermission(authz.PermRoleManage))
+	admin.DELETE("/roles/:id", s.handleDeleteRole,
+		requirePermission(authz.PermRoleManage))
+	admin.PUT("/roles/:id/permissions", s.handleSetRolePermission,
+		requirePermission(authz.PermRoleManage))
+	admin.POST("/roles/:id/members", s.handleAssignRole,
+		requirePermission(authz.PermRoleAssign))
+	admin.DELETE("/roles/:id/members/:user", s.handleRemoveRole,
+		requirePermission(authz.PermRoleAssign))
 	admin.GET("/audit", s.handleReadAudit,
 		requirePermission(authz.PermServerViewAudit))
 

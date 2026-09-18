@@ -122,11 +122,19 @@ const (
 	// which is more worth accounting for than reading a page of it.
 	ActionAuditExported Action = "server.audit.exported"
 
-	ActionRoleCreated       Action = "role.created"
-	ActionRoleDeleted       Action = "role.deleted"
-	ActionRoleAssigned      Action = "role.assigned"
-	ActionRoleRemoved       Action = "role.removed"
-	ActionPermissionChanged Action = "role.permission.changed"
+	ActionRoleCreated  Action = "role.created"
+	ActionRoleDeleted  Action = "role.deleted"
+	ActionRoleAssigned Action = "role.assigned"
+	ActionRoleRemoved  Action = "role.removed"
+	/*
+		A permission granted to or withdrawn from a role.
+
+		Recorded separately from creating the role, because this is the entry
+		that answers "when did everybody get the ability to do that" — which is
+		the question asked after somebody does.
+	*/
+	ActionRolePermissionChanged Action = "role.permission.changed"
+	ActionPermissionChanged     Action = "role.permission.changed"
 
 	ActionConfigChanged Action = "server.config.changed"
 	ActionSetupComplete Action = "server.setup.completed"
