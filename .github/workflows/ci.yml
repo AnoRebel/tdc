@@ -381,12 +381,131 @@ jobs:
           # it again to check the runner is idempotent.
           go test ./internal/db/ -run TestMigrationsApplyFromEmpty -v
 
+  # What the server costs to run, measured rather than assumed.
+  #
+  # The design puts a 1 GB target on a server for a community of this size, which
+  # is the difference between something a Tanzanian developer can host on a cheap
+  # VPS and something that needs a machine nobody wants to pay for. A target
+  # nobody measures is a hope.
+  #
+  # Deliberately reporting rather than failing. Memory moves for legitimate
+  # reasons — a cache that earns its keep, a library that grew — and a job that
+  # blocked on it would be routed around within a month. What it does instead is
+  # put the number and its change in front of whoever is reviewing, so an
+  # increase is something a person chose rather than something that happened.
+  memory:
+    name: What the server costs to run
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tdc
+          POSTGRES_PASSWORD: tdc
+          POSTGRES_DB: tdc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tdc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The base commit as well, so the delta is against what this change is
+          # actually changing rather than against nothing.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - name: Measure this commit
+        id: measure
+        working-directory: server
+        env:
+          TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+        run: |
+          go test ./internal/loadprofile/ -run TestServerFitsItsMemoryTarget -v 2>&1 | tee measurement.txt
+          grep '^MEMORY_BYTES=' measurement.txt >> "$GITHUB_OUTPUT"
+
+      - name: Compare against the base
+        if: github.event_name == 'pull_request'
+        id: baseline
+        working-directory: server
+        env:
+          TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          BASE: ${{ github.event.pull_request.base.sha }}
+        # The same measurement on the commit this branches from. A failure here
+        # is not a failure of the change: an older commit may not have the test
+        # at all, in which case there is simply no delta to report.
+        continue-on-error: true
+        run: |
+          git stash --include-untracked --quiet || true
+          git checkout --quiet "$BASE"
+
+          if go test ./internal/loadprofile/ -run TestServerFitsItsMemoryTarget 2>&1 | tee base.txt | grep -q '^MEMORY_BYTES='; then
+            grep '^MEMORY_BYTES=' base.txt | sed 's/MEMORY_BYTES=/base_bytes=/' >> "$GITHUB_OUTPUT"
+          else
+            echo "The base commit does not measure this; reporting the figure alone."
+          fi
+
+          git checkout --quiet -
+          git stash pop --quiet || true
+
+      - name: Report
+        env:
+          BYTES: ${{ steps.measure.outputs.MEMORY_BYTES }}
+          BASE_BYTES: ${{ steps.baseline.outputs.base_bytes }}
+        run: |
+          python3 - >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import os
+
+          target = 1024 ** 3
+          bytes_now = int(os.environ["BYTES"])
+          base = os.environ.get("BASE_BYTES") or ""
+
+          def mib(value):
+              return f"{value / 1024 / 1024:.1f} MiB"
+
+          print("## What the server costs to run")
+          print()
+          print(f"**{mib(bytes_now)}** against a target of {mib(target)} "
+                f"— {bytes_now / target * 100:.1f}% of it.")
+          print()
+
+          if base:
+              delta = bytes_now - int(base)
+              if abs(delta) < 1024 * 1024:
+                  print(f"Unchanged from the base commit ({mib(int(base))}).")
+              else:
+                  direction = "more" if delta > 0 else "less"
+                  print(f"That is **{mib(abs(delta))} {direction}** than the base "
+                        f"commit's {mib(int(base))}.")
+                  if delta > 0:
+                      print()
+                      print("An increase is not a failure. It is worth a sentence in the "
+                            "pull request saying what it buys.")
+          else:
+              print("No comparable measurement on the base commit, so no delta.")
+
+          if bytes_now > target:
+              print()
+              print("> This is over the target. Not blocking, and worth deciding "
+                    "about deliberately rather than discovering on somebody's VPS.")
+          PY
+
   # One required check for branch protection, rather than a list that has to be
   # updated whenever a job is added or renamed.
   ci-success:
     name: CI
     if: always()
-    needs: [web, accessibility, server, desktop, licences, vulnerabilities, migrations]
+    needs: [web, accessibility, server, desktop, licences, vulnerabilities, migrations, memory]
     runs-on: ubuntu-latest
     steps:
       - name: Verify every job succeeded or was skipped
