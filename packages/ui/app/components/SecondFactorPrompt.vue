@@ -51,6 +51,33 @@ const codeOffered = computed(() => props.pending.methods?.code !== false);
 
 const usingPasskey = ref(false);
 
+const { sendEmailedCode, submitEmailedCode } = useSecondFactor();
+
+/*
+ * Whether a code can be sent by mail.
+ *
+ * Offered last and only as a fallback, because it is the weakest of the three:
+ * it is only as good as the mailbox. Somebody whose phone is in another room
+ * reaches for it; somebody holding their phone should not.
+ */
+const emailOffered = computed(() => props.pending.methods?.email === true);
+const emailSent = ref(false);
+const sendingEmail = ref(false);
+
+async function askForEmailedCode() {
+  error.value = null;
+  sendingEmail.value = true;
+
+  try {
+    await sendEmailedCode(props.pending.ticket);
+    emailSent.value = true;
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : "Could not send a code.";
+  } finally {
+    sendingEmail.value = false;
+  }
+}
+
 async function withPasskey() {
   error.value = null;
   usingPasskey.value = true;
@@ -99,7 +126,19 @@ const form = useForm({
     submitting.value = true;
 
     try {
-      emit("done", await completeSecondFactor(props.pending.ticket, value.code));
+      /*
+       * Which route the code goes to depends on where it came from.
+       *
+       * An emailed code lives on the pending sign-in rather than in a
+       * credential, so it is checked by its own route — sending it to the
+       * authenticator app's would compare it against a secret this account may
+       * not even have.
+       */
+      const result = emailSent.value
+        ? await submitEmailedCode(props.pending.ticket, value.code)
+        : await completeSecondFactor(props.pending.ticket, value.code);
+
+      emit("done", result);
     } catch (cause) {
       if (isApiError(cause) && cause.code === "rate-limited") {
         // Past the allowance for this ticket. Said as what to do next, since
@@ -161,7 +200,11 @@ const form = useForm({
       <span class="h-px flex-1 bg-border" />
     </div>
 
-    <form v-if="codeOffered" class="mt-5 space-y-4" @submit.prevent="form.handleSubmit()">
+    <form
+      v-if="codeOffered || emailSent"
+      class="mt-5 space-y-4"
+      @submit.prevent="form.handleSubmit()"
+    >
       <form.Field name="code">
         <template #default="{ field }">
           <Field label="Code" :error="firstError(field)" required>
@@ -187,6 +230,25 @@ const form = useForm({
         {{ submitting ? "Checking" : "Continue" }}
       </Button>
     </form>
+
+    <!-- The fallback, for somebody whose phone is somewhere else. Below the
+         other two because it is the weakest, and a fallback offered first
+         stops being a fallback. -->
+    <p v-if="emailSent" class="mt-4 rounded-md bg-muted px-3 py-2 text-sm" role="status">
+      A code is on its way to the address on your account. Enter it above — it works once, for five
+      minutes.
+    </p>
+    <Button
+      v-else-if="emailOffered"
+      variant="ghost"
+      class="mt-2 h-9 w-full text-muted-foreground"
+      label="Send a code to my email instead"
+      :disabled="sendingEmail || submitting || usingPasskey"
+      @click="askForEmailedCode"
+    >
+      <Spinner v-if="sendingEmail" size="sm" />
+      Send a code to my email instead
+    </Button>
 
     <!-- Said only when it is nearly true, so it stays worth reading. -->
     <p

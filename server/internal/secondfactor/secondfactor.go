@@ -103,6 +103,8 @@ type Store interface {
 	DeleteRecoveryCodes(ctx context.Context, userID uuid.UUID) error
 
 	StartPendingSignIn(ctx context.Context, arg dbgen.StartPendingSignInParams) (dbgen.PendingSignIn, error)
+	SetEmailedCode(ctx context.Context, arg dbgen.SetEmailedCodeParams) error
+	SpendEmailedCode(ctx context.Context, arg dbgen.SpendEmailedCodeParams) (dbgen.PendingSignIn, error)
 	GetPendingSignIn(ctx context.Context, ticketHash []byte) (dbgen.PendingSignIn, error)
 	CountPendingAttempt(ctx context.Context, id uuid.UUID) (dbgen.PendingSignIn, error)
 	FinishPendingSignIn(ctx context.Context, ticketHash []byte) (dbgen.PendingSignIn, error)
@@ -119,7 +121,10 @@ type Service struct {
 	// with several can tell which server a code belongs to.
 	issuer string
 	store  Store
-	log    *slog.Logger
+	// canEmail says whether a code could be sent to this account, which needs
+	// both a server that sends mail and an address somebody has proved.
+	canEmail CanEmail
+	log      *slog.Logger
 	// now is time.Now, replaceable so a test can stand at a known moment
 	// rather than generating a code and hoping the window does not turn over
 	// between making it and checking it.
@@ -152,7 +157,29 @@ type Offers struct {
 	Code bool
 	// Passkey is a device they already carry.
 	Passkey bool
+	/*
+		Email is a code sent to a confirmed address.
+
+		The weakest of the three, and offered last: it is only as good as the
+		mailbox, and somebody who has taken over an inbox has taken over this.
+		It exists because the alternative for somebody with no phone to hand is
+		an administrator.
+	*/
+	Email bool
 }
+
+/*
+CanEmail is how the service is told mail works.
+
+Set by the caller rather than discovered here, because whether a server can send
+is the mail service's business and whether an address is confirmed is the
+account's. This package's job is only to say which factors are on offer.
+*/
+type CanEmail func(ctx context.Context, userID uuid.UUID) bool
+
+// UseMail wires how the service decides an emailed code is possible. Without
+// it, one is never offered — which is right for a server that sends no mail.
+func (s *Service) UseMail(canEmail CanEmail) { s.canEmail = canEmail }
 
 // Available says what this account can answer a challenge with.
 func (s *Service) Available(ctx context.Context, userID uuid.UUID) (Offers, error) {
@@ -167,7 +194,9 @@ func (s *Service) Available(ctx context.Context, userID uuid.UUID) (Offers, erro
 		return Offers{}, fmt.Errorf("look for a passkey: %w", err)
 	}
 
-	return Offers{Code: code, Passkey: passkey}, nil
+	email := s.canEmail != nil && s.canEmail(ctx, userID)
+
+	return Offers{Code: code, Passkey: passkey, Email: email}, nil
 }
 
 // periodFor is which thirty-second window a moment belongs to, which is what

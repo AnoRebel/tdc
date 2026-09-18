@@ -258,6 +258,25 @@ func run() error {
 		place rather than a nil check at every call site.
 	*/
 	mailService := mail.NewService(cfg.Mail, serverName(cfg), log)
+
+	/*
+		An emailed code is offered only where it could actually arrive.
+
+		Both halves: a server that sends mail, and an address somebody has
+		proved. An unconfirmed address is something typed into a form, and
+		mailing a way past the second factor to one would undo the factor.
+	*/
+	secondFactorService := secondfactor.NewService(serverName(cfg), queries, log)
+	secondFactorService.UseMail(func(ctx context.Context, userID uuid.UUID) bool {
+		if !mailService.Configured() {
+			return false
+		}
+		user, err := queries.GetUserByID(ctx, userID)
+		if err != nil {
+			return false
+		}
+		return user.EmailVerified && user.Email != nil
+	})
 	recoveryService := recovery.NewService(queries, mailService,
 		cfg.Server.CanonicalAddress, serverName(cfg), log)
 
@@ -331,7 +350,7 @@ func run() error {
 		Passkeys: passkeyService,
 		// Always present: optional per account rather than per server, and an
 		// operator may require it of everybody or of administrators.
-		SecondFactor: secondfactor.NewService(serverName(cfg), queries, log),
+		SecondFactor: secondFactorService,
 		Mail:         mailService,
 		Recovery:     recoveryService,
 	}

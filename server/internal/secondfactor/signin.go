@@ -2,7 +2,9 @@ package secondfactor
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net/netip"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/pquerna/otp/totp"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/mail"
 )
 
 // Pending is a sign-in that has passed the first factor and owes a second.
@@ -154,6 +157,176 @@ func (s *Service) Complete(ctx context.Context, ticket, code string) (Accepted, 
 		result.Address = *spent.IpAddress
 	}
 	return result, nil
+}
+
+/*
+emailedCodeLifetime is how long a code sent by mail works.
+
+Five minutes, against the ticket's ten. A ticket lasts long enough to find a
+phone and open an app; a code that arrived by mail should not still work ten
+minutes after somebody read it over a shoulder, and the mail has already
+arrived by the time it matters.
+*/
+const emailedCodeLifetime = 5 * time.Minute
+
+/*
+emailedCodeDigits is how long the code is.
+
+Six, matching the authenticator app's, so somebody typing one into the same box
+is not surprised by the length. The allowance on a ticket is what makes six
+digits enough: five attempts against a million possibilities.
+*/
+const emailedCodeDigits = 6
+
+/*
+PendingFor says whose sign-in a ticket belongs to.
+
+So a caller can look the account up — to find its address, or to decide whether
+it has one worth sending to — without this package needing to know what an
+account is.
+*/
+func (s *Service) PendingFor(ctx context.Context, ticket string) (uuid.UUID, error) {
+	pending, err := s.store.GetPendingSignIn(ctx, hashTicket(ticket))
+	if notFound(err) {
+		return uuid.Nil, ErrRejected
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("find the pending sign-in: %w", err)
+	}
+	return pending.UserID, nil
+}
+
+/*
+SendEmailedCode issues a code for a pending sign-in and returns the message.
+
+Returned rather than sent, like the recovery mail: the caller sends it in the
+background, and the response does not wait on a mail server.
+
+Replaces any outstanding code, so somebody who lost the first message asks again
+rather than being stuck with a code they cannot read.
+*/
+func (s *Service) SendEmailedCode(ctx context.Context, ticket, address, serverName string) (mail.Message, error) {
+	pending, err := s.store.GetPendingSignIn(ctx, hashTicket(ticket))
+	if notFound(err) {
+		return mail.Message{}, ErrRejected
+	}
+	if err != nil {
+		return mail.Message{}, fmt.Errorf("find the pending sign-in: %w", err)
+	}
+
+	code, err := newEmailedCode()
+	if err != nil {
+		return mail.Message{}, err
+	}
+
+	if err := s.store.SetEmailedCode(ctx, dbgen.SetEmailedCodeParams{
+		ID:                   pending.ID,
+		EmailedCodeHash:      hashCode(code),
+		EmailedCodeExpiresAt: pointerTo(s.now().Add(emailedCodeLifetime)),
+	}); err != nil {
+		return mail.Message{}, fmt.Errorf("record the code: %w", err)
+	}
+
+	/*
+		Says what to do if it was not them.
+
+		A code arriving unasked means somebody has their password, which is the
+		one thing the message can usefully tell them — and it is more urgent
+		than the code itself.
+	*/
+	body := fmt.Sprintf(`Your sign-in code for %s is:
+
+%s
+
+It works once, for the next five minutes.
+
+If you did not just try to sign in, somebody else has your password. Change it
+as soon as you can.
+`, serverName, code)
+
+	return mail.Message{
+		To:      address,
+		Subject: "Your sign-in code for " + serverName,
+		Body:    body,
+	}, nil
+}
+
+/*
+CompleteWithEmailedCode spends a ticket that an emailed code has answered.
+
+Attempts are counted first, as they are for an authenticator app's code: six
+digits is a million possibilities, and unlimited guessing makes that patience
+rather than security.
+*/
+func (s *Service) CompleteWithEmailedCode(ctx context.Context, ticket, code string) (Accepted, error) {
+	pending, err := s.store.GetPendingSignIn(ctx, hashTicket(ticket))
+	if notFound(err) {
+		return Accepted{}, ErrRejected
+	}
+	if err != nil {
+		return Accepted{}, fmt.Errorf("find the pending sign-in: %w", err)
+	}
+
+	counted, err := s.store.CountPendingAttempt(ctx, pending.ID)
+	if err != nil {
+		return Accepted{}, fmt.Errorf("count the attempt: %w", err)
+	}
+	if counted.Attempts > maxAttempts {
+		return Accepted{}, ErrTooManyAttempts
+	}
+
+	/*
+		The spend is the check.
+
+		Matched, unexpired and cleared in one statement, so a code is good once
+		under two simultaneous attempts rather than by convention.
+	*/
+	if _, err := s.store.SpendEmailedCode(ctx, dbgen.SpendEmailedCodeParams{
+		TicketHash:      hashTicket(ticket),
+		EmailedCodeHash: hashCode(normaliseDigits(code)),
+	}); err != nil {
+		if notFound(err) {
+			return Accepted{}, ErrRejected
+		}
+		return Accepted{}, fmt.Errorf("spend the code: %w", err)
+	}
+
+	spent, err := s.store.FinishPendingSignIn(ctx, hashTicket(ticket))
+	if notFound(err) {
+		return Accepted{}, ErrRejected
+	}
+	if err != nil {
+		return Accepted{}, fmt.Errorf("finish the pending sign-in: %w", err)
+	}
+
+	remaining, err := s.store.CountUnusedRecoveryCodes(ctx, spent.UserID)
+	if err != nil {
+		return Accepted{}, fmt.Errorf("count the recovery codes: %w", err)
+	}
+
+	result := Accepted{
+		UserID:            spent.UserID,
+		UserAgent:         spent.UserAgent,
+		RecoveryCodesLeft: remaining,
+	}
+	if spent.IpAddress != nil {
+		result.Address = *spent.IpAddress
+	}
+	return result, nil
+}
+
+// newEmailedCode is six digits, zero-padded so it is always the same length.
+func newEmailedCode() (string, error) {
+	limit := big.NewInt(1)
+	for index := 0; index < emailedCodeDigits; index++ {
+		limit.Mul(limit, big.NewInt(10))
+	}
+
+	value, err := rand.Int(rand.Reader, limit)
+	if err != nil {
+		return "", fmt.Errorf("read random bytes: %w", err)
+	}
+	return fmt.Sprintf("%0*d", emailedCodeDigits, value), nil
 }
 
 /*

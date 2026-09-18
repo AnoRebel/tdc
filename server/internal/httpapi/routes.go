@@ -75,6 +75,10 @@ func (s *Server) routes() {
 	// authenticator app.
 	s.echo.POST("/api/auth/second-factor/passkey/begin", s.handleBeginSecondFactorPasskey)
 	s.echo.POST("/api/auth/second-factor/passkey/finish", s.handleFinishSecondFactorPasskey)
+	// Or by mail, for somebody with no phone to hand — where the server sends
+	// mail and the address has been confirmed.
+	s.echo.POST("/api/auth/second-factor/email", s.handleSendEmailedCode)
+	s.echo.POST("/api/auth/second-factor/email/verify", s.handleEmailedCode)
 
 	/*
 		Getting back in without a password.

@@ -1,4 +1,4 @@
-import type { SecondFactorEnrolment, SecondFactorStatus } from "@tdc/types";
+import type { SecondFactorEnrolment, SecondFactorResult, SecondFactorStatus } from "@tdc/types";
 
 /**
  * A second thing somebody must have, beyond the one they know.
@@ -58,5 +58,37 @@ export function useSecondFactor() {
     await api.post("/api/me/second-factor/disable", { password });
   }
 
-  return { status, begin, confirm, reissueRecoveryCodes, disable };
+  /**
+   * Ask for a code by mail, for a sign-in that owes a second factor.
+   *
+   * Only offered where the server sends mail and the address has been
+   * confirmed, which the sign-in response says.
+   */
+  async function sendEmailedCode(ticket: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>("/api/auth/second-factor/email", { ticket });
+  }
+
+  /*
+   * Use a code that arrived by mail.
+   *
+   * Named submit rather than use, because a function called use* in this layer
+   * reads as a composable — and the guard that keeps composables defined here
+   * rather than imported from an application says so.
+   */
+  async function submitEmailedCode(ticket: string, code: string): Promise<SecondFactorResult> {
+    return api.post<SecondFactorResult>("/api/auth/second-factor/email/verify", {
+      ticket,
+      code,
+    });
+  }
+
+  return {
+    status,
+    begin,
+    confirm,
+    reissueRecoveryCodes,
+    disable,
+    sendEmailedCode,
+    submitEmailedCode,
+  };
 }

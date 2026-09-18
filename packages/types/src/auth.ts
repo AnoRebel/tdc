@@ -161,6 +161,14 @@ export interface SecondFactorMethods {
   code: boolean;
   /** A passkey they already carry. */
   passkey: boolean;
+  /**
+   * A code sent to a confirmed address.
+   *
+   * The weakest of the three — it is only as good as the mailbox — and offered
+   * last. It exists because the alternative for somebody whose phone is lost is
+   * writing to an administrator.
+   */
+  email: boolean;
 }
 
 /** A sign-in either finished, or needs a second factor. */

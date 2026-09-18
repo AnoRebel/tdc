@@ -123,3 +123,26 @@ SELECT EXISTS (
 SELECT EXISTS (
     SELECT 1 FROM credentials WHERE user_id = $1 AND kind = 'passkey'
 ) AS has_passkey;
+
+-- Recording a code that has just been mailed. Replaces any outstanding one, so
+-- asking again is how somebody who lost the first message gets a usable code.
+-- name: SetEmailedCode :exec
+UPDATE pending_sign_ins
+SET emailed_code_hash = $2, emailed_code_expires_at = $3
+WHERE id = $1;
+
+/*
+Spending an emailed code.
+
+Matched, unexpired, and cleared in the statement that checks it — so the code is
+good once even if two attempts arrive together, and a wrong guess cannot be told
+from an expired one.
+*/
+-- name: SpendEmailedCode :one
+UPDATE pending_sign_ins
+SET emailed_code_hash = NULL, emailed_code_expires_at = NULL
+WHERE ticket_hash = $1
+  AND emailed_code_hash = $2
+  AND emailed_code_expires_at > NOW()
+  AND expires_at > NOW()
+RETURNING *;

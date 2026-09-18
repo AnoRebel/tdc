@@ -509,6 +509,9 @@ type Querier interface {
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
 	SetDirectMessagePolicy(ctx context.Context, arg SetDirectMessagePolicyParams) error
+	// Recording a code that has just been mailed. Replaces any outstanding one, so
+	// asking again is how somebody who lost the first message gets a usable code.
+	SetEmailedCode(ctx context.Context, arg SetEmailedCodeParams) error
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetHidePushContent(ctx context.Context, arg SetHidePushContentParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
@@ -537,6 +540,7 @@ type Querier interface {
 	// 'anyone who has ever written to me'.
 	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
 	SpendEmailConfirmation(ctx context.Context, tokenHash []byte) (EmailConfirmation, error)
+	SpendEmailedCode(ctx context.Context, arg SpendEmailedCodeParams) (PendingSignIn, error)
 	SpendRecoveryCode(ctx context.Context, arg SpendRecoveryCodeParams) (Credential, error)
 	SpendRecoveryToken(ctx context.Context, tokenHash []byte) (RecoveryToken, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)

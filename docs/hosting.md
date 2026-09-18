@@ -325,6 +325,13 @@ administrative way to show them again. Somebody who loses both their phone and
 their codes needs you to remove the second factor for them, which is a database
 operation until account recovery lands.
 
+Where you have configured mail, somebody whose phone is out of reach can have a
+code sent to their address instead — but only if that address has been
+confirmed, and only as a fallback. It is the weakest of the three factors,
+because it is worth exactly as much as the mailbox: somebody who has taken over
+an inbox has taken over this. It exists because the alternative for somebody
+with a lost phone is writing to you.
+
 A passkey satisfies the requirement. Somebody who has enrolled one already
 carries the thing a second factor is for, so they are asked for it as the second
 step rather than being told to set up an authenticator app as well — which

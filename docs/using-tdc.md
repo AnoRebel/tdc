@@ -53,8 +53,11 @@ offers:
   if you have one, signing in with your password asks for it as the second step
   and there is nothing else to set up. Otherwise it is a code from an
   authenticator app, which comes with ten recovery codes, shown once, for the
-  day you cannot reach your phone. An operator may require two-step sign-in of
-  administrators or of everybody.
+  day you cannot reach your phone. Where the server sends mail and your address
+  is confirmed, a code can also be sent there — a fallback for a phone in
+  another room, and the weakest of the options, since it is worth what your
+  mailbox is worth. An operator may require two-step sign-in of administrators
+  or of everybody.
 
 Recovery codes are not a password reset: they get you past the second step, not
 past a forgotten password.

@@ -203,14 +203,16 @@ type OauthOutcome struct {
 }
 
 type PendingSignIn struct {
-	ID         uuid.UUID
-	TicketHash []byte
-	UserID     uuid.UUID
-	UserAgent  string
-	IpAddress  *netip.Addr
-	Attempts   int32
-	CreatedAt  time.Time
-	ExpiresAt  time.Time
+	ID                   uuid.UUID
+	TicketHash           []byte
+	UserID               uuid.UUID
+	UserAgent            string
+	IpAddress            *netip.Addr
+	Attempts             int32
+	CreatedAt            time.Time
+	ExpiresAt            time.Time
+	EmailedCodeHash      []byte
+	EmailedCodeExpiresAt *time.Time
 }
 
 type PinnedMessage struct {

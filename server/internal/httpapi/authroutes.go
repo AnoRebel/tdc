@@ -278,6 +278,7 @@ func (s *Server) handleSignIn(c *echo.Context) error {
 			"methods": map[string]any{
 				"code":    offers.Code,
 				"passkey": offers.Passkey,
+				"email":   offers.Email,
 			},
 			// So a client can warn somebody who is nearly out of recovery
 			// codes before they need one rather than after.

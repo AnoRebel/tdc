@@ -82,7 +82,7 @@ const countPendingAttempt = `-- name: CountPendingAttempt :one
 UPDATE pending_sign_ins
 SET attempts = attempts + 1
 WHERE id = $1
-RETURNING id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at
+RETURNING id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at, emailed_code_hash, emailed_code_expires_at
 `
 
 func (q *Queries) CountPendingAttempt(ctx context.Context, id uuid.UUID) (PendingSignIn, error) {
@@ -97,6 +97,8 @@ func (q *Queries) CountPendingAttempt(ctx context.Context, id uuid.UUID) (Pendin
 		&i.Attempts,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.EmailedCodeHash,
+		&i.EmailedCodeExpiresAt,
 	)
 	return i, err
 }
@@ -232,7 +234,7 @@ func (q *Queries) DeleteTOTPCredential(ctx context.Context, userID uuid.UUID) er
 const finishPendingSignIn = `-- name: FinishPendingSignIn :one
 DELETE FROM pending_sign_ins
 WHERE ticket_hash = $1 AND expires_at > NOW()
-RETURNING id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at
+RETURNING id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at, emailed_code_hash, emailed_code_expires_at
 `
 
 // Consumed when the second factor is accepted, so a ticket buys one session.
@@ -248,12 +250,14 @@ func (q *Queries) FinishPendingSignIn(ctx context.Context, ticketHash []byte) (P
 		&i.Attempts,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.EmailedCodeHash,
+		&i.EmailedCodeExpiresAt,
 	)
 	return i, err
 }
 
 const getPendingSignIn = `-- name: GetPendingSignIn :one
-SELECT id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at FROM pending_sign_ins
+SELECT id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at, emailed_code_hash, emailed_code_expires_at FROM pending_sign_ins
 WHERE ticket_hash = $1 AND expires_at > NOW()
 `
 
@@ -271,6 +275,8 @@ func (q *Queries) GetPendingSignIn(ctx context.Context, ticketHash []byte) (Pend
 		&i.Attempts,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.EmailedCodeHash,
+		&i.EmailedCodeExpiresAt,
 	)
 	return i, err
 }
@@ -392,6 +398,65 @@ func (q *Queries) ListRecoveryCodes(ctx context.Context, userID uuid.UUID) ([]Cr
 	return items, nil
 }
 
+const setEmailedCode = `-- name: SetEmailedCode :exec
+UPDATE pending_sign_ins
+SET emailed_code_hash = $2, emailed_code_expires_at = $3
+WHERE id = $1
+`
+
+type SetEmailedCodeParams struct {
+	ID                   uuid.UUID
+	EmailedCodeHash      []byte
+	EmailedCodeExpiresAt *time.Time
+}
+
+// Recording a code that has just been mailed. Replaces any outstanding one, so
+// asking again is how somebody who lost the first message gets a usable code.
+func (q *Queries) SetEmailedCode(ctx context.Context, arg SetEmailedCodeParams) error {
+	_, err := q.db.Exec(ctx, setEmailedCode, arg.ID, arg.EmailedCodeHash, arg.EmailedCodeExpiresAt)
+	return err
+}
+
+const spendEmailedCode = `-- name: SpendEmailedCode :one
+/*
+Spending an emailed code.
+
+Matched, unexpired, and cleared in the statement that checks it — so the code is
+good once even if two attempts arrive together, and a wrong guess cannot be told
+from an expired one.
+*/
+UPDATE pending_sign_ins
+SET emailed_code_hash = NULL, emailed_code_expires_at = NULL
+WHERE ticket_hash = $1
+  AND emailed_code_hash = $2
+  AND emailed_code_expires_at > NOW()
+  AND expires_at > NOW()
+RETURNING id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at, emailed_code_hash, emailed_code_expires_at
+`
+
+type SpendEmailedCodeParams struct {
+	TicketHash      []byte
+	EmailedCodeHash []byte
+}
+
+func (q *Queries) SpendEmailedCode(ctx context.Context, arg SpendEmailedCodeParams) (PendingSignIn, error) {
+	row := q.db.QueryRow(ctx, spendEmailedCode, arg.TicketHash, arg.EmailedCodeHash)
+	var i PendingSignIn
+	err := row.Scan(
+		&i.ID,
+		&i.TicketHash,
+		&i.UserID,
+		&i.UserAgent,
+		&i.IpAddress,
+		&i.Attempts,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.EmailedCodeHash,
+		&i.EmailedCodeExpiresAt,
+	)
+	return i, err
+}
+
 const spendRecoveryCode = `-- name: SpendRecoveryCode :one
 /*
 Spending a recovery code.
@@ -441,7 +506,7 @@ func (q *Queries) SpendRecoveryCode(ctx context.Context, arg SpendRecoveryCodePa
 const startPendingSignIn = `-- name: StartPendingSignIn :one
 INSERT INTO pending_sign_ins (id, ticket_hash, user_id, user_agent, ip_address, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at
+RETURNING id, ticket_hash, user_id, user_agent, ip_address, attempts, created_at, expires_at, emailed_code_hash, emailed_code_expires_at
 `
 
 type StartPendingSignInParams struct {
@@ -472,6 +537,8 @@ func (q *Queries) StartPendingSignIn(ctx context.Context, arg StartPendingSignIn
 		&i.Attempts,
 		&i.CreatedAt,
 		&i.ExpiresAt,
+		&i.EmailedCodeHash,
+		&i.EmailedCodeExpiresAt,
 	)
 	return i, err
 }

@@ -539,3 +539,139 @@ func finishSecondFactorWithPasskey(
 		"/api/auth/second-factor/passkey/finish?ticket="+url.QueryEscape(ticket),
 		json.RawMessage(answer), "")
 }
+
+/*
+A code sent by mail, for somebody with no phone to hand.
+
+The weakest of the three factors — it is only as good as the mailbox — and the
+one whose offering rule matters most: it must appear only where the server can
+send and the address has been proved.
+*/
+
+/*
+TestAnEmailedCodeIsOfferedOnlyWhereItCouldArrive.
+
+Two conditions, and the test covers all four combinations because the failure
+that matters is offering something that cannot work: somebody with a lost phone
+choosing "send me a code" and then waiting for a message nobody sent.
+*/
+func TestAnEmailedCodeIsOfferedOnlyWhereItCouldArrive(t *testing.T) {
+	t.Run("no mail, no confirmed address", func(t *testing.T) {
+		handler := newTestAPI(t)
+		completeSetup(t, handler)
+
+		token := secondFactorAccount(t, handler, "amina")
+		enrolSecondFactor(t, handler, token)
+
+		if offers(t, handler, "amina")["email"] == true {
+			t.Error("offered on a server that sends no mail")
+		}
+	})
+
+	t.Run("mail, but no confirmed address", func(t *testing.T) {
+		handler, _ := withMail(t)
+		completeSetup(t, handler)
+
+		token := secondFactorAccount(t, handler, "amina")
+		enrolSecondFactor(t, handler, token)
+
+		if offers(t, handler, "amina")["email"] == true {
+			t.Error("offered for an account whose address nobody has proved")
+		}
+	})
+
+	t.Run("mail and a confirmed address", func(t *testing.T) {
+		handler, _ := withMail(t)
+		completeSetup(t, handler)
+
+		if recorder := call(t, handler, http.MethodPost, "/api/auth/register", map[string]string{
+			"username": "amina", "email": "amina@example.test", "password": testPassword,
+		}, ""); recorder.Code != http.StatusCreated {
+			t.Fatalf("register: status %d", recorder.Code)
+		}
+		markEmailVerified(t, handler, "amina@example.test")
+
+		token := signIn(t, handler, "amina", testPassword)
+		enrolSecondFactor(t, handler, token)
+
+		if offers(t, handler, "amina")["email"] != true {
+			t.Error("not offered where mail works and the address is confirmed")
+		}
+	})
+}
+
+/*
+TestAnEmailedCodeCompletesASignIn.
+
+The whole path: ask for one, read it out of what was sent, use it.
+*/
+func TestAnEmailedCodeCompletesASignIn(t *testing.T) {
+	handler, post := withMail(t)
+	completeSetup(t, handler)
+
+	if recorder := call(t, handler, http.MethodPost, "/api/auth/register", map[string]string{
+		"username": "amina", "email": "amina@example.test", "password": testPassword,
+	}, ""); recorder.Code != http.StatusCreated {
+		t.Fatalf("register: status %d", recorder.Code)
+	}
+	markEmailVerified(t, handler, "amina@example.test")
+
+	token := signIn(t, handler, "amina", testPassword)
+	enrolSecondFactor(t, handler, token)
+
+	begun := beginPasswordSignIn(t, handler, "amina")
+	ticket, _ := begun["ticket"].(string)
+
+	if recorder := call(t, handler, http.MethodPost, "/api/auth/second-factor/email",
+		map[string]string{"ticket": ticket}, ""); recorder.Code != http.StatusAccepted {
+		t.Fatalf("asking for a code: status %d, body %s", recorder.Code, recorder.Body.String())
+	}
+
+	code := digitsFromMail(t, post)
+
+	recorder := call(t, handler, http.MethodPost, "/api/auth/second-factor/email/verify",
+		map[string]string{"ticket": ticket, "code": code}, "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("using the code: status %d, body %s", recorder.Code, recorder.Body.String())
+	}
+	if session, _ := decode(t, recorder)["token"].(string); session == "" {
+		t.Error("an emailed code issued no session")
+	}
+
+	// And it is good once.
+	second := beginPasswordSignIn(t, handler, "amina")
+	secondTicket, _ := second["ticket"].(string)
+	if recorder := call(t, handler, http.MethodPost, "/api/auth/second-factor/email/verify",
+		map[string]string{"ticket": secondTicket, "code": code}, ""); recorder.Code == http.StatusOK {
+		t.Error("the same emailed code worked twice")
+	}
+}
+
+// offers reads which factors a sign-in says are available.
+func offers(t *testing.T, handler http.Handler, username string) map[string]any {
+	t.Helper()
+
+	methods, _ := beginPasswordSignIn(t, handler, username)["methods"].(map[string]any)
+	return methods
+}
+
+// digitsFromMail pulls the six digits out of the message that was sent.
+func digitsFromMail(t *testing.T, post *testPostbox) string {
+	t.Helper()
+
+	delivered := post.delivered()
+	if len(delivered) == 0 {
+		t.Fatal("no code was sent")
+	}
+
+	body := delivered[len(delivered)-1].Body
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) == 6 && strings.Trim(trimmed, "0123456789") == "" {
+			return trimmed
+		}
+	}
+
+	t.Fatalf("no six-digit code in the message:\n%s", body)
+	return ""
+}

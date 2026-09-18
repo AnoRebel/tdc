@@ -212,6 +212,7 @@ func (s *Server) handleSecondFactorStatus(c *echo.Context) error {
 		"methods": map[string]any{
 			"code":    offers.Code,
 			"passkey": offers.Passkey,
+			"email":   offers.Email,
 		},
 		// Whether the operator requires it of this account, so somebody is told
 		// why they are being asked rather than left to wonder.
@@ -568,6 +569,148 @@ func (s *Server) handleFinishSecondFactorPasskey(c *echo.Context) error {
 
 	// The device from the first request, as the code path does: the session
 	// records where the sign-in began rather than where it finished.
+	session, err := s.identity.StartSession(ctx, user.ID,
+		identity.DeviceContext{UserAgent: accepted.UserAgent, IPAddress: accepted.Address},
+		s.config.SessionLifetime)
+	if err != nil {
+		return err
+	}
+
+	if err := s.audit.Record(ctx, audit.Entry{
+		ActorID:    &user.ID,
+		ActorLabel: user.Username,
+		Action:     audit.ActionSignInSucceeded,
+		SourceIP:   address,
+		UserAgent:  c.Request().UserAgent(),
+	}); err != nil {
+		return err
+	}
+
+	setSessionCookie(c, session.Token, s.config.SecureCookies,
+		int(time.Until(session.Record.ExpiresAt).Seconds()))
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"user":              s.userResponse(user),
+		"token":             session.Token,
+		"expiresAt":         session.Record.ExpiresAt,
+		"recoveryCodesLeft": accepted.RecoveryCodesLeft,
+	})
+}
+
+/*
+Sending a code to a confirmed address, for somebody with no phone to hand.
+
+The weakest of the three factors, and the one offered last. It is only as good
+as the mailbox — somebody who has taken over an inbox has taken over this — and
+it exists because the alternative for somebody whose phone is lost is writing to
+an administrator.
+
+Offered only where the server can send mail and the account's address has been
+confirmed. An unconfirmed address is one somebody typed into a form, and mailing
+a way past the second factor to it would undo the factor.
+*/
+
+type emailedCodeRequest struct {
+	Ticket string `json:"ticket"`
+	Code   string `json:"code,omitempty"`
+}
+
+// handleSendEmailedCode mails a code for a pending sign-in.
+func (s *Server) handleSendEmailedCode(c *echo.Context) error {
+	if s.secondFactor == nil || s.mail == nil || !s.mail.Configured() {
+		return echo.NewHTTPError(http.StatusNotFound, "this server cannot send a code by mail")
+	}
+
+	ctx := c.Request().Context()
+
+	var request emailedCodeRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	pending, err := s.secondFactor.PendingFor(ctx, request.Ticket)
+	if errors.Is(err, secondfactor.ErrRejected) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "this sign-in cannot be completed")
+	}
+	if err != nil {
+		return err
+	}
+
+	user, err := s.identity.UserByID(ctx, pending)
+	if err != nil {
+		return err
+	}
+
+	/*
+		Only a confirmed address.
+
+		An unconfirmed one is something somebody typed into a form, and mailing
+		a way past the second factor to it would make "put an address in your
+		profile" a way round the factor entirely.
+	*/
+	if !user.EmailVerified || user.Email == nil {
+		return echo.NewHTTPError(http.StatusConflict,
+			"this account has no confirmed email address to send a code to")
+	}
+
+	message, err := s.secondFactor.SendEmailedCode(ctx, request.Ticket, *user.Email, s.serverName())
+	if errors.Is(err, secondfactor.ErrRejected) {
+		return echo.NewHTTPError(http.StatusUnauthorized, "this sign-in cannot be completed")
+	}
+	if err != nil {
+		return err
+	}
+
+	// After the response, as the recovery mail is: the caller must not learn
+	// anything from how long this took.
+	s.inBackground(ctx, "second factor code", func(ctx context.Context) {
+		if err := s.mail.Send(ctx, message); err != nil {
+			s.log.Error("sending a sign-in code", "error", err)
+		}
+	})
+
+	return c.JSON(http.StatusAccepted, map[string]any{
+		"message": "A code is on its way to the address on your account.",
+	})
+}
+
+// handleEmailedCode spends a ticket that an emailed code answered.
+func (s *Server) handleEmailedCode(c *echo.Context) error {
+	if s.secondFactor == nil || s.mail == nil || !s.mail.Configured() {
+		return echo.NewHTTPError(http.StatusNotFound, "this server cannot send a code by mail")
+	}
+
+	ctx := c.Request().Context()
+	address := requestIP(c)
+
+	var request emailedCodeRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	accepted, err := s.secondFactor.CompleteWithEmailedCode(ctx, request.Ticket, request.Code)
+	switch {
+	case errors.Is(err, secondfactor.ErrTooManyAttempts):
+		return echo.NewHTTPError(http.StatusTooManyRequests,
+			"too many codes have been tried — sign in again to start over")
+	case errors.Is(err, secondfactor.ErrRejected):
+		if recordErr := s.audit.Record(ctx, audit.Entry{
+			Action:    audit.ActionSignInFailed,
+			SourceIP:  address,
+			UserAgent: c.Request().UserAgent(),
+		}); recordErr != nil {
+			return recordErr
+		}
+		return echo.NewHTTPError(http.StatusUnauthorized, "that code was not accepted")
+	case err != nil:
+		return err
+	}
+
+	user, err := s.identity.UserByID(ctx, accepted.UserID)
+	if err != nil {
+		return err
+	}
+
 	session, err := s.identity.StartSession(ctx, user.ID,
 		identity.DeviceContext{UserAgent: accepted.UserAgent, IPAddress: accepted.Address},
 		s.config.SessionLifetime)

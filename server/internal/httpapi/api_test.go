@@ -25,6 +25,8 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/invitations"
+	"github.com/google/uuid"
+
 	"github.com/AnoRebel/tdc/server/internal/mail"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
@@ -156,6 +158,28 @@ func (p *testPostbox) delivered() []mail.Message {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return append([]mail.Message(nil), p.sent...)
+}
+
+/*
+secondFactorForTest builds the second-factor service, told whether mail could
+reach an account.
+
+The same two conditions a real server applies: a mail server to send through,
+and an address somebody has proved.
+*/
+func secondFactorForTest(queries *dbgen.Queries, logger *slog.Logger) *secondfactor.Service {
+	service := secondfactor.NewService("Test Server", queries, logger)
+	service.UseMail(func(ctx context.Context, userID uuid.UUID) bool {
+		if postboxForTest == nil {
+			return false
+		}
+		user, err := queries.GetUserByID(ctx, userID)
+		if err != nil {
+			return false
+		}
+		return user.EmailVerified && user.Email != nil
+	})
+	return service
 }
 
 // recoveryForTest builds the recovery service, which needs mail and an address
@@ -330,7 +354,7 @@ func newTestAPIConfigured(
 		Passkeys: passkeysForTest(t, queries, logger),
 		// Always present, as on a real server: optional per account, and the
 		// operator's policy decides whether it is required.
-		SecondFactor: secondfactor.NewService("Test Server", queries, logger),
+		SecondFactor: secondFactorForTest(queries, logger),
 		/*
 			Mail is delivered to a slice, so a test can read what would have
 			been sent. Off unless a test asked for it, which is the ordinary
