@@ -88,3 +88,31 @@ DELETE FROM typing_indicators WHERE expires_at <= NOW();
 
 -- name: SetTypingPreference :exec
 UPDATE users SET sends_typing_indication = $2, updated_at = NOW() WHERE id = $1;
+
+-- name: GetDisclosurePreferences :one
+-- What this person lets a member list say about them.
+--
+-- Defaults when there is no row, which is the ordinary case: user_privacy is
+-- written on the first change, and somebody who has never opened these
+-- settings discloses all three.
+SELECT
+    COALESCE(shows_presence, TRUE)::boolean  AS shows_presence,
+    COALESCE(shows_status, TRUE)::boolean    AS shows_status,
+    COALESCE(shows_last_seen, TRUE)::boolean AS shows_last_seen
+FROM user_privacy WHERE user_id = $1;
+
+-- name: SetDisclosurePreferences :exec
+-- All three together, because the interface presents them together: a person
+-- toggling one sends the state of all three, and writing them in one statement
+-- means two concurrent changes cannot leave a mixture of old and new.
+--
+-- An upsert, since the row may not exist yet. direct_messages is left to its
+-- own default on insert and untouched on update — the two settings live on one
+-- row but are not one decision.
+INSERT INTO user_privacy (user_id, shows_presence, shows_status, shows_last_seen)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id) DO UPDATE
+SET shows_presence = EXCLUDED.shows_presence,
+    shows_status = EXCLUDED.shows_status,
+    shows_last_seen = EXCLUDED.shows_last_seen,
+    updated_at = NOW();

@@ -156,6 +156,32 @@ const directMessageOptions = [
   },
 ];
 
+/*
+ * The three details a member list may carry beyond a name.
+ *
+ * Phrased as what is shown rather than what is hidden, because the control is a
+ * checkbox somebody ticks to be seen. Last seen is separate from presence
+ * deliberately: "online now" and "last here at 03:12" disclose quite different
+ * things, and people who are happy with the first often are not with the second.
+ */
+const disclosureOptions = [
+  {
+    field: "showsPresence" as const,
+    label: "Whether I am online",
+    detail: "Turning this off does not disconnect you or change what you receive.",
+  },
+  {
+    field: "showsStatus" as const,
+    label: "My status",
+    detail: "The status you have chosen and the note that goes with it.",
+  },
+  {
+    field: "showsLastSeen" as const,
+    label: "When I was last here",
+    detail: "A record of when you work and when you stop, if it is shown.",
+  },
+];
+
 onMounted(() => void personal.refresh());
 
 const { user, can, signOut, listSessions, revokeSession } = useAuth();
@@ -570,6 +596,43 @@ function deviceName(userAgent: string): string {
             </span>
           </label>
         </div>
+
+        <!-- What a member list says about you. Your name and address are not
+             here because they are how a message is attributed and a
+             conversation is opened: a list without them is not a member list.
+             Anything you turn off is left out of what the server sends, rather
+             than sent and hidden. -->
+        <h3 class="mt-5 text-xs font-semibold">What others can see about you</h3>
+        <p class="mt-1 text-xs text-muted-foreground">
+          Your name and address are always shown. Anything you turn off here is left out of what the
+          server sends, not hidden afterwards.
+        </p>
+
+        <div class="mt-3 space-y-1">
+          <label
+            v-for="detail in disclosureOptions"
+            :key="detail.field"
+            class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+          >
+            <input
+              type="checkbox"
+              class="mt-0.5 cursor-pointer accent-primary"
+              :checked="personal.disclosure.value[detail.field]"
+              @change="
+                personal.setDisclosure(detail.field, !personal.disclosure.value[detail.field])
+              "
+            />
+            <span class="min-w-0">
+              <span class="block text-sm font-medium">{{ detail.label }}</span>
+              <span class="block text-xs text-muted-foreground">{{ detail.detail }}</span>
+            </span>
+          </label>
+        </div>
+
+        <p class="mt-2 text-[0.6875rem] text-muted-foreground">
+          A moderator reviewing a report can see what you have turned off, and every time they do it
+          is written to the audit log.
+        </p>
       </section>
 
       <section>

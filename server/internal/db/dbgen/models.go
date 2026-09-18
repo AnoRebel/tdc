@@ -444,6 +444,9 @@ type UserPrivacy struct {
 	UserID         uuid.UUID
 	DirectMessages string
 	UpdatedAt      time.Time
+	ShowsPresence  bool
+	ShowsStatus    bool
+	ShowsLastSeen  bool
 }
 
 type UserRole struct {

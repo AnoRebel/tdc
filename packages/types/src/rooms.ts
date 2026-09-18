@@ -35,13 +35,31 @@ export interface Room {
   retentionFromChannel?: boolean;
 }
 
-/** Someone in a room. */
+/**
+ * Someone in a room.
+ *
+ * The optional fields are details this person may have withheld. Absent means
+ * withheld, and a client must not substitute a default: showing "offline" for
+ * somebody who withheld their presence discloses exactly what they withheld.
+ */
 export interface RoomMember {
   id: string;
   username: string;
   displayName: string;
   address: string;
   joinedAt: string;
+
+  online?: boolean;
+  status?: string;
+  statusText?: string;
+  lastSeenAt?: string;
+
+  /**
+   * Which details this person withholds, sent only to a moderator who asked to
+   * moderate and is being shown them. Its presence is what tells the interface
+   * it is displaying an exception rather than ordinary information.
+   */
+  withheld?: string[];
 }
 
 /** An event in a room's timeline. */
@@ -411,3 +429,24 @@ export interface BlockedPerson {
 
 /** Who may open a direct conversation with somebody. */
 export type DirectMessagePolicy = "anyone" | "shared" | "nobody";
+
+/**
+ * What a member list may say about somebody beyond their name.
+ *
+ * A name and an address are never optional — they are how a message is
+ * attributed and a conversation is opened. These three are, and the server
+ * omits a withheld one from the response rather than sending it to be hidden.
+ */
+export interface DisclosureSettings {
+  /** Whether others may see them as online or offline at all. */
+  showsPresence: boolean;
+  /** Their chosen status and the text explaining it, which travel together. */
+  showsStatus: boolean;
+  /** When they were last here — the most revealing of the three. */
+  showsLastSeen: boolean;
+}
+
+/** Somebody's own privacy settings, as the settings screen reads them. */
+export interface PrivacySettings extends DisclosureSettings {
+  directMessages: DirectMessagePolicy;
+}

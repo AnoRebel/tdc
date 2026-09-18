@@ -267,6 +267,41 @@ The server supports giving a status an expiry so that it reverts by itself, and
 supports appearing offline while connected, but neither has a control in the
 clients yet.
 
+### What a member list says about you
+
+A channel's members can see who else is in it. Your **name and address are
+always shown** — they are how a message is attributed and a conversation is
+opened, so a list without them is not a member list.
+
+The three details past that are yours, under Settings → Privacy:
+
+- **Whether you are online.** Turning it off does not disconnect you or change
+  what you receive; it stops the server answering the question.
+- **Your status**, along with the note that goes with it. One setting for both,
+  because a status without its note ("Away", with no "back at four") gives away
+  the fact while withholding the part that made it useful.
+- **When you were last here.** The most revealing of the three — a last-seen
+  time is a record of when you work and when you stop — and separate from
+  presence, because "online now" and "last here at 03:12" are different things
+  to disclose.
+
+All three are shown by default, and each is a separate choice: hiding when you
+were last here does not hide whether you are online now.
+
+**A detail you turn off is left out of what the server sends**, rather than sent
+and hidden by the application. This is the difference that matters: a detail
+that reaches the client has been disclosed whatever the client then does with
+it, and anybody who can read a network response can read it.
+
+These are standing choices, and not the same as _Appear offline_. Appearing
+offline is about this afternoon and lapses when you turn it off; these hold
+until you change them.
+
+**A moderator reviewing a report can see what you have turned off**, and every
+time one does it is written to the audit log. A report about somebody's status
+cannot be judged without reading it, so the answer is not to refuse the access
+but to account for it — which is what lets you see that it happened.
+
 ### Typing indicators
 
 You see who is composing, and the indicator disappears by itself when it stops

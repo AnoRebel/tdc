@@ -114,6 +114,23 @@ const (
 	*/
 	ActionMessageRemoved Action = "message.removed"
 
+	/*
+		ActionWithheldDetailsViewed records a moderator seeing what somebody
+		chose not to show.
+
+		A privacy setting a moderator can quietly step around is not a privacy
+		setting. Moderation needs the access — a report about somebody's status
+		cannot be judged without reading it — so the answer is not to refuse but
+		to account for it, which is what makes the exception reviewable by the
+		person it was used against.
+
+		Recorded only when there was something withheld to see. A moderator
+		opening a member list where everybody discloses everything has learned
+		nothing they could not have learned as an ordinary member, and logging
+		that would bury the views that mattered.
+	*/
+	ActionWithheldDetailsViewed Action = "user.withheld_details.viewed"
+
 	// ActionAuditPruned records the log removing its own oldest entries, so a
 	// gap in it is explained rather than merely present.
 	ActionAuditPruned Action = "server.audit.pruned"

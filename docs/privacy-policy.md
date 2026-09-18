@@ -132,6 +132,14 @@ Whether you are currently connected, how many connections you hold, the status
 you have chosen and any text with it, whether you are appearing offline, and
 when you were last seen. Typing indicators, which expire on their own.
 
+Which of these other people see is yours to set, under Settings → Privacy:
+whether you are online, your status, and when you were last here can each be
+withheld. A detail you withhold is left out of what the server sends to other
+people rather than sent and hidden by the application. It is still recorded
+here — the server needs your connection count to know whether to deliver a
+notification — and a moderator reviewing a report can still see it, which is
+written to the audit log each time.
+
 ### Notifications
 
 What you have been notified about, why, and whether you have read it — kept on

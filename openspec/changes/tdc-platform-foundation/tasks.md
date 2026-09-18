@@ -114,7 +114,7 @@ Goal: notifications and search, so the product works when you are not looking at
 - [x] 6.10 Build the web notification and search interface; verify both are usable end to end
 - [x] **MILESTONE 6** — Demonstrate: a mention raises an in-app notification, muting silences it while unread state still updates, and searching returns matching messages ranked by recency with results from private channels correctly excluded. Tag `v0.6.0-dev`.
 
-- [ ] 6.10a Implement per-person disclosure settings and a member list that omits withheld details server-side rather than sending them to be hidden; verify a non-member cannot enumerate a private channel's members and that moderator access to withheld details is audited (`messaging/channels`, `platform/audit-log`)
+- [x] 6.10a Implement per-person disclosure settings and a member list that omits withheld details server-side rather than sending them to be hidden; verify a non-member cannot enumerate a private channel's members and that moderator access to withheld details is audited (`messaging/channels`, `platform/audit-log`)
 
 ## 7. Phase 7 — Operators are in control
 

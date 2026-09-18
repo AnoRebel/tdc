@@ -579,30 +579,150 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 	return c.JSON(http.StatusCreated, messageResponseOf(event))
 }
 
+/*
+memberResponse is one person in a member list.
+
+The name and address are always present: they are how a message is attributed
+and a conversation is opened, and a list without them is not a member list.
+
+Everything else is omitted when the person has withheld it — omitted, not sent
+as false or empty, because a detail sent is a detail disclosed however the
+client behaves. omitempty on a pointer is what makes the field absent from the
+JSON rather than present and null.
+*/
+type memberResponse struct {
+	ID          string    `json:"id"`
+	Username    string    `json:"username"`
+	DisplayName string    `json:"displayName"`
+	Address     string    `json:"address"`
+	JoinedAt    time.Time `json:"joinedAt"`
+
+	Online     *bool      `json:"online,omitempty"`
+	Status     *string    `json:"status,omitempty"`
+	StatusText *string    `json:"statusText,omitempty"`
+	LastSeenAt *time.Time `json:"lastSeenAt,omitempty"`
+
+	/*
+		Withheld names the details this person does not disclose, and is sent
+		only to a moderator who is being shown them anyway.
+
+		It exists so a moderator can see that they are looking at something the
+		person chose to hide, rather than reading it as ordinary information.
+		Sending it to everybody would defeat the setting: "this field is
+		withheld" answers the question the person declined to answer.
+	*/
+	Withheld []string `json:"withheld,omitempty"`
+}
+
 func (s *Server) handleRoomMembers(c *echo.Context) error {
 	user, _ := currentUser(c)
+	ctx := c.Request().Context()
 
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
-	members, err := s.rooms.Members(c.Request().Context(), roomID, user.ID)
+	/*
+		The moderation context is asked for, not assumed.
+
+		Without the query parameter a moderator sees exactly what anybody else
+		sees. Opening a member list is not moderating, and a moderator who never
+		asked to look past somebody's settings should not have done so — nor
+		collected an audit entry saying they did.
+	*/
+	asModerator := c.QueryParam("moderating") == "true" && s.mayModerate(ctx, user)
+
+	members, err := s.rooms.MembersWithDisclosure(ctx, roomID, user.ID, asModerator)
 	if err != nil {
 		return roomError(err)
 	}
 
-	response := make([]map[string]any, 0, len(members))
+	response := make([]memberResponse, 0, len(members))
+	disclosed := make([]string, 0)
 	for _, member := range members {
-		response = append(response, map[string]any{
-			"id":          member.ID.String(),
-			"username":    member.Username,
-			"displayName": member.DisplayName,
-			"address":     member.Username + "@" + s.serverName(),
-			"joinedAt":    member.JoinedAt,
-		})
+		entry := memberResponse{
+			ID:          member.ID.String(),
+			Username:    member.Username,
+			DisplayName: member.DisplayName,
+			Address:     member.Username + "@" + s.serverName(),
+			JoinedAt:    member.JoinedAt,
+		}
+
+		// Each detail is attached only when it is not withheld. The query has
+		// already refused to read a withheld one, so what these guards prevent
+		// is sending its zero value as though it were an answer.
+		if !member.WithholdsPresence {
+			online := member.Online
+			entry.Online = &online
+		}
+		if !member.WithholdsStatus {
+			status, statusText := member.Status, member.StatusText
+			entry.Status, entry.StatusText = &status, &statusText
+		}
+		// The query returns the Unix epoch for "no answer" — withheld, or a
+		// person who has never connected. Anything at or before it is not a
+		// time somebody was last seen.
+		if !member.WithholdsLastSeen && member.LastSeenAt.After(time.Unix(0, 0)) {
+			lastSeen := member.LastSeenAt
+			entry.LastSeenAt = &lastSeen
+		}
+
+		if asModerator {
+			entry.Withheld = withheldNames(member)
+			if len(entry.Withheld) > 0 {
+				disclosed = append(disclosed, member.Username)
+			}
+		}
+
+		response = append(response, entry)
 	}
+
+	/*
+		Recorded once for the request rather than once per person, and only when
+		something withheld was actually shown. A moderator who opened a list
+		where everybody discloses everything learned nothing an ordinary member
+		could not have, and an entry for that would bury the ones that matter.
+	*/
+	if len(disclosed) > 0 {
+		s.recordModeration(c, user, audit.ActionWithheldDetailsViewed,
+			"room", roomID.String(), map[string]any{"people": disclosed})
+	}
+
 	return c.JSON(http.StatusOK, response)
+}
+
+// withheldNames lists the details this person does not disclose.
+func withheldNames(member dbgen.ListRoomMembersWithDisclosureRow) []string {
+	withheld := make([]string, 0, 3)
+	if member.WithholdsPresence {
+		withheld = append(withheld, "presence")
+	}
+	if member.WithholdsStatus {
+		withheld = append(withheld, "status")
+	}
+	if member.WithholdsLastSeen {
+		withheld = append(withheld, "lastSeen")
+	}
+	return withheld
+}
+
+/*
+mayModerate reports whether somebody holds the moderation permission.
+
+Separate from the route middleware because this is not a moderation route: the
+member list is for everybody, and moderating is a thing one caller may
+additionally be doing. A server with no authz configured moderates nobody.
+*/
+func (s *Server) mayModerate(ctx context.Context, actor dbgen.User) bool {
+	if s.authz == nil {
+		return false
+	}
+	permissions, err := s.authz.PermissionsFor(ctx, actor.ID)
+	if err != nil {
+		return false
+	}
+	return permissions.AllowsServer(authz.PermModerationReview).Allowed
 }
 
 // roomError maps a rooms failure to a response.

@@ -12,6 +12,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
+	"github.com/AnoRebel/tdc/server/internal/presence"
 )
 
 type banRequest struct {
@@ -226,25 +227,68 @@ func (s *Server) handleListBlocked(c *echo.Context) error {
 type privacyRequest struct {
 	// DirectMessages is "anyone", "shared", or "nobody".
 	DirectMessages string `json:"directMessages"`
+
+	/*
+		What a member list may say about this person beyond their name.
+
+		Pointers so that a request omitting them leaves them alone. An older
+		client sending only directMessages must not silently withdraw somebody's
+		presence because its request body had no field for it.
+	*/
+	ShowsPresence *bool `json:"showsPresence,omitempty"`
+	ShowsStatus   *bool `json:"showsStatus,omitempty"`
+	ShowsLastSeen *bool `json:"showsLastSeen,omitempty"`
 }
 
-// handleSetPrivacy records who may open a conversation with somebody.
+// handleSetPrivacy records who may open a conversation with somebody, and what
+// a member list may say about them.
 func (s *Server) handleSetPrivacy(c *echo.Context) error {
 	user, _ := currentUser(c)
+	ctx := c.Request().Context()
 
 	var request privacyRequest
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	err := s.moderation.SetDirectMessagePolicy(c.Request().Context(), user.ID,
-		moderation.DirectMessagePolicy(request.DirectMessages))
-	if errors.Is(err, moderation.ErrUnknownPolicy) {
-		return echo.NewHTTPError(http.StatusBadRequest,
-			`direct messages must be "anyone", "shared" or "nobody"`)
+	if request.DirectMessages != "" {
+		err := s.moderation.SetDirectMessagePolicy(ctx, user.ID,
+			moderation.DirectMessagePolicy(request.DirectMessages))
+		if errors.Is(err, moderation.ErrUnknownPolicy) {
+			return echo.NewHTTPError(http.StatusBadRequest,
+				`direct messages must be "anyone", "shared" or "nobody"`)
+		}
+		if err != nil {
+			return err
+		}
 	}
-	if err != nil {
-		return err
+
+	/*
+		Read before written, so a request naming one detail leaves the other two
+		as they were. The alternative — writing all three from the request — would
+		make a client that knows about two settings withdraw the third.
+	*/
+	if request.ShowsPresence != nil || request.ShowsStatus != nil || request.ShowsLastSeen != nil {
+		if s.presence == nil {
+			return echo.NewHTTPError(http.StatusNotFound, "this server does not track presence")
+		}
+
+		disclosure, err := s.presence.DisclosureFor(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if request.ShowsPresence != nil {
+			disclosure.Presence = *request.ShowsPresence
+		}
+		if request.ShowsStatus != nil {
+			disclosure.Status = *request.ShowsStatus
+		}
+		if request.ShowsLastSeen != nil {
+			disclosure.LastSeen = *request.ShowsLastSeen
+		}
+		if err := s.presence.SetDisclosure(ctx, user.ID, disclosure); err != nil {
+			return err
+		}
 	}
 
 	return c.NoContent(http.StatusNoContent)
@@ -253,10 +297,27 @@ func (s *Server) handleSetPrivacy(c *echo.Context) error {
 // handleGetPrivacy returns somebody's own settings.
 func (s *Server) handleGetPrivacy(c *echo.Context) error {
 	user, _ := currentUser(c)
+	ctx := c.Request().Context()
 
-	policy := s.moderation.DirectMessagePolicyFor(c.Request().Context(), user.ID)
+	response := privacyRequest{
+		DirectMessages: string(s.moderation.DirectMessagePolicyFor(ctx, user.ID)),
+	}
 
-	return c.JSON(http.StatusOK, privacyRequest{DirectMessages: string(policy)})
+	// Their own settings, so nothing is withheld here: this is the screen on
+	// which somebody changes them, and it has to show what they are.
+	disclosure := presence.DisclosesEverything()
+	if s.presence != nil {
+		read, err := s.presence.DisclosureFor(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		disclosure = read
+	}
+	response.ShowsPresence = &disclosure.Presence
+	response.ShowsStatus = &disclosure.Status
+	response.ShowsLastSeen = &disclosure.LastSeen
+
+	return c.JSON(http.StatusOK, response)
 }
 
 // recordModeration writes an audit entry for an exercise of authority.

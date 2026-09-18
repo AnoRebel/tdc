@@ -203,6 +203,12 @@ type Querier interface {
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetDirectMessagePolicy(ctx context.Context, userID uuid.UUID) (string, error)
+	// What this person lets a member list say about them.
+	//
+	// Defaults when there is no row, which is the ordinary case: user_privacy is
+	// written on the first change, and somebody who has never opened these
+	// settings discloses all three.
+	GetDisclosurePreferences(ctx context.Context, userID uuid.UUID) (GetDisclosurePreferencesRow, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
 	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
@@ -338,6 +344,29 @@ type Querier interface {
 	// Just the identifiers, for deciding who a live event should reach.
 	ListRoomMemberIDs(ctx context.Context, roomID uuid.UUID) ([]uuid.UUID, error)
 	ListRoomMembers(ctx context.Context, roomID uuid.UUID) ([]ListRoomMembersRow, error)
+	// Who is in a channel, with the details each person allows to be disclosed.
+	//
+	// The withholding happens here rather than in Go, and that is the point of the
+	// query: a detail somebody has withheld is never read out of the database, so
+	// there is no value in memory for a later change to send by accident. A
+	// withheld detail comes back as the zero value, and the withholds_* flags
+	// beside it are what tell the handler to omit the field rather than send a
+	// false or an empty string that would read as an answer.
+	//
+	// user_privacy is sparse — a row appears when somebody first changes a setting
+	// — so every flag is read through COALESCE with the disclosing default. A plain
+	// join would withhold everything from everybody who has never opened the
+	// settings, which is nearly everybody.
+	//
+	// sqlc.arg(as_moderator) is the moderation context. A moderator reviewing a
+	// report needs to see what was withheld — a report about somebody's status
+	// cannot be judged without it — and the handler records that access in the
+	// audit log. Passed as an argument rather than served by a second query so the
+	// two cannot drift into disagreeing about what "withheld" means.
+	// Left, because presence is created on first connection: somebody who has
+	// never connected has no row, and an inner join would drop them from the
+	// member list entirely. The same is true of user_privacy.
+	ListRoomMembersWithDisclosure(ctx context.Context, arg ListRoomMembersWithDisclosureParams) ([]ListRoomMembersWithDisclosureRow, error)
 	// Reply counts for every thread in a room, in one query.
 	//
 	// By room rather than by a list of message identifiers: a timeline wants the
@@ -509,6 +538,14 @@ type Querier interface {
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
 	SetDirectMessagePolicy(ctx context.Context, arg SetDirectMessagePolicyParams) error
+	// All three together, because the interface presents them together: a person
+	// toggling one sends the state of all three, and writing them in one statement
+	// means two concurrent changes cannot leave a mixture of old and new.
+	//
+	// An upsert, since the row may not exist yet. direct_messages is left to its
+	// own default on insert and untouched on update — the two settings live on one
+	// row but are not one decision.
+	SetDisclosurePreferences(ctx context.Context, arg SetDisclosurePreferencesParams) error
 	// Recording a code that has just been mailed. Replaces any outstanding one, so
 	// asking again is how somebody who lost the first message gets a usable code.
 	SetEmailedCode(ctx context.Context, arg SetEmailedCodeParams) error

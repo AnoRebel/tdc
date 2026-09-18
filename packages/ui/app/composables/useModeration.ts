@@ -1,4 +1,11 @@
-import type { BlockedPerson, ChannelBan, DirectMessagePolicy, Report } from "@tdc/types";
+import type {
+  BlockedPerson,
+  ChannelBan,
+  DirectMessagePolicy,
+  DisclosureSettings,
+  PrivacySettings,
+  Report,
+} from "@tdc/types";
 
 /**
  * Blocking and privacy, which belong to the person rather than to a moderator.
@@ -13,14 +20,32 @@ export function usePersonalModeration() {
   const blocked = ref<BlockedPerson[]>([]);
   const directMessages = ref<DirectMessagePolicy>("anyone");
 
+  /**
+   * What a member list may say about this person.
+   *
+   * Disclosing by default, matching the server: somebody who has never opened
+   * these settings shows all three, and the setting exists so they can choose
+   * otherwise.
+   */
+  const disclosure = ref<DisclosureSettings>({
+    showsPresence: true,
+    showsStatus: true,
+    showsLastSeen: true,
+  });
+
   async function refresh() {
     try {
       const [people, privacy] = await Promise.all([
         api.get<BlockedPerson[]>("/api/me/blocks"),
-        api.get<{ directMessages: DirectMessagePolicy }>("/api/me/privacy"),
+        api.get<PrivacySettings>("/api/me/privacy"),
       ]);
       blocked.value = people;
       directMessages.value = privacy.directMessages;
+      disclosure.value = {
+        showsPresence: privacy.showsPresence,
+        showsStatus: privacy.showsStatus,
+        showsLastSeen: privacy.showsLastSeen,
+      };
     } catch {
       // A settings page that cannot load is shown empty rather than as an
       // error: the rest of the application still works.
@@ -50,7 +75,36 @@ export function usePersonalModeration() {
     }
   }
 
-  return { blocked, directMessages, refresh, block, unblock, setDirectMessages };
+  /**
+   * Changes one disclosure setting, leaving the other two alone.
+   *
+   * Only the changed field is sent. The server reads the others before writing,
+   * so a request naming one cannot withdraw a decision made earlier — but
+   * sending only what changed is what makes that true from this end too.
+   */
+  async function setDisclosure(field: keyof DisclosureSettings, shown: boolean) {
+    const before = disclosure.value[field];
+    disclosure.value = { ...disclosure.value, [field]: shown };
+
+    try {
+      await api.put("/api/me/privacy", { [field]: shown });
+    } catch {
+      // Put back, so the control never shows a setting the server did not
+      // accept.
+      disclosure.value = { ...disclosure.value, [field]: before };
+    }
+  }
+
+  return {
+    blocked,
+    directMessages,
+    disclosure,
+    refresh,
+    block,
+    unblock,
+    setDirectMessages,
+    setDisclosure,
+  };
 }
 
 /**

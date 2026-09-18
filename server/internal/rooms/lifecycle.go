@@ -321,6 +321,40 @@ func (s *Service) Members(ctx context.Context, roomID, userID uuid.UUID) ([]dbge
 	return members, nil
 }
 
+/*
+MembersWithDisclosure returns who is in a room, carrying only the details each
+person allows to be shown.
+
+asModerator opens the withheld details. It is the caller's job to have
+established that the caller may moderate and to record the access — this takes
+the decision rather than making it, because the permission and the audit log
+both live above this package. Passing true without both is the bug this
+signature cannot prevent, so the only caller that does is the one that checks.
+
+The withholding itself happens in the query. A detail somebody has withheld is
+never read out of the database, so there is no value in memory for a later
+change to send by accident.
+*/
+func (s *Service) MembersWithDisclosure(
+	ctx context.Context,
+	roomID, userID uuid.UUID,
+	asModerator bool,
+) ([]dbgen.ListRoomMembersWithDisclosureRow, error) {
+	if _, err := s.Visible(ctx, roomID, userID); err != nil {
+		return nil, err
+	}
+
+	members, err := s.store.ListRoomMembersWithDisclosure(ctx,
+		dbgen.ListRoomMembersWithDisclosureParams{
+			RoomID:      roomID,
+			AsModerator: asModerator,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("list members: %w", err)
+	}
+	return members, nil
+}
+
 // MemberIDs returns who should receive a room's events.
 func (s *Service) MemberIDs(ctx context.Context, roomID uuid.UUID) ([]uuid.UUID, error) {
 	ids, err := s.store.ListRoomMemberIDs(ctx, roomID)
