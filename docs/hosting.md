@@ -160,6 +160,48 @@ verified it, nothing is linked and they get a new account. That second case is
 not a limitation to work around: a provider where anybody can set an unverified
 address to anything would otherwise be a way into any account on your server.
 
+### Running more than one node
+
+One process is the ordinary deployment and needs nothing here. Two or more
+behind a load balancer need two settings, and they go together:
+
+| Setting             | What it does                                                                                  |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `server.multi_node` | Share events between nodes, so a message sent through one reaches people connected to another |
+| `cache.address`     | Share rate-limit counters, so a limit is one limit rather than one per node                   |
+
+**Setting one without the other is a mistake the server warns about.** Events
+without a shared cache means every rate limit is enforced once per node — five
+sign-in attempts becomes five per node, which nobody notices until it is being
+exploited. A shared cache without events means the limits are right and half
+your community sees a conversation that appears to have stopped.
+
+Events travel over Postgres's own `LISTEN`/`NOTIFY` rather than a queue you
+install: you are already running Postgres. The notification carries the event's
+identity, and each node reads the event from the database — so nothing is lost
+to the eight-kilobyte limit on a notification, however long the message.
+
+What that does not give you is durability. A node that is restarting misses the
+announcements sent while it was down. That is fine here and would not be
+elsewhere: the event is in the log regardless, so a client reconnecting to that
+node receives everything it missed, which is the same path a client on a bad
+connection already takes.
+
+The cache is Valkey. Redis works too — nothing here uses anything the two do not
+share — but Redis is no longer open source under a licence this project can
+depend on, and Valkey is the fork that stayed.
+
+| Setting          | Default | What it does                                 |
+| ---------------- | ------- | -------------------------------------------- |
+| `cache.address`  | —       | `host:port`. Empty is the in-process cache.  |
+| `cache.username` | —       | Where the cache wants credentials            |
+| `cache.password` | —       | Redacted wherever configuration is shown     |
+| `cache.database` | `0`     | For sharing an instance between applications |
+| `cache.tls`      | `false` | For reaching one across a network            |
+
+A server configured with a cache checks it can reach it at startup, rather than
+discovering it cannot when somebody tries to sign in.
+
 ### Roles
 
 Two exist without you doing anything. `Administrator` carries
