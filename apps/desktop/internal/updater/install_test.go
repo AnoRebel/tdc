@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -273,9 +272,14 @@ func TestDecliningAnUpdateRemovesIt(t *testing.T) {
 	}
 }
 
-// The platform this test is running on, as a feed would key it.
+/*
+The platform this test is running on, as a feed would key it.
+
+PlatformKey rather than GOOS/GOARCH: a build against the legacy toolkit asks
+for a key of its own, and a feed keyed the other way would offer it nothing.
+*/
 func platform() string {
-	return runtime.GOOS + "/" + runtime.GOARCH
+	return PlatformKey()
 }
 
 /*

@@ -205,6 +205,26 @@ here rather than by a contributor months later. Go stays pinned there, because a
 Go release can change what `vet` objects to and turn a branch red for reasons
 that have nothing to do with the change under review.
 
+If you are changing the desktop application, build it from `apps/desktop` with:
+
+```sh
+go run github.com/wailsapp/wails/v3/cmd/wails3 task build
+```
+
+On Linux that produces a GTK4 build. A second Linux build is published for
+distributions that do not have GTK4, and you can produce it with:
+
+```sh
+EXTRA_TAGS=gtk3 go run github.com/wailsapp/wails/v3/cmd/wails3 task build
+```
+
+It needs `libgtk-3-dev` and `libwebkit2gtk-4.1-dev` installed. Continuous
+integration builds it on Ubuntu 22.04 and checks two things: that it links GTK3
+rather than GTK4, and that the highest glibc version it requires is one that
+Ubuntu 22.04 actually has. A change that quietly raises that floor makes the
+build useless for the only machines it exists for, so the check fails rather
+than publishing something that cannot start.
+
 `bun install` also installs the git hooks. Before a commit they check
 formatting, run `go vet`, and check that the version in `VERSION` agrees with
 everywhere else it is written; before a push they run the Go tests and build.

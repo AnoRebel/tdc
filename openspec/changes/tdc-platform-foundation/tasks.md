@@ -240,7 +240,7 @@ Goal: everything needed for TDC and others to actually deploy and adopt it.
 - [x] 10.7 Write the federation-readiness test proving a foreign event is verifiable from only the originating server's published keys and the event's own content; verify it passes without database access to the originating server (`platform/event-log`)
 - [x] 10.8 Add dependency licence checking against an approved-licence allowlist and vulnerability scanning; verify a GPL or vulnerable dependency fails the build (`platform/foundation`)
 - [x] 10.9 Add the release workflow producing server binaries and desktop installers for Linux, macOS, and Windows on amd64+arm64 with checksums, plus multi-architecture container images; verify a test tag publishes every artifact and a single platform failure fails the release (`platform/foundation`, `clients/desktop`)
-- [ ] 10.10 Add Linux packaging producing both GTK4 and legacy gtk3 builds per the design; verify both build and the gtk3 variant runs on an older distribution
+- [x] 10.10 Add Linux packaging producing both GTK4 and legacy gtk3 builds per the design; verify both build and the gtk3 variant runs on an older distribution
 - [x] 10.11 Configure reproducible builds with `SOURCE_DATE_EPOCH` from the commit timestamp and `-trimpath`; verify two builds of one commit produce identical binaries
 - [x] 10.12 Add release-notes generation from changes since the previous tag; verify notes are attached to a test release
 - [x] 10.13 Add server memory measurement to CI reporting against the 1 GB target with the delta from baseline; verify the figures are reported on every change and an increase is surfaced for justification rather than blocking (`platform/foundation`)

@@ -2,6 +2,7 @@ package updater
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,6 +48,10 @@ func TestTheReleaseWorkflowsFeedIsReadable(t *testing.T) {
 		"linux/amd64": true, "linux/arm64": true,
 		"darwin/amd64": true, "darwin/arm64": true,
 		"windows/amd64": true, "windows/arm64": true,
+		// The legacy toolkit build, under a key of its own. See
+		// TestTheLegacyBuildIsNeverOfferedTheOrdinaryArtifact below for why
+		// that key must not be "linux/amd64".
+		"linux/amd64-gtk3": true,
 	}
 
 	for platform := range expected {
@@ -114,5 +119,65 @@ func TestThePlatformKeysMatchWhatIsAskedFor(t *testing.T) {
 	// development machine is one of the platforms the workflow builds.
 	if _, err := release.ForThisPlatform(); err != nil {
 		t.Errorf("the feed has nothing for the machine running this: %v", err)
+	}
+}
+
+/*
+The legacy build is never offered the ordinary Linux artifact.
+
+Both run on linux/amd64 as far as the Go runtime is concerned, so keying on
+GOOS/GOARCH alone hands the GTK4 binary to the machine that needed the legacy
+one — precisely the machine without GTK4, where it will not start. The whole
+reason the variant is built is that the two are not interchangeable.
+
+PlatformKey is what keeps them apart, and it is compiled per build tag, so this
+checks the mapping rather than the constant: given the key a gtk3 build asks
+for, the feed must answer with the gtk3 artifact and nothing else.
+*/
+func TestTheLegacyBuildIsNeverOfferedTheOrdinaryArtifact(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("testdata", "workflow-feed.json"))
+	if err != nil {
+		t.Fatalf("reading the sample feed: %v", err)
+	}
+
+	var release Release
+	if err := json.Unmarshal(raw, &release); err != nil {
+		t.Fatalf("parsing: %v", err)
+	}
+
+	ordinary, ok := release.Artifacts["linux/amd64"]
+	if !ok {
+		t.Fatal("no ordinary linux/amd64 artifact, so this proves nothing")
+	}
+	legacy, ok := release.Artifacts["linux/amd64-gtk3"]
+	if !ok {
+		t.Fatal("the feed carries no legacy artifact, so a machine without GTK4 has nothing to update to")
+	}
+
+	if legacy.URL == ordinary.URL {
+		t.Errorf("both keys point at one binary (%s), so one of the two machines gets a build it cannot run", legacy.URL)
+	}
+	if !strings.HasSuffix(legacy.URL, "-gtk3") {
+		t.Errorf("the legacy key points at %q, which is not the legacy build", legacy.URL)
+	}
+
+	/*
+		And a feed that stopped publishing the legacy build offers that machine
+		nothing, rather than quietly falling back to the ordinary one. Absent is
+		the honest answer: there is no newer version it can run.
+
+		ForThisPlatform asks for whichever key this test binary was built for, so
+		the way to check the refusal on either build is to hand it a feed missing
+		that key and require an error. A fallback to the bare platform would make
+		this pass on the ordinary build and fail here.
+	*/
+	withoutMine := Release{Version: release.Version, Artifacts: map[string]Artifact{}}
+	for key, artifact := range release.Artifacts {
+		if key != PlatformKey() {
+			withoutMine.Artifacts[key] = artifact
+		}
+	}
+	if _, err := withoutMine.ForThisPlatform(); !errors.Is(err, ErrNoRelease) {
+		t.Errorf("a feed carrying every platform but %s offered an update anyway: %v", PlatformKey(), err)
 	}
 }

@@ -497,6 +497,33 @@ What the desktop client adds:
 - **Updates that verify what they downloaded** and discard anything that fails
   the check rather than installing it.
 
+### Which Linux download to take
+
+Two Linux builds are published for each architecture, and almost everybody wants
+the ordinary one — `tdc-<version>-linux-amd64`, with no suffix.
+
+The one ending `-gtk3` is for older distributions. The ordinary build uses GTK4
+and WebKitGTK 6.0, which reached the base repositories in **Ubuntu 24.04** and
+**Debian 13**; where those libraries are absent it does not start, because there
+is nothing for it to load. It also needs glibc 2.38 or newer, which rules out
+Ubuntu 22.04 (2.35) and Debian 12 (2.36) whatever else is installed.
+
+The `-gtk3` build uses GTK3 and WebKitGTK 4.1 and needs only glibc 2.34, so it
+runs on **Ubuntu 22.04**, **Debian 12**, and their derivatives.
+
+Debian 12 can install WebKitGTK 6.0 from backports, but that does not make the
+ordinary build run there — its glibc is still too old. Take the `-gtk3` one.
+
+If you are unsure, take the ordinary build. A build that cannot run says so
+immediately and does no harm — it fails to start rather than misbehaving.
+
+The two are not interchangeable afterwards. Each updates only to its own kind,
+so a machine on the `-gtk3` build is never offered an ordinary build it could
+not run. Moving between them means downloading the other one yourself, which you
+would only need to do after upgrading the operating system.
+
+macOS and Windows have one build each; there is nothing to choose.
+
 ## Asking before it is too late
 
 Anything irreversible asks first, in both clients, and the question says what

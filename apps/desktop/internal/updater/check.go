@@ -58,13 +58,34 @@ ForThisPlatform returns the artifact for the machine this is running on.
 An absent one is not an error in the feed: a release may not build for every
 platform on the day it is cut, and somebody on that platform should be told
 there is nothing for them rather than shown a download that will not run.
+
+A build with a variant asks only for its own key and never falls back to the
+bare platform. The two are not interchangeable — that is the whole reason the
+variant exists — so a missing variant artifact means there is nothing this
+machine can run, not that it should take the other one.
 */
 func (r Release) ForThisPlatform() (Artifact, error) {
-	artifact, ok := r.Artifacts[runtime.GOOS+"/"+runtime.GOARCH]
+	key := PlatformKey()
+	artifact, ok := r.Artifacts[key]
 	if !ok {
-		return Artifact{}, fmt.Errorf("%w: %s/%s", ErrNoRelease, runtime.GOOS, runtime.GOARCH)
+		return Artifact{}, fmt.Errorf("%w: %s", ErrNoRelease, key)
 	}
 	return artifact, nil
+}
+
+/*
+PlatformKey is how this build names itself to the feed.
+
+Ordinarily the Go platform, as "linux/amd64". A build against a different
+toolkit appends its variant, so it is offered its own artifact and the ordinary
+build is offered the ordinary one.
+*/
+func PlatformKey() string {
+	key := runtime.GOOS + "/" + runtime.GOARCH
+	if platformVariant != "" {
+		key += "-" + platformVariant
+	}
+	return key
 }
 
 /*

@@ -86,6 +86,20 @@ jobs:
           - os: ubuntu-24.04-arm
             goos: linux
             goarch: arm64
+          # The legacy toolkit, for distributions that predate GTK4.
+          #
+          # Ubuntu 22.04, Debian 12 and RHEL 9 are all still supported and none
+          # of them has WebKitGTK 6.0, so the default build will not start on
+          # any of them. Somebody running a long-term-support distribution is
+          # exactly the person a self-hosted client should not exclude.
+          #
+          # Deliberately time-limited: Wails schedules the gtk3 path for removal
+          # in v3.1, and those distributions leave support before that becomes
+          # urgent. The variant is named so nobody downloads it by accident.
+          - os: ubuntu-22.04
+            goos: linux
+            goarch: amd64
+            variant: gtk3
           - os: macos-13
             goos: darwin
             goarch: amd64
@@ -118,13 +132,21 @@ jobs:
           cache-dependency-path: apps/desktop/go.sum
 
       - name: Install the webview's dependencies
-        if: matrix.goos == 'linux'
-        # GTK4 and WebKitGTK 6.0, which is the default build path. The legacy
-        # gtk3 variant is 10.10's business, not this workflow's.
+        if: matrix.goos == 'linux' && matrix.variant != 'gtk3'
+        # GTK4 and WebKitGTK 6.0, the default build path.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Install the legacy webview's dependencies
+        if: matrix.variant == 'gtk3'
+        # GTK3 and WebKitGTK 4.1, which is what the distributions this variant
+        # exists for actually ship.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - run: bun install --frozen-lockfile
 
@@ -138,6 +160,9 @@ jobs:
           # Reproducibility: the commit's own timestamp rather than the moment
           # the runner happened to start, so two builds of one commit agree.
           SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+          # The legacy toolkit where this is that variant. Empty otherwise, so
+          # the default path is unchanged.
+          EXTRA_TAGS: ${{ matrix.variant == 'gtk3' && 'gtk3' || '' }}
         run: go run github.com/wailsapp/wails/v3/cmd/wails3 task build
 
       - name: Name the artifact
@@ -147,6 +172,11 @@ jobs:
         # downloads is readable and nothing collides.
         run: |
           name="tdc-${{ needs.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          # Named so nobody downloads the legacy build by accident, and so it
+          # does not collide with the default one for the same platform.
+          if [ -n "${{ matrix.variant }}" ]; then
+            name="$name-${{ matrix.variant }}"
+          fi
           if [ "${{ matrix.goos }}" = "windows" ]; then
             mv apps/desktop/bin/tdc.exe "$name.exe"
             echo "path=$name.exe" >> "$GITHUB_OUTPUT"
@@ -167,7 +197,7 @@ jobs:
       - name: Keep the artifact and its proof together
         uses: actions/upload-artifact@v7
         with:
-          name: tdc-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: tdc-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}
           # The bundle's name is the artifact's with .sigstore.json appended,
           # which is what the feed below points at.
           path: |
@@ -405,12 +435,18 @@ jobs:
                   print(f"skipping {binary.name}: no sigstore bundle beside it")
                   continue
 
-              # tdc-1.2.3-linux-amd64 -> linux/amd64
+              # tdc-1.2.3-linux-amd64      -> linux/amd64
+              # tdc-1.2.3-linux-amd64-gtk3 -> linux/amd64-gtk3
+              #
+              # A variant keeps its suffix on purpose. The client built against
+              # that toolkit asks for the suffixed key and nothing else, so the
+              # two builds are never offered to each other's machines — see
+              # PlatformKey in internal/updater.
               stem = binary.name.removesuffix(".exe")
               _, _, platform = stem.partition(f"-{version}-")
-              goos, _, goarch = platform.partition("-")
+              goos, _, rest = platform.partition("-")
 
-              artifacts[f"{goos}/{goarch}"] = {
+              artifacts[f"{goos}/{rest}"] = {
                   "url": f"{base}/{binary.name}",
                   "bundleUrl": f"{base}/{bundle.name}",
                   "size": binary.stat().st_size,
