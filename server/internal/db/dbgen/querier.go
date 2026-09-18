@@ -18,6 +18,7 @@ type Querier interface {
 	// racing, should leave one reaction rather than failing.
 	AddReaction(ctx context.Context, arg AddReactionParams) error
 	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) error
+	AdvanceTOTPPeriod(ctx context.Context, arg AdvanceTOTPPeriodParams) (Credential, error)
 	AppendAuditEntry(ctx context.Context, arg AppendAuditEntryParams) (AuditEntry, error)
 	AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error)
 	// A reply carries the identifier of the message that started the thread.
@@ -44,6 +45,10 @@ type Querier interface {
 	// Collected once: the row is deleted as it is read, so a handle presented twice
 	// yields nothing the second time.
 	CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error)
+	// Confirming enrolment: the person proved their app holds the secret. The
+	// period is recorded at the same moment, so the code that confirmed it cannot
+	// then be replayed to sign in.
+	ConfirmTOTPCredential(ctx context.Context, arg ConfirmTOTPCredentialParams) error
 	// GREATEST keeps the count from going negative if a close is somehow counted
 	// twice, which would otherwise leave someone permanently "present".
 	ConnectionClosed(ctx context.Context, userID uuid.UUID) error
@@ -70,6 +75,7 @@ type Querier interface {
 	// gap and telling the client to resynchronise.
 	CountEventsSince(ctx context.Context, arg CountEventsSinceParams) (int64, error)
 	CountOpenReports(ctx context.Context) (int64, error)
+	CountPendingAttempt(ctx context.Context, id uuid.UUID) (PendingSignIn, error)
 	CountReactionsForEvent(ctx context.Context, eventID string) (int64, error)
 	// How many reports somebody has filed recently, so a person cannot bury the
 	// queue under hundreds of them.
@@ -86,6 +92,7 @@ type Querier interface {
 	// own messages are not unread to them.
 	CountUnread(ctx context.Context, arg CountUnreadParams) (int64, error)
 	CountUnreadNotifications(ctx context.Context, userID uuid.UUID) (int64, error)
+	CountUnusedRecoveryCodes(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	// How many people hold a permission at server scope without an explicit
 	// denial. The administrator floor uses this to refuse a change that would
@@ -105,11 +112,13 @@ type Querier interface {
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
 	CreateOAuthCredential(ctx context.Context, arg CreateOAuthCredentialParams) (Credential, error)
 	CreatePasskeyCredential(ctx context.Context, arg CreatePasskeyCredentialParams) (Credential, error)
+	CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) (Credential, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
 	CreateScheduledMessage(ctx context.Context, arg CreateScheduledMessageParams) (ScheduledMessage, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	CreateTOTPCredential(ctx context.Context, arg CreateTOTPCredentialParams) (Credential, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
@@ -117,6 +126,7 @@ type Querier interface {
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
 	DeleteExpiredOAuthOutcomes(ctx context.Context) (int64, error)
+	DeleteExpiredPendingSignIns(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteExpiredWebauthnCeremonies(ctx context.Context) (int64, error)
 	// Housekeeping only. The expiry is already honoured on read, so this removes
@@ -127,11 +137,15 @@ type Querier interface {
 	// Used when the push service reports a subscription gone, where the endpoint
 	// is all the caller has.
 	DeletePushSubscriptionByEndpoint(ctx context.Context, endpoint string) error
+	// Replacing a batch: the old codes go when new ones are issued, since a person
+	// holding a printed list expects that list to be the whole truth.
+	DeleteRecoveryCodes(ctx context.Context, userID uuid.UUID) error
 	DeleteRole(ctx context.Context, id uuid.UUID) error
 	// Scoped to the sender, and only while unsent: cancelling is the sender's to
 	// do, and a message already sent is a message, not a plan.
 	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
+	DeleteTOTPCredential(ctx context.Context, userID uuid.UUID) error
 	// Establishing the handle when somebody enrols their first passkey. Only ever
 	// set once: it is what the authenticator remembers, and changing it would
 	// orphan every passkey already enrolled.
@@ -167,6 +181,8 @@ type Querier interface {
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)
 	FindInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
+	// Consumed when the second factor is accepted, so a ticket buys one session.
+	FinishPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
 	// What this person chose the interface to look like.
 	//
 	// Empty in any column means they have chosen nothing there and take the
@@ -188,6 +204,9 @@ type Querier interface {
 	GetOAuthCredential(ctx context.Context, arg GetOAuthCredentialParams) (Credential, error)
 	GetPasskeyByCredentialID(ctx context.Context, externalID *string) (Credential, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
+	// Read without consuming: a wrong code must leave the ticket usable, or one
+	// mistyped digit would mean signing in from the beginning.
+	GetPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	GetReport(ctx context.Context, id uuid.UUID) (Report, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
@@ -199,6 +218,7 @@ type Querier interface {
 	GetServerConfigValue(ctx context.Context, key string) (ServerConfig, error)
 	GetServerStatus(ctx context.Context, key string) (ServerStatus, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error)
+	GetTOTPCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	// Which introductions this person has already been given.
 	//
 	// Read whole and written whole: the structure is small, and a partial update
@@ -209,6 +229,10 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
 	GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []byte) (User, error)
 	HasBlocked(ctx context.Context, arg HasBlockedParams) (bool, error)
+	// Whether an account has a second factor to be asked for at all. Confirmed
+	// only: a TOTP secret somebody started enrolling and abandoned must not lock
+	// them out.
+	HasConfirmedSecondFactor(ctx context.Context, userID uuid.UUID) (bool, error)
 	HasUsedInvitation(ctx context.Context, arg HasUsedInvitationParams) (bool, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
 	// Asked before joining and before posting.
@@ -287,6 +311,7 @@ type Querier interface {
 	ListReactionsForEvents(ctx context.Context, eventIds []string) ([]ListReactionsForEventsRow, error)
 	// The most recent events, for opening a room.
 	ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEventsParams) ([]Event, error)
+	ListRecoveryCodes(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	ListReportsForRoom(ctx context.Context, arg ListReportsForRoomParams) ([]Report, error)
 	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]RolePermission, error)
 	ListRoles(ctx context.Context) ([]Role, error)
@@ -493,7 +518,9 @@ type Querier interface {
 	// conversation share a room by definition, which would make 'shared' mean
 	// 'anyone who has ever written to me'.
 	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
+	SpendRecoveryCode(ctx context.Context, arg SpendRecoveryCodeParams) (Credential, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)
+	StartPendingSignIn(ctx context.Context, arg StartPendingSignInParams) (PendingSignIn, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error
 	StartWebauthnCeremony(ctx context.Context, arg StartWebauthnCeremonyParams) (WebauthnCeremony, error)
 	StopTyping(ctx context.Context, arg StopTypingParams) error

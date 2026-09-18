@@ -71,6 +71,9 @@ type Credential struct {
 	ExternalEmail         *string
 	ExternalEmailVerified bool
 	Passkey               []byte
+	UsedAt                *time.Time
+	LastPeriod            *int64
+	ConfirmedAt           *time.Time
 }
 
 type Event struct {
@@ -186,6 +189,17 @@ type OauthOutcome struct {
 	CreatedAt  time.Time
 	ExpiresAt  time.Time
 	StateHash  []byte
+}
+
+type PendingSignIn struct {
+	ID         uuid.UUID
+	TicketHash []byte
+	UserID     uuid.UUID
+	UserAgent  string
+	IpAddress  *netip.Addr
+	Attempts   int32
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
 }
 
 type PinnedMessage struct {

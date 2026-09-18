@@ -64,7 +64,7 @@ INSERT INTO credentials (
     external_email, external_email_verified
 )
 VALUES ($1, $2, 'oauth2', $3, $4, $5, $6, $7)
-RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey
+RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey, used_at, last_period, confirmed_at
 `
 
 type CreateOAuthCredentialParams struct {
@@ -102,6 +102,9 @@ func (q *Queries) CreateOAuthCredential(ctx context.Context, arg CreateOAuthCred
 		&i.ExternalEmail,
 		&i.ExternalEmailVerified,
 		&i.Passkey,
+		&i.UsedAt,
+		&i.LastPeriod,
+		&i.ConfirmedAt,
 	)
 	return i, err
 }
@@ -131,7 +134,7 @@ func (q *Queries) DeleteExpiredOAuthOutcomes(ctx context.Context) (int64, error)
 }
 
 const getOAuthCredential = `-- name: GetOAuthCredential :one
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey, used_at, last_period, confirmed_at FROM credentials
 WHERE kind = 'oauth2' AND provider = $1 AND external_id = $2
 `
 
@@ -157,12 +160,15 @@ func (q *Queries) GetOAuthCredential(ctx context.Context, arg GetOAuthCredential
 		&i.ExternalEmail,
 		&i.ExternalEmailVerified,
 		&i.Passkey,
+		&i.UsedAt,
+		&i.LastPeriod,
+		&i.ConfirmedAt,
 	)
 	return i, err
 }
 
 const listOAuthCredentialsForUser = `-- name: ListOAuthCredentialsForUser :many
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey, used_at, last_period, confirmed_at FROM credentials
 WHERE user_id = $1 AND kind = 'oauth2'
 ORDER BY created_at
 `
@@ -190,6 +196,9 @@ func (q *Queries) ListOAuthCredentialsForUser(ctx context.Context, userID uuid.U
 			&i.ExternalEmail,
 			&i.ExternalEmailVerified,
 			&i.Passkey,
+			&i.UsedAt,
+			&i.LastPeriod,
+			&i.ConfirmedAt,
 		); err != nil {
 			return nil, err
 		}

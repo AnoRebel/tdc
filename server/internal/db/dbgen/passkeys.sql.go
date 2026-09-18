@@ -15,7 +15,7 @@ import (
 const createPasskeyCredential = `-- name: CreatePasskeyCredential :one
 INSERT INTO credentials (id, user_id, kind, label, secret, external_id, sign_count, passkey)
 VALUES ($1, $2, 'passkey', $3, $4, $5, $6, $7)
-RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey
+RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey, used_at, last_period, confirmed_at
 `
 
 type CreatePasskeyCredentialParams struct {
@@ -53,6 +53,9 @@ func (q *Queries) CreatePasskeyCredential(ctx context.Context, arg CreatePasskey
 		&i.ExternalEmail,
 		&i.ExternalEmailVerified,
 		&i.Passkey,
+		&i.UsedAt,
+		&i.LastPeriod,
+		&i.ConfirmedAt,
 	)
 	return i, err
 }
@@ -92,7 +95,7 @@ func (q *Queries) EnsureWebauthnHandle(ctx context.Context, arg EnsureWebauthnHa
 }
 
 const getPasskeyByCredentialID = `-- name: GetPasskeyByCredentialID :one
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey, used_at, last_period, confirmed_at FROM credentials
 WHERE kind = 'passkey' AND external_id = $1
 `
 
@@ -113,6 +116,9 @@ func (q *Queries) GetPasskeyByCredentialID(ctx context.Context, externalID *stri
 		&i.ExternalEmail,
 		&i.ExternalEmailVerified,
 		&i.Passkey,
+		&i.UsedAt,
+		&i.LastPeriod,
+		&i.ConfirmedAt,
 	)
 	return i, err
 }
@@ -151,7 +157,7 @@ func (q *Queries) GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []
 }
 
 const listPasskeysForUser = `-- name: ListPasskeysForUser :many
-SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey FROM credentials
+SELECT id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey, used_at, last_period, confirmed_at FROM credentials
 WHERE user_id = $1 AND kind = 'passkey'
 ORDER BY created_at
 `
@@ -179,6 +185,9 @@ func (q *Queries) ListPasskeysForUser(ctx context.Context, userID uuid.UUID) ([]
 			&i.ExternalEmail,
 			&i.ExternalEmailVerified,
 			&i.Passkey,
+			&i.UsedAt,
+			&i.LastPeriod,
+			&i.ConfirmedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -194,7 +203,7 @@ const renamePasskey = `-- name: RenamePasskey :one
 UPDATE credentials
 SET label = $3
 WHERE id = $1 AND user_id = $2 AND kind = 'passkey'
-RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey
+RETURNING id, user_id, kind, label, secret, external_id, provider, sign_count, created_at, last_used_at, external_email, external_email_verified, passkey, used_at, last_period, confirmed_at
 `
 
 type RenamePasskeyParams struct {
@@ -220,6 +229,9 @@ func (q *Queries) RenamePasskey(ctx context.Context, arg RenamePasskeyParams) (C
 		&i.ExternalEmail,
 		&i.ExternalEmailVerified,
 		&i.Passkey,
+		&i.UsedAt,
+		&i.LastPeriod,
+		&i.ConfirmedAt,
 	)
 	return i, err
 }
