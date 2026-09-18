@@ -252,6 +252,17 @@ type Reaction struct {
 	CreatedAt   time.Time
 }
 
+type RecoveryToken struct {
+	ID            uuid.UUID
+	TokenHash     []byte
+	UserID        uuid.UUID
+	SentTo        string
+	RequestedFrom *netip.Addr
+	CreatedAt     time.Time
+	ExpiresAt     time.Time
+	UsedAt        *time.Time
+}
+
 type Report struct {
 	ID              uuid.UUID
 	RoomID          *uuid.UUID

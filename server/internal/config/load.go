@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"regexp"
 	"strconv"
@@ -214,6 +215,15 @@ func Load(path string) (Config, error) {
 	cfg.Push.VAPIDPrivate = l.str("push.vapid_private", d.Push.VAPIDPrivate)
 	cfg.Push.Subject = l.str("push.subject", d.Push.Subject)
 
+	cfg.Mail.Host = l.str("mail.host", d.Mail.Host)
+	cfg.Mail.Port = l.int32Value("mail.port", d.Mail.Port)
+	cfg.Mail.Username = l.str("mail.username", d.Mail.Username)
+	cfg.Mail.Password = l.str("mail.password", d.Mail.Password)
+	cfg.Mail.From = l.str("mail.from", d.Mail.From)
+	cfg.Mail.FromName = l.str("mail.from_name", d.Mail.FromName)
+	cfg.Mail.TLS = l.oneOf("mail.tls", d.Mail.TLS, "starttls", "tls", "none")
+	cfg.Mail.Timeout = l.duration("mail.timeout", d.Mail.Timeout)
+
 	cfg.GIFs.Provider = l.str("gifs.provider", d.GIFs.Provider)
 	cfg.GIFs.APIKey = l.str("gifs.api_key", d.GIFs.APIKey)
 	cfg.GIFs.ContentFilter = l.str("gifs.content_filter", d.GIFs.ContentFilter)
@@ -251,6 +261,36 @@ func (c Config) validate() []Problem {
 
 	if strings.TrimSpace(c.Server.Name) == "" {
 		add("server.name", "must not be empty")
+	}
+
+	/*
+		Half a mail configuration is refused at startup.
+
+		A host with no sender address produces mail most receiving servers
+		discard, and a sender with no host produces nothing at all. Either way
+		somebody meant to switch this on, and the first they would learn
+		otherwise is a member who cannot get back into their account.
+	*/
+	if strings.TrimSpace(c.Mail.Host) != "" {
+		if strings.TrimSpace(c.Mail.From) == "" {
+			add("mail.from", "is required when mail.host is set — mail with no sender address is mail nobody accepts")
+		} else if !strings.Contains(c.Mail.From, "@") {
+			add("mail.from", "must be an email address, got %q", c.Mail.From)
+		}
+
+		/*
+			Unencrypted only to this machine.
+
+			"none" sends the password, the recovery link and everything else in
+			the clear. Across a network that is not a choice anybody means to
+			make; to a relay on loopback it is ordinary, and refusing it there
+			would be refusing the simplest working setup there is.
+		*/
+		if c.Mail.TLS == "none" && !isLoopback(c.Mail.Host) {
+			add("mail.tls", "may only be \"none\" for a mail server on this machine; %q is not one", c.Mail.Host)
+		}
+	} else if strings.TrimSpace(c.Mail.From) != "" {
+		add("mail.host", "is required when mail.from is set — there is nowhere to send through")
 	}
 
 	/*
@@ -407,3 +447,21 @@ func (l *loader) oauth() OAuthConfig {
 // narrow: the name becomes part of a settings key, an environment variable and
 // a callback path, and all three are happier without surprises in them.
 var providerName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
+
+/*
+isLoopback says whether a host is this machine.
+
+By name as well as by address, because an operator running a relay in the same
+container writes "localhost" far more often than "127.0.0.1", and a check that
+only understood the address would refuse the commonest correct configuration.
+*/
+func isLoopback(host string) bool {
+	trimmed := strings.TrimSpace(strings.ToLower(host))
+	if trimmed == "localhost" || strings.HasSuffix(trimmed, ".localhost") {
+		return true
+	}
+	if address, err := netip.ParseAddr(trimmed); err == nil {
+		return address.IsLoopback()
+	}
+	return false
+}

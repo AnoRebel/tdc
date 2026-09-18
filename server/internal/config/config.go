@@ -21,6 +21,7 @@ type Config struct {
 	GIFs        GIFsConfig
 	Push        PushConfig
 	OAuth       OAuthConfig
+	Mail        MailConfig
 }
 
 /*
@@ -85,6 +86,56 @@ Off unless an operator has generated a key pair. The keys identify this server
 to whichever push service a browser chose; no account with anybody is needed,
 and the server can generate a pair itself.
 */
+/*
+MailConfig is how this server sends mail, if it does.
+
+Empty is the default and a working state: a server that sends nothing still runs,
+and everything that would have been sent — a recovery link, most of all — is
+simply unavailable rather than silently failing.
+
+SMTP rather than an API, because a provider's API is a provider: recovery must
+work with a mail server the operator runs themselves, and every self-hosted one
+speaks SMTP.
+*/
+type MailConfig struct {
+	// Host and Port of the mail server. Empty host is mail switched off.
+	Host string
+	Port int32
+
+	// Username and Password, where the server wants them. Plenty of
+	// self-hosted relays on a private network do not.
+	Username string
+	Password string
+
+	/*
+		From is the address mail appears to come from.
+
+		Required when mail is configured at all: a message with no sender is one
+		most receiving servers refuse, and the operator's own domain is the only
+		thing that makes it deliverable.
+	*/
+	From string
+	// FromName is what appears beside the address, falling back to the
+	// server's own name.
+	FromName string
+
+	/*
+		TLS says how the connection is protected.
+
+		"starttls" — connect in the clear and upgrade, which is what port 587
+		does and what almost every self-hosted server expects.
+		"tls" — TLS from the first byte, which is port 465.
+		"none" — no encryption at all. Refused unless the host is loopback,
+		because a password and a recovery link in the clear across a network is
+		not a configuration anybody means to choose.
+	*/
+	TLS string
+
+	// Timeout bounds a send, so a mail server that stops answering does not
+	// hold a request open.
+	Timeout time.Duration
+}
+
 type PushConfig struct {
 	// VAPIDPublic and VAPIDPrivate are the operator's own pair. Empty disables
 	// push, which is a working state: notifications are still stored and shown
@@ -315,6 +366,16 @@ func Default() Config {
 			MediaSidecarAddress: "",
 			MediaSidecarTimeout: 30 * time.Second,
 		},
+		Mail: MailConfig{
+			// Off. A server that sends nothing runs perfectly well, and
+			// recovery simply is not offered rather than failing quietly.
+			Host: "",
+			Port: 587,
+			// What almost every self-hosted mail server on 587 expects.
+			TLS:     "starttls",
+			Timeout: 15 * time.Second,
+		},
+
 		GIFs: GIFsConfig{
 			// Off: searching requires somebody else's account, and this server
 			// must work without one.

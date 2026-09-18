@@ -113,6 +113,7 @@ type Querier interface {
 	CreateOAuthCredential(ctx context.Context, arg CreateOAuthCredentialParams) (Credential, error)
 	CreatePasskeyCredential(ctx context.Context, arg CreatePasskeyCredentialParams) (Credential, error)
 	CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) (Credential, error)
+	CreateRecoveryToken(ctx context.Context, arg CreateRecoveryTokenParams) (RecoveryToken, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
@@ -127,6 +128,7 @@ type Querier interface {
 	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
 	DeleteExpiredOAuthOutcomes(ctx context.Context) (int64, error)
 	DeleteExpiredPendingSignIns(ctx context.Context) (int64, error)
+	DeleteExpiredRecoveryTokens(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteExpiredWebauthnCeremonies(ctx context.Context) (int64, error)
 	// Housekeeping only. The expiry is already honoured on read, so this removes
@@ -208,6 +210,9 @@ type Querier interface {
 	// mistyped digit would mean signing in from the beginning.
 	GetPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
+	// Read without spending, so the client can tell somebody their link has expired
+	// before asking them to type a new password into a form that cannot work.
+	GetRecoveryToken(ctx context.Context, tokenHash []byte) (RecoveryToken, error)
 	GetReport(ctx context.Context, id uuid.UUID) (Report, error)
 	GetRoleByID(ctx context.Context, id uuid.UUID) (Role, error)
 	GetRoleByName(ctx context.Context, name string) (Role, error)
@@ -235,6 +240,7 @@ type Querier interface {
 	HasConfirmedSecondFactor(ctx context.Context, userID uuid.UUID) (bool, error)
 	HasUsedInvitation(ctx context.Context, arg HasUsedInvitationParams) (bool, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
+	InvalidateRecoveryTokens(ctx context.Context, userID uuid.UUID) (int64, error)
 	// Asked before joining and before posting.
 	//
 	// The expiry is evaluated here rather than by a sweep, so a temporary ban
@@ -519,6 +525,7 @@ type Querier interface {
 	// 'anyone who has ever written to me'.
 	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
 	SpendRecoveryCode(ctx context.Context, arg SpendRecoveryCodeParams) (Credential, error)
+	SpendRecoveryToken(ctx context.Context, tokenHash []byte) (RecoveryToken, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)
 	StartPendingSignIn(ctx context.Context, arg StartPendingSignInParams) (PendingSignIn, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error

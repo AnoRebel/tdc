@@ -53,6 +53,12 @@ var secretKeys = map[string]bool{
 		redacted for the same reason the storage credentials are.
 	*/
 	"gifs.api_key": true,
+	/*
+		The mail account's password. Whoever holds it can send mail as this
+		server, which for a server that sends recovery links is the whole
+		account-takeover story in one credential.
+	*/
+	"mail.password": true,
 }
 
 /*
@@ -137,6 +143,14 @@ func (c Config) Describe(path string) []Setting {
 		{"push.vapid_public", c.Push.VAPIDPublic, defaults.Push.VAPIDPublic},
 		{"push.vapid_private", c.Push.VAPIDPrivate, defaults.Push.VAPIDPrivate},
 		{"push.subject", c.Push.Subject, defaults.Push.Subject},
+		{"mail.host", c.Mail.Host, defaults.Mail.Host},
+		{"mail.port", fmt.Sprint(c.Mail.Port), fmt.Sprint(defaults.Mail.Port)},
+		{"mail.username", c.Mail.Username, defaults.Mail.Username},
+		{"mail.password", c.Mail.Password, defaults.Mail.Password},
+		{"mail.from", c.Mail.From, defaults.Mail.From},
+		{"mail.from_name", c.Mail.FromName, defaults.Mail.FromName},
+		{"mail.tls", c.Mail.TLS, defaults.Mail.TLS},
+		{"mail.timeout", c.Mail.Timeout.String(), defaults.Mail.Timeout.String()},
 		{"gifs.provider", c.GIFs.Provider, defaults.GIFs.Provider},
 		{"gifs.api_key", c.GIFs.APIKey, defaults.GIFs.APIKey},
 		{"log.level", c.Log.Level, defaults.Log.Level},
