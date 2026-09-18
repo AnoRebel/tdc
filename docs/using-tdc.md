@@ -26,12 +26,26 @@ already used up, revoked, meant for somebody else and never having existed all
 produce the same refusal, because a response that distinguished them would tell
 somebody guessing codes when they had guessed right.
 
-**There is no password reset.** Account recovery is not built yet — no reset
-email, no recovery codes. An account that has lost its password needs an
-administrator. Choose a password you will keep, and keep it somewhere.
+**There is no password reset.** An account that has lost its password needs an
+administrator, and there is no email that gets you back in. Choose a password
+you will keep, and keep it somewhere.
 
-Signing in is a username and a password. Signing in with an external account —
-Google, GitHub and the like — is not implemented, and neither are passkeys.
+Beyond a password, there are three other ways in, depending on what the server
+offers:
+
+- **A passkey** — your fingerprint, face or device PIN, with the key itself
+  staying on your device. Sign in with nothing typed at all. Offered wherever the
+  server has a settled address; add one from your settings.
+- **Another service** — GitHub, GitLab, a self-hosted Forgejo or Keycloak,
+  whichever the operator has configured. The buttons appear on the sign-in form
+  when there are any.
+- **Two-step sign-in** — a code from an authenticator app as well as your
+  password, which you can turn on for yourself. It comes with ten recovery codes,
+  shown once, for the day you cannot reach your phone. An operator may require
+  it of administrators or of everybody.
+
+Recovery codes are not a password reset: they get you past the second step, not
+past a forgotten password.
 
 ### Your sessions
 
@@ -486,11 +500,14 @@ So that nothing above is read as implying more than it says:
 - **Federation.** Servers do not exchange messages. Addresses name a home server
   and every event is signed, so the groundwork exists, but your conversations
   are with people on your own server.
-- **Voice and video calls.**
 - **Project management and the developer directory.** Both are part of what TDC
   is for and neither is built.
-- **Signing in with another account, and passkeys.**
-- **Account recovery.** There is no password reset.
+- **Account recovery.** There is no password reset. Two-step sign-in has
+  recovery codes, but those get you past the second step, not past a forgotten
+  password.
+- **Voice and video calls.** The permission list mentions starting and joining
+  one; nothing enforces those and no call can be made. They are names waiting
+  for a feature, not a feature waiting to be switched on.
 - **Message formatting.** No bold, italic, lists or code blocks in a message.
 
 Several capabilities are finished on the server and are waiting only for a

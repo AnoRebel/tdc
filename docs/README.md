@@ -2,6 +2,9 @@
 
 - **[Using TDC](using-tdc.md)** — what the application does, for the people who
   use it.
+- **[Moving from Telegram and WhatsApp](moving-from-telegram-and-whatsapp.md)** —
+  what a community decides before it moves, how its groups map onto channels,
+  and what is better and worse afterwards.
 - **[Hosting](hosting.md)** — deploying a server, TLS, backup and restore.
 - **[Upgrading](upgrading.md)** — moving between releases, including across
   several at once, and what rolling back involves.
