@@ -339,3 +339,36 @@ func TestNothingIsRequiredByDefault(t *testing.T) {
 func mentions(haystack, needle string) bool {
 	return strings.Contains(strings.ToLower(haystack), strings.ToLower(needle))
 }
+
+/*
+TestAPasskeySignInIsNotAskedForACode.
+
+A passkey already proves possession of the device, and where the authenticator
+checks a fingerprint or a PIN it proves knowledge too. Asking for a code as well
+would be ceremony rather than security — and would mean somebody who chose the
+stronger way in gets the more tedious sign-in.
+*/
+func TestAPasskeySignInIsNotAskedForACode(t *testing.T) {
+	handler := withPasskeys(t)
+	completeSetup(t, handler)
+
+	token := secondFactorAccount(t, handler, "amina")
+	enrolSecondFactor(t, handler, token)
+
+	// The same account now has both: a second factor, and a passkey.
+	authenticator, credential := enrolPasskey(t, handler, token, "Phone")
+	handle := webauthnHandle(t, handler, token)
+
+	recorder := signInWithPasskey(t, handler, authenticator, credential, handle)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("signing in with a passkey: status %d, body %s", recorder.Code, recorder.Body.String())
+	}
+
+	result := decode(t, recorder)
+	if _, asked := result["secondFactorRequired"]; asked {
+		t.Error("a passkey sign-in was asked for a second factor as well")
+	}
+	if session, _ := result["token"].(string); session == "" {
+		t.Error("a passkey sign-in did not produce a session")
+	}
+}

@@ -182,6 +182,37 @@ of them, except the one that would leave them no way in at all. That last
 refusal counts across every kind of credential, so a passkey beside a password
 can always be removed.
 
+### Two-step sign-in
+
+Nothing to configure. Anybody may set up an authenticator app for their own
+account, and by default nobody has to.
+
+`auth.second_factor.policy` changes that, and it is policy rather than
+configuration — it takes effect immediately, without a restart:
+
+| Value            | Who must have one                     |
+| ---------------- | ------------------------------------- |
+| `optional`       | Nobody. The default.                  |
+| `administrators` | Anybody who can configure the server. |
+| `everybody`      | Everyone.                             |
+
+Under either requirement, somebody without one is not locked out — they are held
+short of the server and asked to set one up, and can still reach their own
+account, the setup screens and sign-out. The requirement reaches sessions that
+already existed, so setting it does not wait out a month of thirty-day sessions.
+Somebody it applies to cannot then turn it off.
+
+**Recovery codes are shown once.** Ten are issued when somebody finishes setting
+up, each good for one use, and only their hashes are stored — so there is no
+administrative way to show them again. Somebody who loses both their phone and
+their codes needs you to remove the second factor for them, which is a database
+operation until account recovery lands.
+
+`administrators` is the setting most servers want. Those accounts can change the
+registration policy, the limits and the branding, which makes them the ones
+worth attacking, and they belong to the few people an operator can reasonably
+ask to carry an app.
+
 ### Policy, which changes without a restart
 
 Configuration is plumbing — where the database is, what port to listen on. It is

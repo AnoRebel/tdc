@@ -75,6 +75,12 @@ A sign-in through another service is stored as that service's identifier for
 you. **No recoverable secret is stored for any of them.** Each record carries a
 label you chose, when it was created, and when it was last used.
 
+If you turn on two-step sign-in, this server stores the shared secret your
+authenticator app uses — it has to, because every code is derived from it — and
+the hashes of your recovery codes, never the codes themselves. It also records
+which thirty-second window your last accepted code came from, so the same code
+cannot be used twice.
+
 If you enrol a passkey, your account also gains a WebAuthn handle: a random
 value your authenticator stores so it can offer this account when you sign in
 without typing anything. It is deliberately unrelated to your account id or your
