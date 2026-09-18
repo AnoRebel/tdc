@@ -37,6 +37,15 @@ const (
 		account after the password is changed, and a log that did not say so
 		would leave nothing to notice.
 	*/
+	/*
+		Somebody asked for a way back into an account.
+
+		Recorded because it is one of the few things a person does to an account
+		without being signed in to it, and because a run of these against one
+		address is what an attempt on that account looks like from outside.
+	*/
+	ActionRecoveryRequested Action = "auth.recovery.requested"
+
 	ActionCredentialAdded   Action = "auth.credential.added"
 	ActionCredentialRemoved Action = "auth.credential.removed"
 	ActionRateLimited       Action = "auth.rate_limited"

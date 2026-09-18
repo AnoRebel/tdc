@@ -72,6 +72,17 @@ func (s *Server) routes() {
 	*/
 	s.echo.POST("/api/auth/second-factor", s.handleSecondFactor)
 
+	/*
+		Getting back in without a password.
+
+		Unauthenticated, because somebody who could sign in would not be here.
+		The first answers identically whatever it finds, which is the whole
+		point of it.
+	*/
+	s.echo.POST("/api/auth/recover", s.handleRequestRecovery)
+	s.echo.GET("/api/auth/recover", s.handleCheckRecovery)
+	s.echo.POST("/api/auth/recover/redeem", s.handleRedeemRecovery)
+
 	s.echo.POST("/api/auth/passkey/signin/begin", s.handleBeginPasskeySignIn)
 	s.echo.POST("/api/auth/passkey/signin/finish", s.handleFinishPasskeySignIn)
 
@@ -470,6 +481,16 @@ type serverInfoResponse struct {
 		server reading nothing are genuinely different things.
 	*/
 	Passkeys bool `json:"passkeys"`
+
+	/*
+		Whether this server can mail somebody a way back into their account.
+
+		A client needs it before drawing "forgotten your password", which
+		otherwise leads to a form that answers with a refusal — and on a server
+		with no mail that link is worse than absent, because it promises
+		something nobody can deliver.
+	*/
+	Recovery bool `json:"recovery"`
 }
 
 // brandingResponse is what an operator may change about how this server looks.
@@ -567,6 +588,7 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		Branding:              s.branding(c.Request().Context()),
 		SignInProviders:       s.signInProviders(),
 		Passkeys:              s.passkeys.Enabled(),
+		Recovery:              s.recovery != nil && s.recovery.Available(),
 	})
 }
 

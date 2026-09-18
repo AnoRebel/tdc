@@ -23,6 +23,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/gifs"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/invitations"
+	"github.com/AnoRebel/tdc/server/internal/mail"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/oauth"
@@ -30,6 +31,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
+	"github.com/AnoRebel/tdc/server/internal/recovery"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/secondfactor"
@@ -122,6 +124,8 @@ type Server struct {
 	oauth        *oauth.Service
 	passkeys     *passkeys.Service
 	secondFactor *secondfactor.Service
+	mail         mail.Sender
+	recovery     *recovery.Service
 	queries      *dbgen.Queries
 	presence     *presence.Service
 	push         *push.Service
@@ -168,6 +172,13 @@ type Services struct {
 	// SecondFactor is always present: it is optional per account rather than
 	// per server, and an operator may require it.
 	SecondFactor *secondfactor.Service
+	/*
+		Mail and Recovery are nil, or configured with no mail server, on a
+		server whose operator sends nothing. That is a working state: recovery
+		is not offered rather than offered and failing.
+	*/
+	Mail     mail.Sender
+	Recovery *recovery.Service
 	// Push is nil, or configured with no keys, on a server whose operator has
 	// not enabled notifications to closed browsers. That is a working state:
 	// notifications are still stored and shown in the application.
@@ -207,6 +218,8 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		oauth:        services.OAuth,
 		passkeys:     services.Passkeys,
 		secondFactor: services.SecondFactor,
+		mail:         services.Mail,
+		recovery:     services.Recovery,
 		queries:      dbgen.New(pool),
 		presence:     services.Presence,
 		push:         services.Push,
@@ -304,7 +317,7 @@ func (s *Server) Run(ctx context.Context) error {
 		Rows are deleted as they are used, so this only collects the abandoned
 		ones.
 	*/
-	if (s.oauth != nil && s.oauth.Enabled()) || s.passkeys.Enabled() || s.secondFactor != nil {
+	if (s.oauth != nil && s.oauth.Enabled()) || s.passkeys.Enabled() || s.secondFactor != nil || s.recovery != nil {
 		go s.sweepCeremoniesPeriodically(ctx)
 	}
 

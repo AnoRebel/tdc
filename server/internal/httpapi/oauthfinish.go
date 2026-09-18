@@ -574,6 +574,7 @@ func (s *Server) sweepCeremoniesPeriodically(ctx context.Context) {
 			s.sweepOAuth(ctx)
 			s.sweepPasskeys(ctx)
 			s.sweepSecondFactors(ctx)
+			s.sweepRecovery(ctx)
 		}
 	}
 }

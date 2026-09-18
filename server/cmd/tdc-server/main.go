@@ -31,12 +31,14 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/invitations"
+	"github.com/AnoRebel/tdc/server/internal/mail"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/oauth"
 	"github.com/AnoRebel/tdc/server/internal/passkeys"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/push"
+	"github.com/AnoRebel/tdc/server/internal/recovery"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/secondfactor"
@@ -213,6 +215,18 @@ func run() error {
 		return err
 	}
 
+	/*
+		Mail, and the recovery that depends on it.
+
+		Both present whatever the configuration says: a sender with no host
+		reports that it cannot send, and recovery asks it before offering
+		anything. That keeps "this server sends no mail" one answer in one
+		place rather than a nil check at every call site.
+	*/
+	mailService := mail.NewService(cfg.Mail, serverName(cfg), log)
+	recoveryService := recovery.NewService(queries, mailService,
+		cfg.Server.CanonicalAddress, serverName(cfg), log)
+
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
@@ -262,6 +276,8 @@ func run() error {
 		// Always present: optional per account rather than per server, and an
 		// operator may require it of everybody or of administrators.
 		SecondFactor: secondfactor.NewService(serverName(cfg), queries, log),
+		Mail:         mailService,
+		Recovery:     recoveryService,
 	}
 
 	// Messages written now and sent later. The pass takes a row lock and skips

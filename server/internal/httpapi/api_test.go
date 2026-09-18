@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,11 +25,13 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/invitations"
+	"github.com/AnoRebel/tdc/server/internal/mail"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/oauth"
 	"github.com/AnoRebel/tdc/server/internal/passkeys"
 	"github.com/AnoRebel/tdc/server/internal/presence"
+	"github.com/AnoRebel/tdc/server/internal/recovery"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/secondfactor"
@@ -121,6 +124,50 @@ func passkeysForTest(t *testing.T, queries *dbgen.Queries, logger *slog.Logger) 
 // drive a whole ceremony.
 var passkeyOriginsForTest []string
 
+/*
+postboxForTest is where mail goes for the handler built next.
+
+Nil on almost every test, which is a server that sends nothing. A test wanting
+recovery sets it, and reads what arrived.
+*/
+var postboxForTest *testPostbox
+
+// testPostbox collects what would have been sent.
+type testPostbox struct {
+	mu   sync.Mutex
+	sent []mail.Message
+}
+
+func (p *testPostbox) Send(_ context.Context, message mail.Message) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.sent = append(p.sent, message)
+	return nil
+}
+
+// Configured is true whenever a test made one, which is what "this server sends
+// mail" means here.
+func (p *testPostbox) Configured() bool { return p != nil }
+
+func (p *testPostbox) delivered() []mail.Message {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]mail.Message(nil), p.sent...)
+}
+
+// recoveryForTest builds the recovery service, which needs mail and an address
+// to point links at — the same two things a real server needs.
+func recoveryForTest(queries *dbgen.Queries, logger *slog.Logger) *recovery.Service {
+	if postboxForTest == nil {
+		return nil
+	}
+	return recovery.NewService(queries, postboxForTest,
+		canonicalAddressForTest, "Test Server", logger)
+}
+
 // oauthForTest builds the sign-in service the handler gets, or nil when no
 // test asked for one.
 func oauthForTest(queries *dbgen.Queries, logger *slog.Logger) *oauth.Service {
@@ -198,6 +245,9 @@ func newTestAPIConfigured(
 			// ticket surviving into the next test would be a session waiting
 			// to be claimed by it.
 			"DELETE FROM pending_sign_ins",
+			// Tokens cascade from users; cleared anyway, since one surviving
+			// into the next test is a way into an account it did not create.
+			"DELETE FROM recovery_tokens",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)
@@ -207,6 +257,17 @@ func newTestAPIConfigured(
 	clean()
 
 	memory := cache.NewMemory()
+	/*
+		The pool, for the few tests that must reach past the API.
+
+		Marking an address verified has no route yet, and a test that skipped
+		until one existed would leave the rule it checks unguarded for as long
+		as that takes. Package-level because these tests do not run in parallel,
+		like every other value shared with the harness here.
+	*/
+	poolForTest = pool
+	t.Cleanup(func() { poolForTest = nil })
+
 	queries := dbgen.New(pool)
 
 	signingKey, err := events.NewKeyPair("test-key")
@@ -270,6 +331,13 @@ func newTestAPIConfigured(
 		// Always present, as on a real server: optional per account, and the
 		// operator's policy decides whether it is required.
 		SecondFactor: secondfactor.NewService("Test Server", queries, logger),
+		/*
+			Mail is delivered to a slice, so a test can read what would have
+			been sent. Off unless a test asked for it, which is the ordinary
+			server: nothing configured, and recovery not offered.
+		*/
+		Mail:     postboxForTest,
+		Recovery: recoveryForTest(queries, logger),
 	}, logger)
 
 	t.Cleanup(func() {
@@ -731,3 +799,24 @@ func configurationForTest() []config.Setting {
 // secretInTestConfig is the password the configuration view must never
 // disclose. Named so a test asserting its absence says what it is looking for.
 const secretInTestConfig = "a-password-that-must-not-leak"
+
+// poolForTest is the database behind the handler built last, for a test that
+// must set up something the API cannot.
+var poolForTest *db.Pool
+
+/*
+markEmailVerified marks an address proved.
+
+Registration leaves one unverified, and recovery deliberately refuses to mail an
+unverified address — so a test about recovery has to get past that, and there is
+no route that does.
+*/
+func markEmailVerified(t *testing.T, _ http.Handler, email string) {
+	t.Helper()
+
+	if _, err := poolForTest.Exec(context.Background(),
+		"UPDATE users SET email_verified = TRUE WHERE email_folded = $1",
+		strings.ToLower(strings.TrimSpace(email))); err != nil {
+		t.Fatalf("marking %s verified: %v", email, err)
+	}
+}
