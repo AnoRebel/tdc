@@ -1,4 +1,4 @@
-import type { RecoveryRedeemed, RecoveryRequested } from "@tdc/types";
+import type { EmailState, RecoveryRedeemed, RecoveryRequested } from "@tdc/types";
 
 /**
  * Getting back into an account whose password is gone.
@@ -50,5 +50,33 @@ export function useRecovery() {
     return api.post<RecoveryRedeemed>("/api/auth/recover/redeem", { token, password });
   }
 
-  return { available, request, usable, redeem };
+  /** Somebody's own address, and whether it has been proved. */
+  async function emailState(): Promise<EmailState> {
+    return api.get<EmailState>("/api/me/email");
+  }
+
+  /**
+   * Ask to prove an address.
+   *
+   * The account keeps whatever address it already had until the link is used,
+   * so a mistyped one costs nothing but the message.
+   */
+  async function confirmAddress(email: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>("/api/me/email", { email });
+  }
+
+  /** Use a confirmation link. */
+  async function completeConfirmation(token: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>("/api/auth/confirm-email", { token });
+  }
+
+  return {
+    available,
+    request,
+    usable,
+    redeem,
+    emailState,
+    confirmAddress,
+    completeConfirmation,
+  };
 }

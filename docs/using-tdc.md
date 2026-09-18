@@ -32,10 +32,13 @@ have one.** Where the server sends mail and your address has been confirmed,
 password signs every device out and does not sign you in — you sign in with it,
 which is what proves you know it.
 
-Confirming an address is the gap: nothing sends a confirmation yet, so in
-practice the only confirmed addresses are ones a sign-in provider vouched for.
-Without one, an account that has lost its password still needs an
-administrator. Choose a password you will keep, and keep it somewhere.
+Confirming is yours to do, from your settings: give an address, a link arrives,
+and using it proves the address is yours. Until you do, an account that has lost
+its password needs an administrator — so it is worth doing before you need it.
+Choose a password you will keep as well, and keep it somewhere.
+
+Changing the address later keeps the old one working until the new one is
+proved, so a typo costs nothing.
 
 Beyond a password, there are three other ways in, depending on what the server
 offers:
@@ -509,10 +512,9 @@ So that nothing above is read as implying more than it says:
   are with people on your own server.
 - **Project management and the developer directory.** Both are part of what TDC
   is for and neither is built.
-- **Confirming an email address.** Nothing sends a confirmation, so a password
-  reset only reaches accounts whose address was confirmed some other way — which
-  today means signing in through a provider that vouched for it. Everybody else
-  still needs an administrator.
+- **Changing your own username or display name.** Neither has a control or an
+  endpoint, so both are whatever they were when the account was made. The
+  server can already change a display name; nothing asks it to.
 - **Voice and video calls.** The permission list mentions starting and joining
   one; nothing enforces those and no call can be made. They are names waiting
   for a feature, not a feature waiting to be switched on.

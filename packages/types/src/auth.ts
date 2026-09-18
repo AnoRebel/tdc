@@ -188,3 +188,15 @@ export interface RecoveryRequested {
 export interface RecoveryRedeemed {
   message: string;
 }
+
+/** Somebody's own email address, as their settings screen sees it. */
+export interface EmailState {
+  /** The confirmed address, if there is one. */
+  address?: string;
+  /** Whether it has been proved, which is what recovery depends on. */
+  confirmed: boolean;
+  /** An address waiting to be proved, if one was asked about. */
+  pending?: string;
+  /** Whether this server can send mail at all. */
+  canSendMail: boolean;
+}

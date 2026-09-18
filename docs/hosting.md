@@ -197,10 +197,15 @@ Setting a new password signs out every device and does not sign the person in.
 They sign in with the password they chose, which proves they know it and goes
 through the second factor where the account has one.
 
-**An account with no confirmed address still cannot be recovered.** There is no
-route that confirms one yet, so in practice recovery reaches accounts whose
-address was marked confirmed some other way. Until that changes, a forgotten
-password is still an administrator's problem for most people — plan for it.
+**An account with no confirmed address still cannot be recovered**, and that is
+the part to tell members about. Confirming is theirs to do, from their own
+settings: they give an address, a link arrives, and using it proves the address
+belongs to them. Until they do, a forgotten password is an administrator's
+problem.
+
+A confirmation link lasts a day rather than an hour — nothing is at stake in an
+unclaimed one — and the account keeps whatever address it already had until the
+link is used, so a mistyped address costs nothing but the message.
 
 ### Passkeys
 

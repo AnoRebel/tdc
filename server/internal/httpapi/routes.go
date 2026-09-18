@@ -132,6 +132,7 @@ func (s *Server) routes() {
 	me.GET("/permissions", s.handleCurrentPermissions)
 	// Adding or changing the address the account can be recovered through. The
 	// account keeps its current one until the link is used.
+	me.GET("/email", s.handleCurrentEmail)
 	me.POST("/email", s.handleRequestEmailConfirmation)
 	me.GET("/sessions", s.handleListSessions)
 	me.DELETE("/sessions/:id", s.handleRevokeSession)

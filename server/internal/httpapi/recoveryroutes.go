@@ -236,6 +236,39 @@ var confirmationPerUser = cache.RateLimit{
 	Window:   time.Hour,
 }
 
+/*
+handleCurrentEmail is what somebody's own settings screen reads.
+
+Separate from /api/me, which is the shape everybody sees of everybody: an
+address does not belong in it. This is the same person asking about themselves,
+where it does.
+*/
+func (s *Server) handleCurrentEmail(c *echo.Context) error {
+	user, ok := currentUser(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "sign in first")
+	}
+
+	response := map[string]any{
+		// Whether this server could send anything at all, so a client knows
+		// whether to offer confirming at all.
+		"canSendMail": s.recovery != nil && s.recovery.Available(),
+		"confirmed":   user.EmailVerified,
+	}
+	if user.Email != nil {
+		response["address"] = *user.Email
+	}
+	/*
+		An address waiting to be proved, so somebody who asked yesterday and
+		forgot is reminded rather than left wondering why nothing changed.
+	*/
+	if user.PendingEmail != nil {
+		response["pending"] = *user.PendingEmail
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
 type confirmEmailRequest struct {
 	Email string `json:"email"`
 }

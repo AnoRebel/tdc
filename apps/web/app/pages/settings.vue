@@ -323,6 +323,10 @@ function deviceName(userAgent: string): string {
       <!-- Both are about who can reach this account, and both come before the
            list of devices that already do. The second factor first, since it is
            the one that protects the password everybody already has. -->
+      <!-- Before two-step, because this is the one that decides whether a
+           forgotten password is recoverable at all. -->
+      <EmailAddress />
+
       <SecondFactorManager />
 
       <!-- Draws nothing where the server cannot offer passkeys. -->
