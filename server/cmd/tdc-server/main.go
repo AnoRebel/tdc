@@ -133,11 +133,44 @@ func run() error {
 
 	queries := dbgen.New(pool)
 
-	// The in-process cache is the default, so a single-server deployment needs
-	// no cache service. An operator running several processes configures a
-	// shared implementation instead.
-	memoryCache := cache.NewMemory()
-	defer func() { _ = memoryCache.Close() }()
+	/*
+		Where short-lived shared state lives.
+
+		In-process by default, which is right for the single-node deployment
+		almost every operator runs and needs nothing installed. Configured with
+		a Valkey, the rate-limit counters become one shared count rather than
+		one per process — which is the difference between a limit of five
+		attempts and five attempts per node.
+
+		Checked at startup rather than on the first request: a server pointing
+		at a cache that is not there should say so now, not once somebody is
+		trying to sign in.
+	*/
+	var (
+		sharedCache cache.Cache
+		limiter     cache.Rates
+	)
+	if cfg.Cache.Address != "" {
+		valkeyCache, err := cache.NewValkey(cfg.Cache)
+		if err != nil {
+			return err
+		}
+		pingCtx, cancelPing := context.WithTimeout(ctx, 5*time.Second)
+		err = valkeyCache.Ping(pingCtx)
+		cancelPing()
+		if err != nil {
+			return fmt.Errorf("the configured cache at %s: %w", cfg.Cache.Address, err)
+		}
+
+		log.Info("counting rate limits in the shared cache", "address", cfg.Cache.Address)
+		sharedCache = valkeyCache
+		limiter = cache.NewSharedLimiter(valkeyCache)
+	} else {
+		memory := cache.NewMemory()
+		sharedCache = memory
+		limiter = cache.NewLimiter(memory)
+	}
+	defer func() { _ = sharedCache.Close() }()
 
 	// The signing key identifies this server. It is loaded from storage rather
 	// than generated per start: a server that made a new key each time would
@@ -231,7 +264,7 @@ func run() error {
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
 		Audit:    auditRecorder,
-		Limiter:  cache.NewLimiter(memoryCache),
+		Limiter:  limiter,
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
 		Attachments: attachmentService,
@@ -268,7 +301,7 @@ func run() error {
 			// should never resolve to a private address, and the day one does
 			// is the day this matters.
 		}, unfurl.DialContext, log),
-		Unfurl: unfurl.NewService(memoryCache,
+		Unfurl: unfurl.NewService(sharedCache,
 			unfurl.Settings{Enabled: cfg.Attachments.LinkPreviews}, log),
 		Presence: presenceService,
 		Push:     pushService,

@@ -59,6 +59,9 @@ var secretKeys = map[string]bool{
 		account-takeover story in one credential.
 	*/
 	"mail.password": true,
+	// The cache's password. Whoever holds it can read and rewrite every
+	// rate-limit counter on the server.
+	"cache.password": true,
 }
 
 /*
@@ -143,6 +146,11 @@ func (c Config) Describe(path string) []Setting {
 		{"push.vapid_public", c.Push.VAPIDPublic, defaults.Push.VAPIDPublic},
 		{"push.vapid_private", c.Push.VAPIDPrivate, defaults.Push.VAPIDPrivate},
 		{"push.subject", c.Push.Subject, defaults.Push.Subject},
+		{"cache.address", c.Cache.Address, defaults.Cache.Address},
+		{"cache.username", c.Cache.Username, defaults.Cache.Username},
+		{"cache.password", c.Cache.Password, defaults.Cache.Password},
+		{"cache.database", fmt.Sprint(c.Cache.Database), fmt.Sprint(defaults.Cache.Database)},
+		{"cache.tls", fmt.Sprint(c.Cache.TLS), fmt.Sprint(defaults.Cache.TLS)},
 		{"mail.host", c.Mail.Host, defaults.Mail.Host},
 		{"mail.port", fmt.Sprint(c.Mail.Port), fmt.Sprint(defaults.Mail.Port)},
 		{"mail.username", c.Mail.Username, defaults.Mail.Username},

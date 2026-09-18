@@ -111,7 +111,7 @@ type Server struct {
 	identity     *identity.Service
 	authz        *authz.Service
 	audit        *audit.Recorder
-	limiter      *cache.Limiter
+	limiter      cache.Rates
 	rooms        *rooms.Service
 	attachments  *attachments.Service
 	unfurl       *unfurl.Service
@@ -150,7 +150,7 @@ type Services struct {
 	Identity    *identity.Service
 	Authz       *authz.Service
 	Audit       *audit.Recorder
-	Limiter     *cache.Limiter
+	Limiter     cache.Rates
 	Rooms       *rooms.Service
 	Attachments *attachments.Service
 	Unfurl      *unfurl.Service

@@ -22,6 +22,7 @@ type Config struct {
 	Push        PushConfig
 	OAuth       OAuthConfig
 	Mail        MailConfig
+	Cache       CacheConfig
 }
 
 /*
@@ -86,6 +87,39 @@ Off unless an operator has generated a key pair. The keys identify this server
 to whichever push service a browser chose; no account with anybody is needed,
 and the server can generate a pair itself.
 */
+/*
+CacheConfig is where short-lived shared state lives.
+
+Empty is the default and the right answer for almost every server: one process,
+one in-memory cache, nothing else to run. What it costs is that rate-limit
+counters are per-process, which matters the moment there are two processes —
+two nodes behind a load balancer would each allow the full number of attempts,
+so a limit of five would in practice be ten.
+
+So an operator running more than one node configures a Valkey, and the counters
+become one shared count rather than one per process. Valkey rather than Redis
+because Redis is no longer open source under a licence this project can depend
+on, and Valkey is the fork that stayed.
+*/
+type CacheConfig struct {
+	// Address of the Valkey, host:port. Empty means the in-process cache.
+	Address string
+	// Username and Password, where the server wants them.
+	Username string
+	Password string
+	// Database selects one of Valkey's numbered databases, for an operator
+	// sharing an instance between applications.
+	Database int32
+	/*
+		TLS encrypts the connection.
+
+		Off by default, because the ordinary deployment is a Valkey on a private
+		network beside the server. An operator reaching one across a network
+		somebody else can see turns it on.
+	*/
+	TLS bool
+}
+
 /*
 MailConfig is how this server sends mail, if it does.
 
@@ -366,6 +400,12 @@ func Default() Config {
 			MediaSidecarAddress: "",
 			MediaSidecarTimeout: 30 * time.Second,
 		},
+		Cache: CacheConfig{
+			// In-process, which is right for the single-node deployment almost
+			// every operator runs.
+			Address: "",
+		},
+
 		Mail: MailConfig{
 			// Off. A server that sends nothing runs perfectly well, and
 			// recovery simply is not offered rather than failing quietly.

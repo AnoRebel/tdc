@@ -105,6 +105,30 @@ func (l *loader) duration(key string, fallback time.Duration) time.Duration {
 	return parsed
 }
 
+/*
+int32OrZero is int32Value for a setting where zero is a real answer.
+
+int32Value refuses it, which is right for a connection count or a limit — zero
+there is a server that does nothing. For a Valkey database number, zero is the
+default database and by far the commonest choice.
+*/
+func (l *loader) int32OrZero(key string, fallback int32) int32 {
+	value, ok := l.raw(key)
+	if !ok {
+		return fallback
+	}
+	parsed, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		l.problem(key, "%q is not a whole number", value)
+		return fallback
+	}
+	if parsed < 0 {
+		l.problem(key, "must not be negative, got %d", parsed)
+		return fallback
+	}
+	return int32(parsed)
+}
+
 func (l *loader) int32Value(key string, fallback int32) int32 {
 	value, ok := l.raw(key)
 	if !ok {
@@ -214,6 +238,12 @@ func Load(path string) (Config, error) {
 	cfg.Push.VAPIDPublic = l.str("push.vapid_public", d.Push.VAPIDPublic)
 	cfg.Push.VAPIDPrivate = l.str("push.vapid_private", d.Push.VAPIDPrivate)
 	cfg.Push.Subject = l.str("push.subject", d.Push.Subject)
+
+	cfg.Cache.Address = l.str("cache.address", d.Cache.Address)
+	cfg.Cache.Username = l.str("cache.username", d.Cache.Username)
+	cfg.Cache.Password = l.str("cache.password", d.Cache.Password)
+	cfg.Cache.Database = l.int32OrZero("cache.database", d.Cache.Database)
+	cfg.Cache.TLS = l.boolean("cache.tls", d.Cache.TLS)
 
 	cfg.Mail.Host = l.str("mail.host", d.Mail.Host)
 	cfg.Mail.Port = l.int32Value("mail.port", d.Mail.Port)

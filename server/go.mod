@@ -20,6 +20,7 @@ require (
 	github.com/labstack/echo/v5 v5.3.1
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/pquerna/otp v1.5.0
+	github.com/valkey-io/valkey-go v1.0.78
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb
 	golang.org/x/image v0.45.0
 	golang.org/x/net v0.59.0

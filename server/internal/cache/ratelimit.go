@@ -27,6 +27,19 @@ type Decision struct {
 	RetryAfter time.Duration
 }
 
+/*
+Rates is what a caller needs of a rate limiter.
+
+An interface because there are two: one counting in this process, right for the
+single-node deployment almost everybody runs, and one counting in Valkey, which
+is the only way several nodes can share a limit. A caller is written against
+this and the deployment decides which does the counting.
+*/
+type Rates interface {
+	Allow(ctx context.Context, key string, limit RateLimit) (Decision, error)
+	Reset(ctx context.Context, key string) error
+}
+
 // Limiter counts attempts against a limit.
 //
 // It is built on the Cache interface so that a single process and a multi-node
@@ -154,3 +167,10 @@ func (l *Limiter) store(ctx context.Context, key string, state counter, limit Ra
 	}
 	return nil
 }
+
+// Both implementations satisfy the interface, checked here rather than at a
+// call site that happens to use one of them.
+var (
+	_ Rates = (*Limiter)(nil)
+	_ Rates = (*SharedLimiter)(nil)
+)
