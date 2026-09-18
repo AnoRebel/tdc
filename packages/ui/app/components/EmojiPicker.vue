@@ -31,6 +31,8 @@ const field = ref<HTMLInputElement>();
 const tab = ref<"emoji" | "gifs">("emoji");
 const gifs = useGifs();
 
+const { $t, $ts } = useI18n();
+
 watch(tab, (chosen) => {
   if (chosen === "gifs") void gifs.run(query.value);
 });
@@ -111,7 +113,7 @@ watch(results, () => {
         "
         @click="tab = option"
       >
-        {{ option === "emoji" ? "Emoji" : "GIFs" }}
+        {{ option === "emoji" ? $t("attachment.emoji") : $t("attachment.gifs") }}
       </button>
     </div>
 
@@ -123,8 +125,8 @@ watch(results, () => {
         class="h-8 pl-7 text-xs"
         ref="field"
         v-model="query"
-        :placeholder="tab === 'gifs' ? 'Search GIFs' : 'Search emoji'"
-        :aria-label="tab === 'gifs' ? 'Search GIFs' : 'Search emoji'"
+        :placeholder="tab === 'gifs' ? $ts('attachment.searchGifs') : $ts('attachment.searchEmoji')"
+        :aria-label="tab === 'gifs' ? $ts('attachment.searchGifs') : $ts('attachment.searchEmoji')"
         autocomplete="off"
         @keydown="onKeydown"
       />
@@ -134,13 +136,13 @@ watch(results, () => {
       <!-- GIFs, when that tab is showing. -->
       <template v-if="tab === 'gifs'">
         <p v-if="gifs.failed.value" class="px-2 py-6 text-center text-xs text-muted-foreground">
-          The GIF library could not be reached.
+          {{ $t("attachment.gifsUnreachable") }}
         </p>
         <p
           v-else-if="!gifs.results.value.length && !gifs.searching.value"
           class="px-2 py-6 text-center text-xs text-muted-foreground"
         >
-          Nothing to show.
+          {{ $t("attachment.nothingToShow") }}
         </p>
         <div v-else class="grid grid-cols-2 gap-1">
           <button
@@ -167,13 +169,17 @@ watch(results, () => {
           v-if="gifs.provider.value"
           class="pt-2 text-center text-[0.625rem] text-muted-foreground"
         >
-          Powered by {{ gifs.provider.value === "tenor" ? "Tenor" : "GIPHY" }}
+          {{
+            $t("attachment.poweredBy", {
+              provider: gifs.provider.value === "tenor" ? "Tenor" : "GIPHY",
+            })
+          }}
         </p>
       </template>
 
       <template v-else-if="searching">
         <p v-if="!results.length" class="px-2 py-6 text-center text-xs text-muted-foreground">
-          Nothing matches &ldquo;{{ query.trim() }}&rdquo;.
+          {{ $t("nav.noMatches", { query: query.trim() }) }}
         </p>
         <div v-else class="grid grid-cols-8 gap-0.5">
           <button

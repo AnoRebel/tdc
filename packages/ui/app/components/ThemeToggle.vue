@@ -17,18 +17,20 @@ import { Button } from "#layers/ui/app/components/ui/button";
 
 const open = defineModel<boolean>({ default: false });
 
+const { $t, $ts } = useI18n();
+
 const theme = useTheme();
 
-const appearances = [
-  { value: "auto" as const, label: "Follow my device", icon: Monitor },
-  { value: "light" as const, label: "Light", icon: Sun },
-  { value: "dark" as const, label: "Dark", icon: Moon },
-];
+const appearances = computed(() => [
+  { value: "auto" as const, label: $t("settings.followMyDevice"), icon: Monitor },
+  { value: "light" as const, label: $t("settings.light"), icon: Sun },
+  { value: "dark" as const, label: $t("settings.dark"), icon: Moon },
+]);
 
-const palettes = [
-  { value: "default" as const, label: "Cool", swatch: "oklch(0.53 0.16 269)" },
-  { value: "congrator" as const, label: "Warm", swatch: "oklch(0.62 0.16 40)" },
-];
+const palettes = computed(() => [
+  { value: "default" as const, label: $t("app.paletteCool"), swatch: "oklch(0.53 0.16 269)" },
+  { value: "congrator" as const, label: $t("app.paletteWarm"), swatch: "oklch(0.62 0.16 40)" },
+]);
 
 const panel = useTemplateRef<HTMLElement>("panel");
 
@@ -53,7 +55,7 @@ function onKeydown(event: KeyboardEvent) {
     <Button
       variant="ghost"
       size="icon"
-      label="Appearance"
+      :label="$ts('settings.appearance')"
       :aria-expanded="open"
       aria-haspopup="menu"
       @click="open = !open"
@@ -65,11 +67,11 @@ function onKeydown(event: KeyboardEvent) {
       v-if="open"
       ref="panel"
       role="menu"
-      aria-label="Appearance"
+      :aria-label="$ts('settings.appearance')"
       class="absolute right-0 bottom-full z-30 mb-2 w-52 overflow-hidden rounded-xl border border-border bg-surface-raised p-1 shadow-lg"
     >
       <p class="px-2 pt-1.5 pb-1 text-[0.6875rem] font-semibold text-muted-foreground uppercase">
-        Appearance
+        {{ $t("settings.appearance") }}
       </p>
       <button
         v-for="option in appearances"
@@ -90,7 +92,7 @@ function onKeydown(event: KeyboardEvent) {
       <div class="my-1 border-t border-border" />
 
       <p class="px-2 pt-1 pb-1 text-[0.6875rem] font-semibold text-muted-foreground uppercase">
-        Colours
+        {{ $t("app.colours") }}
       </p>
       <button
         v-for="option in palettes"
@@ -126,7 +128,7 @@ function onKeydown(event: KeyboardEvent) {
             class="size-3.5 shrink-0 rounded-full border border-border"
             :style="{ background: theme.accent.value }"
           />
-          <span class="flex-1 text-left">Reset accent</span>
+          <span class="flex-1 text-left">{{ $t("app.resetAccent") }}</span>
         </button>
       </template>
     </div>

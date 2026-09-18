@@ -34,7 +34,7 @@ const lastSeenRoomsKey = "tdc.lastseen.rooms";
 const roomsApi = useRooms();
 const api = useApi();
 const router = useRouter();
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 const { can } = useAuth();
 
 /*
@@ -91,12 +91,12 @@ const creating = useState("channel.creating", () => false);
  * not "86400 seconds".
  */
 
-const lifetimeChoices = [
-  { seconds: 3600, label: "An hour" },
-  { seconds: 86400, label: "A day" },
-  { seconds: 604800, label: "A week" },
-  { seconds: 2592000, label: "A month" },
-];
+const lifetimeChoices = computed(() => [
+  { seconds: 3600, label: $ts("channel.lifetime.hour") },
+  { seconds: 86400, label: $ts("channel.lifetime.day") },
+  { seconds: 604800, label: $ts("channel.lifetime.week") },
+  { seconds: 2592000, label: $ts("channel.lifetime.month") },
+]);
 const slugInput = ref<HTMLInputElement | null>(null);
 const createError = ref<string | null>(null);
 
@@ -109,16 +109,18 @@ const createError = ref<string | null>(null);
  * server's own vocabulary rather than the sentence already written above the
  * box.
  */
-const channel = v.object({
-  slug: v.pipe(
-    v.string(),
-    v.trim(),
-    v.minLength(1, "A channel needs a name."),
-    v.regex(/^[a-z0-9_.-]+$/i, "Letters, digits, underscore, dot and hyphen."),
-  ),
-  disposable: v.boolean(),
-  lifetime: v.number(),
-});
+const channel = computed(() =>
+  v.object({
+    slug: v.pipe(
+      v.string(),
+      v.trim(),
+      v.minLength(1, $ts("channel.needsName")),
+      v.regex(/^[a-z0-9_.-]+$/i, $ts("channel.slugRule")),
+    ),
+    disposable: v.boolean(),
+    lifetime: v.number(),
+  }),
+);
 
 /** The first thing wrong with a field, once somebody has touched it. */
 function firstError(field: AnyFieldApi): string | undefined {
@@ -238,7 +240,7 @@ useShortcuts({
  */
 const createForm = useForm({
   defaultValues: { slug: "", disposable: false, lifetime: 86400 },
-  validators: { onSubmit: channel },
+  validators: { onSubmit: channel.value },
   async onSubmit({ value }) {
     createError.value = null;
     try {
@@ -262,9 +264,9 @@ const createForm = useForm({
       // rather than shown the server's vocabulary.
       createError.value = isApiError(cause)
         ? cause.requiredPermission
-          ? "You do not have permission to create channels on this server."
+          ? $ts("channel.noPermission")
           : cause.message
-        : "Could not create that channel.";
+        : $ts("channel.couldNotCreate");
     }
   },
 });
@@ -395,7 +397,7 @@ provide("openSearch", () => {
       v-if="navigationOpen"
       type="button"
       class="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm md:hidden"
-      aria-label="Close the channel list"
+      :aria-label="$ts('nav.closeChannelList')"
       @click="navigationOpen = false"
     />
 
@@ -426,20 +428,20 @@ provide("openSearch", () => {
         <createForm.Field name="disposable">
           <template #default="{ field: disposable }">
             <h2 class="text-sm font-semibold">
-              {{ disposable.state.value ? "New disposable chat" : "New channel" }}
+              {{ disposable.state.value ? $t("nav.newDisposableChat") : $t("nav.newChannel") }}
             </h2>
           </template>
         </createForm.Field>
         <p class="mt-1 text-xs text-muted-foreground">
-          The name becomes the channel's address, so people on other servers can reach it.
+          {{ $t("channel.nameBecomesAddress") }}
         </p>
 
         <form class="mt-4 space-y-3" @submit.prevent="createForm.handleSubmit()">
           <createForm.Field name="slug">
             <template #default="{ field }">
               <Field
-                label="Name"
-                hint="Letters, digits, underscore, dot and hyphen."
+                :label="$ts('channel.name')"
+                :hint="$ts('channel.slugRule')"
                 :error="firstError(field)"
               >
                 <template #default="{ id, invalid, describedBy }">
@@ -447,7 +449,7 @@ provide("openSearch", () => {
                     :id="id"
                     ref="slugInput"
                     :model-value="field.state.value"
-                    placeholder="general"
+                    :placeholder="$ts('channel.namePlaceholder')"
                     autocomplete="off"
                     :invalid="invalid"
                     :described-by="describedBy"
@@ -468,10 +470,9 @@ provide("openSearch", () => {
                   @update:model-value="field.handleChange($event)"
                 />
                 <span class="min-w-0">
-                  <span class="block text-xs font-medium">Disposable</span>
+                  <span class="block text-xs font-medium">{{ $t("channel.disposable") }}</span>
                   <span class="block text-[0.6875rem] text-muted-foreground">
-                    Messages are removed after a set time. Everyone in the chat is told before they
-                    post.
+                    {{ $t("channel.disposableHint") }}
                   </span>
                 </span>
               </label>
@@ -479,12 +480,12 @@ provide("openSearch", () => {
               <div v-if="field.state.value" class="mt-3">
                 <createForm.Field name="lifetime">
                   <template #default="{ field: lifetime }">
-                    <Field label="Messages last">
+                    <Field :label="$ts('channel.messagesLast')">
                       <template #default="{ id }">
                         <Select
                           :id="id"
                           :model-value="lifetime.state.value"
-                          label="Messages last"
+                          :label="$ts('channel.messagesLast')"
                           :options="
                             lifetimeChoices.map((choice) => ({
                               value: choice.seconds,
@@ -508,8 +509,8 @@ provide("openSearch", () => {
           </p>
 
           <div class="flex gap-2">
-            <Button type="submit">Create</Button>
-            <Button variant="ghost" @click="creating = false">Cancel</Button>
+            <Button type="submit">{{ $t("action.create") }}</Button>
+            <Button variant="ghost" @click="creating = false">{{ $t("action.cancel") }}</Button>
           </div>
         </form>
       </aside>

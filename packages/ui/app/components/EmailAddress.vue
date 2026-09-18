@@ -11,6 +11,8 @@ import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
+const { $t, $ts } = useI18n();
+
 /**
  * Somebody's own email address, and proving it belongs to them.
  *
@@ -81,12 +83,9 @@ onMounted(load);
     <div>
       <h2 class="flex items-center gap-1.5 text-sm font-semibold">
         <AtSign class="size-4" />
-        Email address
+        {{ $t("email.title") }}
       </h2>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Confirming an address is what lets you set a new password if you forget yours. Without one,
-        an administrator is the only way back in.
-      </p>
+      <p class="mt-1 text-xs text-muted-foreground">{{ $t("email.why") }}</p>
     </div>
 
     <p
@@ -99,7 +98,7 @@ onMounted(load);
 
     <p v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
       <Spinner size="sm" />
-      Reading your address
+      {{ $t("email.reading") }}
     </p>
 
     <template v-else>
@@ -113,20 +112,21 @@ onMounted(load);
         <CircleDashed v-else class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span class="truncate">{{ state.address }}</span>
         <span class="shrink-0 text-xs text-muted-foreground">
-          {{ state.confirmed ? "confirmed" : "not confirmed" }}
+          {{ state.confirmed ? $t("email.confirmed") : $t("email.notConfirmed") }}
         </span>
       </p>
-      <p v-else class="text-sm text-muted-foreground">You have no address on this account.</p>
+      <p v-else class="text-sm text-muted-foreground">{{ $t("email.none") }}</p>
 
       <!-- Waiting on one, so somebody who asked yesterday is reminded rather
            than left wondering why nothing changed. -->
       <p v-if="state.pending" class="rounded-md bg-muted px-3 py-2 text-sm" role="status">
-        A link was sent to <span class="font-medium">{{ state.pending }}</span
-        >. Your account keeps its current address until you use it.
+        {{ $t("email.pendingBefore") }}
+        <span class="font-medium">{{ state.pending }}</span
+        >{{ $t("email.pendingAfter") }}
       </p>
 
       <p v-if="sent" class="rounded-md bg-primary/10 px-3 py-2 text-sm" role="status">
-        Check that address for a link. It works once, and for a day.
+        {{ $t("email.sent") }}
       </p>
 
       <form class="flex items-end gap-2" @submit.prevent="form.handleSubmit()">
@@ -134,7 +134,7 @@ onMounted(load);
           <form.Field name="email">
             <template #default="{ field }">
               <Field
-                :label="state.address ? 'Change to' : 'Add an address'"
+                :label="state.address ? $ts('email.changeTo') : $ts('email.addAddress')"
                 :error="firstError(field)"
               >
                 <template #default="{ id, invalid, describedBy }">
@@ -158,10 +158,10 @@ onMounted(load);
           type="submit"
           class="h-9"
           :disabled="form.state.isSubmitting"
-          label="Send a confirmation link"
+          :label="$ts('email.sendConfirmationLink')"
         >
           <Spinner v-if="form.state.isSubmitting" size="sm" />
-          Send link
+          {{ $t("email.sendLink") }}
         </Button>
       </form>
     </template>

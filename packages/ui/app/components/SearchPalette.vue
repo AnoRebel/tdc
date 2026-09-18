@@ -26,7 +26,7 @@ const { matching } = useCommands({
 });
 const rooms = useRooms();
 const router = useRouter();
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 const field = ref<HTMLInputElement>();
 const active = ref(0);
@@ -227,7 +227,7 @@ function iconFor(room: RoomHit) {
           class="mx-auto mt-[12vh] w-[min(40rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
           role="dialog"
           aria-modal="true"
-          aria-label="Search"
+          :aria-label="$ts('nav.search')"
           @click.stop
         >
           <div class="flex items-center gap-2 border-b border-border px-3">
@@ -236,9 +236,9 @@ function iconFor(room: RoomHit) {
               ref="field"
               :value="query"
               type="text"
-              placeholder="Search channels, people and messages"
+              :placeholder="$ts('nav.searchPlaceholder')"
               class="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              aria-label="Search channels, people and messages"
+              :aria-label="$ts('nav.searchPlaceholder')"
               autocomplete="off"
               spellcheck="false"
               @input="onInput"
@@ -259,7 +259,7 @@ function iconFor(room: RoomHit) {
               <h2
                 class="px-2 pt-1.5 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
               >
-                Actions
+                {{ $t("nav.actions") }}
               </h2>
               <button
                 v-for="(command, index) in commands"
@@ -279,11 +279,11 @@ function iconFor(room: RoomHit) {
               v-if="!query.trim() && !commands.length"
               class="px-2 py-8 text-center text-xs text-muted-foreground"
             >
-              Find a channel, somebody to talk to, or something that was said.
+              {{ $t("nav.searchHint") }}
             </p>
 
             <p v-else-if="failed" class="px-2 py-8 text-center text-xs text-muted-foreground">
-              The search could not be completed. Try again.
+              {{ $t("nav.searchFailed") }}
             </p>
 
             <!-- Only when the commands found nothing either: a query matching
@@ -292,7 +292,7 @@ function iconFor(room: RoomHit) {
               v-else-if="isEmpty && !commands.length"
               class="px-2 py-8 text-center text-xs text-muted-foreground"
             >
-              Nothing matches &ldquo;{{ query.trim() }}&rdquo;.
+              {{ $t("nav.noMatches", { query: query.trim() }) }}
             </p>
 
             <template v-else-if="total">
@@ -300,7 +300,7 @@ function iconFor(room: RoomHit) {
                 <h2
                   class="px-2 pt-1.5 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
                 >
-                  Channels
+                  {{ $t("nav.channels") }}
                 </h2>
                 <button
                   v-for="(room, index) in results.rooms"
@@ -319,13 +319,13 @@ function iconFor(room: RoomHit) {
                   <span class="ml-auto flex shrink-0 items-center gap-1.5">
                     <Spinner v-if="joining === room.id" class="size-3.5" />
                     <span v-else-if="!room.member" class="text-[0.6875rem] text-muted-foreground">
-                      Join
+                      {{ $t("action.join") }}
                     </span>
                     <span
                       v-if="room.archived"
                       class="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
                     >
-                      Archived
+                      {{ $t("nav.archived") }}
                     </span>
                   </span>
                 </button>
@@ -335,7 +335,7 @@ function iconFor(room: RoomHit) {
                 <h2
                   class="px-2 pt-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
                 >
-                  People
+                  {{ $t("nav.people") }}
                 </h2>
                 <button
                   v-for="(person, index) in results.people"
@@ -358,7 +358,7 @@ function iconFor(room: RoomHit) {
                 <h2
                   class="px-2 pt-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
                 >
-                  Messages
+                  {{ $t("nav.messages") }}
                 </h2>
                 <button
                   v-for="(message, index) in results.messages"

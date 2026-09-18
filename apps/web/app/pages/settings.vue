@@ -21,6 +21,8 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { fully } from "#layers/ui/app/lib/dates";
 
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+
 /** Account settings: identity, status, signed-in devices. */
 
 definePageMeta({ middleware: "auth", layout: "app" });
@@ -90,9 +92,9 @@ async function chooseHidePushContent(event: Event) {
  * most people want and what somebody who has never opened this already has.
  */
 const themeOptions = [
-  { value: "auto" as const, label: "Follow my device", icon: Monitor },
-  { value: "light" as const, label: "Light", icon: Sun },
-  { value: "dark" as const, label: "Dark", icon: Moon },
+  { value: "auto" as const, label: $t("settings.followMyDevice"), icon: Monitor },
+  { value: "light" as const, label: $t("settings.light"), icon: Sun },
+  { value: "dark" as const, label: $t("settings.dark"), icon: Moon },
 ];
 
 /*
@@ -100,8 +102,16 @@ const themeOptions = [
  * they came from — "Congrator" means nothing to somebody who has not used it.
  */
 const paletteOptions = [
-  { value: "default" as const, label: "Cool", description: "Indigo on tinted grey" },
-  { value: "congrator" as const, label: "Warm", description: "Terracotta and amber" },
+  {
+    value: "default" as const,
+    label: $t("settings.paletteCool"),
+    description: $t("settings.paletteCoolDescription"),
+  },
+  {
+    value: "congrator" as const,
+    label: $t("settings.paletteWarm"),
+    description: $t("settings.paletteWarmDescription"),
+  },
 ];
 
 /*
@@ -139,20 +149,18 @@ function clearAccent() {
 const directMessageOptions = [
   {
     value: "anyone" as const,
-    label: "Anyone",
-    detail: "Anybody on this server can start a conversation with you.",
+    label: $t("settings.anyone"),
+    detail: $t("settings.anyoneHint"),
   },
   {
     value: "shared" as const,
-    label: "People I share a channel with",
-    detail: "Colleagues can reach you; people you have never met cannot.",
+    label: $t("settings.sharedChannel"),
+    detail: $t("settings.sharedChannelHint"),
   },
   {
     value: "nobody" as const,
-    label: "Nobody",
-    detail:
-      "No new conversations. Moderators can still reach you, so that nobody " +
-      "is beyond contact by the people responsible for this server.",
+    label: $t("settings.nobody"),
+    detail: $t("settings.nobodyHint"),
   },
 ];
 
@@ -167,18 +175,18 @@ const directMessageOptions = [
 const disclosureOptions = [
   {
     field: "showsPresence" as const,
-    label: "Whether I am online",
-    detail: "Turning this off does not disconnect you or change what you receive.",
+    label: $t("settings.showsPresence"),
+    detail: $t("settings.showsPresenceHint"),
   },
   {
     field: "showsStatus" as const,
-    label: "My status",
-    detail: "The status you have chosen and the note that goes with it.",
+    label: $t("settings.showsStatus"),
+    detail: $t("settings.showsStatusHint"),
   },
   {
     field: "showsLastSeen" as const,
-    label: "When I was last here",
-    detail: "A record of when you work and when you stop, if it is shown.",
+    label: $t("settings.showsLastSeen"),
+    detail: $t("settings.showsLastSeenHint"),
   },
 ];
 
@@ -187,7 +195,6 @@ onMounted(() => void personal.refresh());
 const { user, can, signOut, listSessions, revokeSession } = useAuth();
 const api = useApi();
 const router = useRouter();
-const { $localeRoute: localeRoute } = useI18n();
 
 const sessions = ref<Session[]>([]);
 const statuses = ref<ServerStatus[]>([]);
@@ -261,7 +268,7 @@ function when(value: string): string {
  * end a session needs "Chrome on Linux", not a version tuple.
  */
 function deviceName(userAgent: string): string {
-  if (!userAgent) return "Unknown device";
+  if (!userAgent) return $ts("settings.unknownDevice");
 
   const browser = /\bEdg\//.test(userAgent)
     ? "Edge"
@@ -302,11 +309,11 @@ function deviceName(userAgent: string): string {
       <NuxtLink
         :to="localeRoute({ name: 'index' })"
         class="btn btn-ghost size-7 px-0"
-        aria-label="Back"
+        :aria-label="$ts('action.back')"
       >
         <ArrowLeft class="size-4" />
       </NuxtLink>
-      <h1 class="text-sm font-semibold">Settings</h1>
+      <h1 class="text-sm font-semibold">{{ $t("settings.title") }}</h1>
     </header>
 
     <div class="max-w-2xl space-y-8 px-4 py-6">
@@ -329,9 +336,9 @@ function deviceName(userAgent: string): string {
       </section>
 
       <section>
-        <h2 class="text-sm font-semibold">Status</h2>
+        <h2 class="text-sm font-semibold">{{ $t("settings.status") }}</h2>
         <p class="mt-0.5 text-xs text-muted-foreground">
-          What others see beside your name. Your server's administrator chooses which are available.
+          {{ $t("settings.statusHint") }}
         </p>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
@@ -361,10 +368,10 @@ function deviceName(userAgent: string): string {
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <Monitor class="size-3.5 text-muted-foreground" />
-          Signed-in devices
+          {{ $t("auth.signedInDevices") }}
         </h2>
         <p class="mt-0.5 text-xs text-muted-foreground">
-          Ending a session signs that device out immediately.
+          {{ $t("auth.endingSessionSignsOut") }}
         </p>
 
         <ul class="mt-3 space-y-1.5">
@@ -380,7 +387,7 @@ function deviceName(userAgent: string): string {
                   v-if="session.current"
                   class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success-text"
                 >
-                  This device
+                  {{ $t("auth.thisDevice") }}
                 </span>
               </p>
               <p class="text-xs text-muted-foreground">
@@ -393,7 +400,7 @@ function deviceName(userAgent: string): string {
               :disabled="busy === session.id"
               @click="ending = session"
             >
-              {{ busy === session.id ? "Ending" : "End session" }}
+              {{ busy === session.id ? $t("settings.endingSession") : $t("auth.endSession") }}
             </Button>
           </li>
         </ul>
@@ -402,10 +409,10 @@ function deviceName(userAgent: string): string {
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <Sun class="size-4" />
-          Appearance
+          {{ $t("settings.appearance") }}
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          Following your device is the default, and changes with it.
+          {{ $t("settings.appearanceHint") }}
         </p>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
@@ -420,8 +427,8 @@ function deviceName(userAgent: string): string {
           </Button>
         </div>
 
-        <h3 class="mt-5 text-xs font-semibold">Colours</h3>
-        <p class="mt-1 text-xs text-muted-foreground">Each works in both light and dark.</p>
+        <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.colours") }}</h3>
+        <p class="mt-1 text-xs text-muted-foreground">{{ $t("settings.coloursHint") }}</p>
 
         <div class="mt-2 flex flex-wrap gap-1.5">
           <Button
@@ -436,14 +443,13 @@ function deviceName(userAgent: string): string {
           </Button>
         </div>
 
-        <h3 class="mt-5 text-xs font-semibold">Accent</h3>
+        <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.accent") }}</h3>
         <p class="mt-1 text-xs text-muted-foreground">
-          The colour on buttons and links. Adjusted for light and dark so its label stays readable
-          in both. Leave it empty for the one this palette comes with.
+          {{ $t("settings.accentHint") }}
         </p>
 
         <div class="mt-2 flex flex-wrap items-start gap-1.5">
-          <label class="sr-only" for="accent">Accent colour</label>
+          <label class="sr-only" for="accent">{{ $t("settings.accentColour") }}</label>
           <Input
             class="w-40"
             id="accent"
@@ -453,8 +459,10 @@ function deviceName(userAgent: string): string {
             :aria-describedby="accentRefusal ? 'accent-refusal' : undefined"
             @keydown.enter.prevent="applyAccent"
           />
-          <Button variant="outline" @click="applyAccent">Apply</Button>
-          <Button variant="ghost" v-if="theme.accent.value" @click="clearAccent"> Reset </Button>
+          <Button variant="outline" @click="applyAccent">{{ $t("settings.apply") }}</Button>
+          <Button variant="ghost" v-if="theme.accent.value" @click="clearAccent">
+            {{ $t("settings.reset") }}
+          </Button>
         </div>
 
         <!-- The number, not just "that will not work": somebody who is 0.2
@@ -475,10 +483,10 @@ function deviceName(userAgent: string): string {
       <section v-if="push.offered.value && push.supported.value">
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <Bell class="size-4" />
-          Notifications
+          {{ $t("notification.title") }}
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          Told about a message while TDC is closed. Each device is separate.
+          {{ $t("notification.whileClosed") }}
         </p>
 
         <p
@@ -496,7 +504,7 @@ function deviceName(userAgent: string): string {
           @click="push.subscribe()"
         >
           <Bell class="size-3.5" />
-          {{ push.busy.value ? "Asking" : "Notify me on this device" }}
+          {{ push.busy.value ? $t("notification.asking") : $t("notification.notifyThisDevice") }}
         </Button>
 
         <ul v-if="push.devices.value.length" class="mt-3 space-y-1.5">
@@ -512,14 +520,14 @@ function deviceName(userAgent: string): string {
                   v-if="device.current"
                   class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success-text"
                 >
-                  This device
+                  {{ $t("auth.thisDevice") }}
                 </span>
               </p>
               <p class="text-xs text-muted-foreground">
                 <template v-if="device.lastUsedAt">
-                  Last notified <time>{{ when(device.lastUsedAt) }}</time>
+                  {{ $t("notification.lastNotified", { when: when(device.lastUsedAt) }) }}
                 </template>
-                <template v-else>Not used yet</template>
+                <template v-else>{{ $t("notification.notUsedYet") }}</template>
               </p>
             </div>
             <Button
@@ -528,7 +536,7 @@ function deviceName(userAgent: string): string {
               :disabled="push.busy.value"
               @click="push.unsubscribe(device.id)"
             >
-              Stop
+              {{ $t("action.stop") }}
             </Button>
           </li>
         </ul>
@@ -544,9 +552,11 @@ function deviceName(userAgent: string): string {
             @change="chooseHidePushContent"
           />
           <span class="min-w-0">
-            <span class="block text-xs font-medium">Keep messages off my lock screen</span>
+            <span class="block text-xs font-medium">{{
+              $t("notification.keepOffLockScreen")
+            }}</span>
             <span class="block text-[0.6875rem] text-muted-foreground">
-              A notification says something arrived, not what it said.
+              {{ $t("notification.keepOffLockScreenHint") }}
             </span>
           </span>
         </label>
@@ -555,26 +565,25 @@ function deviceName(userAgent: string): string {
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <Compass class="size-4" />
-          Getting around
+          {{ $t("settings.gettingAround") }}
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          The short introduction to the application, if you would like it again.
+          {{ $t("settings.gettingAroundHint") }}
         </p>
 
         <Button variant="ghost" class="mt-3" @click="showTourAgain">
           <Compass class="size-3.5" />
-          Show me around
+          {{ $t("settings.showMeAround") }}
         </Button>
       </section>
 
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <ShieldCheck class="size-4" />
-          Privacy
+          {{ $t("settings.privacy") }}
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          Who may start a conversation with you. Existing conversations are unaffected by narrowing
-          this.
+          {{ $t("settings.privacyHint") }}
         </p>
 
         <div class="mt-3 space-y-1">
@@ -602,10 +611,9 @@ function deviceName(userAgent: string): string {
              conversation is opened: a list without them is not a member list.
              Anything you turn off is left out of what the server sends, rather
              than sent and hidden. -->
-        <h3 class="mt-5 text-xs font-semibold">What others can see about you</h3>
+        <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.whatOthersCanSee") }}</h3>
         <p class="mt-1 text-xs text-muted-foreground">
-          Your name and address are always shown. Anything you turn off here is left out of what the
-          server sends, not hidden afterwards.
+          {{ $t("settings.whatOthersCanSeeHint") }}
         </p>
 
         <div class="mt-3 space-y-1">
@@ -630,23 +638,21 @@ function deviceName(userAgent: string): string {
         </div>
 
         <p class="mt-2 text-[0.6875rem] text-muted-foreground">
-          A moderator reviewing a report can see what you have turned off, and every time they do it
-          is written to the audit log.
+          {{ $t("settings.moderatorCanSeeDisclosure") }}
         </p>
       </section>
 
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <UserX class="size-4" />
-          Blocked
+          {{ $t("settings.blocked") }}
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          People you have blocked cannot start a conversation with you. They are not told, and this
-          list is yours alone.
+          {{ $t("settings.blockedHint") }}
         </p>
 
         <p v-if="!personal.blocked.value.length" class="mt-3 text-xs text-muted-foreground">
-          You have not blocked anybody.
+          {{ $t("settings.blockedNobody") }}
         </p>
 
         <ul v-else class="mt-3 space-y-1">
@@ -663,7 +669,7 @@ function deviceName(userAgent: string): string {
               </span>
             </span>
             <Button variant="ghost" class="h-7 px-2 text-xs" @click="unblocking = person">
-              Unblock
+              {{ $t("settings.unblock") }}
             </Button>
           </li>
         </ul>
@@ -678,7 +684,7 @@ function deviceName(userAgent: string): string {
           can('user.invite')
         "
       >
-        <h2 class="text-sm font-semibold">Administration</h2>
+        <h2 class="text-sm font-semibold">{{ $t("nav.administration") }}</h2>
         <div class="mt-3 flex flex-wrap gap-2">
           <NuxtLink
             v-if="can('server.configure')"
@@ -686,7 +692,7 @@ function deviceName(userAgent: string): string {
             class="btn btn-outline"
           >
             <SlidersHorizontal class="size-3.5" />
-            Server settings
+            {{ $t("settings.serverSettings") }}
           </NuxtLink>
           <NuxtLink
             v-if="can('user.suspend') || can('user.invite')"
@@ -694,7 +700,7 @@ function deviceName(userAgent: string): string {
             class="btn btn-outline"
           >
             <Users class="size-3.5" />
-            People
+            {{ $t("nav.people") }}
           </NuxtLink>
           <NuxtLink
             v-if="can('moderation.review')"
@@ -702,7 +708,7 @@ function deviceName(userAgent: string): string {
             class="btn btn-outline"
           >
             <Flag class="size-3.5" />
-            Reports
+            {{ $t("moderation.reports") }}
             <!-- The count is fetched by the queue itself; a badge here would
                  mean every settings visit reads the moderation queue. -->
           </NuxtLink>
@@ -712,7 +718,7 @@ function deviceName(userAgent: string): string {
             class="btn btn-outline"
           >
             <ScrollText class="size-3.5" />
-            View the audit log
+            {{ $t("settings.viewAuditLog") }}
           </NuxtLink>
         </div>
       </section>
@@ -720,7 +726,7 @@ function deviceName(userAgent: string): string {
       <section class="border-t pt-6">
         <Button variant="danger" @click="leave">
           <LogOut class="size-3.5" />
-          Sign out
+          {{ $t("auth.signOut") }}
         </Button>
       </section>
     </div>
@@ -728,18 +734,18 @@ function deviceName(userAgent: string): string {
 
   <ConfirmDialog
     v-if="ending"
-    title="End this session?"
-    :detail="`${deviceName(ending.userAgent)} will be signed out straight away, in the middle of whatever it is doing. Whoever is using it is not told why, and will have to sign in again.`"
-    confirm-label="End session"
+    :title="$ts('settings.endSessionTitle')"
+    :detail="$ts('settings.endSessionDetail', { device: deviceName(ending.userAgent) })"
+    :confirm-label="$ts('auth.endSession')"
     @cancel="ending = null"
     @confirm="confirmEnding"
   />
 
   <ConfirmDialog
     v-if="unblocking"
-    :title="`Unblock @${unblocking.username}?`"
-    detail="They will be able to start a conversation with you again. They are not told that they were blocked, or that they no longer are."
-    confirm-label="Unblock"
+    :title="$ts('settings.unblockTitle', { username: unblocking.username })"
+    :detail="$ts('settings.unblockDetail')"
+    :confirm-label="$ts('settings.unblock')"
     @cancel="unblocking = null"
     @confirm="confirmUnblock"
   />

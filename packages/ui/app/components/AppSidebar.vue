@@ -6,7 +6,7 @@ import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
 import { Button } from "#layers/ui/app/components/ui/button";
 
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 /**
  * The persistent navigation.
@@ -132,7 +132,7 @@ function conversationName(room: Room): string {
         @click="emit('search')"
       >
         <Icon name="lucide:search" class="size-3.5 shrink-0" />
-        <span>Search</span>
+        <span>{{ $t("nav.search") }}</span>
         <Kbd class="ml-auto">{{ shortcut }}</Kbd>
       </button>
     </div>
@@ -142,7 +142,7 @@ function conversationName(room: Room): string {
         <h2
           class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
         >
-          Channels
+          {{ $t("nav.channels") }}
         </h2>
         <ul class="space-y-px">
           <li v-for="room in joined" :key="room.id">
@@ -171,7 +171,7 @@ function conversationName(room: Room): string {
         <h2
           class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
         >
-          Direct messages
+          {{ $t("nav.directMessages") }}
         </h2>
         <ul class="space-y-px">
           <li v-for="room in conversations" :key="room.id">
@@ -193,7 +193,7 @@ function conversationName(room: Room): string {
         <h2
           class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
         >
-          Browse
+          {{ $t("nav.browse") }}
         </h2>
         <ul class="space-y-px">
           <li v-for="room in joinable" :key="room.id">
@@ -209,7 +209,7 @@ function conversationName(room: Room): string {
         <h2
           class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
         >
-          Servers
+          {{ $t("nav.servers") }}
         </h2>
         <ul class="space-y-px">
           <li v-for="peer in peers" :key="peer.domain">
@@ -240,9 +240,9 @@ function conversationName(room: Room): string {
               <span
                 v-if="!peer.reachable"
                 class="ml-auto shrink-0 text-[0.6875rem] text-warning"
-                title="Not reachable right now"
+                :title="$ts('error.notReachableRightNow')"
               >
-                offline
+                {{ $t("nav.offline") }}
               </span>
               <span
                 v-else-if="peer.publishedRoomCount"
@@ -259,14 +259,14 @@ function conversationName(room: Room): string {
         v-if="!joined.length && !conversations.length && !joinable.length && !peers.length"
         class="px-2 py-6 text-center text-xs text-muted-foreground"
       >
-        No rooms yet.
+        {{ $t("nav.noRoomsYet") }}
       </p>
     </nav>
 
     <div v-if="props.canCreate" data-tour="create" class="border-t p-2">
       <button type="button" class="nav-item w-full" @click="emit('create')">
         <Icon name="lucide:plus" class="size-3.5" />
-        New channel
+        {{ $t("nav.newChannel") }}
       </button>
     </div>
 
@@ -285,8 +285,8 @@ function conversationName(room: Room): string {
         data-tour="notifications"
         :label="
           notifications.unread.value
-            ? `Notifications, ${notifications.unread.value} unread`
-            : 'Notifications'
+            ? $ts('nav.notificationsUnread', { count: notifications.unread.value })
+            : $ts('notification.title')
         "
         @click="showNotifications = !showNotifications"
       >
@@ -313,7 +313,7 @@ function conversationName(room: Room): string {
       <NuxtLink
         :to="localeRoute({ name: 'settings' })"
         class="btn btn-ghost size-7 px-0"
-        aria-label="Settings"
+        :aria-label="$ts('nav.settings')"
       >
         <Icon name="lucide:settings" class="size-3.5" />
       </NuxtLink>

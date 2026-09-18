@@ -24,7 +24,7 @@ useHead({ title: "Set up this server" });
 
 const { setupStatus, completeSetup } = useAuth();
 const router = useRouter();
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 const error = ref<string | null>(null);
 const submitting = ref(false);
@@ -88,9 +88,9 @@ const form = useForm({
       <ShieldCheck class="size-4 text-primary" />
     </span>
 
-    <h1 class="mt-4 text-xl font-semibold">Set up this server</h1>
+    <h1 class="mt-4 text-xl font-semibold">{{ $t("auth.setUpThisServer") }}</h1>
     <p class="mt-1 text-sm text-muted-foreground">
-      This account becomes the server's administrator. It can only be created once.
+      {{ $t("auth.setUpThisServerDetail") }}
     </p>
 
     <form class="mt-6 space-y-4" @submit.prevent="form.handleSubmit()">
@@ -104,7 +104,7 @@ const form = useForm({
 
       <form.Field name="username">
         <template #default="{ field }">
-          <Field label="Username" :error="firstError(field)" required>
+          <Field :label="$ts('auth.username')" :error="firstError(field)" required>
             <template #default="{ id, invalid, describedBy }">
               <Input
                 :id="id"
@@ -123,7 +123,11 @@ const form = useForm({
 
       <form.Field name="displayName">
         <template #default="{ field }">
-          <Field label="Display name" hint="Optional." :error="firstError(field)">
+          <Field
+            :label="$ts('auth.displayName')"
+            :hint="$ts('auth.optional')"
+            :error="firstError(field)"
+          >
             <template #default="{ id, invalid, describedBy }">
               <Input
                 :id="id"
@@ -142,8 +146,8 @@ const form = useForm({
       <form.Field name="password">
         <template #default="{ field }">
           <Field
-            label="Password"
-            hint="At least twelve characters."
+            :label="$ts('auth.password')"
+            :hint="$ts('auth.atLeastTwelveCharacters')"
             :error="firstError(field)"
             required
           >
@@ -165,7 +169,7 @@ const form = useForm({
 
       <Button class="h-9 w-full" type="submit" :disabled="submitting">
         <Spinner v-if="submitting" size="sm" />
-        {{ submitting ? "Creating administrator" : "Create administrator" }}
+        {{ submitting ? $t("auth.creatingAdministrator") : $t("auth.createAdministrator") }}
       </Button>
     </form>
   </div>

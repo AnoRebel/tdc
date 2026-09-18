@@ -19,7 +19,7 @@ useHead({ title: "Confirm your address" });
 const { completeConfirmation } = useRecovery();
 const router = useRouter();
 const route = useRoute();
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 const working = ref(true);
 const confirmed = ref(false);
@@ -50,7 +50,7 @@ onMounted(async () => {
   <div>
     <p v-if="working" class="flex items-center gap-2 text-sm text-muted-foreground">
       <Spinner size="sm" />
-      Confirming your address
+      {{ $t("auth.confirmingAddress") }}
     </p>
 
     <template v-else-if="confirmed">
@@ -59,19 +59,19 @@ onMounted(async () => {
           <AtSign class="size-4 text-primary" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-          <h1 class="text-sm font-semibold">That address is confirmed</h1>
+          <h1 class="text-sm font-semibold">{{ $t("auth.addressConfirmed") }}</h1>
           <p class="mt-1 text-sm text-muted-foreground">
-            If you ever forget your password, you can set a new one through it.
+            {{ $t("auth.addressConfirmedDetail") }}
           </p>
         </div>
       </div>
 
       <Button
         class="mt-5 h-9 w-full"
-        label="Continue"
+        :label="$ts('action.continue')"
         @click="router.push(localeRoute({ name: 'index' }))"
       >
-        Continue
+        {{ $t("action.continue") }}
       </Button>
     </template>
 
@@ -81,23 +81,22 @@ onMounted(async () => {
           <LinkIcon class="size-4 text-muted-foreground" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-          <h1 class="text-sm font-semibold">That link cannot be used</h1>
+          <h1 class="text-sm font-semibold">{{ $t("auth.linkCannotBeUsed") }}</h1>
           <p class="mt-1 text-sm text-muted-foreground">{{ error }}</p>
         </div>
       </div>
 
       <p class="mt-4 text-xs text-muted-foreground">
-        Links work once and last a day, and asking for a new one replaces the old. You can ask again
-        from your settings.
+        {{ $t("auth.confirmationLinkExpiredDetail") }}
       </p>
 
       <Button
         variant="outline"
         class="mt-5 h-9 w-full"
-        label="Go to sign in"
+        :label="$ts('auth.goToSignIn')"
         @click="router.push(localeRoute({ name: 'signin' }))"
       >
-        Go to sign in
+        {{ $t("auth.goToSignIn") }}
       </Button>
     </template>
   </div>

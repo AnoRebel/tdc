@@ -10,6 +10,8 @@ import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
+const { $t, $ts } = useI18n();
+
 /**
  * Asking for a way back into an account.
  *
@@ -82,33 +84,31 @@ const form = useForm({
           <MailCheck class="size-4 text-primary" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-          <h2 class="text-sm font-semibold">Check your email</h2>
+          <h2 class="text-sm font-semibold">{{ $t("auth.checkYourEmail") }}</h2>
           <p class="mt-1 text-sm text-muted-foreground">
-            If there is an account with that address, a link to set a new password is on its way. It
-            works once, and for an hour.
+            {{ $t("auth.recoveryLinkOnWay") }}
           </p>
         </div>
       </div>
 
       <p class="mt-4 text-xs text-muted-foreground">
-        Nothing arrived? Check the address you typed, and the spam folder. If the account has no
-        confirmed email address, an administrator is the only way back in.
+        {{ $t("auth.recoveryNothingArrived") }}
       </p>
 
       <Button
         variant="outline"
         class="mt-5 h-9 w-full"
-        label="Back to sign in"
+        :label="$ts('auth.backToSignIn')"
         @click="emit('cancel')"
       >
-        Back to sign in
+        {{ $t("auth.backToSignIn") }}
       </Button>
     </template>
 
     <template v-else>
-      <h2 class="text-sm font-semibold">Forgotten your password</h2>
+      <h2 class="text-sm font-semibold">{{ $t("auth.forgottenPasswordTitle") }}</h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        Give the email address on your account and we will send a link to set a new password.
+        {{ $t("auth.forgottenPasswordHint") }}
       </p>
 
       <p
@@ -122,7 +122,7 @@ const form = useForm({
       <form class="mt-5 space-y-4" @submit.prevent="form.handleSubmit()">
         <form.Field name="email">
           <template #default="{ field }">
-            <Field label="Email address" :error="firstError(field)" required>
+            <Field :label="$ts('auth.emailAddress')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -142,18 +142,18 @@ const form = useForm({
 
         <Button class="h-9 w-full" type="submit" :disabled="submitting">
           <Spinner v-if="submitting" size="sm" />
-          {{ submitting ? "Sending" : "Send the link" }}
+          {{ submitting ? $t("auth.sending") : $t("auth.sendTheLink") }}
         </Button>
       </form>
 
       <Button
         variant="ghost"
         class="mt-2 h-9 w-full"
-        label="Back to sign in"
+        :label="$ts('auth.backToSignIn')"
         :disabled="submitting"
         @click="emit('cancel')"
       >
-        Back to sign in
+        {{ $t("auth.backToSignIn") }}
       </Button>
     </template>
   </div>

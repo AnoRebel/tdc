@@ -10,6 +10,8 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { atTime } from "#layers/ui/app/lib/dates";
 
+const { $t } = useI18n();
+
 /**
  * A thread, opened beside the channel.
  *
@@ -80,7 +82,7 @@ function when(value: string): string {
 <template>
   <aside class="flex w-80 shrink-0 flex-col border-l bg-surface-sunken">
     <header class="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-      <h2 class="text-sm font-semibold">Thread</h2>
+      <h2 class="text-sm font-semibold">{{ $t("room.thread") }}</h2>
       <span v-if="thread" class="text-xs text-muted-foreground">
         {{ thread.replies.length === 1 ? "1 reply" : `${thread.replies.length} replies` }}
       </span>
@@ -132,7 +134,7 @@ function when(value: string): string {
         />
 
         <p v-else class="py-6 text-center text-xs text-muted-foreground">
-          No replies yet. Start the discussion.
+          {{ $t("room.noRepliesYet") }}
         </p>
 
         <article v-for="reply in thread.replies" :key="reply.id" class="flex gap-2.5 px-1">

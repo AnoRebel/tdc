@@ -14,9 +14,11 @@ import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
+const { $t, $ts } = useI18n();
+
 useHead({
   // The server being viewed, so several open at once stay distinguishable.
-  title: computed(() => String(useRoute().params.domain ?? "Server")),
+  title: computed(() => String(useRoute().params.domain ?? $ts("nav.server"))),
 });
 
 const route = useRoute();
@@ -40,7 +42,7 @@ async function load() {
       `/api/federation/servers/${encodeURIComponent(domain.value)}/rooms`,
     );
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not reach that server.";
+    error.value = isApiError(cause) ? cause.message : $ts("error.couldNotReach");
   } finally {
     loading.value = false;
   }
@@ -59,10 +61,10 @@ const visibilityIcon = computed(() =>
 
 const visibilityLabel = computed(() =>
   server.value?.visibility === "public"
-    ? "Open to the network"
+    ? $t("nav.openToNetwork")
     : server.value?.visibility === "limited"
-      ? "Open to listed servers"
-      : "Private",
+      ? $t("nav.openToListedServers")
+      : $t("channel.private"),
 );
 </script>
 
@@ -105,13 +107,11 @@ const visibilityLabel = computed(() =>
           class="mt-4 flex items-center gap-2.5 rounded-lg border border-warning/30 bg-warning/8 px-3 py-2.5 text-sm"
         >
           <WifiOff class="size-4 shrink-0 text-warning" />
-          <span>
-            This server is not reachable right now. Its rooms will appear again when it returns.
-          </span>
+          <span>{{ $t("nav.serverUnreachable") }}</span>
         </div>
 
         <section class="mt-6">
-          <h2 class="text-sm font-semibold">Rooms</h2>
+          <h2 class="text-sm font-semibold">{{ $t("nav.rooms") }}</h2>
 
           <ul v-if="rooms.length" class="mt-3 space-y-1">
             <li v-for="room in rooms" :key="room.id">
@@ -132,7 +132,7 @@ const visibilityLabel = computed(() =>
           </ul>
 
           <p v-else class="mt-3 text-sm text-muted-foreground">
-            This server publishes no rooms you can browse.
+            {{ $t("nav.noPublishedRooms") }}
           </p>
         </section>
       </template>

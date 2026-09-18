@@ -15,6 +15,8 @@ defineProps<{ body: string }>();
 
 const emit = defineEmits<{ cancel: []; schedule: [sendAt: Date] }>();
 
+const { $t, $ts } = useI18n();
+
 /*
  * Whether the application is in its dark palette, which the picker has to be
  * told rather than being able to read.
@@ -41,16 +43,16 @@ const presets = computed(() => {
   const options: { label: string; when: Date }[] = [];
 
   // Later today, only while there is still a later today to speak of.
-  if (now.getHours() < 17) options.push({ label: "This evening, 6pm", when: at(18) });
+  if (now.getHours() < 17) options.push({ label: $ts("room.thisEvening"), when: at(18) });
 
-  options.push({ label: "Tomorrow morning, 9am", when: at(9, 1) });
-  options.push({ label: "Tomorrow evening, 6pm", when: at(18, 1) });
+  options.push({ label: $ts("room.tomorrowMorning"), when: at(9, 1) });
+  options.push({ label: $ts("room.tomorrowEvening"), when: at(18, 1) });
 
   // The coming Monday, for anything that should wait for the working week.
   const monday = new Date();
   monday.setDate(monday.getDate() + ((8 - monday.getDay()) % 7 || 7));
   monday.setHours(9, 0, 0, 0);
-  options.push({ label: "Monday morning, 9am", when: monday });
+  options.push({ label: $ts("room.mondayMorning"), when: monday });
 
   return options;
 });
@@ -80,7 +82,7 @@ function describe(when: Date): string {
     class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
     role="dialog"
     aria-modal="true"
-    aria-label="Send later"
+    :aria-label="$ts('room.sendLater')"
     @click.self="emit('cancel')"
     @keydown.esc="emit('cancel')"
   >
@@ -94,7 +96,7 @@ function describe(when: Date): string {
         class="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3 text-sm font-semibold"
       >
         <Clock class="size-4" />
-        Send later
+        {{ $t("room.sendLater") }}
       </h2>
 
       <div class="min-h-0 flex-1 overflow-y-auto p-4">
@@ -119,7 +121,7 @@ function describe(when: Date): string {
 
         <div class="mt-4 border-t border-border pt-3">
           <label for="schedule-custom" class="mb-1 block text-xs font-medium">
-            Or pick a time
+            {{ $t("room.orPickATime") }}
           </label>
           <ClientOnly>
             <!-- Inline rather than a popup. A popup anchored to an input near
@@ -147,16 +149,16 @@ function describe(when: Date): string {
                the presets above still work, so this says so rather than
                showing a control that does nothing. -->
             <template #fallback>
-              <p class="text-xs text-muted-foreground">Loading the calendar…</p>
+              <p class="text-xs text-muted-foreground">{{ $t("room.loadingCalendar") }}</p>
             </template>
           </ClientOnly>
         </div>
       </div>
 
       <div class="flex shrink-0 justify-end gap-2 border-t border-border px-4 py-3">
-        <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
+        <Button variant="ghost" @click="emit('cancel')">{{ $t("action.cancel") }}</Button>
         <Button :disabled="!customValid" @click="custom && emit('schedule', custom)">
-          Schedule
+          {{ $t("room.schedule") }}
         </Button>
       </div>
     </div>

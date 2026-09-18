@@ -11,6 +11,8 @@ import { Textarea } from "#layers/ui/app/components/ui/textarea";
  * explain is a decision nobody can review.
  */
 
+const { $t, $ts } = useI18n();
+
 defineProps<{ username: string }>();
 
 const emit = defineEmits<{
@@ -28,10 +30,10 @@ const reason = ref("");
  * accident.
  */
 const durations = [
-  { label: "An hour", hours: 1 },
-  { label: "A day", hours: 24 },
-  { label: "A week", hours: 24 * 7 },
-  { label: "Permanent", hours: 0 },
+  { label: $ts("channel.lifetime.hour"), hours: 1 },
+  { label: $ts("channel.lifetime.day"), hours: 24 },
+  { label: $ts("channel.lifetime.week"), hours: 24 * 7 },
+  { label: $ts("moderation.permanent"), hours: 0 },
 ];
 
 const hours = ref(24);
@@ -47,39 +49,40 @@ function submit() {
     class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
     role="dialog"
     aria-modal="true"
-    aria-label="Ban from channel"
+    :aria-label="$ts('moderation.banFromChannel')"
     @click.self="emit('cancel')"
     @keydown.esc="emit('cancel')"
   >
     <div class="w-[min(26rem,100%)] rounded-xl border border-border bg-card p-4 shadow-2xl">
       <h2 class="flex items-center gap-2 text-sm font-semibold">
         <ShieldOff class="size-4" />
-        Ban {{ username }} from this channel
+        {{ $t("moderation.banWhomFromChannel", { username }) }}
       </h2>
 
       <p class="mt-2 text-xs text-muted-foreground">
-        They will be removed from this channel and cannot rejoin it. Everything else they belong to
-        is untouched.
+        {{ $t("moderation.banConsequenceHint") }}
       </p>
 
       <form class="mt-4 space-y-3" @submit.prevent="submit">
         <div>
-          <label for="ban-reason" class="mb-1 block text-xs font-medium"> Reason </label>
+          <label for="ban-reason" class="mb-1 block text-xs font-medium">
+            {{ $t("moderation.reason") }}
+          </label>
           <Textarea
             class="h-auto py-2"
             id="ban-reason"
             v-model="reason"
             rows="2"
-            placeholder="What happened"
+            :placeholder="$ts('moderation.whatHappened')"
             autofocus
           />
           <p class="mt-1 text-[0.6875rem] text-muted-foreground">
-            Recorded, and shown to whoever reviews this later.
+            {{ $t("admin.recordedShownToReviewerHint") }}
           </p>
         </div>
 
         <fieldset>
-          <legend class="mb-1.5 text-xs font-medium">How long</legend>
+          <legend class="mb-1.5 text-xs font-medium">{{ $t("moderation.howLong") }}</legend>
           <div class="flex flex-wrap gap-1">
             <button
               v-for="duration in durations"
@@ -99,8 +102,10 @@ function submit() {
         </fieldset>
 
         <div class="flex justify-end gap-2">
-          <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
-          <Button variant="danger" type="submit" :disabled="!reason.trim()">Ban</Button>
+          <Button variant="ghost" @click="emit('cancel')">{{ $t("action.cancel") }}</Button>
+          <Button variant="danger" type="submit" :disabled="!reason.trim()">
+            {{ $t("moderation.ban") }}
+          </Button>
         </div>
       </form>
     </div>

@@ -12,6 +12,8 @@ import {
 
 import { Button } from "#layers/ui/app/components/ui/button";
 
+const { $t } = useI18n();
+
 /**
  * A table of things, sortable and paginated.
  *
@@ -54,7 +56,7 @@ const props = withDefaults(
     /** A label for the table itself, since a screen reader announces it. */
     caption?: string;
   }>(),
-  { pageSize: 25, empty: "Nothing here yet.", caption: undefined },
+  { pageSize: 25, empty: undefined, caption: undefined },
 );
 
 const table = useTable({
@@ -157,7 +159,7 @@ const pageIndex = computed(() => table.atoms.pagination.get().pageIndex);
               :colspan="columns.length"
               class="px-3 py-8 text-center text-sm text-muted-foreground"
             >
-              {{ empty }}
+              {{ empty ?? $t("app.nothingHereYet") }}
             </td>
           </tr>
         </tbody>
@@ -170,7 +172,9 @@ const pageIndex = computed(() => table.atoms.pagination.get().pageIndex);
       v-if="pageCount > 1"
       class="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground"
     >
-      <span class="tabular-nums">Page {{ pageIndex + 1 }} of {{ pageCount }}</span>
+      <span class="tabular-nums">
+        {{ $t("app.pageOf", { page: pageIndex + 1, total: pageCount }) }}
+      </span>
 
       <div class="flex gap-1">
         <Button
@@ -179,7 +183,7 @@ const pageIndex = computed(() => table.atoms.pagination.get().pageIndex);
           :disabled="!table.getCanPreviousPage()"
           @click="table.previousPage()"
         >
-          Previous
+          {{ $t("action.previous") }}
         </Button>
         <Button
           variant="ghost"
@@ -187,7 +191,7 @@ const pageIndex = computed(() => table.atoms.pagination.get().pageIndex);
           :disabled="!table.getCanNextPage()"
           @click="table.nextPage()"
         >
-          Next
+          {{ $t("action.next") }}
         </Button>
       </div>
     </div>

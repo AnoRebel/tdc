@@ -10,6 +10,8 @@ import { isApiError } from "@tdc/types";
 import type { Passkey } from "@tdc/types";
 import { whenBriefly } from "#layers/ui/app/lib/dates";
 
+const { $t, $ts } = useI18n();
+
 /**
  * Somebody's own passkeys: what they have, and adding or removing one.
  *
@@ -102,10 +104,9 @@ onMounted(load);
 <template>
   <section v-if="available" class="space-y-4">
     <div>
-      <h2 class="text-sm font-semibold">Passkeys</h2>
+      <h2 class="text-sm font-semibold">{{ $t("auth.passkeys") }}</h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        Sign in with your fingerprint, face or device PIN instead of a password. The key stays on
-        your device.
+        {{ $t("auth.passkeysHint") }}
       </p>
     </div>
 
@@ -119,13 +120,12 @@ onMounted(load);
 
     <p v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
       <Spinner size="sm" />
-      Reading your passkeys
+      {{ $t("auth.readingPasskeys") }}
     </p>
 
     <!-- Nothing yet, said as an invitation rather than as an absence. -->
     <p v-else-if="passkeys.length === 0" class="text-sm text-muted-foreground">
-      You have none yet. Adding one takes a moment and means you can sign in without typing
-      anything.
+      {{ $t("auth.noPasskeysYet") }}
     </p>
 
     <ul v-else class="divide-y rounded-lg border">
@@ -133,22 +133,22 @@ onMounted(load);
         <Fingerprint class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 
         <div class="min-w-0 flex-1">
-          <p class="truncate text-sm font-medium">{{ passkey.label || "Unnamed" }}</p>
+          <p class="truncate text-sm font-medium">{{ passkey.label || $t("auth.unnamed") }}</p>
           <p class="text-xs text-muted-foreground">
-            Added {{ whenBriefly(passkey.added)
+            {{ $t("auth.addedWhen", { when: whenBriefly(passkey.added) })
             }}<template v-if="passkey.lastUsed">
-              · last used {{ whenBriefly(passkey.lastUsed) }}</template
+              · {{ $t("auth.lastUsedWhen", { when: whenBriefly(passkey.lastUsed) }) }}</template
             >
             <!-- Never used is worth saying: it is how somebody spots one they
                  enrolled and forgot, or one they did not enrol at all. -->
-            <template v-else> · never used</template>
+            <template v-else> · {{ $t("auth.neverUsed") }}</template>
           </p>
         </div>
 
         <Button
           variant="ghost"
           class="size-8 shrink-0 p-0 text-muted-foreground hover:text-destructive"
-          :label="`Remove ${passkey.label || 'this passkey'}`"
+          :label="$ts('auth.removeNamed', { name: passkey.label || $ts('auth.thisPasskey') })"
           @click="removing = passkey"
         >
           <Trash2 class="size-4" aria-hidden="true" />
@@ -158,7 +158,7 @@ onMounted(load);
 
     <form class="flex items-end gap-2" @submit.prevent="add">
       <div class="flex-1">
-        <Field label="Name for a new passkey">
+        <Field :label="$ts('auth.nameForNewPasskey')">
           <template #default="{ id, invalid, describedBy }">
             <Input
               :id="id"
@@ -171,18 +171,18 @@ onMounted(load);
         </Field>
       </div>
 
-      <Button type="submit" class="h-9 gap-2" :disabled="adding" label="Add a passkey">
+      <Button type="submit" class="h-9 gap-2" :disabled="adding" :label="$ts('auth.addPasskey')">
         <Spinner v-if="adding" size="sm" />
         <Plus v-else class="size-4" aria-hidden="true" />
-        {{ adding ? "Waiting for your device" : "Add" }}
+        {{ adding ? $t("auth.waitingForDevice") : $t("auth.add") }}
       </Button>
     </form>
 
     <ConfirmDialog
       v-if="removing"
-      title="Remove this passkey?"
-      :detail="removing.label || 'Unnamed'"
-      confirm-label="Remove"
+      :title="$ts('auth.removeThisPasskey')"
+      :detail="removing.label || $ts('auth.unnamed')"
+      :confirm-label="$ts('action.remove')"
       @confirm="confirmRemoval"
       @cancel="removing = null"
     />

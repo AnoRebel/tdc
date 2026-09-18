@@ -11,6 +11,8 @@ import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
+const { $t, $ts } = useI18n();
+
 /**
  * What a sign-in through a provider asks, when it asks anything.
  *
@@ -171,13 +173,13 @@ async function declineLink() {
 const trouble = computed(() => {
   switch (props.result.status) {
     case "declined":
-      return "The sign-in was cancelled.";
+      return $t("auth.oauthDeclined");
     case "expired":
-      return "That sign-in took too long. Try again.";
+      return $t("auth.oauthExpired");
     case "already-attached":
-      return "That account is already connected to a different account here.";
+      return $t("auth.oauthAlreadyAttached");
     case "failed":
-      return "The provider could not complete the sign-in. Try again.";
+      return $t("auth.oauthFailed");
     default:
       return null;
   }
@@ -201,10 +203,9 @@ const trouble = computed(() => {
           <Link2 class="size-4 text-primary" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-          <h2 class="text-sm font-semibold">Connect this to your account?</h2>
+          <h2 class="text-sm font-semibold">{{ $t("auth.connectToAccount") }}</h2>
           <p class="mt-1 text-sm text-muted-foreground">
-            An account here already uses that email address. Sign in to it once and this provider
-            will work on its own from then on.
+            {{ $t("auth.connectToAccountHint") }}
           </p>
         </div>
       </div>
@@ -212,7 +213,7 @@ const trouble = computed(() => {
       <form class="mt-5 space-y-4" @submit.prevent="linkForm.handleSubmit()">
         <linkForm.Field name="password">
           <template #default="{ field }">
-            <Field label="Password" :error="firstError(field)" required>
+            <Field :label="$ts('auth.password')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -232,7 +233,7 @@ const trouble = computed(() => {
 
         <Button class="h-9 w-full" type="submit" :disabled="submitting">
           <Spinner v-if="submitting" size="sm" />
-          {{ submitting ? "Connecting" : "Connect and sign in" }}
+          {{ submitting ? $t("auth.connecting") : $t("auth.connectAndSignIn") }}
         </Button>
       </form>
 
@@ -241,11 +242,11 @@ const trouble = computed(() => {
       <Button
         variant="ghost"
         class="mt-2 h-9 w-full"
-        label="Create a separate account instead"
+        :label="$ts('auth.createSeparateAccount')"
         :disabled="submitting"
         @click="declineLink"
       >
-        Create a separate account instead
+        {{ $t("auth.createSeparateAccount") }}
       </Button>
     </template>
 
@@ -256,10 +257,9 @@ const trouble = computed(() => {
           <UserPlus class="size-4 text-primary" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-          <h2 class="text-sm font-semibold">Choose a username</h2>
+          <h2 class="text-sm font-semibold">{{ $t("auth.chooseUsername") }}</h2>
           <p class="mt-1 text-sm text-muted-foreground">
-            This is how people will see you here. It does not have to match the one you use
-            elsewhere.
+            {{ $t("auth.chooseUsernameHint") }}
           </p>
         </div>
       </div>
@@ -267,7 +267,7 @@ const trouble = computed(() => {
       <form class="mt-5 space-y-4" @submit.prevent="accountForm.handleSubmit()">
         <accountForm.Field name="username">
           <template #default="{ field }">
-            <Field label="Username" :error="firstError(field)" required>
+            <Field :label="$ts('auth.username')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -286,7 +286,7 @@ const trouble = computed(() => {
 
         <accountForm.Field name="displayName">
           <template #default="{ field }">
-            <Field label="Display name" :error="firstError(field)">
+            <Field :label="$ts('auth.displayName')" :error="firstError(field)">
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -304,7 +304,7 @@ const trouble = computed(() => {
 
         <Button class="h-9 w-full" type="submit" :disabled="submitting">
           <Spinner v-if="submitting" size="sm" />
-          {{ submitting ? "Creating your account" : "Create account" }}
+          {{ submitting ? $t("auth.creatingYourAccount") : $t("auth.createAccount") }}
         </Button>
       </form>
     </template>
@@ -317,10 +317,10 @@ const trouble = computed(() => {
       <Button
         variant="outline"
         class="mt-4 h-9 w-full"
-        label="Back to sign in"
+        :label="$ts('auth.backToSignIn')"
         @click="emit('cancel')"
       >
-        Back to sign in
+        {{ $t("auth.backToSignIn") }}
       </Button>
     </template>
   </div>

@@ -13,6 +13,8 @@ import { Download, EyeOff, FileCode, FileText, Music, Play } from "lucide-vue-ne
 
 const props = defineProps<{ attachments: Attachment[] }>();
 
+const { $t } = useI18n();
+
 const mediaUrl = useMediaUrl();
 const { obscureSensitiveMedia } = useServerInfo();
 
@@ -148,8 +150,12 @@ function previewStyle(attachment: Attachment) {
                comes from the image's aspect ratio, so without it the icon is
                the child squeezed to nothing. -->
           <EyeOff class="size-5 shrink-0 drop-shadow" />
-          <span class="text-xs font-medium drop-shadow">Marked sensitive</span>
-          <span class="text-[0.6875rem] opacity-80 drop-shadow">Click to show</span>
+          <span class="text-xs font-medium drop-shadow">{{
+            $t("attachment.markedSensitive")
+          }}</span>
+          <span class="text-[0.6875rem] opacity-80 drop-shadow">
+            {{ $t("attachment.clickToShow") }}
+          </span>
         </span>
       </button>
 

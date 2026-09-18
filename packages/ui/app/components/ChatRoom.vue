@@ -53,6 +53,8 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { atTime, onDay } from "#layers/ui/app/lib/dates";
 
+const { $t, $ts } = useI18n();
+
 /*
  * The conversation this shows, given by whichever page renders it.
  *
@@ -441,14 +443,14 @@ onBeforeUnmount(() => document.removeEventListener("click", closeComposerMenus))
 const pickerAccept = ref("");
 
 const attachmentOptions = [
-  { label: "Photo or video", accept: "image/*,video/*", icon: ImageIcon },
-  { label: "Audio", accept: "audio/*", icon: Music },
+  { label: $ts("room.photoOrVideo"), accept: "image/*,video/*", icon: ImageIcon },
+  { label: $ts("room.audio"), accept: "audio/*", icon: Music },
   {
-    label: "Document",
+    label: $ts("room.document"),
     accept: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.txt,.md",
     icon: FileText,
   },
-  { label: "Any file", accept: "", icon: Paperclip },
+  { label: $ts("room.anyFile"), accept: "", icon: Paperclip },
 ];
 
 /** Opens the picker filtered to one kind. */
@@ -1189,7 +1191,7 @@ function menuFor(
 
   if (!message.removed) {
     items.push({
-      label: "Copy text",
+      label: $ts("room.copyText"),
       icon: Copy,
       action: () => navigator.clipboard?.writeText(message.body),
     });
@@ -1197,24 +1199,24 @@ function menuFor(
 
   if (room.value?.member && !message.removed) {
     items.push({
-      label: "Reply in thread",
+      label: $ts("room.replyInThread"),
       icon: MessageSquareText,
       action: () => openThread(message.id),
     });
     items.push({
-      label: "Forward",
+      label: $ts("room.forward"),
       icon: Forward,
       action: () => {
         forwarding.value = [message.id];
       },
     });
     items.push({
-      label: pins.pinnedIds.value.has(message.id) ? "Unpin" : "Pin to channel",
+      label: pins.pinnedIds.value.has(message.id) ? $ts("room.unpin") : $ts("room.pinToChannel"),
       icon: Pin,
       action: () => togglePin(message.id),
     });
     items.push({
-      label: "Select",
+      label: $ts("room.select"),
       icon: CheckSquare,
       action: () => toggleSelected(message.id),
     });
@@ -1229,7 +1231,7 @@ function menuFor(
    */
   if ((mine || can("moderation.review")) && !message.removed) {
     items.push({
-      label: message.lifetime ? "Change when it expires" : "Expire this message",
+      label: message.lifetime ? $ts("room.changeWhenItExpires") : $ts("room.expireThisMessage"),
       icon: Timer,
       action: () => {
         expiring.value = { id: message.id, current: message.lifetime };
@@ -1262,7 +1264,7 @@ function menuFor(
 
     if (!anyCovered || theirsToLift) {
       items.push({
-        label: anyCovered ? "Unmark as sensitive" : "Mark as sensitive",
+        label: anyCovered ? $ts("room.unmarkAsSensitive") : $ts("room.markAsSensitive"),
         icon: anyCovered ? Eye : EyeOff,
         action: () => setSensitive(markable, !anyCovered),
       });
@@ -1273,7 +1275,7 @@ function menuFor(
   // tell a moderator about a message you wrote and can delete yourself.
   if (!mine && !message.removed) {
     items.push({
-      label: "Report",
+      label: $ts("room.report"),
       icon: Flag,
       action: () => {
         reporting.value = { id: message.id, body: message.body };
@@ -1283,7 +1285,7 @@ function menuFor(
     // Blocking the person, which is a personal boundary rather than a report:
     // nobody is told, least of all them.
     items.push({
-      label: `Block ${shortName(sender)}`,
+      label: $ts("room.blockPerson", { who: shortName(sender) }),
       icon: UserX,
       destructive: true,
       action: () => {
@@ -1295,7 +1297,7 @@ function menuFor(
     // it appears only for whoever holds that authority.
     if (can("moderation.restrict")) {
       items.push({
-        label: `Ban ${shortName(sender)} from this channel`,
+        label: $ts("room.banPersonFromChannel", { who: shortName(sender) }),
         icon: ShieldOff,
         destructive: true,
         action: () => {
@@ -1307,9 +1309,9 @@ function menuFor(
 
   if (mine && !message.removed) {
     items.push(
-      { label: "Edit", icon: Pencil, action: () => startEditing(message) },
+      { label: $ts("action.edit"), icon: Pencil, action: () => startEditing(message) },
       {
-        label: "Delete",
+        label: $ts("action.delete"),
         icon: Trash2,
         destructive: true,
         action: () => confirmDelete(message),
@@ -1669,17 +1671,23 @@ watch(roomId, load, { immediate: true });
         class="flex shrink-0 items-center gap-2 border-b bg-accent/40 px-4 py-2 text-xs"
       >
         <span class="font-medium">
-          {{ selected.size === 1 ? "1 message selected" : `${selected.size} messages selected` }}
+          {{
+            selected.size === 1
+              ? $t("room.oneMessageSelected")
+              : $t("room.messagesSelected", { count: selected.size })
+          }}
         </span>
         <Button variant="ghost" class="h-7 px-2" @click="forwarding = [...selected]">
           <Forward class="size-3.5" />
-          Forward
+          {{ $t("room.forward") }}
         </Button>
         <Button variant="ghost" class="h-7 px-2" @click="copySelected">
           <Copy class="size-3.5" />
-          Copy
+          {{ $t("action.copy") }}
         </Button>
-        <Button variant="ghost" class="ml-auto h-7 px-2" @click="clearSelection"> Cancel </Button>
+        <Button variant="ghost" class="ml-auto h-7 px-2" @click="clearSelection">
+          {{ $t("action.cancel") }}
+        </Button>
       </div>
 
       <p
@@ -1699,7 +1707,7 @@ watch(roomId, load, { immediate: true });
         aria-live="polite"
       >
         <Spinner v-if="pull.refreshing.value" class="size-3.5" />
-        <span>{{ pull.refreshing.value ? "Refreshing" : "Pull to refresh" }}</span>
+        <span>{{ pull.refreshing.value ? $t("room.refreshing") : $t("room.pullToRefresh") }}</span>
       </div>
 
       <!-- What is on screen was true when the server was last reached, and is
@@ -1735,9 +1743,9 @@ watch(roomId, load, { immediate: true });
             <span class="mx-auto grid size-10 place-items-center rounded-xl bg-muted">
               <Hash class="size-4 text-muted-foreground" />
             </span>
-            <p class="mt-3 text-sm font-medium">This is the start of {{ room?.name }}</p>
+            <p class="mt-3 text-sm font-medium">{{ $t("room.startOf") }} {{ room?.name }}</p>
             <p class="mt-0.5 text-xs text-muted-foreground">
-              {{ room?.member ? "Send the first message." : "Join to take part." }}
+              {{ room?.member ? $t("room.sendFirstMessage") : $t("room.joinToTakePart") }}
             </p>
           </div>
         </div>
@@ -1851,7 +1859,7 @@ watch(roomId, load, { immediate: true });
                     class="flex items-center gap-1 text-[0.6875rem] text-muted-foreground"
                   >
                     <Pin class="size-3" />
-                    Pinned
+                    {{ $t("room.pinned") }}
                   </span>
                   <Bubble
                     v-if="message.body || message.removed"
@@ -1872,7 +1880,7 @@ watch(roomId, load, { immediate: true });
                     </form>
 
                     <template v-else>
-                      <template v-if="message.removed">This message was removed</template>
+                      <template v-if="message.removed">{{ $t("room.messageRemoved") }}</template>
                       <MessageBody v-else :body="message.body" />
                       <!-- Dimmed, but not below what can be read. At 60% this
                            fell under 4.5:1 against a sender's own bubble,
@@ -1947,7 +1955,7 @@ watch(roomId, load, { immediate: true });
               <span class="text-xs font-semibold">You</span>
               <span class="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
                 <CloudOff class="size-3" />
-                Waiting to send
+                {{ $t("room.waitingToSend") }}
               </span>
             </div>
 
@@ -2128,7 +2136,7 @@ watch(roomId, load, { immediate: true });
           v-else-if="room"
           class="flex items-center justify-between gap-4 rounded-xl border bg-surface px-3 py-2.5"
         >
-          <p class="text-sm text-muted-foreground">Join this channel to take part.</p>
+          <p class="text-sm text-muted-foreground">{{ $t("room.joinToTakePart") }}</p>
           <Button @click="join">
             <Check class="size-3.5" />
             Join
@@ -2168,7 +2176,7 @@ watch(roomId, load, { immediate: true });
       class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
       role="status"
     >
-      Blocked. They are not told.
+      {{ $t("room.blockedNotTold") }}
     </p>
 
     <BanDialog
@@ -2192,7 +2200,7 @@ watch(roomId, load, { immediate: true });
       class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
       role="status"
     >
-      Scheduled. It will send at the time you chose.
+      {{ $t("room.scheduledForLater") }}
     </p>
 
     <p
@@ -2200,7 +2208,7 @@ watch(roomId, load, { immediate: true });
       class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
       role="status"
     >
-      Reported. A moderator will look at it.
+      {{ $t("room.reportedToModerator") }}
     </p>
 
     <ForwardDialog

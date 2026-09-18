@@ -12,6 +12,8 @@ import { Textarea } from "#layers/ui/app/components/ui/textarea";
  * place when it changes.
  */
 
+const { $t, $ts } = useI18n();
+
 defineProps<{ body: string }>();
 
 const emit = defineEmits<{
@@ -47,14 +49,14 @@ function submit() {
     class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
     role="dialog"
     aria-modal="true"
-    aria-label="Report"
+    :aria-label="$ts('moderation.report')"
     @click.self="emit('cancel')"
     @keydown.esc="emit('cancel')"
   >
     <div class="w-[min(26rem,100%)] rounded-xl border border-border bg-card p-4 shadow-2xl">
       <h2 class="flex items-center gap-2 text-sm font-semibold">
         <Flag class="size-4" />
-        Report this message
+        {{ $t("moderation.reportThisMessage") }}
       </h2>
 
       <!-- What is being reported, so the reader can see they picked the right
@@ -66,12 +68,14 @@ function submit() {
       </p>
 
       <p v-if="!reasons.length" class="mt-3 text-xs text-muted-foreground">
-        Reporting is unavailable at the moment.
+        {{ $t("moderation.reportingUnavailable") }}
       </p>
 
       <form v-else class="mt-4 space-y-3" @submit.prevent="submit">
         <fieldset>
-          <legend class="mb-1.5 text-xs font-medium">What is wrong with it?</legend>
+          <legend class="mb-1.5 text-xs font-medium">
+            {{ $t("moderation.whatIsWrongWithIt") }}
+          </legend>
           <div class="space-y-1">
             <label
               v-for="option in reasons"
@@ -91,25 +95,27 @@ function submit() {
 
         <div>
           <label for="report-detail" class="mb-1 block text-xs font-medium">
-            Anything else? <span class="text-muted-foreground">(optional)</span>
+            {{ $t("moderation.anythingElse") }}
+            <span class="text-muted-foreground">({{ $t("moderation.optional") }})</span>
           </label>
           <Textarea
             class="h-auto py-2"
             id="report-detail"
             v-model="detail"
             rows="3"
-            placeholder="What a moderator should know"
+            :placeholder="$ts('moderation.whatModeratorShouldKnow')"
           />
         </div>
 
         <p class="text-[0.6875rem] text-muted-foreground">
-          A moderator will see this message and what you have written. Reporting is not anonymous to
-          them.
+          {{ $t("moderation.notAnonymousHint") }}
         </p>
 
         <div class="flex justify-end gap-2">
-          <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
-          <Button variant="danger" type="submit" :disabled="!reason">Report</Button>
+          <Button variant="ghost" @click="emit('cancel')">{{ $t("action.cancel") }}</Button>
+          <Button variant="danger" type="submit" :disabled="!reason">
+            {{ $t("moderation.report") }}
+          </Button>
         </div>
       </form>
     </div>

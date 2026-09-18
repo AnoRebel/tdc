@@ -16,6 +16,8 @@ import { Button } from "#layers/ui/app/components/ui/button";
 
 const open = defineModel<boolean>({ default: false });
 
+const { $t, $ts } = useI18n();
+
 /** Grouped as the list declares, in the order the groups first appear. */
 const groups = computed(() => {
   const byGroup = new Map<string, typeof shortcuts>();
@@ -51,7 +53,7 @@ function label(key: string): string {
     class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
     role="dialog"
     aria-modal="true"
-    aria-label="Keyboard shortcuts"
+    :aria-label="$ts('nav.keyboardShortcuts')"
     @click.self="open = false"
     @keydown.esc="open = false"
   >
@@ -60,7 +62,7 @@ function label(key: string): string {
     >
       <h2 class="flex items-center gap-2 text-sm font-semibold">
         <Keyboard class="size-4" />
-        Keyboard shortcuts
+        {{ $t("nav.keyboardShortcuts") }}
       </h2>
 
       <div v-for="group in groups" :key="group.name" class="mt-4">
@@ -81,7 +83,7 @@ function label(key: string): string {
       </div>
 
       <div class="mt-4 flex justify-end">
-        <Button variant="ghost" @click="open = false">Close</Button>
+        <Button variant="ghost" @click="open = false">{{ $t("action.close") }}</Button>
       </div>
     </div>
   </div>

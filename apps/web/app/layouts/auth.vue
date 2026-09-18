@@ -27,6 +27,8 @@ const glow = ref({ ...restingPosition });
  */
 const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
+const { $t } = useI18n();
+
 /**
  * Follows the pointer across the panel.
  *
@@ -70,7 +72,7 @@ function rest() {
     >
       <!-- An ambient wash that follows the pointer, so the panel has depth and
            a little life without a photograph to load.
-           
+
            Positioned by percentage and transformed to its own centre, so it
            tracks the pointer exactly rather than trailing it by half its width.
            The transition is long and eased: a light this large moving quickly
@@ -94,22 +96,20 @@ function rest() {
         >
           TDC
         </span>
-        <span class="font-semibold">Tanzania Developers Community</span>
+        <span class="font-semibold">{{ $t("auth.communityName") }}</span>
       </div>
 
       <div class="relative max-w-md">
         <p class="text-2xl leading-snug font-semibold text-balance">
-          Where the community talks, plans, and finds each other.
+          {{ $t("app.tagline") }}
         </p>
         <p class="mt-3 text-sm text-muted-foreground text-pretty">
-          Channels and threads for discussion, projects to track the work, and a directory
-          connecting developers with the people who need them. Run on your own server, by the
-          community, for the community.
+          {{ $t("auth.communityDescription") }}
         </p>
       </div>
 
       <p class="relative text-xs text-muted-foreground">
-        Free and open source. Self-hosted, always.
+        {{ $t("auth.freeAndOpenSource") }}
       </p>
     </aside>
 
@@ -122,7 +122,7 @@ function rest() {
         >
           TDC
         </span>
-        <span class="font-semibold">Tanzania Developers</span>
+        <span class="font-semibold">{{ $t("auth.communityNameShort") }}</span>
       </div>
 
       <div class="w-full max-w-sm">

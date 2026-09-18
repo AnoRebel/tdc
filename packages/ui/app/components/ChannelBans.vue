@@ -11,6 +11,8 @@ import { onDayAtTime } from "#layers/ui/app/lib/dates";
  * half: seeing who is out, why, and until when — and lifting it.
  */
 
+const { $t, $ts } = useI18n();
+
 const props = defineProps<{ roomId: string }>();
 
 const roomId = computed(() => props.roomId);
@@ -34,12 +36,12 @@ async function lift(userId: string) {
 
 /** When a ban lifts, in words rather than a timestamp. */
 function until(ban: { expiresAt?: string }): string {
-  if (!ban.expiresAt) return "Permanent";
+  if (!ban.expiresAt) return $ts("moderation.permanent");
 
   const when = new Date(ban.expiresAt);
-  if (when.getTime() <= Date.now()) return "Expired";
+  if (when.getTime() <= Date.now()) return $ts("admin.expired");
 
-  return `Until ${onDayAtTime(when)}`;
+  return $ts("admin.untilWhen", { when: onDayAtTime(when) });
 }
 </script>
 
@@ -47,22 +49,22 @@ function until(ban: { expiresAt?: string }): string {
   <section>
     <h2 class="flex items-center gap-1.5 text-sm font-semibold">
       <ShieldOff class="size-4" />
-      Banned from this channel
+      {{ $t("moderation.bannedFromThisChannel") }}
     </h2>
 
     <!-- Most people cannot read this list, and the refusal is expected rather
          than exceptional: the section simply says so. -->
     <p v-if="bans.failed.value" class="mt-1 text-xs text-muted-foreground">
-      You do not have permission to see who is banned here.
+      {{ $t("moderation.cannotSeeWhoIsBanned") }}
     </p>
 
     <template v-else>
       <p class="mt-1 text-xs text-muted-foreground">
-        A ban applies to this channel only. Everything else they belong to is untouched.
+        {{ $t("moderation.banAppliesToChannelOnlyHint") }}
       </p>
 
       <p v-if="!bans.bans.value.length" class="mt-3 text-xs text-muted-foreground">
-        Nobody is banned from this channel.
+        {{ $t("moderation.nobodyBannedFromThisChannel") }}
       </p>
 
       <ul v-else class="mt-3 space-y-1">
@@ -84,7 +86,7 @@ function until(ban: { expiresAt?: string }): string {
                  nobody can see is one nobody can review. -->
             <span class="mt-0.5 block text-xs text-muted-foreground">{{ ban.reason }}</span>
             <span class="block text-[0.6875rem] text-muted-foreground">
-              by {{ ban.bannedBy.split("@")[0] }}
+              {{ $ts("moderation.byWhom", { who: ban.bannedBy.split("@")[0] ?? ban.bannedBy }) }}
             </span>
           </span>
 
@@ -93,7 +95,7 @@ function until(ban: { expiresAt?: string }): string {
             class="h-7 shrink-0 px-2 text-xs"
             @click="lifting = { userId: ban.userId, username: ban.username }"
           >
-            Lift ban
+            {{ $t("moderation.liftBan") }}
           </Button>
         </li>
       </ul>
@@ -101,9 +103,9 @@ function until(ban: { expiresAt?: string }): string {
 
     <ConfirmDialog
       v-if="lifting"
-      title="Lift this ban?"
-      :detail="`${lifting.username} will be able to rejoin this channel and post in it again.`"
-      confirm-label="Lift ban"
+      :title="$ts('moderation.liftThisBan')"
+      :detail="$ts('moderation.liftBanConsequence', { username: lifting.username })"
+      :confirm-label="$ts('moderation.liftBan')"
       @cancel="lifting = null"
       @confirm="lift(lifting.userId)"
     />

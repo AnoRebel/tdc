@@ -24,6 +24,8 @@ const open = defineModel<boolean>({ default: false });
 
 const emit = defineEmits<{ open: [notification: Notification] }>();
 
+const { $t } = useI18n();
+
 const { items, unread, refresh, markRead, dismissRoom } = useNotifications();
 
 watch(open, (isOpen) => {
@@ -78,13 +80,15 @@ function when(notification: Notification): string {
     class="absolute bottom-full left-2 z-30 mb-2 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-xl"
   >
     <header class="flex items-center justify-between border-b border-border px-3 py-2">
-      <h2 class="text-xs font-semibold">Notifications</h2>
-      <span v-if="unread" class="text-[0.6875rem] text-muted-foreground">{{ unread }} unread</span>
+      <h2 class="text-xs font-semibold">{{ $t("notification.title") }}</h2>
+      <span v-if="unread" class="text-[0.6875rem] text-muted-foreground">
+        {{ $t("notification.unreadCount", { count: unread }) }}
+      </span>
     </header>
 
     <div class="max-h-80 overflow-y-auto p-1.5">
       <p v-if="!items.length" class="px-2 py-8 text-center text-xs text-muted-foreground">
-        Nothing waiting. You are up to date.
+        {{ $t("notification.nothingWaiting") }}. {{ $t("notification.upToDate") }}
       </p>
 
       <button

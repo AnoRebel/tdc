@@ -3,7 +3,7 @@ import { isApiError } from "@tdc/types";
 import { ArrowLeft, Download, ShieldAlert } from "lucide-vue-next";
 import { fully } from "#layers/ui/app/lib/dates";
 
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 /**
  * The audit log.
@@ -25,21 +25,21 @@ definePageMeta({ middleware: "auth", layout: "app" });
 const columns = [
   {
     accessorKey: "occurredAt",
-    header: "When",
+    header: $t("admin.when"),
     cell: ({ row }: { row: { original: AuditEntry } }) => when(row.original.occurredAt),
   },
-  { accessorKey: "actor", header: "Who" },
-  { accessorKey: "action", header: "Action" },
+  { accessorKey: "actor", header: $t("admin.who") },
+  { accessorKey: "action", header: $t("admin.action") },
   {
     accessorKey: "targetKind",
-    header: "Target",
+    header: $t("admin.target"),
     // An entry about the server itself has no target, and an empty cell reads
     // as a missing value rather than an absent one.
     cell: ({ row }: { row: { original: AuditEntry } }) => row.original.targetKind ?? "—",
   },
 ];
 
-useHead({ title: "Audit log" });
+useHead({ title: $ts("moderation.auditLog") });
 
 interface AuditEntry {
   id: number;
@@ -64,7 +64,7 @@ try {
     error.value = cause.message;
     requiredPermission.value = cause.requiredPermission ?? null;
   } else {
-    error.value = "Could not load the audit log.";
+    error.value = $ts("admin.couldNotLoadAuditLog");
   }
 }
 
@@ -88,20 +88,20 @@ function when(value: string): string {
       <NuxtLink
         :to="localeRoute({ name: 'settings' })"
         class="btn btn-ghost size-7 px-0"
-        aria-label="Back to settings"
+        :aria-label="$ts('admin.backToSettings')"
       >
         <ArrowLeft class="size-4" />
       </NuxtLink>
-      <h1 class="text-sm font-semibold">Audit log</h1>
+      <h1 class="text-sm font-semibold">{{ $t("moderation.auditLog") }}</h1>
       <span v-if="!error" class="tabular ml-auto text-xs text-muted-foreground">
-        {{ entries.length }} most recent
+        {{ $t("admin.mostRecentCount", { count: entries.length }) }}
       </span>
 
       <!-- The whole log, not the page above it. Kept beside the listing
            because an operator who wants a copy is usually looking at it. -->
       <a v-if="!error" :href="exportUrl" download="audit-log.ndjson" class="btn btn-outline">
         <Download class="size-3.5" />
-        Export
+        {{ $t("admin.export") }}
       </a>
     </header>
 
@@ -115,27 +115,26 @@ function when(value: string): string {
         <div class="text-sm">
           <p class="font-medium text-destructive">{{ error }}</p>
           <p v-if="requiredPermission" class="mt-1 text-muted-foreground">
-            This needs the
+            {{ $t("admin.needsPermissionBefore") }}
             <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">
               {{ requiredPermission }}
             </code>
-            permission.
+            {{ $t("admin.needsPermissionAfter") }}
           </p>
         </div>
       </div>
 
       <template v-else>
         <p class="text-sm text-muted-foreground">
-          Every security- and administration-relevant action, most recent first. Reading this log is
-          itself recorded.
+          {{ $t("admin.auditLogHint") }}
         </p>
 
         <UiDataTable
           class="mt-4 bg-surface"
           :columns="columns"
           :data="entries"
-          caption="Recorded actions, most recent first"
-          empty="Nothing recorded yet."
+          :caption="$ts('admin.recordedActionsMostRecentFirst')"
+          :empty="$ts('admin.nothingRecordedYet')"
         />
       </template>
     </div>

@@ -22,6 +22,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
+const { $t, $ts } = useI18n();
+
 const mediaUrl = useMediaUrl();
 
 const index = ref(props.startAt ?? 0);
@@ -91,7 +93,7 @@ onBeforeUnmount(() => {
           <p class="text-xs text-white/60">
             {{ readableSize(current?.size ?? 0) }}
             <span v-if="hasSeveral" class="tabular">
-              · {{ index + 1 }} of {{ attachments.length }}
+              · {{ $t("attachment.indexOfTotal", { index: index + 1, total: attachments.length }) }}
             </span>
           </p>
         </div>
@@ -100,14 +102,14 @@ onBeforeUnmount(() => {
           :href="mediaUrl(current?.url)"
           :download="current?.filename"
           class="grid size-8 place-items-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"
-          title="Download"
+          :title="$ts('attachment.download')"
         >
           <Download class="size-4" />
         </a>
         <button
           type="button"
           class="grid size-8 place-items-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"
-          aria-label="Close"
+          :aria-label="$ts('action.close')"
           @click="emit('close')"
         >
           <X class="size-4" />
@@ -119,7 +121,7 @@ onBeforeUnmount(() => {
           v-if="hasSeveral"
           type="button"
           class="absolute left-2 z-10 grid size-10 place-items-center rounded-full bg-black/40 text-white transition hover:bg-black/60"
-          aria-label="Previous attachment"
+          :aria-label="$ts('attachment.previousAttachment')"
           @click.stop="previous"
         >
           <ChevronLeft class="size-5" />
@@ -197,7 +199,7 @@ onBeforeUnmount(() => {
             class="btn btn-primary mt-4"
           >
             <Download class="size-3.5" />
-            Download
+            {{ $t("attachment.download") }}
           </a>
         </div>
 
@@ -205,7 +207,7 @@ onBeforeUnmount(() => {
           v-if="hasSeveral"
           type="button"
           class="absolute right-2 z-10 grid size-10 place-items-center rounded-full bg-black/40 text-white transition hover:bg-black/60"
-          aria-label="Next attachment"
+          :aria-label="$ts('attachment.nextAttachment')"
           @click.stop="next"
         >
           <ChevronRight class="size-5" />

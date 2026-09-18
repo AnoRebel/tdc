@@ -15,6 +15,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
  * about what it costs, because it costs nothing.
  */
 const { $pwa } = useNuxtApp();
+const { $t, $ts } = useI18n();
 
 const dismissed = ref(false);
 const updating = ref(false);
@@ -55,15 +56,20 @@ async function update() {
       <RefreshCw class="size-4 shrink-0 text-primary" :class="updating && 'animate-spin'" />
 
       <p class="min-w-0 text-sm">
-        A new version is ready.
-        <span class="block text-xs text-muted-foreground"> What you have typed is kept. </span>
+        {{ $t("update.ready") }}
+        <span class="block text-xs text-muted-foreground">{{ $t("update.typedIsKept") }}</span>
       </p>
 
       <Button class="h-8" :disabled="updating" @click="update">
-        {{ updating ? "Updating" : "Reload" }}
+        {{ updating ? $t("update.updating") : $t("action.reload") }}
       </Button>
 
-      <Button variant="ghost" class="size-8 shrink-0 p-0" label="Not now" @click="dismissed = true">
+      <Button
+        variant="ghost"
+        class="size-8 shrink-0 p-0"
+        :label="$ts('update.notNow')"
+        @click="dismissed = true"
+      >
         <X class="size-3.5" />
       </Button>
     </div>

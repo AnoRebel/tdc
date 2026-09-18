@@ -6,7 +6,7 @@ import { Select } from "#layers/ui/app/components/ui/select";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
 
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 /**
  * Server administration.
@@ -22,7 +22,7 @@ const { $localeRoute: localeRoute } = useI18n();
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
-useHead({ title: "Server settings" });
+useHead({ title: $ts("admin.serverSettings") });
 
 const admin = useServerAdmin();
 
@@ -57,12 +57,12 @@ const groups = computed(() => {
 });
 
 const groupTitles: Record<string, string> = {
-  registration: "Who may join",
-  limits: "Capacity",
-  filter: "Content filter",
-  server: "How this server is found",
-  brand: "How this server looks",
-  audit: "Audit log",
+  registration: $ts("admin.whoMayJoin"),
+  limits: $ts("admin.capacity"),
+  filter: $ts("admin.contentFilter"),
+  server: $ts("admin.howThisServerIsFound"),
+  brand: $ts("admin.howThisServerLooks"),
+  audit: $ts("moderation.auditLog"),
 };
 
 /*
@@ -77,20 +77,20 @@ const groupTitles: Record<string, string> = {
  */
 const choices: Record<string, { value: string; label: string }[]> = {
   "registration.policy": [
-    { value: "open", label: "Anybody may register" },
-    { value: "invitation", label: "Only with an invitation" },
-    { value: "closed", label: "Nobody — the operator creates accounts" },
-    { value: "domain", label: "Only these email domains" },
+    { value: "open", label: $ts("admin.anybodyMayRegister") },
+    { value: "invitation", label: $ts("admin.onlyWithInvitation") },
+    { value: "closed", label: $ts("admin.nobodyOperatorCreatesAccounts") },
+    { value: "domain", label: $ts("admin.onlyTheseEmailDomains") },
   ],
   "server.visibility": [
-    { value: "public", label: "Anybody may find this server" },
-    { value: "limited", label: "Only the servers listed below" },
-    { value: "private", label: "Nobody — reachable only by invitation" },
+    { value: "public", label: $ts("admin.anybodyMayFindThisServer") },
+    { value: "limited", label: $ts("admin.onlyServersListedBelow") },
+    { value: "private", label: $ts("admin.nobodyReachableOnlyByInvitation") },
   ],
   "filter.action": [
-    { value: "flag", label: "Deliver it, and show a moderator" },
-    { value: "mask", label: "Deliver it with the words replaced" },
-    { value: "block", label: "Refuse the message" },
+    { value: "flag", label: $ts("admin.deliverAndShowModerator") },
+    { value: "mask", label: $ts("admin.deliverWithWordsReplaced") },
+    { value: "block", label: $ts("admin.refuseTheMessage") },
   ],
 };
 
@@ -109,7 +109,7 @@ async function save(key: string, value: string) {
   try {
     await admin.setSetting(key, value);
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "That change was not accepted.";
+    error.value = isApiError(cause) ? cause.message : $ts("admin.changeNotAccepted");
     await admin.refresh();
   } finally {
     saving.value = null;
@@ -121,13 +121,13 @@ async function toggle(name: string, enabled: boolean) {
   try {
     await admin.setFeature(name, enabled);
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "That capability could not be changed.";
+    error.value = isApiError(cause) ? cause.message : $ts("admin.capabilityNotChanged");
   }
 }
 
 /** A limit of zero means none, which is what an operator needs to read. */
 function limitLabel(limit: number): string {
-  return limit === 0 ? "no limit" : limit.toLocaleString();
+  return limit === 0 ? $ts("admin.noLimit") : limit.toLocaleString();
 }
 
 function bytes(value: number): string {
@@ -149,11 +149,11 @@ function bytes(value: number): string {
       <NuxtLink
         :to="localeRoute({ name: 'settings' })"
         class="btn btn-ghost size-7 px-0"
-        aria-label="Back to settings"
+        :aria-label="$ts('admin.backToSettings')"
       >
         <ArrowLeft class="size-4" />
       </NuxtLink>
-      <h1 class="text-sm font-semibold">Server settings</h1>
+      <h1 class="text-sm font-semibold">{{ $t("admin.serverSettings") }}</h1>
     </header>
 
     <div class="max-w-3xl space-y-8 px-4 py-6">
@@ -164,11 +164,11 @@ function bytes(value: number): string {
       >
         <ShieldAlert class="mt-0.5 size-4 shrink-0 text-destructive" />
         <div class="text-sm">
-          <p class="font-medium text-destructive">You cannot configure this server.</p>
+          <p class="font-medium text-destructive">{{ $t("admin.cannotConfigureServer") }}</p>
           <p class="mt-1 text-muted-foreground">
-            This needs the
+            {{ $t("admin.needsPermissionBefore") }}
             <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">server.configure</code>
-            permission.
+            {{ $t("admin.needsPermissionAfter") }}
           </p>
         </div>
       </div>
@@ -183,36 +183,38 @@ function bytes(value: number): string {
         </p>
 
         <section v-if="admin.usage.value">
-          <h2 class="text-sm font-semibold">What this server holds</h2>
+          <h2 class="text-sm font-semibold">{{ $t("admin.whatThisServerHolds") }}</h2>
           <dl class="mt-3 grid gap-3 sm:grid-cols-3">
             <div class="rounded-lg border bg-surface px-3 py-2.5">
-              <dt class="text-xs text-muted-foreground">People</dt>
+              <dt class="text-xs text-muted-foreground">{{ $t("nav.people") }}</dt>
               <dd class="tabular mt-0.5 text-sm">
                 {{ admin.usage.value.users.used.toLocaleString() }}
                 <span class="text-xs text-muted-foreground">
-                  of {{ limitLabel(admin.usage.value.users.limit) }}
+                  {{ $t("admin.ofLimit", { limit: limitLabel(admin.usage.value.users.limit) }) }}
                 </span>
               </dd>
             </div>
             <div class="rounded-lg border bg-surface px-3 py-2.5">
-              <dt class="text-xs text-muted-foreground">Channels</dt>
+              <dt class="text-xs text-muted-foreground">{{ $t("nav.channels") }}</dt>
               <dd class="tabular mt-0.5 text-sm">
                 {{ admin.usage.value.channels.used.toLocaleString() }}
                 <span class="text-xs text-muted-foreground">
-                  of {{ limitLabel(admin.usage.value.channels.limit) }}
+                  {{ $t("admin.ofLimit", { limit: limitLabel(admin.usage.value.channels.limit) }) }}
                 </span>
               </dd>
             </div>
             <div class="rounded-lg border bg-surface px-3 py-2.5">
-              <dt class="text-xs text-muted-foreground">Attachments</dt>
+              <dt class="text-xs text-muted-foreground">{{ $t("attachment.attachments") }}</dt>
               <dd class="tabular mt-0.5 text-sm">
                 {{ bytes(admin.usage.value.storage.used) }}
                 <span class="text-xs text-muted-foreground">
-                  of
                   {{
-                    admin.usage.value.storage.limit === 0
-                      ? "no limit"
-                      : bytes(admin.usage.value.storage.limit)
+                    $t("admin.ofLimit", {
+                      limit:
+                        admin.usage.value.storage.limit === 0
+                          ? $ts("admin.noLimit")
+                          : bytes(admin.usage.value.storage.limit),
+                    })
                   }}
                 </span>
               </dd>
@@ -221,10 +223,9 @@ function bytes(value: number): string {
         </section>
 
         <section>
-          <h2 class="text-sm font-semibold">What this server offers</h2>
+          <h2 class="text-sm font-semibold">{{ $t("admin.whatThisServerOffers") }}</h2>
           <p class="mt-0.5 text-xs text-muted-foreground">
-            A capability turned off here is refused by the server and is not advertised to clients,
-            so the control disappears rather than failing.
+            {{ $t("admin.capabilityOffHint") }}
           </p>
 
           <ul class="mt-3 space-y-1">
@@ -240,7 +241,7 @@ function bytes(value: number): string {
                     v-if="feature.enabled !== feature.default"
                     class="ml-1.5 rounded bg-primary/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-primary"
                   >
-                    changed
+                    {{ $t("admin.changed") }}
                   </span>
                 </p>
                 <p class="mt-0.5 text-xs text-muted-foreground">{{ feature.description }}</p>
@@ -253,7 +254,7 @@ function bytes(value: number): string {
                   class="mt-1 flex items-center gap-1 text-xs text-warning"
                 >
                   <TriangleAlert class="size-3 shrink-0" />
-                  Nothing is configured for this yet, so it stays unavailable.
+                  {{ $t("admin.notConfiguredYetHint") }}
                 </p>
               </div>
 
@@ -272,7 +273,7 @@ function bytes(value: number): string {
         <section v-if="admin.warnings.value.length">
           <h2 class="flex items-center gap-1.5 text-sm font-semibold text-warning">
             <TriangleAlert class="size-4" />
-            Worth checking
+            {{ $t("admin.worthChecking") }}
           </h2>
           <ul class="mt-3 space-y-1.5">
             <li
@@ -333,10 +334,9 @@ function bytes(value: number): string {
         </section>
 
         <section v-if="admin.configuration.value.length">
-          <h2 class="text-sm font-semibold">How this server was started</h2>
+          <h2 class="text-sm font-semibold">{{ $t("admin.howThisServerWasStarted") }}</h2>
           <p class="mt-0.5 text-xs text-muted-foreground">
-            Read-only. These come from the environment or the configuration file and need a restart
-            to change. The source says whether a value was chosen or merely inherited.
+            {{ $t("admin.readOnlyConfigurationHint") }}
           </p>
 
           <div class="mt-3 overflow-x-auto rounded-lg border bg-surface">
@@ -344,13 +344,13 @@ function bytes(value: number): string {
               <thead>
                 <tr class="border-b text-left">
                   <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
-                    Setting
+                    {{ $t("admin.setting") }}
                   </th>
                   <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
-                    Value
+                    {{ $t("admin.value") }}
                   </th>
                   <th scope="col" class="px-3 py-2 text-xs font-medium text-muted-foreground">
-                    From
+                    {{ $t("admin.from") }}
                   </th>
                 </tr>
               </thead>
@@ -365,12 +365,14 @@ function bytes(value: number): string {
                     <span v-if="value.value" class="font-mono text-xs break-all">
                       {{ value.value }}
                     </span>
-                    <span v-else class="text-xs text-muted-foreground">not set</span>
+                    <span v-else class="text-xs text-muted-foreground">{{
+                      $t("admin.notSet")
+                    }}</span>
                     <span
                       v-if="value.secret"
                       class="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
                     >
-                      redacted
+                      {{ $t("admin.redacted") }}
                     </span>
                   </td>
                   <td class="px-3 py-2">

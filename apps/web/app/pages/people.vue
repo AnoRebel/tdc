@@ -13,7 +13,7 @@ import { Textarea } from "#layers/ui/app/components/ui/textarea";
 import { onDate, onDayAtTime } from "#layers/ui/app/lib/dates";
 import { Field } from "#layers/ui/app/components/ui/field";
 
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 /**
  * Who is on this server: suspending somebody, lifting it, and inviting people.
@@ -25,7 +25,7 @@ const { $localeRoute: localeRoute } = useI18n();
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
-useHead({ title: "People" });
+useHead({ title: $ts("nav.people") });
 
 const people = usePeople();
 const { can } = useAuth();
@@ -40,7 +40,7 @@ const suspending = ref<Person | null>(null);
  * nothing enforced.
  */
 const suspension = v.object({
-  reason: v.pipe(v.string(), v.trim(), v.minLength(1, "Say why, for whoever reviews this.")),
+  reason: v.pipe(v.string(), v.trim(), v.minLength(1, $ts("admin.sayWhyHint"))),
   hours: v.number(),
 });
 
@@ -65,10 +65,10 @@ onMounted(() => void people.refresh());
  * choosing it should know they are choosing it.
  */
 const durations = [
-  { hours: 24, label: "A day" },
-  { hours: 168, label: "A week" },
-  { hours: 720, label: "A month" },
-  { hours: 0, label: "Until somebody lifts it" },
+  { hours: 24, label: $ts("channel.lifetime.day") },
+  { hours: 168, label: $ts("channel.lifetime.week") },
+  { hours: 720, label: $ts("channel.lifetime.month") },
+  { hours: 0, label: $ts("admin.untilLifted") },
 ];
 
 /*
@@ -102,7 +102,7 @@ const suspendForm = useForm({
       await people.suspend(person.id, value.reason, value.hours || undefined);
       suspendForm.reset();
     } catch (cause) {
-      error.value = isApiError(cause) ? cause.message : "That suspension was not accepted.";
+      error.value = isApiError(cause) ? cause.message : $ts("admin.suspensionNotAccepted");
     }
   },
 });
@@ -119,7 +119,7 @@ async function lift(person: Person) {
   try {
     await people.lift(person.id);
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "That suspension could not be lifted.";
+    error.value = isApiError(cause) ? cause.message : $ts("admin.suspensionNotLifted");
   }
 }
 
@@ -133,7 +133,7 @@ async function createInvitation() {
     // are issued — afterwards it holds a hash and cannot show them again.
     issued.value = { url: invitation.url, code: invitation.code };
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "That invitation was not issued.";
+    error.value = isApiError(cause) ? cause.message : $ts("admin.invitationNotIssued");
   }
 }
 
@@ -147,9 +147,9 @@ async function copyInvitation() {
 
 /** When a suspension lifts, in words rather than a timestamp. */
 function until(person: Person): string {
-  if (!person.suspendedUntil) return "Until somebody lifts it";
+  if (!person.suspendedUntil) return $ts("admin.untilLifted");
 
-  return `Until ${onDayAtTime(person.suspendedUntil)}`;
+  return $ts("admin.untilWhen", { when: onDayAtTime(person.suspendedUntil) });
 }
 
 function when(value: string): string {
@@ -163,11 +163,11 @@ function when(value: string): string {
       <NuxtLink
         :to="localeRoute({ name: 'settings' })"
         class="btn btn-ghost size-7 px-0"
-        aria-label="Back to settings"
+        :aria-label="$ts('admin.backToSettings')"
       >
         <ArrowLeft class="size-4" />
       </NuxtLink>
-      <h1 class="text-sm font-semibold">People</h1>
+      <h1 class="text-sm font-semibold">{{ $t("nav.people") }}</h1>
     </header>
 
     <div class="max-w-3xl space-y-8 px-4 py-6">
@@ -178,13 +178,13 @@ function when(value: string): string {
       >
         <ShieldAlert class="mt-0.5 size-4 shrink-0 text-destructive" />
         <div class="text-sm">
-          <p class="font-medium text-destructive">You cannot manage people on this server.</p>
+          <p class="font-medium text-destructive">{{ $t("admin.cannotManagePeople") }}</p>
           <p class="mt-1 text-muted-foreground">
-            This needs the
+            {{ $t("admin.needsPermissionBefore") }}
             <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">user.suspend</code>
-            or
+            {{ $t("admin.needsPermissionOr") }}
             <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">user.invite</code>
-            permission.
+            {{ $t("admin.needsPermissionAfter") }}
           </p>
         </div>
       </div>
@@ -201,14 +201,14 @@ function when(value: string): string {
         <section v-if="can('user.invite')">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <h2 class="text-sm font-semibold">Invitations</h2>
+              <h2 class="text-sm font-semibold">{{ $t("moderation.invitations") }}</h2>
               <p class="mt-0.5 text-xs text-muted-foreground">
-                A link, and a short code for reading aloud. Both last a week.
+                {{ $t("admin.invitationLinkAndCode") }}
               </p>
             </div>
             <Button class="shrink-0" @click="createInvitation">
               <UserPlus class="size-3.5" />
-              Invite
+              {{ $t("admin.invite") }}
             </Button>
           </div>
 
@@ -216,23 +216,24 @@ function when(value: string): string {
                again and saying so is more honest than a page that looks like
                it could. -->
           <div v-if="issued" class="mt-3 rounded-lg border border-primary/30 bg-primary/8 p-3">
-            <p class="text-xs font-medium">Share this now — it is not shown again.</p>
+            <p class="text-xs font-medium">{{ $t("admin.shareNowNotShownAgain") }}</p>
             <div class="mt-2 flex flex-wrap items-center gap-2">
               <code class="min-w-0 flex-1 truncate rounded bg-surface px-2 py-1 font-mono text-xs">
                 {{ issued.url }}
               </code>
               <Button variant="outline" class="shrink-0" @click="copyInvitation">
                 <component :is="copied ? Check : Copy" class="size-3.5" />
-                {{ copied ? "Copied" : "Copy" }}
+                {{ copied ? $t("action.copied") : $t("action.copy") }}
               </Button>
             </div>
             <p v-if="issued.code" class="mt-2 text-xs text-muted-foreground">
-              Or the code <span class="font-mono font-semibold">{{ issued.code }}</span>
+              {{ $t("admin.orTheCodeBefore") }}
+              <span class="font-mono font-semibold">{{ issued.code }}</span>
             </p>
           </div>
 
           <p v-if="!people.invitations.value.length" class="mt-3 text-xs text-muted-foreground">
-            No invitations outstanding.
+            {{ $t("admin.noInvitationsOutstanding") }}
           </p>
 
           <ul v-else class="mt-3 space-y-1">
@@ -243,18 +244,25 @@ function when(value: string): string {
             >
               <span class="min-w-0 flex-1">
                 <span class="block text-sm">
-                  {{ invitation.boundTo || "Anybody with the link" }}
+                  {{ invitation.boundTo || $t("admin.anybodyWithTheLink") }}
                   <span
                     v-if="!invitation.usable"
                     class="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground"
                   >
-                    {{ invitation.revokedAt ? "Withdrawn" : "Expired" }}
+                    {{ invitation.revokedAt ? $t("admin.withdrawn") : $t("admin.expired") }}
                   </span>
                 </span>
                 <span class="block text-xs text-muted-foreground">
-                  Used {{ invitation.uses }}
-                  <template v-if="invitation.maxUses">of {{ invitation.maxUses }}</template>
-                  times · issued {{ when(invitation.createdAt) }}
+                  <template v-if="invitation.maxUses">
+                    {{
+                      $t("admin.usedOfTimes", {
+                        uses: invitation.uses,
+                        max: invitation.maxUses,
+                      })
+                    }}
+                  </template>
+                  <template v-else>{{ $t("admin.usedTimes", { uses: invitation.uses }) }}</template>
+                  · {{ $t("admin.issuedWhen", { when: when(invitation.createdAt) }) }}
                 </span>
               </span>
               <Button
@@ -263,16 +271,16 @@ function when(value: string): string {
                 v-if="invitation.usable"
                 @click="withdrawing = invitation"
               >
-                Withdraw
+                {{ $t("admin.withdraw") }}
               </Button>
             </li>
           </ul>
         </section>
 
         <section v-if="can('user.suspend')">
-          <h2 class="text-sm font-semibold">Everybody here</h2>
+          <h2 class="text-sm font-semibold">{{ $t("moderation.everybodyHere") }}</h2>
           <p class="mt-0.5 text-xs text-muted-foreground">
-            Suspending somebody ends their sessions and stops them signing in. Their messages stay.
+            {{ $t("admin.suspendingEndsSessionsHint") }}
           </p>
 
           <ul class="mt-3 space-y-1">
@@ -289,7 +297,7 @@ function when(value: string): string {
                     v-if="person.suspended"
                     class="ml-1.5 rounded bg-destructive/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-destructive"
                   >
-                    Suspended
+                    {{ $t("admin.suspended") }}
                   </span>
                 </span>
                 <span class="block truncate text-xs text-muted-foreground">
@@ -310,7 +318,7 @@ function when(value: string): string {
                 v-if="person.suspended"
                 @click="lift(person)"
               >
-                Lift
+                {{ $t("admin.lift") }}
               </Button>
               <Button
                 variant="ghost"
@@ -319,7 +327,7 @@ function when(value: string): string {
                 @click="askToSuspend(person)"
               >
                 <UserX class="size-3.5" />
-                Suspend
+                {{ $t("admin.suspend") }}
               </Button>
             </li>
           </ul>
@@ -339,25 +347,24 @@ function when(value: string): string {
       class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label="Suspend this account"
+      :aria-label="$ts('admin.suspendThisAccount')"
       @click.self="suspending = null"
       @keydown.esc="suspending = null"
     >
       <div class="w-[min(26rem,100%)] rounded-xl border border-border bg-card p-4 shadow-2xl">
         <h2 class="text-sm font-semibold">
-          Suspend {{ suspending.displayName || suspending.username }}
+          {{ $t("admin.suspendWhom", { who: suspending.displayName || suspending.username }) }}
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          Their sessions end at once and they cannot sign in. What they have written stays where it
-          is.
+          {{ $t("admin.suspendConsequenceHint") }}
         </p>
 
         <form class="mt-3 space-y-3" @submit.prevent="suspendForm.handleSubmit()">
           <suspendForm.Field name="reason">
             <template #default="{ field }">
               <Field
-                label="Why"
-                hint="Recorded, and shown to whoever reviews this later."
+                :label="$ts('admin.why')"
+                :hint="$ts('admin.recordedShownToReviewerHint')"
                 :error="firstError(field)"
                 required
               >
@@ -367,7 +374,7 @@ function when(value: string): string {
                     class="h-auto py-2"
                     :model-value="field.state.value"
                     rows="3"
-                    placeholder="What they did"
+                    :placeholder="$ts('admin.whatTheyDid')"
                     :invalid="invalid"
                     :described-by="describedBy"
                     @update:model-value="field.handleChange($event)"
@@ -380,12 +387,12 @@ function when(value: string): string {
 
           <suspendForm.Field name="hours">
             <template #default="{ field }">
-              <Field label="For how long">
+              <Field :label="$ts('admin.forHowLong')">
                 <template #default="{ id }">
                   <Select
                     :id="id"
                     :model-value="field.state.value"
-                    label="For how long"
+                    :label="$ts('admin.forHowLong')"
                     :options="
                       durations.map((choice) => ({ value: choice.hours, label: choice.label }))
                     "
@@ -397,8 +404,8 @@ function when(value: string): string {
           </suspendForm.Field>
 
           <div class="flex justify-end gap-2">
-            <Button variant="ghost" @click="suspending = null">Cancel</Button>
-            <Button variant="danger" type="submit">Suspend</Button>
+            <Button variant="ghost" @click="suspending = null">{{ $t("action.cancel") }}</Button>
+            <Button variant="danger" type="submit">{{ $t("admin.suspend") }}</Button>
           </div>
         </form>
       </div>
@@ -412,9 +419,9 @@ function when(value: string): string {
     -->
   <ConfirmDialog
     v-if="withdrawing"
-    title="Withdraw this invitation?"
-    detail="The link stops working immediately. Anybody holding it will not be able to join, and will not be told why."
-    confirm-label="Withdraw"
+    :title="$ts('admin.withdrawThisInvitation')"
+    :detail="$ts('admin.withdrawConsequenceHint')"
+    :confirm-label="$ts('admin.withdraw')"
     @cancel="withdrawing = null"
     @confirm="confirmWithdrawal"
   />

@@ -244,6 +244,44 @@ everywhere else it is written; before a push they run the Go tests and build.
 They are deliberately the cheap checks — anything slow belongs in CI, where it
 does not stand between somebody and their own commit.
 
+## Words people read
+
+Every sentence the interface shows goes through the translation layer. TDC is
+built for a community that speaks Kiswahili, and a string written straight into
+a component is one no translation can reach.
+
+In a template:
+
+```vue
+<script setup lang="ts">
+const { $t, $ts } = useI18n();
+</script>
+
+<template>
+  <h2>{{ $t("settings.title") }}</h2>
+  <Input :placeholder="$ts('search.placeholder')" />
+</template>
+```
+
+`$t` for text, `$ts` where a plain string is required — a bound attribute such
+as `:label`, `:placeholder` or `:aria-label`. Values interpolate with braces:
+`"greeting": "Habari, {name}"`, called as `$t("app.greeting", { name })`.
+
+Add the key to **both** [`packages/ui/locales/en.json`](../packages/ui/locales/en.json)
+and [`sw.json`](../packages/ui/locales/sw.json). A key in one and not the other
+fails `translations.test.ts`, which also checks that a translation interpolates
+the same placeholders as its English — a translation that drops `{name}` loses
+the value it was carrying, and one that invents a placeholder renders it
+literally.
+
+If you do not speak Kiswahili, say so in the pull request and leave the English
+text in the `sw` entry rather than guessing or running it through a machine. A
+reviewer who speaks it can correct one string easily; a plausible-looking wrong
+translation is harder to spot than an obviously untranslated one.
+
+`bun run --filter=@tdc/web translations` counts what is still written inline. It
+reports rather than fails — the number going down is the point.
+
 ## What a good pull request looks like
 
 **Say why, not only what.** The diff already says what changed.

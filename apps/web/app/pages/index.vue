@@ -12,7 +12,9 @@ import { Hash, MessagesSquare } from "lucide-vue-next";
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
-useHead({ title: "Home" });
+const { $t, $ts } = useI18n();
+
+useHead({ title: $ts("nav.home") });
 
 const roomsApi = useRooms();
 const { user } = useAuth();
@@ -38,21 +40,17 @@ const firstName = computed(() => user.value?.displayName?.split(" ")[0] ?? "");
         <MessagesSquare class="size-5 text-muted-foreground" />
       </span>
 
-      <h1 class="mt-4 text-lg font-semibold">Karibu, {{ firstName }}</h1>
+      <h1 class="mt-4 text-lg font-semibold">{{ $t("nav.welcome", { name: firstName }) }}</h1>
 
       <p class="mt-1.5 text-sm text-muted-foreground text-pretty">
-        {{
-          joined.length
-            ? "Pick a conversation from the sidebar to carry on where you left off."
-            : "Join a channel from the sidebar, or create one to get started."
-        }}
+        {{ joined.length ? $t("nav.pickConversation") : $t("nav.joinToStart") }}
       </p>
 
       <div v-if="joined.length" class="mt-6 space-y-1 text-left">
         <p
           class="px-1 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
         >
-          Jump back in
+          {{ $t("nav.jumpBackIn") }}
         </p>
         <NuxtLink
           v-for="room in joined.slice(0, 4)"

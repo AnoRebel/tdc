@@ -437,10 +437,14 @@ it.
 
 ### Language
 
-English and Kiswahili translations ship, and your operator sets the server's
-default. The interface does not yet read from them, though — the text on screen
-is English whichever you choose. The translations are written and waiting on the
-components being wired to them.
+English and Kiswahili both ship, and your operator sets the server's default.
+Switching changes what is on screen: every sentence the interface writes goes
+through the translation layer, so a Kiswahili speaker reads a Kiswahili
+application rather than an English one with a Kiswahili menu.
+
+What is never translated is what people wrote — messages, channel names, status
+text, somebody's display name. Those are shown as they were typed, in whatever
+language they were typed in.
 
 ### The keyboard
 

@@ -11,6 +11,8 @@ import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
+const { $t, $ts } = useI18n();
+
 /**
  * The second half of a sign-in.
  *
@@ -163,10 +165,9 @@ const form = useForm({
         <ShieldCheck class="size-4 text-primary" aria-hidden="true" />
       </span>
       <div class="min-w-0">
-        <h2 class="text-sm font-semibold">Enter your code</h2>
+        <h2 class="text-sm font-semibold">{{ $t("auth.enterYourCode") }}</h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          From your authenticator app. If you cannot reach it, one of your recovery codes works here
-          too.
+          {{ $t("auth.enterYourCodeHint") }}
         </p>
       </div>
     </div>
@@ -185,18 +186,18 @@ const form = useForm({
       v-if="passkeyOffered"
       type="button"
       class="mt-5 h-9 w-full justify-center gap-2"
-      label="Use your passkey"
+      :label="$ts('auth.useYourPasskey')"
       :disabled="usingPasskey || submitting"
       @click="withPasskey"
     >
       <Spinner v-if="usingPasskey" size="sm" />
       <Fingerprint v-else class="size-4" aria-hidden="true" />
-      {{ usingPasskey ? "Waiting for your device" : "Use your passkey" }}
+      {{ usingPasskey ? $t("auth.waitingForDevice") : $t("auth.useYourPasskey") }}
     </Button>
 
     <div v-if="passkeyOffered && codeOffered" class="mt-5 flex items-center gap-3" role="separator">
       <span class="h-px flex-1 bg-border" />
-      <span class="text-xs text-muted-foreground">or enter a code</span>
+      <span class="text-xs text-muted-foreground">{{ $t("auth.orEnterCode") }}</span>
       <span class="h-px flex-1 bg-border" />
     </div>
 
@@ -207,7 +208,7 @@ const form = useForm({
     >
       <form.Field name="code">
         <template #default="{ field }">
-          <Field label="Code" :error="firstError(field)" required>
+          <Field :label="$ts('auth.code')" :error="firstError(field)" required>
             <template #default="{ id, invalid, describedBy }">
               <Input
                 :id="id"
@@ -227,7 +228,7 @@ const form = useForm({
 
       <Button class="h-9 w-full" type="submit" :disabled="submitting">
         <Spinner v-if="submitting" size="sm" />
-        {{ submitting ? "Checking" : "Continue" }}
+        {{ submitting ? $t("auth.checking") : $t("action.continue") }}
       </Button>
     </form>
 
@@ -235,19 +236,18 @@ const form = useForm({
          other two because it is the weakest, and a fallback offered first
          stops being a fallback. -->
     <p v-if="emailSent" class="mt-4 rounded-md bg-muted px-3 py-2 text-sm" role="status">
-      A code is on its way to the address on your account. Enter it above — it works once, for five
-      minutes.
+      {{ $t("auth.emailedCodeOnWay") }}
     </p>
     <Button
       v-else-if="emailOffered"
       variant="ghost"
       class="mt-2 h-9 w-full text-muted-foreground"
-      label="Send a code to my email instead"
+      :label="$ts('auth.sendCodeToEmail')"
       :disabled="sendingEmail || submitting || usingPasskey"
       @click="askForEmailedCode"
     >
       <Spinner v-if="sendingEmail" size="sm" />
-      Send a code to my email instead
+      {{ $t("auth.sendCodeToEmail") }}
     </Button>
 
     <!-- Said only when it is nearly true, so it stays worth reading. -->
@@ -255,19 +255,21 @@ const form = useForm({
       v-if="props.pending.recoveryCodesLeft > 0 && props.pending.recoveryCodesLeft <= 3"
       class="mt-4 text-xs text-muted-foreground"
     >
-      You have {{ props.pending.recoveryCodesLeft }} recovery
-      {{ props.pending.recoveryCodesLeft === 1 ? "code" : "codes" }} left. Make more from your
-      settings once you are in.
+      {{
+        props.pending.recoveryCodesLeft === 1
+          ? $t("auth.recoveryCodesLeftSingular", { count: props.pending.recoveryCodesLeft })
+          : $t("auth.recoveryCodesLeftPlural", { count: props.pending.recoveryCodesLeft })
+      }}
     </p>
 
     <Button
       variant="ghost"
       class="mt-2 h-9 w-full"
-      label="Back to sign in"
+      :label="$ts('auth.backToSignIn')"
       :disabled="submitting"
       @click="emit('cancel')"
     >
-      Back to sign in
+      {{ $t("auth.backToSignIn") }}
     </Button>
   </div>
 </template>

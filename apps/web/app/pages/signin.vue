@@ -16,7 +16,7 @@ useHead({ title: "Sign in" });
 
 const { signIn, setupStatus, refresh } = useAuth();
 const router = useRouter();
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 const error = ref<string | null>(null);
 const submitting = ref(false);
@@ -218,8 +218,8 @@ const form = useForm({
     />
 
     <template v-else>
-      <h1 class="text-xl font-semibold">Sign in</h1>
-      <p class="mt-1 text-sm text-muted-foreground">Welcome back.</p>
+      <h1 class="text-xl font-semibold">{{ $t("auth.signIn") }}</h1>
+      <p class="mt-1 text-sm text-muted-foreground">{{ $t("auth.welcomeBack") }}</p>
 
       <!-- Above the password fields, because for somebody who has a passkey
            this is the whole sign-in and the form beneath is the fallback.
@@ -237,7 +237,7 @@ const form = useForm({
 
         <form.Field name="username">
           <template #default="{ field }">
-            <Field label="Username or email" :error="firstError(field)" required>
+            <Field :label="$ts('auth.usernameOrEmail')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -256,7 +256,7 @@ const form = useForm({
 
         <form.Field name="password">
           <template #default="{ field }">
-            <Field label="Password" :error="firstError(field)" required>
+            <Field :label="$ts('auth.password')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -275,7 +275,7 @@ const form = useForm({
 
         <Button class="h-9 w-full" type="submit" :disabled="submitting">
           <Spinner v-if="submitting" size="sm" />
-          {{ submitting ? "Signing in" : "Sign in" }}
+          {{ submitting ? $t("auth.signingIn") : $t("auth.signIn") }}
         </Button>
       </form>
 
@@ -291,17 +291,17 @@ const form = useForm({
           class="font-medium text-muted-foreground hover:text-foreground hover:underline"
           @click="askingForRecovery = true"
         >
-          Forgotten your password?
+          {{ $t("auth.forgottenPassword") }}
         </button>
       </p>
 
       <p class="mt-6 text-center text-sm text-muted-foreground">
-        No account yet?
+        {{ $t("auth.noAccountYet") }}
         <NuxtLink
           :to="localeRoute({ name: 'register' })"
           class="font-medium text-primary hover:underline"
         >
-          Create one
+          {{ $t("auth.createOne") }}
         </NuxtLink>
       </p>
     </template>

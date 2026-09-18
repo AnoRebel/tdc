@@ -271,7 +271,7 @@ messages that carry their own actions.
 
 These run continuously from the phase in which they first apply, not only at the end.
 
-- [ ] 11.1 Configure lefthook pre-commit and pre-push hooks per the house convention; verify a commit with a lint error is rejected — from Phase 1
+- [x] 11.1 Configure lefthook pre-commit and pre-push hooks per the house convention; verify a commit with a lint error is rejected — from Phase 1
 - [x] 11.2 Add ESLint flat config with `@nuxt/eslint`, `eslint-plugin-vue`, and `eslint-plugin-vuejs-accessibility`, plus Prettier configured for semicolons and double quotes, `vue-tsc`, and `.golangci.yml`; verify `bun run lint` and `golangci-lint run` pass and that a single-quoted, semicolon-less file is reformatted — from Phase 1
   - `@nuxt/eslint` is deliberately not installed. Its purpose is generating a config per Nuxt application; this repository lints three workspaces from one hand-written flat config at the root, and adding the module would mean a second config source competing with it. Everything the task wants from it — Vue template rules, TypeScript, accessibility — is in that config.
 - [x] 11.3 Add the CI workflow with per-workspace jobs and a `ci-success` aggregate gate, pinning exact Go and Wails versions with written rationale while taking the latest released Bun rather than a pinned one, so an incompatibility surfaces in a build rather than months later on a contributor's machine; verify a failing job blocks the gate — from Phase 1
@@ -282,5 +282,5 @@ These run continuously from the phase in which they first apply, not only at the
 - [ ] 11.7 Maintain end-to-end tests for permission enforcement, verifying private channels stay undiscoverable and unauthorized actions are refused server-side — from Phase 2
 - [ ] 11.8 Maintain end-to-end tests for offline behaviour and reconnection gap recovery; verify no duplicate or missing messages after a simulated partition — from Phase 3
 - [ ] 11.9 Add a load test establishing and tracking the baseline for concurrent connections and fanout latency; verify documented targets are met and recorded — from Phase 3
-- [ ] 11.11 Move the interface's own words behind the translation layer, which is configured and carries no strings: every screen writes them inline today, so a Swahili speaker sees an English application. Verify switching locale changes what is on screen, and that a string added without a translation is caught rather than silently falling back — from Phase 9a
+- [x] 11.11 Move the interface's own words behind the translation layer, which is configured and carries no strings: every screen writes them inline today, so a Swahili speaker sees an English application. Verify switching locale changes what is on screen, and that a string added without a translation is caught rather than silently falling back — from Phase 9a
 - [ ] 11.10 Keep documentation current in the same change that alters the behaviour it describes; verify a behaviour change without a documentation update is rejected in review (`platform/foundation`) — from Phase 1

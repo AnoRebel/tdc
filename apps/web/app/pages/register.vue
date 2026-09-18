@@ -15,7 +15,7 @@ useHead({ title: "Create an account" });
 
 const { register } = useAuth();
 const router = useRouter();
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 const error = ref<string | null>(null);
 const submitting = ref(false);
@@ -83,9 +83,9 @@ const form = useForm({
 
 <template>
   <div>
-    <h1 class="text-xl font-semibold">Create an account</h1>
+    <h1 class="text-xl font-semibold">{{ $t("auth.createAnAccount") }}</h1>
     <p class="mt-1 text-sm text-muted-foreground">
-      Your username becomes your address on this server.
+      {{ $t("auth.usernameBecomesAddress") }}
     </p>
 
     <form class="mt-6 space-y-4" @submit.prevent="form.handleSubmit()">
@@ -99,7 +99,7 @@ const form = useForm({
 
       <form.Field name="username">
         <template #default="{ field }">
-          <Field label="Username" :error="firstError(field)" required>
+          <Field :label="$ts('auth.username')" :error="firstError(field)" required>
             <template #default="{ id, invalid, describedBy }">
               <Input
                 :id="id"
@@ -118,7 +118,11 @@ const form = useForm({
 
       <form.Field name="displayName">
         <template #default="{ field }">
-          <Field label="Display name" hint="Optional." :error="firstError(field)">
+          <Field
+            :label="$ts('auth.displayName')"
+            :hint="$ts('auth.optional')"
+            :error="firstError(field)"
+          >
             <template #default="{ id, invalid, describedBy }">
               <Input
                 :id="id"
@@ -136,7 +140,7 @@ const form = useForm({
 
       <form.Field name="email">
         <template #default="{ field }">
-          <Field label="Email" hint="Optional." :error="firstError(field)">
+          <Field :label="$ts('auth.email')" :hint="$ts('auth.optional')" :error="firstError(field)">
             <template #default="{ id, invalid, describedBy }">
               <Input
                 :id="id"
@@ -156,8 +160,8 @@ const form = useForm({
       <form.Field name="password">
         <template #default="{ field }">
           <Field
-            label="Password"
-            hint="At least twelve characters."
+            :label="$ts('auth.password')"
+            :hint="$ts('auth.atLeastTwelveCharacters')"
             :error="firstError(field)"
             required
           >
@@ -179,17 +183,17 @@ const form = useForm({
 
       <Button class="h-9 w-full" type="submit" :disabled="submitting">
         <Spinner v-if="submitting" size="sm" />
-        {{ submitting ? "Creating account" : "Create account" }}
+        {{ submitting ? $t("auth.creatingAccount") : $t("auth.createAccount") }}
       </Button>
     </form>
 
     <p class="mt-6 text-center text-sm text-muted-foreground">
-      Already have an account?
+      {{ $t("auth.haveAccount") }}
       <NuxtLink
         :to="localeRoute({ name: 'signin' })"
         class="font-medium text-primary hover:underline"
       >
-        Sign in
+        {{ $t("auth.signIn") }}
       </NuxtLink>
     </p>
   </div>

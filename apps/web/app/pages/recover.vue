@@ -23,7 +23,7 @@ useHead({ title: "Set a new password" });
 const { usable, redeem } = useRecovery();
 const router = useRouter();
 const route = useRoute();
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 const token = computed(() => {
   const value = route.query.token;
@@ -106,7 +106,7 @@ onMounted(async () => {
   <div>
     <p v-if="checking" class="flex items-center gap-2 text-sm text-muted-foreground">
       <Spinner size="sm" />
-      Checking the link
+      {{ $t("auth.checkingLink") }}
     </p>
 
     <!-- Done. Deliberately not signed in: signing in is what proves the
@@ -118,19 +118,19 @@ onMounted(async () => {
           <KeyRound class="size-4 text-primary" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-          <h1 class="text-sm font-semibold">Your password has been changed</h1>
+          <h1 class="text-sm font-semibold">{{ $t("auth.passwordChanged") }}</h1>
           <p class="mt-1 text-sm text-muted-foreground">
-            Every device that was signed in has been signed out. Sign in with the new password.
+            {{ $t("auth.passwordChangedDetail") }}
           </p>
         </div>
       </div>
 
       <Button
         class="mt-5 h-9 w-full"
-        label="Go to sign in"
+        :label="$ts('auth.goToSignIn')"
         @click="router.push(localeRoute({ name: 'signin' }))"
       >
-        Sign in
+        {{ $t("auth.signIn") }}
       </Button>
     </template>
 
@@ -141,10 +141,9 @@ onMounted(async () => {
           <LinkIcon class="size-4 text-muted-foreground" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-          <h1 class="text-sm font-semibold">That link cannot be used</h1>
+          <h1 class="text-sm font-semibold">{{ $t("auth.linkCannotBeUsed") }}</h1>
           <p class="mt-1 text-sm text-muted-foreground">
-            It has been used already, or the hour it lasts has passed. Asking again will send a
-            fresh one.
+            {{ $t("auth.recoveryLinkExpiredDetail") }}
           </p>
         </div>
       </div>
@@ -152,17 +151,17 @@ onMounted(async () => {
       <Button
         variant="outline"
         class="mt-5 h-9 w-full"
-        label="Back to sign in"
+        :label="$ts('auth.backToSignIn')"
         @click="router.push(localeRoute({ name: 'signin' }))"
       >
-        Back to sign in
+        {{ $t("auth.backToSignIn") }}
       </Button>
     </template>
 
     <template v-else>
-      <h1 class="text-sm font-semibold">Set a new password</h1>
+      <h1 class="text-sm font-semibold">{{ $t("auth.setNewPassword") }}</h1>
       <p class="mt-1 text-sm text-muted-foreground">
-        Choose something you will keep. There is no password reset beyond this one.
+        {{ $t("auth.setNewPasswordDetail") }}
       </p>
 
       <p
@@ -176,7 +175,7 @@ onMounted(async () => {
       <form class="mt-5 space-y-4" @submit.prevent="form.handleSubmit()">
         <form.Field name="password">
           <template #default="{ field }">
-            <Field label="New password" :error="firstError(field)" required>
+            <Field :label="$ts('auth.newPassword')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -196,7 +195,7 @@ onMounted(async () => {
 
         <form.Field name="again">
           <template #default="{ field }">
-            <Field label="Again" :error="firstError(field)" required>
+            <Field :label="$ts('auth.again')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -215,7 +214,7 @@ onMounted(async () => {
 
         <Button class="h-9 w-full" type="submit" :disabled="submitting">
           <Spinner v-if="submitting" size="sm" />
-          {{ submitting ? "Setting it" : "Set the password" }}
+          {{ submitting ? $t("auth.settingPassword") : $t("auth.setThePassword") }}
         </Button>
       </form>
     </template>

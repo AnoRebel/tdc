@@ -11,6 +11,8 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { isApiError } from "@tdc/types";
 import type { SecondFactorStatus } from "@tdc/types";
 
+const { $t, $ts } = useI18n();
+
 /**
  * Somebody's own second factor: setting one up, replacing the recovery codes,
  * and turning it off.
@@ -163,11 +165,10 @@ onMounted(load);
     <div>
       <h2 class="flex items-center gap-1.5 text-sm font-semibold">
         <ShieldCheck class="size-4" />
-        Two-step sign-in
+        {{ $t("auth.twoStep") }}
       </h2>
       <p class="mt-1 text-xs text-muted-foreground">
-        A code from an app on your phone, as well as your password. Somebody who learns your
-        password still cannot sign in.
+        {{ $t("auth.twoStepHint") }}
       </p>
     </div>
 
@@ -181,7 +182,7 @@ onMounted(load);
 
     <p v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
       <Spinner size="sm" />
-      Reading your settings
+      {{ $t("auth.readingSettings") }}
     </p>
 
     <template v-else-if="state">
@@ -191,15 +192,14 @@ onMounted(load);
         class="rounded-md bg-primary/10 px-3 py-2 text-sm"
         role="status"
       >
-        This server requires two-step sign-in on your account. Set it up to carry on.
+        {{ $t("auth.twoStepRequired") }}
       </p>
 
       <!-- The codes, at the one moment they exist. -->
       <div v-if="codes" class="rounded-lg border p-4">
-        <h3 class="text-sm font-semibold">Your recovery codes</h3>
+        <h3 class="text-sm font-semibold">{{ $t("auth.recoveryCodesTitle") }}</h3>
         <p class="mt-1 text-xs text-muted-foreground">
-          Each works once, for the day you cannot reach your app. Write them down or keep them
-          somewhere safe — this is the only time they are shown.
+          {{ $t("auth.recoveryCodesHint") }}
         </p>
 
         <ul class="mt-3 grid grid-cols-2 gap-1 font-mono text-sm">
@@ -210,24 +210,29 @@ onMounted(load);
           <Button
             variant="outline"
             class="h-8 gap-1.5"
-            label="Copy recovery codes"
+            :label="$ts('auth.copyRecoveryCodes')"
             @click="copyCodes"
           >
             <Check v-if="copied" class="size-3.5" aria-hidden="true" />
             <Copy v-else class="size-3.5" aria-hidden="true" />
-            {{ copied ? "Copied" : "Copy" }}
+            {{ copied ? $t("auth.copied") : $t("action.copy") }}
           </Button>
-          <Button variant="ghost" class="h-8" label="I have kept these safe" @click="codes = null">
-            I have kept these safe
+          <Button
+            variant="ghost"
+            class="h-8"
+            :label="$ts('auth.keptTheseSafe')"
+            @click="codes = null"
+          >
+            {{ $t("auth.keptTheseSafe") }}
           </Button>
         </div>
       </div>
 
       <!-- Setting up: the secret, then a code proving the app has it. -->
       <div v-else-if="setup" class="rounded-lg border p-4">
-        <h3 class="text-sm font-semibold">Add this to your authenticator app</h3>
+        <h3 class="text-sm font-semibold">{{ $t("auth.addToAuthenticator") }}</h3>
         <p class="mt-1 text-xs text-muted-foreground">
-          Scan the code in your app, or type the key below if you cannot scan.
+          {{ $t("auth.addToAuthenticatorHint") }}
         </p>
 
         <p class="mt-3 font-mono text-sm break-all select-all">{{ setup.secret }}</p>
@@ -235,7 +240,7 @@ onMounted(load);
         <form class="mt-4 space-y-3" @submit.prevent="confirmForm.handleSubmit()">
           <confirmForm.Field name="code">
             <template #default="{ field }">
-              <Field label="Code from your app" :error="firstError(field)" required>
+              <Field :label="$ts('auth.codeFromApp')" :error="firstError(field)" required>
                 <template #default="{ id, invalid, describedBy }">
                   <Input
                     :id="id"
@@ -256,15 +261,15 @@ onMounted(load);
           <div class="flex gap-2">
             <Button type="submit" class="h-9" :disabled="busy">
               <Spinner v-if="busy" size="sm" />
-              {{ busy ? "Checking" : "Confirm" }}
+              {{ busy ? $t("auth.checking") : $t("action.confirm") }}
             </Button>
             <Button
               variant="ghost"
               class="h-9"
-              label="Cancel setting this up"
+              :label="$ts('auth.cancelSettingUp')"
               @click="setup = null"
             >
-              Cancel
+              {{ $t("action.cancel") }}
             </Button>
           </div>
         </form>
@@ -277,15 +282,17 @@ onMounted(load);
         class="rounded-md bg-muted px-3 py-2 text-sm"
         role="status"
       >
-        Your passkey already covers this — signing in with your password asks for it as the second
-        step. An authenticator app is an alternative, not a requirement.
+        {{ $t("auth.passkeyAlreadyCovers") }}
       </p>
 
       <!-- Already on. -->
       <template v-else-if="state.enrolled">
         <p class="text-sm">
-          On, with {{ state.recoveryCodesLeft }} recovery
-          {{ state.recoveryCodesLeft === 1 ? "code" : "codes" }} left.
+          {{
+            state.recoveryCodesLeft === 1
+              ? $t("auth.onWithCodeLeft", { count: state.recoveryCodesLeft })
+              : $t("auth.onWithCodesLeft", { count: state.recoveryCodesLeft })
+          }}
         </p>
 
         <div class="flex flex-wrap gap-2">
@@ -293,10 +300,10 @@ onMounted(load);
             variant="outline"
             class="h-9"
             :disabled="busy"
-            label="Make new recovery codes"
+            :label="$ts('auth.makeNewRecoveryCodes')"
             @click="makeNewCodes"
           >
-            Make new recovery codes
+            {{ $t("auth.makeNewRecoveryCodes") }}
           </Button>
 
           <!-- Not offered where the operator requires it, since it would be a
@@ -305,11 +312,11 @@ onMounted(load);
             v-if="!state.required && !disabling"
             variant="ghost"
             class="h-9 gap-1.5 text-muted-foreground hover:text-destructive"
-            label="Turn off two-step sign-in"
+            :label="$ts('auth.turnOffTwoStep')"
             @click="disabling = true"
           >
             <ShieldOff class="size-3.5" aria-hidden="true" />
-            Turn off
+            {{ $t("auth.turnOff") }}
           </Button>
         </div>
 
@@ -319,13 +326,12 @@ onMounted(load);
           @submit.prevent="disableForm.handleSubmit()"
         >
           <p class="text-sm text-muted-foreground">
-            Your password, to confirm this is you. Turning this off also removes your recovery
-            codes.
+            {{ $t("auth.turnOffPasswordHint") }}
           </p>
 
           <disableForm.Field name="password">
             <template #default="{ field }">
-              <Field label="Password" :error="firstError(field)" required>
+              <Field :label="$ts('auth.password')" :error="firstError(field)" required>
                 <template #default="{ id, invalid, describedBy }">
                   <Input
                     :id="id"
@@ -350,15 +356,15 @@ onMounted(load);
               :disabled="busy"
             >
               <Spinner v-if="busy" size="sm" />
-              {{ busy ? "Turning off" : "Turn off" }}
+              {{ busy ? $t("auth.turningOff") : $t("auth.turnOff") }}
             </Button>
             <Button
               variant="ghost"
               class="h-9"
-              label="Keep two-step sign-in"
+              :label="$ts('auth.keepTwoStep')"
               @click="disabling = false"
             >
-              Keep it on
+              {{ $t("auth.keepItOn") }}
             </Button>
           </div>
         </form>
@@ -369,11 +375,11 @@ onMounted(load);
         v-else
         class="h-9"
         :disabled="busy"
-        label="Set up two-step sign-in"
+        :label="$ts('auth.setUpTwoStep')"
         @click="startSetup"
       >
         <Spinner v-if="busy" size="sm" />
-        Set it up
+        {{ $t("auth.setItUp") }}
       </Button>
     </template>
   </section>

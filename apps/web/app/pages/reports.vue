@@ -7,7 +7,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
 import { onDayAtTime } from "#layers/ui/app/lib/dates";
 
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 /**
  * The moderation queue.
@@ -24,7 +24,7 @@ const { $localeRoute: localeRoute } = useI18n();
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
-useHead({ title: "Reports" });
+useHead({ title: $ts("moderation.reports") });
 
 const queue = useReportQueue();
 
@@ -84,16 +84,16 @@ function name(address: string): string {
       <NuxtLink
         :to="localeRoute({ name: 'settings' })"
         class="btn btn-ghost size-7 px-0"
-        aria-label="Back to settings"
+        :aria-label="$ts('admin.backToSettings')"
       >
         <ArrowLeft class="size-4" />
       </NuxtLink>
-      <h1 class="text-sm font-semibold">Reports</h1>
+      <h1 class="text-sm font-semibold">{{ $t("moderation.reports") }}</h1>
       <span
         v-if="!queue.failed.value && queue.reports.value.length"
         class="tabular ml-auto text-xs text-muted-foreground"
       >
-        {{ queue.reports.value.length }} open
+        {{ $t("moderation.openCount", { count: queue.reports.value.length }) }}
       </span>
     </header>
 
@@ -105,19 +105,18 @@ function name(address: string): string {
       >
         <ShieldAlert class="mt-0.5 size-4 shrink-0 text-destructive" />
         <div class="text-sm">
-          <p class="font-medium text-destructive">You cannot read the moderation queue.</p>
+          <p class="font-medium text-destructive">{{ $t("moderation.cannotReadQueue") }}</p>
           <p class="mt-1 text-muted-foreground">
-            This needs the
+            {{ $t("admin.needsPermissionBefore") }}
             <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">moderation.review</code>
-            permission.
+            {{ $t("admin.needsPermissionAfter") }}
           </p>
         </div>
       </div>
 
       <template v-else>
         <p class="text-sm text-muted-foreground">
-          What people have reported, oldest first. The person reported is never told who reported
-          them.
+          {{ $t("moderation.reportedOldestFirstHint") }}
         </p>
 
         <!-- An empty queue is the good outcome, so it says so rather than
@@ -127,8 +126,8 @@ function name(address: string): string {
           class="mt-6 rounded-lg border border-dashed py-12 text-center"
         >
           <Flag class="mx-auto size-6 text-muted-foreground/60" />
-          <p class="mt-2 text-sm font-medium">Nothing waiting</p>
-          <p class="mt-0.5 text-xs text-muted-foreground">Every report has been dealt with.</p>
+          <p class="mt-2 text-sm font-medium">{{ $t("notification.nothingWaiting") }}</p>
+          <p class="mt-0.5 text-xs text-muted-foreground">{{ $t("moderation.allDealtWith") }}</p>
         </div>
 
         <ul class="mt-4 space-y-3">
@@ -143,11 +142,13 @@ function name(address: string): string {
               <div class="min-w-0 flex-1">
                 <p class="text-sm">
                   <span class="font-medium">{{ name(report.subject) }}</span>
-                  <span class="text-muted-foreground"> was reported for </span>
+                  <span class="text-muted-foreground"> {{ $t("moderation.wasReportedFor") }} </span>
                   <span class="font-medium">{{ reportReasonLabel(report.reason) }}</span>
                 </p>
                 <p class="mt-0.5 text-xs text-muted-foreground">
-                  <template v-if="report.reporter"> by {{ name(report.reporter) }} · </template>
+                  <template v-if="report.reporter">
+                    {{ $t("moderation.byWhom", { who: name(report.reporter) }) }} ·
+                  </template>
                   <time>{{ when(report.createdAt) }}</time>
                 </p>
               </div>
@@ -167,24 +168,24 @@ function name(address: string): string {
             </blockquote>
 
             <p v-if="report.detail" class="mt-2 text-sm text-muted-foreground">
-              <span class="font-medium">They said:</span> {{ report.detail }}
+              <span class="font-medium">{{ $t("moderation.theySaid") }}</span> {{ report.detail }}
             </p>
 
             <div class="mt-3 flex flex-wrap gap-2">
               <Button variant="outline" @click="decide(report, false)">
                 <Check class="size-3.5" />
-                Acted on it
+                {{ $t("moderation.actedOnIt") }}
               </Button>
               <Button variant="ghost" @click="decide(report, true)">
                 <X class="size-3.5" />
-                Dismiss
+                {{ $t("moderation.dismiss") }}
               </Button>
               <NuxtLink
                 v-if="report.roomId"
                 :to="`/rooms/${report.roomId}`"
                 class="btn btn-ghost ml-auto"
               >
-                Open the channel
+                {{ $t("moderation.openTheChannel") }}
               </NuxtLink>
             </div>
           </li>
@@ -204,19 +205,27 @@ function name(address: string): string {
       class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      :aria-label="deciding.dismissing ? 'Dismiss this report' : 'Record what was done'"
+      :aria-label="
+        deciding.dismissing
+          ? $ts('moderation.dismissThisReport')
+          : $ts('moderation.recordWhatWasDone')
+      "
       @click.self="deciding = null"
       @keydown.esc="deciding = null"
     >
       <div class="w-[min(26rem,100%)] rounded-xl border border-border bg-card p-4 shadow-2xl">
         <h2 class="text-sm font-semibold">
-          {{ deciding.dismissing ? "Dismiss this report" : "Record what was done" }}
+          {{
+            deciding.dismissing
+              ? $t("moderation.dismissThisReport")
+              : $t("moderation.recordWhatWasDone")
+          }}
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
           {{
             deciding.dismissing
-              ? "Kept on the record as considered and not acted on."
-              : "The next moderator to see this person reported will read this."
+              ? $t("moderation.keptOnRecordHint")
+              : $t("moderation.nextModeratorWillReadHint")
           }}
         </p>
 
@@ -225,7 +234,9 @@ function name(address: string): string {
                starts typing, so anybody who looks away loses what the field
                was for, and a screen reader may never announce it at all. -->
           <label class="sr-only" for="moderation-note">
-            {{ deciding.dismissing ? "Why this needs nothing done" : "What you did about it" }}
+            {{
+              deciding.dismissing ? $t("moderation.whyNothingNeeded") : $t("moderation.whatYouDid")
+            }}
           </label>
           <Textarea
             id="moderation-note"
@@ -233,14 +244,22 @@ function name(address: string): string {
             v-model="note"
             rows="3"
             :placeholder="
-              deciding.dismissing ? 'Why this needs nothing done' : 'What you did about it'
+              deciding.dismissing
+                ? $ts('moderation.whyNothingNeeded')
+                : $ts('moderation.whatYouDid')
             "
           />
 
           <div class="flex justify-end gap-2">
-            <Button variant="ghost" @click="deciding = null">Cancel</Button>
+            <Button variant="ghost" @click="deciding = null">{{ $t("action.cancel") }}</Button>
             <Button type="submit" :disabled="busy">
-              {{ busy ? "Recording" : deciding.dismissing ? "Dismiss" : "Record" }}
+              {{
+                busy
+                  ? $t("moderation.recording")
+                  : deciding.dismissing
+                    ? $t("moderation.dismiss")
+                    : $t("moderation.record")
+              }}
             </Button>
           </div>
         </form>
