@@ -49,10 +49,12 @@ offers:
 - **Another service** — GitHub, GitLab, a self-hosted Forgejo or Keycloak,
   whichever the operator has configured. The buttons appear on the sign-in form
   when there are any.
-- **Two-step sign-in** — a code from an authenticator app as well as your
-  password, which you can turn on for yourself. It comes with ten recovery codes,
-  shown once, for the day you cannot reach your phone. An operator may require
-  it of administrators or of everybody.
+- **Two-step sign-in** — something as well as your password. A passkey counts:
+  if you have one, signing in with your password asks for it as the second step
+  and there is nothing else to set up. Otherwise it is a code from an
+  authenticator app, which comes with ten recovery codes, shown once, for the
+  day you cannot reach your phone. An operator may require two-step sign-in of
+  administrators or of everybody.
 
 Recovery codes are not a password reset: they get you past the second step, not
 past a forgotten password.

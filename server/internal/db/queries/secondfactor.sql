@@ -95,11 +95,31 @@ RETURNING *;
 -- name: DeleteExpiredPendingSignIns :execrows
 DELETE FROM pending_sign_ins WHERE expires_at <= NOW();
 
--- Whether an account has a second factor to be asked for at all. Confirmed
--- only: a TOTP secret somebody started enrolling and abandoned must not lock
--- them out.
+/*
+Whether an account has a second factor to be asked for at all.
+
+A passkey counts. Somebody who already carries one has the thing a second factor
+is for — a device in their possession — and asking them to carry an authenticator
+app as well is ceremony rather than security. It is also the difference between
+somebody turning two-step sign-in on and somebody deciding it is not worth the
+trouble.
+
+Confirmed only, for TOTP: a secret somebody started enrolling and abandoned must
+not lock them out. A passkey has no equivalent half-finished state — it exists
+once the authenticator has made it.
+*/
 -- name: HasConfirmedSecondFactor :one
 SELECT EXISTS (
     SELECT 1 FROM credentials
-    WHERE user_id = $1 AND kind = 'totp' AND confirmed_at IS NOT NULL
+    WHERE user_id = $1
+      AND (
+        (kind = 'totp' AND confirmed_at IS NOT NULL)
+        OR kind = 'passkey'
+      )
 ) AS has_second_factor;
+
+-- The passkeys an account could answer a second-factor challenge with.
+-- name: HasPasskey :one
+SELECT EXISTS (
+    SELECT 1 FROM credentials WHERE user_id = $1 AND kind = 'passkey'
+) AS has_passkey;

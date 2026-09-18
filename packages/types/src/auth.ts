@@ -143,8 +143,24 @@ export interface SecondFactorRequired {
   secondFactorRequired: true;
   ticket: string;
   expiresAt: string;
+  /**
+   * What this account can actually answer with.
+   *
+   * Asking somebody for six digits when what they have is a passkey is asking
+   * for something they cannot produce, and the only clue would be that nothing
+   * they try works.
+   */
+  methods: SecondFactorMethods;
   /** So somebody nearly out of recovery codes is warned before they need one. */
   recoveryCodesLeft: number;
+}
+
+/** The ways an account can answer a second-factor challenge. */
+export interface SecondFactorMethods {
+  /** An authenticator app, or a code from the printed list. */
+  code: boolean;
+  /** A passkey they already carry. */
+  passkey: boolean;
 }
 
 /** A sign-in either finished, or needs a second factor. */
@@ -164,8 +180,16 @@ export interface SecondFactorResult extends SignInResult {
 
 /** Somebody's own second-factor state, for their settings screen. */
 export interface SecondFactorStatus {
-  /** Whether they have set one up and proved it works. */
+  /** Whether they have one at all. */
   enrolled: boolean;
+  /**
+   * Which factors they have.
+   *
+   * Separate from enrolled: a settings screen needs to say that a passkey is
+   * already doing this job, or somebody sets up an authenticator app they did
+   * not need.
+   */
+  methods: SecondFactorMethods;
   /** Whether this server requires one of them, so they are told why. */
   required: boolean;
   recoveryCodesLeft: number;

@@ -157,6 +157,62 @@ func (s *Service) Complete(ctx context.Context, ticket, code string) (Accepted, 
 }
 
 /*
+CompleteWithPasskey spends a ticket that a passkey has answered.
+
+The passkey ceremony is verified by the passkeys package, which says whose
+account it proved. This checks that the account it proved is the account the
+ticket is for — without which a passkey on any account would complete a pending
+sign-in for any other, which is the whole of the second factor undone.
+
+No attempt is counted. A passkey is not guessable, so an allowance would protect
+nothing, and spending one on a ceremony the person abandoned would punish
+somebody whose authenticator prompt timed out.
+*/
+func (s *Service) CompleteWithPasskey(ctx context.Context, ticket string, provedUserID uuid.UUID) (Accepted, error) {
+	pending, err := s.store.GetPendingSignIn(ctx, hashTicket(ticket))
+	if notFound(err) {
+		return Accepted{}, ErrRejected
+	}
+	if err != nil {
+		return Accepted{}, fmt.Errorf("find the pending sign-in: %w", err)
+	}
+
+	if pending.UserID != provedUserID {
+		/*
+			A passkey belonging to somebody else.
+
+			Refused with the same error a wrong code gives: which of the two
+			went wrong is not something the caller needs, and saying would
+			confirm that the ticket is real.
+		*/
+		return Accepted{}, ErrRejected
+	}
+
+	spent, err := s.store.FinishPendingSignIn(ctx, hashTicket(ticket))
+	if notFound(err) {
+		return Accepted{}, ErrRejected
+	}
+	if err != nil {
+		return Accepted{}, fmt.Errorf("finish the pending sign-in: %w", err)
+	}
+
+	remaining, err := s.store.CountUnusedRecoveryCodes(ctx, pending.UserID)
+	if err != nil {
+		return Accepted{}, fmt.Errorf("count the recovery codes: %w", err)
+	}
+
+	result := Accepted{
+		UserID:            spent.UserID,
+		UserAgent:         spent.UserAgent,
+		RecoveryCodesLeft: remaining,
+	}
+	if spent.IpAddress != nil {
+		result.Address = *spent.IpAddress
+	}
+	return result, nil
+}
+
+/*
 check tries a code as both kinds.
 
 The app first, because that is what almost every sign-in uses. A recovery code

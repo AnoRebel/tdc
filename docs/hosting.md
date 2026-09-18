@@ -325,6 +325,12 @@ administrative way to show them again. Somebody who loses both their phone and
 their codes needs you to remove the second factor for them, which is a database
 operation until account recovery lands.
 
+A passkey satisfies the requirement. Somebody who has enrolled one already
+carries the thing a second factor is for, so they are asked for it as the second
+step rather than being told to set up an authenticator app as well — which
+matters if you require two-step sign-in, because the requirement then costs a
+passkey holder nothing.
+
 `administrators` is the setting most servers want. Those accounts can change the
 registration policy, the limits and the branding, which makes them the ones
 worth attacking, and they belong to the few people an operator can reasonably

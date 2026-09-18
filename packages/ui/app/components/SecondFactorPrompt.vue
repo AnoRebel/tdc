@@ -2,7 +2,7 @@
 import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
-import { ShieldCheck } from "lucide-vue-next";
+import { Fingerprint, ShieldCheck } from "lucide-vue-next";
 
 import { isApiError } from "@tdc/types";
 import type { SecondFactorRequired, SecondFactorResult } from "@tdc/types";
@@ -29,6 +29,47 @@ const emit = defineEmits<{
 }>();
 
 const { completeSecondFactor } = useAuth();
+const { answerSecondFactor, supported: passkeySupported } = usePasskeys();
+
+/*
+ * Whether a passkey can answer this.
+ *
+ * Both sides again: the account must have one, and this browser must be able to
+ * use it. A button for something that cannot work is worse than no button.
+ */
+const passkeyOffered = computed(
+  () => props.pending.methods?.passkey === true && passkeySupported.value,
+);
+
+/*
+ * Whether a code can.
+ *
+ * An older server sends no methods at all, which is read as "a code", since
+ * that was the only answer before passkeys could be one.
+ */
+const codeOffered = computed(() => props.pending.methods?.code !== false);
+
+const usingPasskey = ref(false);
+
+async function withPasskey() {
+  error.value = null;
+  usingPasskey.value = true;
+
+  try {
+    emit("done", await answerSecondFactor(props.pending.ticket));
+  } catch (cause) {
+    // Dismissing the authenticator's prompt is a decision, not a failure.
+    if (
+      cause instanceof DOMException &&
+      (cause.name === "NotAllowedError" || cause.name === "AbortError")
+    ) {
+      return;
+    }
+    error.value = isApiError(cause) ? cause.message : "That passkey was not accepted.";
+  } finally {
+    usingPasskey.value = false;
+  }
+}
 
 const error = ref<string | null>(null);
 const submitting = ref(false);
@@ -99,7 +140,28 @@ const form = useForm({
       {{ error }}
     </p>
 
-    <form class="mt-5 space-y-4" @submit.prevent="form.handleSubmit()">
+    <!-- The passkey first, where there is one: it is one gesture against six
+         digits typed from another device. -->
+    <Button
+      v-if="passkeyOffered"
+      type="button"
+      class="mt-5 h-9 w-full justify-center gap-2"
+      label="Use your passkey"
+      :disabled="usingPasskey || submitting"
+      @click="withPasskey"
+    >
+      <Spinner v-if="usingPasskey" size="sm" />
+      <Fingerprint v-else class="size-4" aria-hidden="true" />
+      {{ usingPasskey ? "Waiting for your device" : "Use your passkey" }}
+    </Button>
+
+    <div v-if="passkeyOffered && codeOffered" class="mt-5 flex items-center gap-3" role="separator">
+      <span class="h-px flex-1 bg-border" />
+      <span class="text-xs text-muted-foreground">or enter a code</span>
+      <span class="h-px flex-1 bg-border" />
+    </div>
+
+    <form v-if="codeOffered" class="mt-5 space-y-4" @submit.prevent="form.handleSubmit()">
       <form.Field name="code">
         <template #default="{ field }">
           <Field label="Code" :error="firstError(field)" required>

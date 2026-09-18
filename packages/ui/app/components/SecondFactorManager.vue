@@ -270,6 +270,17 @@ onMounted(load);
         </form>
       </div>
 
+      <!-- A passkey is already doing this job, so say so rather than letting
+           somebody set up an app they did not need. -->
+      <p
+        v-if="state.methods?.passkey && !state.methods?.code"
+        class="rounded-md bg-muted px-3 py-2 text-sm"
+        role="status"
+      >
+        Your passkey already covers this — signing in with your password asks for it as the second
+        step. An authenticator app is an alternative, not a requirement.
+      </p>
+
       <!-- Already on. -->
       <template v-else-if="state.enrolled">
         <p class="text-sm">

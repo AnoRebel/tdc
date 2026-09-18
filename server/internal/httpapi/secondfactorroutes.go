@@ -195,8 +195,24 @@ func (s *Server) handleSecondFactorStatus(c *echo.Context) error {
 		return err
 	}
 
+	offers, err := s.secondFactor.Available(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+
 	return c.JSON(http.StatusOK, map[string]any{
 		"enrolled": enrolled,
+		/*
+			Which factors this account actually has.
+
+			Separate from "enrolled", which is whether there is one at all: a
+			settings screen needs to say that a passkey is already doing this
+			job, or somebody sets up an authenticator app they did not need.
+		*/
+		"methods": map[string]any{
+			"code":    offers.Code,
+			"passkey": offers.Passkey,
+		},
 		// Whether the operator requires it of this account, so somebody is told
 		// why they are being asked rather than left to wonder.
 		"required":          required,
@@ -468,4 +484,114 @@ func allowedWithoutSecondFactor(path string) bool {
 	// Exactly /api/me, not everything under it: the rest of somebody's account
 	// is the server they are being kept out of.
 	return path == "/api/me"
+}
+
+/*
+Answering a second-factor challenge with a passkey.
+
+Two requests, like every other passkey ceremony: one for a challenge, one with
+what the authenticator did with it. What makes these different from signing in
+with a passkey alone is the ticket — the password has already been checked, and
+this is the second half rather than the whole.
+
+Somebody who carries a passkey has the thing a second factor is for. Requiring
+them to carry an authenticator app as well is ceremony, and ceremony is what
+makes people turn two-step sign-in off.
+*/
+
+// handleBeginSecondFactorPasskey issues a challenge for the second step.
+func (s *Server) handleBeginSecondFactorPasskey(c *echo.Context) error {
+	if s.secondFactor == nil || !s.passkeys.Enabled() {
+		return echo.NewHTTPError(http.StatusNotFound, "this server does not offer that")
+	}
+
+	assertion, err := s.passkeys.BeginSignIn(c.Request().Context())
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, assertion.Options)
+}
+
+/*
+handleFinishSecondFactorPasskey spends a ticket that a passkey answered.
+
+The ticket travels in the query rather than the body, because the body is the
+authenticator's own response — parsed by the library from the request itself —
+and adding a field would mean reshaping what the browser just made.
+*/
+func (s *Server) handleFinishSecondFactorPasskey(c *echo.Context) error {
+	if s.secondFactor == nil || !s.passkeys.Enabled() {
+		return echo.NewHTTPError(http.StatusNotFound, "this server does not offer that")
+	}
+
+	ctx := c.Request().Context()
+	address := requestIP(c)
+
+	ticket := c.QueryParam("ticket")
+	if ticket == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "this sign-in cannot be completed")
+	}
+
+	/*
+		The passkey is verified first, and says whose account it proved.
+
+		Which account it is allowed to prove is the next question, and a
+		separate one: a valid passkey belonging to somebody else must not
+		complete this ticket.
+	*/
+	proved, err := s.passkeys.FinishSignIn(ctx, c.Request())
+	if err != nil {
+		if recordErr := s.audit.Record(ctx, audit.Entry{
+			Action:    audit.ActionSignInFailed,
+			SourceIP:  address,
+			UserAgent: c.Request().UserAgent(),
+		}); recordErr != nil {
+			return recordErr
+		}
+		return echo.NewHTTPError(http.StatusUnauthorized, "that passkey was not accepted")
+	}
+
+	accepted, err := s.secondFactor.CompleteWithPasskey(ctx, ticket, proved.ID)
+	if errors.Is(err, secondfactor.ErrRejected) {
+		// Covers both a ticket that is not usable and a passkey for the wrong
+		// account, deliberately: which of the two is not the caller's business.
+		return echo.NewHTTPError(http.StatusUnauthorized, "that passkey was not accepted")
+	}
+	if err != nil {
+		return err
+	}
+
+	user, err := s.identity.UserByID(ctx, accepted.UserID)
+	if err != nil {
+		return err
+	}
+
+	// The device from the first request, as the code path does: the session
+	// records where the sign-in began rather than where it finished.
+	session, err := s.identity.StartSession(ctx, user.ID,
+		identity.DeviceContext{UserAgent: accepted.UserAgent, IPAddress: accepted.Address},
+		s.config.SessionLifetime)
+	if err != nil {
+		return err
+	}
+
+	if err := s.audit.Record(ctx, audit.Entry{
+		ActorID:    &user.ID,
+		ActorLabel: user.Username,
+		Action:     audit.ActionSignInSucceeded,
+		SourceIP:   address,
+		UserAgent:  c.Request().UserAgent(),
+	}); err != nil {
+		return err
+	}
+
+	setSessionCookie(c, session.Token, s.config.SecureCookies,
+		int(time.Until(session.Record.ExpiresAt).Seconds()))
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"user":              s.userResponse(user),
+		"token":             session.Token,
+		"expiresAt":         session.Record.ExpiresAt,
+		"recoveryCodesLeft": accepted.RecoveryCodesLeft,
+	})
 }

@@ -1,4 +1,4 @@
-import type { Passkey, SignInResult } from "@tdc/types";
+import type { Passkey, SecondFactorResult, SignInResult } from "@tdc/types";
 import { decodeBase64Url as decode, encodeBase64Url as encode } from "#layers/ui/app/lib/webauthn";
 
 /**
@@ -86,6 +86,30 @@ export function usePasskeys() {
     return api.post<SignInResult>("/api/auth/passkey/signin/finish", toAssertionJSON(asserted));
   }
 
+  /**
+   * Answer a second-factor challenge with a passkey.
+   *
+   * The password has already been checked; this is the second half. The ticket
+   * says which sign-in, and the passkey has to belong to the account that
+   * sign-in is for — the server checks, and refuses one that does not.
+   */
+  async function answerSecondFactor(ticket: string): Promise<SecondFactorResult> {
+    const options = await api.post<PublicKeyCredentialRequestOptionsJSON>(
+      "/api/auth/second-factor/passkey/begin",
+    );
+
+    const asserted = (await navigator.credentials.get({
+      publicKey: fromRequestJSON(options),
+    })) as PublicKeyCredential | null;
+
+    if (!asserted) throw new Error("No passkey was offered.");
+
+    return api.post<SecondFactorResult>(
+      `/api/auth/second-factor/passkey/finish?ticket=${encodeURIComponent(ticket)}`,
+      toAssertionJSON(asserted),
+    );
+  }
+
   /** Somebody's own passkeys. */
   async function list(): Promise<Passkey[]> {
     return api.get<Passkey[]>("/api/me/passkeys");
@@ -106,7 +130,17 @@ export function usePasskeys() {
     await api.delete(`/api/me/passkeys/${encodeURIComponent(id)}`);
   }
 
-  return { offered, supported, available, enrol, signIn, list, rename, revoke };
+  return {
+    offered,
+    supported,
+    available,
+    enrol,
+    signIn,
+    answerSecondFactor,
+    list,
+    rename,
+    revoke,
+  };
 }
 
 /*

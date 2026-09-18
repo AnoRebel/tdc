@@ -71,6 +71,10 @@ func (s *Server) routes() {
 		except the right to try a code for the account it names.
 	*/
 	s.echo.POST("/api/auth/second-factor", s.handleSecondFactor)
+	// Or with a passkey, for somebody who already carries one rather than an
+	// authenticator app.
+	s.echo.POST("/api/auth/second-factor/passkey/begin", s.handleBeginSecondFactorPasskey)
+	s.echo.POST("/api/auth/second-factor/passkey/finish", s.handleFinishSecondFactorPasskey)
 
 	/*
 		Getting back in without a password.

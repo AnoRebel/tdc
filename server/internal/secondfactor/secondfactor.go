@@ -109,6 +109,7 @@ type Store interface {
 	DeleteExpiredPendingSignIns(ctx context.Context) (int64, error)
 
 	HasConfirmedSecondFactor(ctx context.Context, userID uuid.UUID) (bool, error)
+	HasPasskey(ctx context.Context, userID uuid.UUID) (bool, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (dbgen.User, error)
 }
 
@@ -134,9 +135,39 @@ func NewService(issuer string, store Store, log *slog.Logger) *Service {
 	return &Service{issuer: issuer, store: store, log: log, now: time.Now}
 }
 
-// Required reports whether an account has a confirmed second factor.
+// Required reports whether an account has a second factor at all.
 func (s *Service) Required(ctx context.Context, userID uuid.UUID) (bool, error) {
 	return s.store.HasConfirmedSecondFactor(ctx, userID)
+}
+
+/*
+Offers says which second factors an account can actually answer with.
+
+A client needs it to draw the right prompt: asking somebody for six digits when
+what they have is a passkey is asking for something they cannot produce, and the
+only clue would be that nothing they try works.
+*/
+type Offers struct {
+	// Code is an authenticator app, or a recovery code from its list.
+	Code bool
+	// Passkey is a device they already carry.
+	Passkey bool
+}
+
+// Available says what this account can answer a challenge with.
+func (s *Service) Available(ctx context.Context, userID uuid.UUID) (Offers, error) {
+	credential, err := s.store.GetTOTPCredential(ctx, userID)
+	code := err == nil && credential.ConfirmedAt != nil
+	if err != nil && !notFound(err) {
+		return Offers{}, fmt.Errorf("look for an authenticator app: %w", err)
+	}
+
+	passkey, err := s.store.HasPasskey(ctx, userID)
+	if err != nil {
+		return Offers{}, fmt.Errorf("look for a passkey: %w", err)
+	}
+
+	return Offers{Code: code, Passkey: passkey}, nil
 }
 
 // periodFor is which thirty-second window a moment belongs to, which is what

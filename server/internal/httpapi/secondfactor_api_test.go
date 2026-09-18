@@ -1,10 +1,15 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/descope/virtualwebauthn"
 
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
@@ -371,4 +376,166 @@ func TestAPasskeySignInIsNotAskedForACode(t *testing.T) {
 	if session, _ := result["token"].(string); session == "" {
 		t.Error("a passkey sign-in did not produce a session")
 	}
+}
+
+/*
+A passkey answering the second step.
+
+Somebody who already carries a passkey has the thing a second factor is for.
+Asking them for an authenticator app as well is ceremony, and ceremony is what
+makes people turn two-step sign-in off.
+*/
+
+// beginPasswordSignIn gets as far as the ticket, which is where the second
+// factor is owed.
+func beginPasswordSignIn(t *testing.T, handler http.Handler, username string) map[string]any {
+	t.Helper()
+
+	recorder := call(t, handler, http.MethodPost, "/api/auth/signin", map[string]string{
+		"username": username, "password": testPassword,
+	}, "")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("signing in: status %d, body %s", recorder.Code, recorder.Body.String())
+	}
+	return decode(t, recorder)
+}
+
+/*
+TestAPasskeyAnswersTheSecondStep.
+
+The whole feature: a password account with a passkey and no authenticator app
+is asked for a second factor, and the passkey is what answers it.
+*/
+func TestAPasskeyAnswersTheSecondStep(t *testing.T) {
+	handler := withPasskeys(t)
+	completeSetup(t, handler)
+
+	token := secondFactorAccount(t, handler, "amina")
+	authenticator, credential := enrolPasskey(t, handler, token, "Phone")
+	handle := webauthnHandle(t, handler, token)
+
+	// The passkey alone makes this account one with a second factor.
+	begun := beginPasswordSignIn(t, handler, "amina")
+	if required, _ := begun["secondFactorRequired"].(bool); !required {
+		t.Fatal("a password account with a passkey was signed straight in")
+	}
+
+	methods, _ := begun["methods"].(map[string]any)
+	if offered, _ := methods["passkey"].(bool); !offered {
+		t.Error("the passkey is not offered as a way to answer")
+	}
+	if offered, _ := methods["code"].(bool); offered {
+		t.Error("a code is offered, but this account has no authenticator app")
+	}
+
+	ticket, _ := begun["ticket"].(string)
+
+	// And the passkey completes it.
+	recorder := finishSecondFactorWithPasskey(t, handler, ticket, authenticator, credential, handle)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("answering with a passkey: status %d, body %s", recorder.Code, recorder.Body.String())
+	}
+	if session, _ := decode(t, recorder)["token"].(string); session == "" {
+		t.Error("answering with a passkey issued no session")
+	}
+}
+
+/*
+TestSomebodyElsesPasskeyDoesNotAnswerYourTicket.
+
+The one that matters. A passkey verifies perfectly well and proves an account —
+just not this one. Without checking which, any passkey on the server would
+complete any pending sign-in, and the second factor would protect nothing.
+*/
+func TestSomebodyElsesPasskeyDoesNotAnswerYourTicket(t *testing.T) {
+	handler := withPasskeys(t)
+	completeSetup(t, handler)
+
+	// Whoever is being signed in as.
+	target := secondFactorAccount(t, handler, "amina")
+	enrolPasskey(t, handler, target, "Amina's phone")
+
+	// And somebody else, with a passkey of their own.
+	attacker := secondFactorAccount(t, handler, "juma")
+	theirAuthenticator, theirCredential := enrolPasskey(t, handler, attacker, "Juma's phone")
+	theirHandle := webauthnHandle(t, handler, attacker)
+
+	// The attacker has the password — that is what the second factor is for.
+	begun := beginPasswordSignIn(t, handler, "amina")
+	ticket, _ := begun["ticket"].(string)
+	if ticket == "" {
+		t.Fatal("no ticket")
+	}
+
+	recorder := finishSecondFactorWithPasskey(t, handler, ticket,
+		theirAuthenticator, theirCredential, theirHandle)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("somebody else's passkey answered the ticket: status %d, body %s",
+			recorder.Code, recorder.Body.String())
+	}
+}
+
+/*
+TestAnAuthenticatorAppIsStillOffered.
+
+The passkey is an addition rather than a replacement. An account with both can
+answer either way — somebody whose phone is flat reaches for the other.
+*/
+func TestAnAuthenticatorAppIsStillOffered(t *testing.T) {
+	handler := withPasskeys(t)
+	completeSetup(t, handler)
+
+	token := secondFactorAccount(t, handler, "amina")
+	secret, _ := enrolSecondFactor(t, handler, token)
+	enrolPasskey(t, handler, token, "Phone")
+
+	begun := beginPasswordSignIn(t, handler, "amina")
+	methods, _ := begun["methods"].(map[string]any)
+
+	if offered, _ := methods["code"].(bool); !offered {
+		t.Error("the authenticator app is no longer offered")
+	}
+	if offered, _ := methods["passkey"].(bool); !offered {
+		t.Error("the passkey is not offered")
+	}
+
+	// And the code still works.
+	ticket, _ := begun["ticket"].(string)
+	recorder := call(t, handler, http.MethodPost, "/api/auth/second-factor", map[string]string{
+		"ticket": ticket, "code": codeFor(t, secret, time.Now().Add(30*time.Second)),
+	}, "")
+	if recorder.Code != http.StatusOK {
+		t.Errorf("the code stopped working: status %d, body %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+// finishSecondFactorWithPasskey runs the second half of the ceremony against a
+// pending ticket.
+func finishSecondFactorWithPasskey(
+	t *testing.T,
+	handler http.Handler,
+	ticket string,
+	authenticator virtualwebauthn.Authenticator,
+	credential virtualwebauthn.Credential,
+	handle []byte,
+) *httptest.ResponseRecorder {
+	t.Helper()
+
+	begun := call(t, handler, http.MethodPost, "/api/auth/second-factor/passkey/begin", nil, "")
+	if begun.Code != http.StatusOK {
+		t.Fatalf("asking for a challenge: status %d, body %s", begun.Code, begun.Body.String())
+	}
+
+	options, err := virtualwebauthn.ParseAssertionOptions(begun.Body.String())
+	if err != nil {
+		t.Fatalf("parsing: %v", err)
+	}
+
+	authenticator.Options.UserHandle = handle
+	answer := virtualwebauthn.CreateAssertionResponse(
+		passkeyRelyingParty, authenticator, credential, *options)
+
+	return call(t, handler, http.MethodPost,
+		"/api/auth/second-factor/passkey/finish?ticket="+url.QueryEscape(ticket),
+		json.RawMessage(answer), "")
 }

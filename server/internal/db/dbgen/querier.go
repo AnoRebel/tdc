@@ -243,10 +243,9 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
 	GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []byte) (User, error)
 	HasBlocked(ctx context.Context, arg HasBlockedParams) (bool, error)
-	// Whether an account has a second factor to be asked for at all. Confirmed
-	// only: a TOTP secret somebody started enrolling and abandoned must not lock
-	// them out.
 	HasConfirmedSecondFactor(ctx context.Context, userID uuid.UUID) (bool, error)
+	// The passkeys an account could answer a second-factor challenge with.
+	HasPasskey(ctx context.Context, userID uuid.UUID) (bool, error)
 	HasUsedInvitation(ctx context.Context, arg HasUsedInvitationParams) (bool, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
 	// Issuing a new one invalidates the old, so somebody who asks twice is not left

@@ -259,10 +259,26 @@ func (s *Server) handleSignIn(c *echo.Context) error {
 			return err
 		}
 
+		/*
+			What they can actually answer with.
+
+			Asking somebody for six digits when what they have is a passkey is
+			asking for something they cannot produce, and the only clue would be
+			that nothing they try works.
+		*/
+		offers, err := s.secondFactor.Available(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+
 		return c.JSON(http.StatusOK, map[string]any{
 			"secondFactorRequired": true,
 			"ticket":               pending.Ticket,
 			"expiresAt":            pending.ExpiresAt,
+			"methods": map[string]any{
+				"code":    offers.Code,
+				"passkey": offers.Passkey,
+			},
 			// So a client can warn somebody who is nearly out of recovery
 			// codes before they need one rather than after.
 			"recoveryCodesLeft": pending.RecoveryCodesLeft,
