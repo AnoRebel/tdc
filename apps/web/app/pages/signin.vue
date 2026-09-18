@@ -22,6 +22,7 @@ const error = ref<string | null>(null);
 const submitting = ref(false);
 
 const { begin, pendingHandle, finish } = useOAuth();
+const { available: recoveryAvailable } = useRecovery();
 
 /*
  * Signing in through a provider, which has two moments on this page.
@@ -38,6 +39,9 @@ const { begin, pendingHandle, finish } = useOAuth();
  * offering two is how somebody answers the wrong one.
  */
 const awaitingSecondFactor = ref<SecondFactorRequired | null>(null);
+
+// Asking for a way back in, shown in place of the form rather than beside it.
+const askingForRecovery = ref(false);
 
 const openingProvider = ref<string | null>(null);
 const returned = ref<OAuthResult | null>(null);
@@ -203,6 +207,8 @@ const form = useForm({
       />
     </template>
 
+    <RecoveryRequest v-else-if="askingForRecovery" @cancel="askingForRecovery = false" />
+
     <!-- The password was right, and something more is needed. -->
     <SecondFactorPrompt
       v-else-if="awaitingSecondFactor"
@@ -276,6 +282,18 @@ const form = useForm({
       <!-- Draws nothing when the server offers no providers, which is most of
            them, so this needs no condition around it here. -->
       <SignInProviders :busy="openingProvider" @choose="chooseProvider" />
+
+      <!-- Only where the server can send. A link that leads to a form which
+           answers with a refusal is worse than no link. -->
+      <p v-if="recoveryAvailable" class="mt-4 text-center text-sm">
+        <button
+          type="button"
+          class="font-medium text-muted-foreground hover:text-foreground hover:underline"
+          @click="askingForRecovery = true"
+        >
+          Forgotten your password?
+        </button>
+      </p>
 
       <p class="mt-6 text-center text-sm text-muted-foreground">
         No account yet?

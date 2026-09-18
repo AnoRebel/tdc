@@ -72,6 +72,13 @@ export interface ServerInfo {
    * it and absent must read as "no" rather than as a type error.
    */
   passkeys?: boolean;
+  /**
+   * Whether this server can mail somebody a way back into their account.
+   *
+   * A "forgotten your password" link on a server that cannot send is worse than
+   * no link: it promises something nobody can deliver.
+   */
+  recovery?: boolean;
 }
 
 /** A way of signing in that this server offers through somebody else. */

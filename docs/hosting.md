@@ -160,6 +160,48 @@ verified it, nothing is linked and they get a new account. That second case is
 not a limitation to work around: a provider where anybody can set an unverified
 address to anything would otherwise be a way into any account on your server.
 
+### Mail, and the account recovery that depends on it
+
+Nothing is configured by default, and a server that sends no mail runs perfectly
+well — what it loses is the ability to offer a password reset, which it then does
+not offer rather than offering and failing.
+
+| Setting          | Default    | What it does                                       |
+| ---------------- | ---------- | -------------------------------------------------- |
+| `mail.host`      | —          | The mail server. Empty is mail switched off.       |
+| `mail.port`      | `587`      | The port                                           |
+| `mail.username`  | —          | Where the server wants credentials                 |
+| `mail.password`  | —          | Redacted wherever configuration is shown           |
+| `mail.from`      | —          | Required with a host; the address mail comes from  |
+| `mail.from_name` | —          | The name beside it, defaulting to the server's own |
+| `mail.tls`       | `starttls` | `starttls`, `tls`, or `none`                       |
+| `mail.timeout`   | `15s`      | How long a send may take                           |
+
+SMTP rather than a provider's API, deliberately: recovery has to work against a
+mail server you run yourself, and every self-hosted one speaks SMTP. A relay on
+the same machine needs no credentials at all.
+
+`mail.tls = "none"` is refused unless the host is on this machine. Without
+encryption the password and the recovery link cross the network in the clear,
+which is not a configuration anybody means to choose; to a relay on loopback it
+is ordinary, and refusing it there would refuse the simplest working setup.
+
+**What members get.** A link, good once and for an hour, sent only to an address
+the account has confirmed. Asking discloses nothing — an address with no account
+is answered exactly as one with an account, which means somebody who mistypes
+theirs gets silence rather than a correction. That is the trade, and it is the
+right one: the alternative is a form that tells anybody who asks which addresses
+have accounts here.
+
+Setting a new password signs out every device and does not sign the person in.
+They sign in with the password they chose, which proves they know it and goes
+through the second factor where the account has one.
+
+**An account with no confirmed address still cannot be recovered.** There is no
+route that confirms one yet, so in practice recovery reaches accounts whose
+address was marked confirmed some other way. Until that changes, a forgotten
+password is still an administrator's problem for most people — plan for it.
+
 ### Passkeys
 
 Nothing to configure, and nothing to turn on. A server signs people in with

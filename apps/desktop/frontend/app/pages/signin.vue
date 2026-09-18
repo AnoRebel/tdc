@@ -37,6 +37,7 @@ const error = ref<string | null>(null);
 const submitting = ref(false);
 
 const { begin, finish } = useOAuth();
+const { available: recoveryAvailable } = useRecovery();
 
 /*
  * Signing in through a provider, which works differently here.
@@ -52,6 +53,9 @@ const { begin, finish } = useOAuth();
  */
 // A sign-in that stopped short of a session, as on the web.
 const awaitingSecondFactor = ref<SecondFactorRequired | null>(null);
+
+// Asking for a way back in. The link itself lands in a browser, not here.
+const askingForRecovery = ref(false);
 
 const openingProvider = ref<string | null>(null);
 const waitingForProvider = ref(false);
@@ -271,6 +275,8 @@ const form = useForm({
       @cancel="returned = null"
     />
 
+    <RecoveryRequest v-else-if="askingForRecovery" @cancel="askingForRecovery = false" />
+
     <SecondFactorPrompt
       v-else-if="awaitingSecondFactor"
       :pending="awaitingSecondFactor"
@@ -359,6 +365,19 @@ const form = useForm({
       >
         <Spinner size="sm" />
         Waiting for your browser. You can come back here when you are done.
+      </p>
+
+      <!-- The mail carries a link to the server's own page, which opens in a
+           browser. This client then signs in with the new password like any
+           other, so nothing here has to receive it. -->
+      <p v-if="recoveryAvailable" class="mt-4 text-center text-xs">
+        <button
+          type="button"
+          class="font-medium text-muted-foreground hover:text-foreground hover:underline"
+          @click="askingForRecovery = true"
+        >
+          Forgotten your password?
+        </button>
       </p>
 
       <p class="mt-6 text-center text-xs text-muted-foreground">

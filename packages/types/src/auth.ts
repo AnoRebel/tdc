@@ -178,3 +178,13 @@ export interface SecondFactorEnrolment {
   /** The otpauth:// value, which the client renders as a QR code. */
   url: string;
 }
+
+/** What a recovery request is answered with — deliberately the same either way. */
+export interface RecoveryRequested {
+  message: string;
+}
+
+/** What redeeming a link returns. Notably not a session. */
+export interface RecoveryRedeemed {
+  message: string;
+}

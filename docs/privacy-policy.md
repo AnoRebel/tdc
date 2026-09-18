@@ -75,6 +75,11 @@ A sign-in through another service is stored as that service's identifier for
 you. **No recoverable secret is stored for any of them.** Each record carries a
 label you chose, when it was created, and when it was last used.
 
+If you ask to reset your password, this server stores a hash of the link it
+mailed you, the address it went to, when it expires, and the IP address the
+request came from — the last so that an attempt on your account is something an
+administrator can see afterwards. The link itself exists only in that message.
+
 If you turn on two-step sign-in, this server stores the shared secret your
 authenticator app uses — it has to, because every code is derived from it — and
 the hashes of your recovery codes, never the codes themselves. It also records

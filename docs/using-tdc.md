@@ -26,9 +26,16 @@ already used up, revoked, meant for somebody else and never having existed all
 produce the same refusal, because a response that distinguished them would tell
 somebody guessing codes when they had guessed right.
 
-**There is no password reset.** An account that has lost its password needs an
-administrator, and there is no email that gets you back in. Choose a password
-you will keep, and keep it somewhere.
+**A password reset needs a confirmed email address, and most accounts do not
+have one.** Where the server sends mail and your address has been confirmed,
+"forgotten your password" sends a link good once and for an hour. Setting a new
+password signs every device out and does not sign you in — you sign in with it,
+which is what proves you know it.
+
+Confirming an address is the gap: nothing sends a confirmation yet, so in
+practice the only confirmed addresses are ones a sign-in provider vouched for.
+Without one, an account that has lost its password still needs an
+administrator. Choose a password you will keep, and keep it somewhere.
 
 Beyond a password, there are three other ways in, depending on what the server
 offers:
@@ -502,9 +509,10 @@ So that nothing above is read as implying more than it says:
   are with people on your own server.
 - **Project management and the developer directory.** Both are part of what TDC
   is for and neither is built.
-- **Account recovery.** There is no password reset. Two-step sign-in has
-  recovery codes, but those get you past the second step, not past a forgotten
-  password.
+- **Confirming an email address.** Nothing sends a confirmation, so a password
+  reset only reaches accounts whose address was confirmed some other way — which
+  today means signing in through a provider that vouched for it. Everybody else
+  still needs an administrator.
 - **Voice and video calls.** The permission list mentions starting and joining
   one; nothing enforces those and no call can be made. They are names waiting
   for a feature, not a feature waiting to be switched on.
