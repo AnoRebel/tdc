@@ -312,6 +312,34 @@ say so plainly rather than promising a right you will not deliver.
 There is also no password reset built in. An account that loses its password
 needs you.
 
+**If you ask to be erased.** The operator can run an erasure, and this is
+exactly what it does — worth reading before anybody promises more than it
+delivers.
+
+Removed: your account and everything attached to it (credentials, sessions, push
+subscriptions, notifications, memberships, reactions, blocks, preferences); the
+content of every message you sent; the search index's copies of them; the copies
+any moderation report kept of your words; and your name from the audit log.
+
+Kept, and why:
+
+- **The messages themselves, emptied.** Removing the rows would break the
+  ordering of every conversation you took part in, which is other people's data
+  as much as yours. What is left is a placeholder where a message was.
+- **That an account existed**, shown as `erased@` this server. A conversation
+  where one participant's messages have no author at all reads as broken rather
+  than as erased.
+- **Audit entries**, with your name replaced and the address and browser
+  removed. A log with holes in it is not a log.
+- **Reports other people made** about your messages, with the copied content
+  removed. The complaint belongs to whoever made it.
+
+One consequence worth stating: an erased message can no longer be
+cryptographically verified. The sender's address is part of what this server
+signed, so removing it means the message cannot prove itself any more. That is
+deliberate — your right to be erased outweighs this server's ability to prove
+who said something you are no longer recorded as having said.
+
 **What deletion can and cannot do.** Deleting an account removes the account and
 the things attached to it. It does not remove messages the person sent: those
 stay, with their sender address, because the message log is append-only and

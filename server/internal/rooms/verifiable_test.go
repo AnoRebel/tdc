@@ -289,3 +289,117 @@ func TestNothingNeededForVerificationIsServerLocal(t *testing.T) {
 		t.Errorf("verification depends on something only this server has: %v", err)
 	}
 }
+
+/*
+TestErasureRemovesWhatItSaysAndKeepsWhatItSays.
+
+The specification asks that erasure be bounded and documented, and this is the
+boundary as a test: what goes, what stays, and that the conversations other
+people took part in survive it.
+
+The failure to guard against is an erasure that claims more than it does. A
+partial erasure described as a complete one is worse for an operator than an
+honest partial one, because it is the description they will repeat to whoever
+asked.
+*/
+func TestErasureRemovesWhatItSaysAndKeepsWhatItSays(t *testing.T) {
+	service, queries, pool := newTestService(t)
+	ctx := context.Background()
+
+	leaving := makeUser(t, queries, "amina")
+	staying := makeUser(t, queries, "juma")
+	room := makeRoom(t, service, staying.ID, "conversation")
+
+	if err := service.Join(ctx, room.ID, leaving.ID); err != nil {
+		t.Fatalf("joining: %v", err)
+	}
+
+	// A conversation both of them were part of.
+	theirs, err := service.SendMessage(ctx, room.ID, leaving.ID, "something they said", "")
+	if err != nil {
+		t.Fatalf("sending: %v", err)
+	}
+	others, err := service.SendMessage(ctx, room.ID, staying.ID, "something somebody else said", "")
+	if err != nil {
+		t.Fatalf("sending: %v", err)
+	}
+
+	erased, err := service.Erase(ctx, leaving.ID)
+	if err != nil {
+		t.Fatalf("erasing: %v", err)
+	}
+	if erased.MessagesEmptied == 0 {
+		t.Error("erasure reports emptying nothing")
+	}
+
+	// What they said is gone.
+	after, err := service.Event(ctx, theirs.ID)
+	if err != nil {
+		t.Fatalf("reading their event: %v", err)
+	}
+	if strings.Contains(string(after.Content), "something they said") {
+		t.Errorf("their words survived erasure: %s", after.Content)
+	}
+
+	// And their name with it.
+	if strings.Contains(after.SenderAddress, "amina") {
+		t.Errorf("their address survived erasure: %s", after.SenderAddress)
+	}
+
+	/*
+		The erased event no longer verifies, and that is the documented cost.
+
+		Erasure rewrites the sender's address, which is part of what was signed
+		— so the event cannot reproduce its own identifier and there is no
+		mechanism that could preserve both. A person asking to be erased has a
+		right that outweighs this server's ability to prove who said something
+		they are no longer allowed to be recorded as having said.
+
+		Asserted rather than left implicit, so that a change which quietly
+		restored verifiability — by keeping the address — fails here.
+	*/
+	if rooms.CanVerify(after) {
+		t.Error("an erased event claims to be verifiable, which would mean the address was kept")
+	}
+
+	untouched, err := service.Event(ctx, others.ID)
+	if err != nil {
+		t.Fatalf("reading the other event: %v", err)
+	}
+	if !strings.Contains(string(untouched.Content), "somebody else") {
+		t.Error("somebody else's message was erased too")
+	}
+	if err := service.Keyring().Verify(rooms.Verifiable(untouched)); err != nil {
+		t.Errorf("somebody else's message stopped verifying: %v", err)
+	}
+
+	// The account is gone.
+	if _, err := queries.GetUserByID(ctx, leaving.ID); err == nil {
+		t.Error("the account survived erasure")
+	}
+
+	/*
+		And what the documentation says remains, remains.
+
+		Checked because the documentation is what an operator repeats to
+		whoever asked — so a change that quietly removed more, or less, should
+		fail here rather than make that description wrong.
+	*/
+	var remainingEvents int
+	if err := pool.QueryRow(ctx,
+		"SELECT count(*) FROM events WHERE id = $1", theirs.ID).Scan(&remainingEvents); err != nil {
+		t.Fatalf("counting: %v", err)
+	}
+	if remainingEvents != 1 {
+		t.Error("the event row was deleted, which breaks the ordering of everybody else's conversation")
+	}
+
+	var searchCopies int
+	if err := pool.QueryRow(ctx,
+		"SELECT count(*) FROM message_search WHERE event_id = $1", theirs.ID).Scan(&searchCopies); err != nil {
+		t.Fatalf("counting the search index: %v", err)
+	}
+	if searchCopies != 0 {
+		t.Error("the search index still holds a copy of what they said")
+	}
+}

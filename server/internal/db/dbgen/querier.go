@@ -155,6 +155,12 @@ type Querier interface {
 	// set once: it is what the authenticator remembers, and changing it would
 	// orphan every passkey already enrolled.
 	EnsureWebauthnHandle(ctx context.Context, arg EnsureWebauthnHandleParams) ([]byte, error)
+	EraseAccount(ctx context.Context, id uuid.UUID) error
+	ErasePersonsAuditLabel(ctx context.Context, actorID *uuid.UUID) (int64, error)
+	ErasePersonsAuthorship(ctx context.Context, senderID *uuid.UUID) (int64, error)
+	ErasePersonsEvents(ctx context.Context, senderID *uuid.UUID) (int64, error)
+	ErasePersonsReportedContent(ctx context.Context, senderID *uuid.UUID) (int64, error)
+	ErasePersonsSearchIndex(ctx context.Context, senderID *uuid.UUID) (int64, error)
 	// Redacts messages past their channel's retention period.
 	//
 	// The channel's own period where it has one, and the server's default
