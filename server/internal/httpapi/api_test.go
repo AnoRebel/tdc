@@ -810,6 +810,10 @@ type settledHandler struct {
 	server  *httpapi.Server
 }
 
+// Server exposes the server behind a test handler, for the checks that ask it
+// about itself rather than making a request.
+func (h settledHandler) Server() *httpapi.Server { return h.server }
+
 func (h settledHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.handler.ServeHTTP(w, r)
 	h.server.WaitForBackground()

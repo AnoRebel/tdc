@@ -23,6 +23,13 @@ func (s *Server) routes() {
 	// Public: a client needs these before it can sign in, and an uptime check
 	// holds no credential.
 	s.echo.GET("/api/health", s.handleHealth)
+	/*
+		What this server serves, generated from the routing table.
+
+		Public, because a client deciding whether it can talk to this server
+		should not have to hold a credential to find out what it could ask for.
+	*/
+	s.echo.GET("/api/description", s.handleDescription)
 	s.echo.GET("/api/version", s.handleVersion)
 	s.echo.GET("/api/server", s.handleServerInfo)
 

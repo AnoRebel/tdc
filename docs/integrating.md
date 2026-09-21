@@ -235,8 +235,15 @@ Worth stating plainly, so that nobody builds against it:
 - **No federation.** Addresses name a home server and events are signed, but
   nothing crosses a server boundary. `protocolVersions` is empty for this
   reason.
-- **No OpenAPI document.** There is no generated schema to import; this guide
-  and the routing table are the description.
+- **No OpenAPI document.** `GET /api/description` returns a machine-readable
+  list of every endpoint — method, path, parameters, what a caller must carry
+  and which permission it needs — generated from the routing table, so it
+  describes what the server serves rather than what somebody wrote down. It is
+  deliberately not OpenAPI: a schema claiming to describe request and response
+  bodies would mean inferring shapes that are not there, and a schema that is
+  confidently wrong about a body is worse than none, because somebody generates
+  a client from it and finds out at runtime. For bodies, this guide is the
+  description.
 - **No API versioning.** Paths are `/api/…` with no version segment. The
   protocol version in `/api/version` is the thing to check compatibility
   against.
