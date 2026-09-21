@@ -296,6 +296,31 @@ signs in once and everything else reuses the stored session. A check that signs
 in for itself spends one of the eight; a suite that does it per test runs out
 and then reports the application as broken when what broke was the suite.
 
+## The milestone demonstrations
+
+Each phase ends with a demonstration rather than a checklist: something that
+runs, end to end, and shows the phase did what it promised. They live in
+`scripts/` and are run deliberately rather than in continuous integration,
+because several need a display, a real browser, or minutes of wall clock.
+
+```sh
+python3 scripts/demo-milestone-7.py      # moderation, limits, the audit log
+bun run --cwd apps/web demo:milestone-8  # installing, offline, notifications
+scripts/demo-milestone-10a.sh            # a program asking a channel a question
+```
+
+Each brings up what it needs and tears it down afterwards. They want the
+database container running (`docker compose up -d database`) and nothing else.
+
+**Where a demonstration cannot show something, it says so rather than
+skipping it.** Milestone 8 cannot show a push arriving with the browser
+genuinely closed, because that needs a push service the machine can reach;
+milestone 10a presses one button in a real browser and the other through the
+desktop's Go service, because the desktop reaches the server over Wails
+bindings rather than HTTP — driving a browser against its built frontend would
+exercise a transport it never uses. The seam is named in each case, which is
+the difference between a demonstration and a performance.
+
 ## Words people read
 
 Every sentence the interface shows goes through the translation layer. TDC is

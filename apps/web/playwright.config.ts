@@ -74,7 +74,8 @@ export default defineConfig({
       dependencies: ["setup"],
       // The milestone demonstration signs itself in, because two of its four
       // parts are about what happens on arrival.
-      testIgnore: /milestone-8\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
+      testIgnore:
+        /milestone-8\.spec\.ts|milestone-10a\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
     },
     /*
      * The other two engines a release is gated on.
@@ -94,7 +95,7 @@ export default defineConfig({
       use: { ...devices["Desktop Firefox"], storageState: SESSION },
       dependencies: ["setup"],
       testIgnore:
-        /milestone-8\.spec\.ts|accessibility\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
+        /milestone-8\.spec\.ts|milestone-10a\.spec\.ts|accessibility\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
     },
     /*
      * WebKit needs libraries a Debian-family machine has and others may not —
@@ -109,7 +110,7 @@ export default defineConfig({
       use: { ...devices["Desktop Safari"], storageState: SESSION },
       dependencies: ["setup"],
       testIgnore:
-        /milestone-8\.spec\.ts|accessibility\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
+        /milestone-8\.spec\.ts|milestone-10a\.spec\.ts|accessibility\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
     },
     /*
      * The milestone demonstration, run on its own.
@@ -132,6 +133,19 @@ export default defineConfig({
       // their fixture as somebody who may create a channel. The pages
       // themselves run with no session at all.
       dependencies: ["setup"],
+    },
+    /*
+     * The Milestone 10a demonstration's web half.
+     *
+     * Its own project because it is run deliberately, by
+     * scripts/demo-milestone-10a.sh, rather than as part of the suite: it
+     * creates a channel and prints what the desktop half needs.
+     */
+    {
+      name: "milestone-10a",
+      use: { ...devices["Desktop Chrome"], storageState: SESSION },
+      dependencies: ["setup"],
+      testMatch: /milestone-10a\.spec\.ts/,
     },
     {
       name: "milestone",
