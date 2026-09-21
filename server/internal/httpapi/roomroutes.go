@@ -922,8 +922,14 @@ func (s *Server) handlePressAction(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
+	/*
+		eventIDParam rather than c.Param: an event identifier begins with "$",
+		which a correct client percent-encodes, and Echo hands back the raw
+		segment. Reading it directly yields "%24abc" and every lookup misses —
+		invisibly, for as long as every client leaves the "$" alone.
+	*/
 	event, err := s.rooms.PressAction(ctx, roomID, user.ID,
-		c.Param("eventId"), c.Param("action"))
+		eventIDParam(c), c.Param("action"))
 	if err != nil {
 		return roomError(err)
 	}

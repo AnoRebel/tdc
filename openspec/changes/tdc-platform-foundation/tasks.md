@@ -267,7 +267,7 @@ messages that carry their own actions.
 - [x] 10a.4 Add message actions — a message may carry labelled buttons — with a documented boundary between actions that emit an event to the sender and the fixed set the client may perform itself; verify an action naming an undeclared client capability is refused at the point it is posted (`chat/messages`)
 - [x] 10a.5 Deliver action presses to the sender as events, identifying who pressed and which action, exactly once; verify a press reaches a program and a repeated press of a one-shot action is refused (`chat/messages`)
 - [x] 10a.6 Render actions accessibly in both clients — reachable and operable by keyboard, announced as buttons, with the outcome announced when it arrives; verify with a screen reader and in the automated accessibility pass (`clients/web`, `clients/desktop`)
-- [ ] 10a.7 Document writing a program against the API, with a worked example that posts a message carrying actions and responds to a press; verify somebody can follow it without reading the server source
+- [x] 10a.7 Document writing a program against the API, with a worked example that posts a message carrying actions and responds to a press; verify somebody can follow it without reading the server source
 - [ ] **MILESTONE 10a** — Demonstrate: a program authenticates with a token, posts a message offering two choices, a person presses one in the web client and another in the desktop client, and the program receives both presses and replies. Tag `v1.1.0-dev`.
 
 ## 11. Cross-cutting verification

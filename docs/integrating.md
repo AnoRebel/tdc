@@ -340,7 +340,7 @@ curl "http://localhost:8080/api/rooms/$ROOM/timeline" \
 [
   {
     "id": "b14e…",
-    "type": "m.message",
+    "type": "message.sent",
     "sender": "founder@localhost:8080",
     "sequence": 1,
     "content": { "body": "Hello" },
@@ -557,13 +557,17 @@ An `event` payload looks like:
 ```json
 {
   "id": "b14e…",
-  "type": "m.message",
+  "type": "message.sent",
   "sender": "founder@localhost:8080",
   "content": { "body": "Hello" },
   "createdAt": 1758099731000,
   "redacted": false
 }
 ```
+
+`type` is the event's own type — the same string the timeline gives. The ones a
+program usually cares about are `message.sent`, `message.edited`,
+`message.deleted` and `action.pressed`.
 
 **Note the time encoding differs from the REST API.** Here `createdAt` is epoch
 milliseconds as a number; the REST timeline gives `sentAt` as an RFC 3339
@@ -657,6 +661,117 @@ to read who acted.
 Direct conversations are not readable through any of these. An administrator
 querying ordinary endpoints cannot read other people's direct messages, and that
 is enforced rather than merely undocumented.
+
+## A worked example
+
+A program that asks a channel a question and acts on the answer. It is short
+enough to read in one go and does the three things every integration does:
+authenticate, say something, and listen for what happens next.
+
+**Before you start**, issue it a token and find the channel:
+
+```sh
+# Signed in as yourself, in a browser or with curl.
+curl -X POST http://localhost:8080/api/me/tokens \
+  -H "Authorization: Bearer $SESSION" \
+  -H 'Content-Type: application/json' \
+  -d '{"label":"deploy bot","scope":["channel.post","channel.read"]}'
+
+# The channel it should talk in.
+curl http://localhost:8080/api/rooms -H "Authorization: Bearer $SESSION"
+```
+
+Keep the `token` from the first response — it is shown once. Then:
+
+```ts
+#!/usr/bin/env bun
+const SERVER = process.env.TDC_SERVER ?? "http://localhost:8080";
+const TOKEN = process.env.TDC_TOKEN!;
+const CHANNEL = process.env.TDC_CHANNEL!;
+
+const authorised = { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" };
+
+async function api(path: string, init?: RequestInit) {
+  const response = await fetch(`${SERVER}${path}`, { ...init, headers: authorised });
+  if (!response.ok) {
+    throw new Error(
+      `${init?.method ?? "GET"} ${path}: ${response.status} ${await response.text()}`,
+    );
+  }
+  return response.status === 204 ? undefined : response.json();
+}
+
+// Ask the question.
+const asked = await api(`/api/rooms/${CHANNEL}/messages`, {
+  method: "POST",
+  body: JSON.stringify({
+    body: "Deploy build 41 to production?",
+    clientToken: crypto.randomUUID(),
+    actions: [
+      { name: "deploy", label: "Deploy", once: true },
+      { name: "hold", label: "Not yet" },
+    ],
+  }),
+});
+
+// Listen for the answer.
+const socket = new WebSocket(`${SERVER.replace(/^http/, "ws")}/api/live`, {
+  headers: { Authorization: `Bearer ${TOKEN}` },
+} as never);
+
+socket.addEventListener("message", async (frame) => {
+  const message = JSON.parse(String(frame.data));
+
+  // Subscribe once the connection is ready.
+  if (message.type === "ready") {
+    socket.send(JSON.stringify({ action: "subscribe", rooms: [CHANNEL] }));
+    return;
+  }
+  if (message.type !== "event") return;
+
+  const event = message.payload;
+  if (event.type !== "action.pressed") return;
+  // Presses on somebody else's message arrive here too.
+  if (event.content.pressed !== asked.id) return;
+
+  const who = event.sender.split("@")[0];
+  await api(`/api/rooms/${CHANNEL}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      body:
+        event.content.action === "deploy"
+          ? `Deploying build 41, at ${who}'s word.`
+          : `Holding, at ${who}'s word.`,
+      clientToken: crypto.randomUUID(),
+    }),
+  });
+
+  socket.close();
+});
+```
+
+```sh
+TDC_TOKEN=tdc_… TDC_CHANNEL=22089cc6-… bun run deploybot.ts
+```
+
+The message appears with two buttons. Somebody presses one, and the bot posts
+its reply naming who decided.
+
+**Four things in there are not incidental.**
+
+`clientToken` on every post, a fresh one per message. It is what makes a retry
+safe.
+
+Subscribing on `ready` rather than on `open`. The socket is open before the
+server has said anything; `ready` is the server saying it is listening.
+
+Checking `event.content.pressed` against the message you sent. A subscription
+carries every event in the channel, including presses on messages other
+programs posted.
+
+Percent-encoding an event identifier if you build a path with one. They begin
+with `$`, and `encodeURIComponent` is what a correct client uses — this
+example never does, because it only ever reads identifiers out of events.
 
 ## Writing an integration that behaves
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -422,5 +423,44 @@ func TestPressingNeedsMembership(t *testing.T) {
 
 	if recorder := press(t, handler, outsider, roomID, eventID, "deploy"); recorder.Code == http.StatusCreated {
 		t.Error("somebody who is not in the channel answered its question")
+	}
+}
+
+/*
+A press whose event identifier is percent-encoded reaches the same message.
+
+An event identifier begins with "$", which a correct client encodes as "%24".
+Echo hands back the raw path segment, so a handler reading the parameter
+directly looks up "%24abc" and finds nothing — invisibly, for as long as every
+client leaves the "$" alone. A browser does; a program following the
+documentation does not, which is how this was found.
+*/
+func TestAPressWorksWithAnEncodedEventID(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	eventID := postAndGetID(t, handler, owner, roomID, "Deploy?", []map[string]any{
+		{"name": "deploy", "label": "Deploy"},
+	})
+
+	/*
+		As a correct client sends it, rather than as a browser happens to.
+
+		QueryEscape rather than PathEscape: PathEscape leaves "$" alone — it
+		is legal in a path — so a test using it would encode nothing and pass
+		whatever the handler did. encodeURIComponent, which is what the
+		clients here use, escapes it.
+	*/
+	encoded := url.QueryEscape(eventID)
+	if encoded == eventID {
+		t.Fatalf("the identifier %q needed no encoding, so this proves nothing", eventID)
+	}
+
+	recorder := call(t, handler, http.MethodPost,
+		"/api/rooms/"+roomID+"/messages/"+encoded+"/actions/deploy", nil, owner)
+	if recorder.Code != http.StatusCreated {
+		t.Errorf("a press with an encoded identifier returned %d: %s",
+			recorder.Code, recorder.Body.String())
 	}
 }
