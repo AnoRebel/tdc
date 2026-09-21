@@ -387,6 +387,56 @@ resulting message rather than 200 or 204. Deleting leaves a placeholder rather
 than removing the event: a deleted message leaves evidence that something was
 there.
 
+### Offering a choice
+
+A message may carry buttons:
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/messages" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "body": "Deploy to production?",
+    "clientToken": "3f9a2c7e-2",
+    "actions": [
+      {"name": "deploy", "label": "Deploy", "once": true},
+      {"name": "hold",   "label": "Not yet"},
+      {"name": "log",    "label": "See the build", "capability": "open",
+       "url": "https://ci.example.test/builds/41"}
+    ]
+  }'
+```
+
+`name` is what a press reports back, so your program can tell which button it
+was without matching on a label somebody may translate. `label` is what a
+reader sees. At most five per message.
+
+**There is a boundary worth understanding.** Almost every action does one
+thing: a press becomes an event to whoever posted the message, and your program
+decides what it means. Your program is the only thing that knows, so it is the
+only thing that decides.
+
+The exception is a short, fixed set of things a **client** does by itself,
+named by `capability`. There is one today:
+
+| Capability | What it does                       |
+| ---------- | ---------------------------------- |
+| `open`     | Opens `url`, which must be http(s) |
+
+**A capability this server does not declare is refused when you post the
+message**, with a 400 naming what was refused — not when somebody presses the
+button. A message that reached the channel and then failed on being touched has
+already been read, and somebody has already decided the button was worth
+trusting. `javascript:`, `data:` and `file:` links are refused for the same
+reason.
+
+`once` makes an action pressable one time in total, by anybody, and `expires`
+gives it a deadline. Both are enforced by the server so your program does not
+have to defend against replay itself.
+
+A message carrying no `actions` is exactly the message it was before this
+existed — the key is absent rather than empty, and nothing extra to parse.
+
 ### Attachments
 
 A file is uploaded to the room first, and the returned identifier is then

@@ -84,9 +84,41 @@ export interface Message {
 }
 
 /** The payload of an event, by type. */
+/**
+ * Something a client will do by itself when a button is pressed, rather than
+ * telling the program that posted the message.
+ *
+ * A fixed, short list. Every addition is a thing every client must implement
+ * and a thing a message can ask any reader's client to do, so it is a decision
+ * rather than a configuration. A client meeting a capability it does not know
+ * shows the message without that button rather than failing to render it.
+ */
+export type ActionCapability = "open";
+
+/** One button on a message. */
+export interface MessageAction {
+  /** What a press reports back, so the sender knows which button it was. */
+  name: string;
+  /** What a reader sees. */
+  label: string;
+  /**
+   * Absent for the ordinary case, where a press becomes an event to whoever
+   * posted the message and the client does nothing itself.
+   */
+  capability?: ActionCapability;
+  /** Where `open` goes. Only http and https; the server refuses the rest. */
+  url?: string;
+  /** Pressable once in total, by anybody. Enforced by the server. */
+  once?: boolean;
+  /** When it stops being offered. */
+  expires?: string;
+}
+
 export interface MessageContent {
   /** For message.sent and message.edited. */
   body?: string;
+  /** Buttons this message offers. Absent on a message that offers none. */
+  actions?: MessageAction[];
   /** For message.edited: the event this replaces. */
   replaces?: string;
   /** For message.deleted: the event whose content was removed. */

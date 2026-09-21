@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/actions"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -379,6 +380,15 @@ type sendMessageRequest struct {
 	// ClientToken makes a retry safe: resending with the same token returns
 	// the original message rather than posting twice.
 	ClientToken string `json:"clientToken"`
+
+	/*
+		Buttons this message offers.
+
+		Refused at this point rather than when somebody presses one: a message
+		that reached a channel and then failed on being touched has already
+		been read and already been trusted.
+	*/
+	Actions []actions.Action `json:"actions,omitempty"`
 }
 
 func (s *Server) handleSendMessage(c *echo.Context) error {
@@ -427,7 +437,7 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		return err
 	}
 
-	event, err := s.rooms.SendMessage(ctx, roomID, user.ID, filtered.Body, request.ClientToken)
+	event, err := s.rooms.SendMessage(ctx, roomID, user.ID, filtered.Body, request.ClientToken, request.Actions...)
 	if err != nil {
 		return roomError(err)
 	}
@@ -743,7 +753,22 @@ func roomError(err error) error {
 		return echo.NewHTTPError(http.StatusConflict, "that room address is already taken")
 	case errors.Is(err, rooms.ErrInvalidSlug),
 		errors.Is(err, rooms.ErrEmptyMessage),
-		errors.Is(err, rooms.ErrMessageTooLong):
+		errors.Is(err, rooms.ErrMessageTooLong),
+		/*
+			A message whose buttons are not acceptable.
+
+			Reported with the reason rather than as a bare refusal: the caller
+			is a program, and "that is not something a client will do:
+			\"execute\"" is the difference between a fix and an afternoon.
+		*/
+		errors.Is(err, actions.ErrTooMany),
+		errors.Is(err, actions.ErrLabelRequired),
+		errors.Is(err, actions.ErrLabelTooLong),
+		errors.Is(err, actions.ErrNameRequired),
+		errors.Is(err, actions.ErrDuplicateName),
+		errors.Is(err, actions.ErrUnknownCapability),
+		errors.Is(err, actions.ErrURLRequired),
+		errors.Is(err, actions.ErrURLNotAllowed):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	default:
 		return err

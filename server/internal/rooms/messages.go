@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/actions"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
 )
@@ -106,10 +107,23 @@ func (s *Service) SendMessage(
 	roomID, senderID uuid.UUID,
 	body string,
 	clientToken string,
+	offered ...actions.Action,
 ) (dbgen.Event, error) {
 	trimmed := strings.TrimSpace(body)
 	if trimmed == "" {
 		return dbgen.Event{}, ErrEmptyMessage
+	}
+
+	/*
+		The buttons, checked before anything is written.
+
+		Refusing here rather than at the press is the point: a message that
+		reached a channel and then failed when somebody touched it has already
+		been read, and somebody has already decided the button was worth
+		trusting.
+	*/
+	if err := actions.Check(offered); err != nil {
+		return dbgen.Event{}, err
 	}
 	if len(trimmed) > MaxMessageLength {
 		return dbgen.Event{}, fmt.Errorf("%w: limit is %d characters", ErrMessageTooLong, MaxMessageLength)
@@ -143,7 +157,14 @@ func (s *Service) SendMessage(
 		return dbgen.Event{}, fmt.Errorf("read sender: %w", err)
 	}
 
-	content, err := json.Marshal(map[string]any{"body": trimmed})
+	payload := map[string]any{"body": trimmed}
+	// Absent rather than empty when there are none, so an ordinary message's
+	// content is exactly what it was before actions existed.
+	if len(offered) > 0 {
+		payload["actions"] = offered
+	}
+
+	content, err := json.Marshal(payload)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("encode message: %w", err)
 	}
