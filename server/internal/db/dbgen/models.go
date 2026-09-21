@@ -11,6 +11,18 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+type ApiToken struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Label      string
+	TokenHash  []byte
+	Scope      []byte
+	ExpiresAt  *time.Time
+	RevokedAt  *time.Time
+	LastUsedAt *time.Time
+	CreatedAt  time.Time
+}
+
 type Attachment struct {
 	ID              uuid.UUID
 	StorageKey      string

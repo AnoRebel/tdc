@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/apitokens"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 )
@@ -26,6 +27,21 @@ func (s *Server) authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		token := sessionToken(c)
 		if token == "" {
+			return next(c)
+		}
+
+		/*
+			An API token, which a program carries in the same header.
+
+			Tried first, and recognised by its prefix rather than by looking it
+			up — so this costs no query for the session tokens that are the
+			ordinary case, and a session token is never searched for among the
+			API tokens.
+		*/
+		if handled, err := s.authenticateWithToken(c, token); handled || err != nil {
+			if err != nil {
+				return err
+			}
 			return next(c)
 		}
 
@@ -53,6 +69,57 @@ func (s *Server) authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 
 		return next(c)
 	}
+}
+
+/*
+authenticateWithToken resolves an API token, if the request carries one.
+
+Reports whether the credential was an API token at all — which is not the same
+as whether it worked. A token that has been revoked or has expired is handled
+here and the request proceeds unauthenticated, rather than falling through to
+be looked up as a session it could never be.
+
+What a token may do is its scope intersected with what its account still holds,
+computed now rather than when the token was issued: a permission the account
+loses is lost to its tokens in the same moment.
+*/
+func (s *Server) authenticateWithToken(c *echo.Context, presented string) (bool, error) {
+	if s.apiTokens == nil || !apitokens.Looks(presented) {
+		return false, nil
+	}
+
+	ctx := c.Request().Context()
+
+	user, token, err := s.apiTokens.Resolve(ctx, presented)
+	if errors.Is(err, apitokens.ErrTokenInvalid) {
+		// Handled: it was ours and it does not work. The request goes on
+		// unauthenticated and is refused by whatever needs authority.
+		return true, nil
+	}
+	if err != nil {
+		return true, err
+	}
+
+	held, err := s.authz.PermissionsFor(ctx, user.ID)
+	if err != nil {
+		return true, err
+	}
+
+	c.Set(contextKeyUser, user)
+	c.Set(contextKeyPermissions, apitokens.Restrict(held, token.Scope))
+	c.Set(contextKeyAPIToken, token)
+
+	/*
+		Recorded after the fact and never fatal. A token that worked has worked
+		whether or not the note about when it was last used could be written,
+		and failing the request over it would make a list nobody depends on
+		into a thing that breaks sign-in.
+	*/
+	if err := s.apiTokens.Touch(ctx, token); err != nil {
+		s.log.Warn("could not record when a token was used", "error", err)
+	}
+
+	return true, nil
 }
 
 // sessionToken extracts the session token from the request.

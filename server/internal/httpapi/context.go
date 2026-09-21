@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/apitokens"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 )
@@ -18,7 +19,23 @@ const (
 	contextKeyUser        = "tdc.user"
 	contextKeySession     = "tdc.session"
 	contextKeyPermissions = "tdc.permissions"
+	// contextKeyAPIToken marks a request made by a program rather than a
+	// person, and names which token. Absent for a session.
+	contextKeyAPIToken = "tdc.apiToken"
 )
+
+/*
+currentAPIToken returns the token this request was made with, if it was made by
+a program rather than a person.
+
+Absent for a session, which is what distinguishes the two at the point where it
+matters: an action a person may take interactively is not always one a program
+should be able to take unattended.
+*/
+func currentAPIToken(c *echo.Context) (apitokens.Token, bool) {
+	token, ok := c.Get(contextKeyAPIToken).(apitokens.Token)
+	return token, ok
+}
 
 // currentUser returns the authenticated user, if the request carried a valid
 // session.

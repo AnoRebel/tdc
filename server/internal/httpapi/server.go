@@ -12,6 +12,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/apitokens"
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -112,6 +113,7 @@ type Server struct {
 	authz        *authz.Service
 	audit        *audit.Recorder
 	limiter      cache.Rates
+	apiTokens    *apitokens.Service
 	rooms        *rooms.Service
 	attachments  *attachments.Service
 	unfurl       *unfurl.Service
@@ -154,10 +156,13 @@ type Server struct {
 // Grouped into one parameter rather than a growing argument list, so adding a
 // dependency does not change every call site.
 type Services struct {
-	Identity    *identity.Service
-	Authz       *authz.Service
-	Audit       *audit.Recorder
-	Limiter     cache.Rates
+	Identity *identity.Service
+	Authz    *authz.Service
+	Audit    *audit.Recorder
+	Limiter  cache.Rates
+	// APITokens resolves the credentials a program carries. Optional: a server
+	// without it simply has no programmatic access.
+	APITokens   *apitokens.Service
 	Rooms       *rooms.Service
 	Attachments *attachments.Service
 	Unfurl      *unfurl.Service
@@ -216,6 +221,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		authz:        services.Authz,
 		audit:        services.Audit,
 		limiter:      services.Limiter,
+		apiTokens:    services.APITokens,
 		rooms:        services.Rooms,
 		attachments:  services.Attachments,
 		unfurl:       services.Unfurl,

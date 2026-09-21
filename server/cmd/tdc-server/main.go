@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/AnoRebel/tdc/server/internal/apitokens"
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -306,6 +307,9 @@ func run() error {
 		Authz:    authz.NewService(queries),
 		Audit:    auditRecorder,
 		Limiter:  limiter,
+		// Everything the web client does is an HTTP call somebody else can
+		// make; this is what lets them make it.
+		APITokens: apitokens.NewService(queries),
 		Rooms: rooms.NewService(queries, events.NewKeyring(signingKey),
 			serverName(cfg), log),
 		Attachments: attachmentService,

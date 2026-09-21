@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AnoRebel/tdc/server/internal/apitokens"
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -323,11 +324,12 @@ func newTestAPIConfigured(
 		SecureCookies:  false,
 		AllowedOrigins: origins,
 	}, pool, httpapi.Services{
-		Identity: identity.NewService(queries, logger),
-		Authz:    authz.NewService(queries),
-		Audit:    audit.NewRecorder(queries, logger),
-		Limiter:  cache.NewLimiter(memory),
-		Rooms:    rooms.NewService(queries, events.NewKeyring(signingKey), "tdc.test", logger),
+		Identity:  identity.NewService(queries, logger),
+		Authz:     authz.NewService(queries),
+		Audit:     audit.NewRecorder(queries, logger),
+		Limiter:   cache.NewLimiter(memory),
+		APITokens: apitokens.NewService(queries),
+		Rooms:     rooms.NewService(queries, events.NewKeyring(signingKey), "tdc.test", logger),
 		// The local store, in a directory the test framework removes: the
 		// object-store backends have their own tests, and what matters here is
 		// the behaviour above the interface.
@@ -578,6 +580,8 @@ func TestProtectedRoutesRefuseUnauthenticatedRequests(t *testing.T) {
 		{http.MethodPost, "/api/auth/signout"},
 		{http.MethodGet, "/api/admin/audit"},
 		{http.MethodGet, "/api/admin/permissions"},
+		{http.MethodGet, "/api/me/tokens"},
+		{http.MethodPost, "/api/me/tokens"},
 	} {
 		recorder := call(t, handler, route.method, route.path, nil, "")
 		if recorder.Code != http.StatusUnauthorized {

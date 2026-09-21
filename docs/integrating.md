@@ -118,17 +118,69 @@ one of several reasons to set it.
 A failed sign-in answers 401 with `{"message":"the username or password is
 incorrect"}` — the same message whether or not the account exists.
 
-### There is no API key
+### API tokens
 
-A token belongs to a session, which belongs to a person. There is no separate
-service-account or API-key mechanism, so a bot authenticates as an account
-somebody made for it, and its authority is that account's permissions. That
-account can be given a narrow role like any other, and its session shows up in
-its own session list and can be revoked from there.
+A program should not be holding somebody's password. Issue it a token instead:
 
-Sessions last 30 days by default (`server.session_lifetime`) and are renewed by
-use. A password change invalidates every other session, so a long-running
-integration whose account's password is changed needs to sign in again.
+```sh
+curl -X POST http://localhost:8080/api/me/tokens \
+  -H "Authorization: Bearer $SESSION" \
+  -H 'Content-Type: application/json' \
+  -d '{"label":"deploy bot","scope":["channel.post","attachment.upload"]}'
+```
+
+```json
+{
+  "id": "…",
+  "label": "deploy bot",
+  "scope": ["channel.post", "attachment.upload"],
+  "created": "2026-09-21T10:00:00Z",
+  "token": "tdc_…"
+}
+```
+
+**`token` is shown once.** It is stored hashed and nobody can recover it, not
+even the person who made it — a lost one is replaced rather than found. It
+starts `tdc_` so a secret scanner can recognise it as a credential rather than
+as an anonymous string.
+
+Use it exactly like a session token, in the same header, on every route:
+
+```sh
+curl http://localhost:8080/api/rooms -H "Authorization: Bearer tdc_…"
+```
+
+**A token does what its scope names and what its account still holds**, and
+never more. The two are intersected on every request rather than frozen when
+the token was issued, so taking a role away from an account takes it from that
+account's tokens at the same moment. Scope names come from
+`GET /api/admin/permissions`; an unknown name is refused rather than ignored,
+and one the account does not hold is refused too — a token is a way to delegate
+authority, never a way to acquire it.
+
+`expiresAt` is optional. Without it the token does not expire on its own, which
+is right for a deployment that runs for years; with it, a token for an
+afternoon's script stops mattering by the evening.
+
+`GET /api/me/tokens` lists them without their secrets, including when each was
+last used, so a token nobody has touched for a year is easy to spot.
+`DELETE /api/me/tokens/{id}` stops one working immediately.
+
+Two things a token deliberately cannot do. It cannot issue another token — a
+program able to mint its own successor would make revocation less than final —
+and it does not appear in the account's list of signed-in devices, because it is
+not one.
+
+**Recovering an account ends every token it held.** A password is changed after
+a compromise, and a token minted by whoever had the account is exactly what
+would let them back in.
+
+### Signing in as an account instead
+
+A bot may still authenticate as an account somebody made for it, which is what
+to do when it needs to act continuously as a distinct identity rather than on
+somebody's behalf. Sessions last 30 days by default
+(`server.session_lifetime`) and are renewed by use.
 
 ### Signing out
 

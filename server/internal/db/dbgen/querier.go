@@ -99,6 +99,7 @@ type Querier interface {
 	// denial. The administrator floor uses this to refuse a change that would
 	// leave nobody able to administer the server.
 	CountUsersWithPermission(ctx context.Context, permission string) (int64, error)
+	CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) (ApiToken, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
@@ -194,6 +195,14 @@ type Querier interface {
 	FindInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
 	// Consumed when the second factor is accepted, so a ticket buys one session.
 	FinishPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
+	// The per-request lookup, joined to the account so one query answers both
+	// "is this token good" and "who is it".
+	//
+	// Expiry and revocation are filtered here rather than checked in Go: a token
+	// that has stopped working should be indistinguishable from one that never
+	// existed, and doing it in the query means there is no window where a caller
+	// reads the row and forgets to check.
+	GetAPITokenByHash(ctx context.Context, tokenHash []byte) (GetAPITokenByHashRow, error)
 	// What this person chose the interface to look like.
 	//
 	// Empty in any column means they have chosen nothing there and take the
@@ -273,6 +282,9 @@ type Querier interface {
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
 	LiftPostingRestriction(ctx context.Context, arg LiftPostingRestrictionParams) (int64, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
+	// Never the hash. What this returns is what a person is shown, and the token
+	// itself is not recoverable by anybody, including its owner.
+	ListAPITokensForUser(ctx context.Context, userID uuid.UUID) ([]ListAPITokensForUserRow, error)
 	ListAttachmentsForEvent(ctx context.Context, eventID *string) ([]Attachment, error)
 	// The files carried by a set of messages, so expiring the messages can remove
 	// them too.
@@ -490,6 +502,13 @@ type Querier interface {
 	ResolveReport(ctx context.Context, arg ResolveReportParams) (Report, error)
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RestrictPosting(ctx context.Context, arg RestrictPostingParams) (PostingRestriction, error)
+	// Scoped to the owner, so somebody cannot revoke a token by guessing an
+	// identifier. Returns the row so the caller can name it in the audit entry
+	// and can tell "revoked" from "was not yours".
+	RevokeAPIToken(ctx context.Context, arg RevokeAPITokenParams) (RevokeAPITokenRow, error)
+	// Every token an account holds, for a suspension or a password change: a
+	// credential that outlived the account's own access would be the way back in.
+	RevokeAPITokensForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
 	// Revoking is idempotent in effect but recorded once: a second revocation
 	// leaves the first one's timestamp, which is when it actually stopped working.
@@ -598,6 +617,12 @@ type Querier interface {
 	// sent twice occupies one place, so charging it twice would refuse uploads
 	// against space that is not being used.
 	TotalAttachmentBytes(ctx context.Context) (int64, error)
+	// When it was last used, for the list where somebody decides what to revoke.
+	//
+	// Rounded to the minute by the caller rather than written on every request:
+	// an exact timestamp would mean a write per request for no benefit anybody can
+	// see in a list that shows "last used yesterday".
+	TouchAPIToken(ctx context.Context, arg TouchAPITokenParams) error
 	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
 	TouchPresence(ctx context.Context, userID uuid.UUID) error
 	TouchSession(ctx context.Context, id uuid.UUID) error

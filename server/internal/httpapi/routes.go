@@ -135,6 +135,21 @@ func (s *Server) routes() {
 	passkeys.DELETE("/:id", s.handleRevokePasskey)
 
 	// The signed-in user's own account and sessions.
+	/*
+		The credentials a program carries.
+
+		Under /api/me because they belong to the account rather than the
+		server, and beside the passkeys for the same reason: these are the
+		things somebody issues in their own name and has to be able to take
+		back. Creating one is refused to a caller that is itself a token — a
+		program that could mint a successor would make revocation less than
+		final.
+	*/
+	tokens := s.echo.Group("/api/me/tokens", requireAuthentication)
+	tokens.GET("", s.handleListTokens)
+	tokens.POST("", s.handleCreateToken)
+	tokens.DELETE("/:id", s.handleRevokeToken)
+
 	me := s.echo.Group("/api/me", requireAuthentication)
 	me.GET("", s.handleCurrentUser)
 	me.GET("/permissions", s.handleCurrentPermissions)

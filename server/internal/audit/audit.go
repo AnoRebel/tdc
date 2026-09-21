@@ -56,7 +56,18 @@ const (
 
 	ActionCredentialAdded   Action = "auth.credential.added"
 	ActionCredentialRemoved Action = "auth.credential.removed"
-	ActionRateLimited       Action = "auth.rate_limited"
+
+	/*
+		The lifetime of a credential a program carries.
+
+		Separate from the credential actions because a token is not a way to
+		prove who somebody is — it is a delegation of what they can already do,
+		made deliberately, and the interesting questions about it are
+		different: what it was allowed to do, and when somebody took that back.
+	*/
+	ActionTokenIssued  Action = "auth.token.issued"
+	ActionTokenRevoked Action = "auth.token.revoked"
+	ActionRateLimited  Action = "auth.rate_limited"
 
 	ActionUserCreated    Action = "user.created"
 	ActionUserSuspended  Action = "user.suspended"

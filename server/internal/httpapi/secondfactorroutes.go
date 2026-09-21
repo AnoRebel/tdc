@@ -438,6 +438,20 @@ func (s *Server) requireSecondFactorEnrolment(next echo.HandlerFunc) echo.Handle
 			return next(c)
 		}
 
+		/*
+			A program carrying a token is not somebody who can enrol.
+
+			The requirement exists so that a person signing in proves two
+			things; a token cannot open an authenticator app, so blocking it
+			here would not add a factor, it would only stop every integration
+			working on the day an operator turns the policy on. The second
+			factor was proved by the session that issued the token, and the
+			token carries only what it was granted.
+		*/
+		if _, byToken := currentAPIToken(c); byToken {
+			return next(c)
+		}
+
 		required, err := s.secondFactorRequiredOf(c, user.ID)
 		if err != nil {
 			return err

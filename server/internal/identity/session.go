@@ -331,6 +331,23 @@ func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, newPassw
 		return fmt.Errorf("replace password: %w", err)
 	}
 
+	/*
+		Every API token the account holds, ended.
+
+		A password is changed after a compromise, and a token minted by
+		whoever had the account is exactly what would let them back in — it
+		survives the password it was created behind, because it never depended
+		on that password. Revoking sessions and leaving the tokens would take
+		back the visible half of an intrusion and leave the durable half.
+
+		Before the sessions, so that a failure here refuses the change rather
+		than leaving an account whose sessions are gone and whose tokens are
+		not.
+	*/
+	if err := s.store.RevokeAPITokensForUser(ctx, userID); err != nil {
+		return fmt.Errorf("revoke api tokens: %w", err)
+	}
+
 	// The same rule a revoked credential gets: a session established with the
 	// old password must not outlive it.
 	return s.RevokeOtherSessions(ctx, userID, keepSessionID)

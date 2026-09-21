@@ -258,8 +258,8 @@ Everything the web client does is an HTTP call somebody else can make. This
 phase makes that true deliberately rather than incidentally, and adds the
 messages that carry their own actions.
 
-- [ ] 10a.1 Issue API tokens as first-class credentials on an existing account, scoped and revocable, with the same permissions and audit trail as a session; verify a token cannot do what its account may not, and that revoking one takes effect immediately (`platform/api`)
-- [ ] 10a.2 Accept bearer tokens on every existing route rather than a separate namespace; verify each documented endpoint answers identically to a session and to a token, and that a token is refused where a session would be (`platform/api`)
+- [x] 10a.1 Issue API tokens as first-class credentials on an existing account, scoped and revocable, with the same permissions and audit trail as a session; verify a token cannot do what its account may not, and that revoking one takes effect immediately (`platform/api`)
+- [x] 10a.2 Accept bearer tokens on every existing route rather than a separate namespace; verify each documented endpoint answers identically to a session and to a token, and that a token is refused where a session would be (`platform/api`)
 - [ ] 10a.3 Publish a machine-readable description of the API generated from the routes themselves; verify a route added without documentation fails the check (`platform/api`)
 - [ ] 10a.4 Add message actions — a message may carry labelled buttons — with a documented boundary between actions that emit an event to the sender and the fixed set the client may perform itself; verify an action naming an undeclared client capability is refused at the point it is posted (`chat/messages`)
 - [ ] 10a.5 Deliver action presses to the sender as events, identifying who pressed and which action, exactly once; verify a press reaches a program and a repeated press of a one-shot action is refused (`chat/messages`)
