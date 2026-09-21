@@ -20,9 +20,14 @@ Say if you did that.
 -->
 
 - [ ] `bun run lint`, `bun run typecheck` and `bun run test` pass
-- [ ] `gofmt -l .` prints nothing, `go vet ./...` and `go test ./...` pass
+- [ ] `gofmt -l .` prints nothing, `go vet ./...`, `golangci-lint run` and
+      `go test ./...` pass
 - [ ] There is a test that fails without this change
-- [ ] Documentation is updated in this pull request, if behaviour changed
+- [ ] Documentation is updated in this pull request, if behaviour changed —
+      the settings, endpoints, commands and constraints somebody else has to
+      know about, not a changelog
+- [ ] Interface strings go through `$t`, with both `en.json` and `sw.json`
+      updated, if this adds words somebody reads
 
 ## AI assistance
 

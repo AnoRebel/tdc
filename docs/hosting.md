@@ -537,6 +537,29 @@ from the ones that let somebody change things, so that being able to act is not
 the same as being able to read who acted. `/api/admin/audit/export` takes the
 whole thing as newline-delimited JSON.
 
+### What it can carry
+
+Measured rather than estimated, by a check that runs in continuous integration
+and prints its figures into the build log — so these numbers are re-taken on
+every change rather than being a claim made once.
+
+Fanout is the measurement that matters, because one message into a channel
+everybody is watching becomes one delivery per connected member, and that
+multiplication is what decides whether a busy channel stays usable. On a
+development machine, 250 connections all watching one channel and 40 messages
+posted into it — 10,000 deliveries — arrive with a median under 200µs and a
+slowest delivery under a millisecond.
+
+Two things are asserted rather than reported. Every entitled connection
+receives every message, because a fanout that got faster by dropping
+deliveries would look like an improvement. And a client that stops reading
+cannot stall the channel: its buffer fills, it is dropped, and everybody else
+carries on. One slow phone must not make a channel slow for the room.
+
+These are not a guarantee about your hardware. They are a baseline: if the
+figure in your own logs is far from this, something is different, and the
+difference is worth finding before people notice it.
+
 ## Things that catch people out
 
 **The web assets are read once at startup.** Replacing them means restarting the

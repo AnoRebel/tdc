@@ -524,6 +524,36 @@ jobs:
 
           echo "Links GTK3 and starts on glibc $floor or newer."
 
+  # What fanout costs when a channel is busy.
+  #
+  # One message into a channel everybody is watching becomes one delivery per
+  # connected member, and that multiplication is the shape of the problem this
+  # server has to survive. The figure is reported rather than gated for the
+  # same reason as memory: latency moves on a shared runner, and a job that
+  # failed on a threshold would be routed around within a month.
+  #
+  # What it does fail on is a fanout that drops deliveries — which would report
+  # a better latency while being worse, and is a bug rather than a measurement.
+  fanout:
+    name: What fanout costs
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: server/go.sum
+
+      - name: Measure delivery under load
+        working-directory: server
+        # -v so the figures reach the log: the whole point is that somebody
+        # reviewing can see the number and its change.
+        run: go test -v -run "TestFanoutUnderLoad|TestConnectionsScale" ./internal/realtime/
+
   # What the server costs to run, measured rather than assumed.
   #
   # The design puts a 1 GB target on a server for a community of this size, which
@@ -660,6 +690,7 @@ jobs:
         memory,
         reproducible,
         legacy-desktop,
+        fanout,
       ]
     runs-on: ubuntu-latest
     steps:
