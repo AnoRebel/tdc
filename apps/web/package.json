@@ -14,6 +14,7 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest run --passWithNoTests",
     "test:a11y": "playwright test --project=setup --project=chromium",
+    "test:e2e": "playwright test --project=setup --project=chromium --project=firefox --project=webkit --project=arrival",
     "budget": "bun scripts/payload-budget.ts",
     "demo:milestone-8": "playwright test --project=milestone",
     "translations": "bun scripts/check-translations.ts"

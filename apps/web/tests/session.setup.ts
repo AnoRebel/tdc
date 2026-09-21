@@ -26,14 +26,22 @@ setup("sign in once", async ({ page }) => {
   /*
    * The introduction, given to a first arrival.
    *
-   * Dismissed with Escape rather than by reaching into storage, so this also
-   * asserts — every run — that somebody can leave the tour from the keyboard.
+   * Dismissed with Escape rather than by reaching into storage, so when it does
+   * appear this also asserts that somebody can leave the tour from the
+   * keyboard.
+   *
+   * Whether it appears at all depends on the account, not the browser: the
+   * record of having seen it is `users.tour_progress` on the server. So the
+   * first engine to run this dismisses it and every engine after finds no
+   * tour — as does a second run against the same database. Waiting for it
+   * unconditionally made this pass exactly once per fresh database, which is
+   * the kind of green that stops meaning anything.
    */
   const tour = page.locator(".driver-popover");
-  await tour.waitFor({ state: "visible", timeout: 8000 });
-  await page.keyboard.press("Escape");
-  await expect(tour).toHaveCount(0);
+  if (await tour.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape");
+    await expect(tour).toHaveCount(0);
+  }
 
-  // The tour's own record travels with the session, so it stays dismissed.
   await page.context().storageState({ path: SESSION });
 });

@@ -202,8 +202,17 @@ test.describe("the appearance toggle", () => {
    * it to everything that runs afterwards.
    */
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    await page.evaluate(() => {
+    /*
+     * Cleared before the application ever runs, rather than by loading it,
+     * wiping storage and loading it again.
+     *
+     * The second navigation was the problem: Firefox aborts it with
+     * NS_BINDING_ABORTED, because the page it is replacing is still resolving
+     * its own startup navigation and cancelling that is exactly what the error
+     * says. An init script runs before any of the page's own code, so the
+     * application starts once, already in the state this wants.
+     */
+    await page.addInitScript(() => {
       try {
         localStorage.removeItem("tdc-palette");
         localStorage.removeItem("tdc-accent");
@@ -211,7 +220,7 @@ test.describe("the appearance toggle", () => {
         // Nothing stored is the state we wanted anyway.
       }
     });
-    await page.reload();
+    await page.goto("/");
   });
 
   test("changes the palette from the sidebar", async ({ page }) => {

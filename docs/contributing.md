@@ -244,6 +244,58 @@ everywhere else it is written; before a push they run the Go tests and build.
 They are deliberately the cheap checks — anything slow belongs in CI, where it
 does not stand between somebody and their own commit.
 
+## The browser checks
+
+The unit tests run in jsdom, which has no layout: it cannot say whether a
+control is visible, what colour it resolves to, or where Tab goes. Those
+questions need a browser, so they live in `apps/web/tests` and run under
+Playwright against a built application and a running server.
+
+They need three things set up, in this order:
+
+```sh
+# 1. A database of their own, so seeding is repeatable.
+docker compose up -d database
+docker exec tdc-database-1 psql -U tdc -d postgres -c "CREATE DATABASE tdc_e2e;"
+
+# 2. The application, built to call the server it is served from.
+NUXT_PUBLIC_API_BASE="" bun run --cwd apps/web generate
+
+# 3. The server, serving that build.
+cd server && go build -o /tmp/tdc-server ./cmd/tdc-server
+TDC_DATABASE_URL="postgres://tdc:tdc@127.0.0.1:55433/tdc_e2e?sslmode=disable" \
+TDC_SERVER_WEB_ROOT="$PWD/../apps/web/.output/public" \
+TDC_SERVER_ADDRESS="127.0.0.1:8099" /tmp/tdc-server
+```
+
+`NUXT_PUBLIC_API_BASE=""` is the one that catches people. Without it the build
+bakes in `http://localhost:8080` and every request from the browser goes
+somewhere nothing is listening, which presents as "Could not reach the server"
+on the sign-in screen rather than as a configuration mistake. The server also
+reads the web root once at startup, so regenerating the application means
+restarting it.
+
+Then seed an account and a channel — [the workflow](../.github/workflows/ci.yml)
+does exactly this under "Prepare an account to sign in with" — and run:
+
+```sh
+bun run --cwd apps/web test:e2e     # every engine, as CI runs it
+bun run --cwd apps/web test:a11y    # the accessibility pass alone
+```
+
+**WebKit needs libraries a Debian-family machine has**: `libicu 74` and flite's
+voice libraries, by their Debian sonames. `bunx playwright install --with-deps
+webkit` supplies them where those package names exist. On a distribution
+shipping a different ICU it refuses to launch and every test "fails" in
+milliseconds with a message about the host rather than the application — run
+the other two engines locally and let CI cover WebKit.
+
+**Sign-ins are limited to eight per account per quarter hour**, and
+registrations to five per address per hour. Both limits are right, so the suite
+signs in once and everything else reuses the stored session. A check that signs
+in for itself spends one of the eight; a suite that does it per test runs out
+and then reports the application as broken when what broke was the suite.
+
 ## Words people read
 
 Every sentence the interface shows goes through the translation layer. TDC is
