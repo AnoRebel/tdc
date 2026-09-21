@@ -252,7 +252,7 @@ Goal: everything needed for TDC and others to actually deploy and adopt it.
 - [x] 10.17 Write the integration guide documenting the API surface and authentication; verify the documented examples run against a live server
 - [x] 10.18 Write the upgrade and migration guide including skipped-release upgrades; verify the documented procedure works across two releases
 - [x] 10.19 Write the Telegram and WhatsApp migration guide for TDC members; verify it addresses account creation, channel setup, and expectations differing from those tools
-- [ ] **MILESTONE 10** — Demonstrate: a person who has never seen the repository deploys a server from the published container image following only the hosting guide, invites a second person, and both exchange messages from the web and desktop apps. Tag `v1.0.0-rc.1`.
+- [ ] **MILESTONE 10** — `v1.0.0-dev` is held for this and deliberately unused: 10a is tagged `v1.1.0-dev` per its own line, and tagging this one needs the demonstration rather than the code. Demonstrate: a person who has never seen the repository deploys a server from the published container image following only the hosting guide, invites a second person, and both exchange messages from the web and desktop apps. Tag `v1.0.0-rc.1`.
 
 ## 10a. Phase 10a — The same interface for people and programs
 
