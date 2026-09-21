@@ -197,6 +197,28 @@ to disappear in an hour should not find that it now lasts a week.
 
 When an expiring message goes, its attachments go with it.
 
+### Messages that ask you something
+
+A message from a program may carry buttons — "Deploy", "Not yet", that sort of
+thing. Pressing one tells the program what you chose; it decides what happens
+next, because it is the only thing that knows.
+
+They are ordinary buttons. You can reach them by pressing Tab, press them with
+Enter or Space, and a screen reader announces them as buttons and says what
+happened after you press. You need to be in the channel to answer — reading one
+is not the same as taking part in it.
+
+Some are offered once. A question put to a channel is usually answered once by
+anybody, so the second press is refused and says so rather than quietly
+counting twice. Some have a deadline, and stay visible but stop working when it
+passes — a button that vanished would leave you wondering whether you had
+imagined it.
+
+A button that opens a link says so with an icon, and opens it in a new tab. TDC
+only lets a message offer `http` and `https` links; anything else is refused
+when the message is posted, so a button in a message cannot be a way to run
+something on your machine.
+
 ### Links
 
 Message text is plain text. Links, addresses and phone numbers in it are

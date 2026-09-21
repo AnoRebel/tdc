@@ -86,6 +86,69 @@ test.describe("the pages somebody arrives at", () => {
     expect(violations, `\n  ${describe(violations)}\n`).toEqual([]);
   });
 
+  /*
+   * A message offering choices, which is the newest thing a reader meets and
+   * the one most likely to be a div with a click handler.
+   *
+   * Posted over the API rather than through the interface: the question is
+   * whether the buttons are usable, not whether a composer can be driven, and
+   * a fixture that failed for the second reason would look like a failure of
+   * the first.
+   */
+  test("a message offering choices has no accessibility violations", async ({ page, request }) => {
+    const signIn = await request.post("/api/auth/signin", {
+      data: { username: "founder", password: "correct horse battery staple" },
+    });
+    expect(signIn.ok(), "could not sign in to post the fixture").toBeTruthy();
+    const authorised = { Authorization: `Bearer ${(await signIn.json()).token}` };
+
+    /*
+     * A channel of its own rather than "General".
+     *
+     * Every other spec reads that one, and a fixture posting messages with
+     * buttons into it changes what they find — which is how two keyboard
+     * tests and a messaging test came to fail in the suite while passing
+     * alone.
+     */
+    const slug = `a11y-choices-${Date.now().toString(36)}`;
+    const created = await request.post("/api/rooms", {
+      headers: authorised,
+      data: { slug, name: slug, topic: "Messages that ask something" },
+    });
+    expect(created.ok(), "the fixture channel could not be created").toBeTruthy();
+    const room = await created.json();
+
+    const posted = await request.post(`/api/rooms/${room.id}/messages`, {
+      headers: authorised,
+      data: {
+        body: `Accessible choices ${Date.now().toString(36)}`,
+        actions: [
+          { name: "yes", label: "Yes" },
+          { name: "no", label: "No" },
+          { name: "docs", label: "Read more", capability: "open", url: "https://example.test/x" },
+        ],
+      },
+    });
+    expect(posted.ok(), "the fixture message was refused").toBeTruthy();
+
+    await page.goto("/");
+    await page
+      .getByRole("link", { name: new RegExp(slug, "i") })
+      .first()
+      .click();
+    await page.waitForURL(/\/rooms\//);
+
+    // The buttons are there, and they are buttons: a div with a click handler
+    // would not be found by role, which is how a screen reader looks too.
+    await expect(page.getByRole("button", { name: "Yes" }).first()).toBeVisible();
+
+    await settled(page);
+
+    const { violations } = await auditor(page).analyze();
+
+    expect(violations, `\n  ${describe(violations)}\n`).toEqual([]);
+  });
+
   test("settings has no accessibility violations", async ({ page }) => {
     await page.goto("/settings");
 

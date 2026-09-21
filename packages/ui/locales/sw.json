@@ -243,7 +243,12 @@
     "messagesSelected": "Jumbe {count} zimechaguliwa",
     "blockedNotTold": "Amezuiwa. Haambiwi.",
     "scheduledForLater": "Imepangwa. Itatumwa kwa wakati uliouchagua.",
-    "reportedToModerator": "Imeripotiwa. Msimamizi ataiangalia."
+    "reportedToModerator": "Imeripotiwa. Msimamizi ataiangalia.",
+    "joinToAnswer": "Jiunge na kipindi hiki ili ujibu.",
+    "actionNoLongerOffered": "{label} — haitolewi tena",
+    "actionTaken": "{label} — imejibiwa",
+    "actionAlreadyAnswered": "Hilo limeshajibiwa.",
+    "actionFailed": "Hilo halikuweza kujibiwa. Jaribu tena."
   },
   "channel": {
     "create": "Kipindi kipya",

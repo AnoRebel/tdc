@@ -111,6 +111,20 @@ export function useRooms() {
   }
 
   /**
+   * Presses a button on a message.
+   *
+   * The press becomes an event in the room, which is how it reaches whoever
+   * posted the message. Nothing is returned to act on locally: the answer
+   * arrives the same way every other event does, so a client showing the
+   * outcome shows what actually happened rather than what it assumed.
+   */
+  function pressAction(roomId: string, eventId: string, action: string): Promise<Message> {
+    return api.post<Message>(
+      `/api/rooms/${roomId}/messages/${encodeURIComponent(eventId)}/actions/${encodeURIComponent(action)}`,
+    );
+  }
+
+  /**
    * Bans somebody from one channel.
    *
    * Confined to that channel: every other membership they hold is untouched,
@@ -227,6 +241,7 @@ export function useRooms() {
     thread,
     threadSummaries,
     forward,
+    pressAction,
     report,
     banFromChannel,
     captionAttachment,

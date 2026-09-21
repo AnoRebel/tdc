@@ -38,7 +38,20 @@ setup("sign in once", async ({ page }) => {
    * the kind of green that stops meaning anything.
    */
   const tour = page.locator(".driver-popover");
-  if (await tour.isVisible().catch(() => false)) {
+
+  /*
+   * Waited for rather than asked about.
+   *
+   * isVisible() answers immediately, and on a fresh database the tour has not
+   * rendered yet when it is asked — so the dismissal was skipped and the tour
+   * appeared in every test that followed, trapping Tab inside its own two
+   * buttons. Three checks failed that way and none of them was about the tour.
+   *
+   * A short wait that is allowed to find nothing: on a database where this
+   * account has already seen it, there is genuinely nothing to dismiss.
+   */
+  await tour.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+  if (await tour.count()) {
     await page.keyboard.press("Escape");
     await expect(tour).toHaveCount(0);
   }

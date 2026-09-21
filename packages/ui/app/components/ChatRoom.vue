@@ -3,6 +3,7 @@ import type {
   Attachment,
   LiveEventPayload,
   Message,
+  MessageAction,
   MessageLifetime,
   Presence,
   Room,
@@ -552,6 +553,42 @@ async function scheduleDraft(sendAt: Date) {
   }
 }
 
+/**
+ * What the last press said, keyed by message, for the live region.
+ *
+ * Kept here rather than in the button row because the outcome arrives as an
+ * event over the live connection rather than as the answer to the press — so
+ * what a reader is told is what actually happened, not what the client assumed
+ * would happen.
+ */
+const pressOutcome = ref<Record<string, string>>({});
+
+/**
+ * Presses a button on a message.
+ *
+ * The refusals are worth telling apart. A conflict means somebody has already
+ * answered — including this person, from another tab — and saying "try again"
+ * to that would be wrong. Anything else is worth retrying.
+ */
+async function pressAction(message: { id: string; actions: MessageAction[] }, name: string) {
+  const action = message.actions.find((one) => one.name === name);
+  if (!action) return;
+
+  try {
+    await roomsApi.pressAction(props.roomId, message.id, name);
+    pressOutcome.value = {
+      ...pressOutcome.value,
+      [message.id]: $ts("room.actionTaken", { label: action.label }),
+    };
+  } catch (cause) {
+    const already = isApiError(cause) && cause.status === 409;
+    pressOutcome.value = {
+      ...pressOutcome.value,
+      [message.id]: already ? $ts("room.actionAlreadyAnswered") : $ts("room.actionFailed"),
+    };
+  }
+}
+
 /** Every other room this person can post in, as forwarding destinations. */
 const forwardableRooms = ref<Room[]>([]);
 
@@ -670,6 +707,14 @@ const visible = computed(() => {
       body: replaced.get(message.id) ?? message.content.body ?? "",
       edited: replaced.has(message.id),
       removed: redacted.has(message.id) || message.redacted,
+      /*
+       * The buttons this message offers.
+       *
+       * Dropped from a removed message: a question whose text is gone is not a
+       * question anybody can answer, and leaving the buttons would invite
+       * somebody to answer something they can no longer read.
+       */
+      actions: redacted.has(message.id) || message.redacted ? [] : (message.content.actions ?? []),
     }));
 });
 
@@ -1882,6 +1927,18 @@ watch(roomId, load, { immediate: true });
                     <template v-else>
                       <template v-if="message.removed">{{ $t("room.messageRemoved") }}</template>
                       <MessageBody v-else :body="message.body" />
+                      <!-- The buttons this message offers. Real buttons, so a
+                           keyboard reaches them and a screen reader says
+                           "button"; the outcome is announced rather than only
+                           shown, because somebody who cannot see the row
+                           change still has to be told the press landed. -->
+                      <MessageActions
+                        v-if="!message.removed && message.actions.length"
+                        :actions="message.actions"
+                        :can-press="Boolean(room?.member)"
+                        :outcome="pressOutcome[message.id] ?? ''"
+                        @press="(name: string) => pressAction(message, name)"
+                      />
                       <!-- Dimmed, but not below what can be read. At 60% this
                            fell under 4.5:1 against a sender's own bubble,
                            which axe caught and an eye would forgive until it
@@ -1894,10 +1951,17 @@ watch(roomId, load, { immediate: true });
                       </span>
                       <!-- Said on the message itself rather than on hover:
                            somebody deciding whether to answer needs to know it
-                           is on a timer without going looking. -->
+                           is on a timer without going looking.
+
+                           At 85% for the reason the edited marker is: 70% fell
+                           under 4.5:1 against a sender's own bubble, which axe
+                           caught only when a message with a lifetime happened
+                           to be on screen during the audit. An eye forgives it
+                           until it is the only thing saying a message is on a
+                           timer. -->
                       <span
                         v-if="message.lifetime && !message.removed"
-                        class="ml-1 inline-flex items-center gap-0.5 align-baseline text-[0.6875rem] opacity-70"
+                        class="ml-1 inline-flex items-center gap-0.5 align-baseline text-[0.6875rem] opacity-85"
                         :title="lifetimeExplanation(message.lifetime)"
                       >
                         <Timer class="size-2.5" />
