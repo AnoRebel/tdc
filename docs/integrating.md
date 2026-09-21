@@ -437,6 +437,47 @@ have to defend against replay itself.
 A message carrying no `actions` is exactly the message it was before this
 existed — the key is absent rather than empty, and nothing extra to parse.
 
+### Hearing that somebody pressed
+
+A press becomes an event in the room, which is how it reaches you: over the
+live connection you already hold, through the same delivery every other event
+uses. There is no webhook to register and no second mechanism with its own
+retries.
+
+```json
+{
+  "type": "action.pressed",
+  "sender": "juma@chat.example.test",
+  "content": { "action": "deploy", "pressed": "$abc123…" }
+}
+```
+
+`action` is the `name` you gave the button. `pressed` is the message it was on.
+`sender` is who pressed it — established by the server from the authenticated
+request, so it is not something a client can claim.
+
+**Exactly once.** The same person pressing the same button twice is refused
+with **409**: a repeat is a retry or a mistake, and a program receiving two
+events for one decision cannot tell that from somebody changing their mind. An
+action marked `once` is stricter — one press in total, by anybody — so a
+question offered to a room is answered once. A press after `expires` is **410**,
+and a press naming a button the message does not offer is **404**.
+
+You never have to defend against replay yourself. That is a database rule here,
+not something the application remembers.
+
+To press one as a client:
+
+```sh
+curl -X POST \
+  "http://localhost:8080/api/rooms/$ROOM/messages/$EVENT/actions/deploy" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Answers **201** with the `action.pressed` event. Pressing needs membership of
+the channel, not merely the ability to read it — answering a question in a
+channel is taking part in it.
+
 ### Attachments
 
 A file is uploaded to the room first, and the returned identifier is then

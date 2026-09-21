@@ -36,6 +36,16 @@ const (
 	TypeMessageSent    Type = "message.sent"
 	TypeMessageEdited  Type = "message.edited"
 	TypeMessageDeleted Type = "message.deleted"
+
+	/*
+		Somebody pressed a button on a message.
+
+		An event in the room's log like any other, so the program that posted
+		the message receives it over the live connection it already holds —
+		rather than a separate delivery mechanism with its own retries, its own
+		failures and its own way of being wrong.
+	*/
+	TypeActionPressed Type = "action.pressed"
 )
 
 // Event is one entry in a room's log.

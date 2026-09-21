@@ -747,6 +747,17 @@ func roomError(err error) error {
 		return echo.NewHTTPError(http.StatusForbidden, "you are not a member of this room")
 	case errors.Is(err, rooms.ErrArchived):
 		return echo.NewHTTPError(http.StatusConflict, "this room is archived")
+	case errors.Is(err, rooms.ErrNoSuchAction):
+		// Missing rather than a bad request: a press naming something the
+		// message does not offer is a press of a button that is not there.
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	case errors.Is(err, rooms.ErrAlreadyPressed):
+		// Conflict, because the request is well formed and the state refuses
+		// it — which is also what a client needs to tell "try again" from
+		// "this is settled".
+		return echo.NewHTTPError(http.StatusConflict, err.Error())
+	case errors.Is(err, rooms.ErrActionExpired):
+		return echo.NewHTTPError(http.StatusGone, err.Error())
 	case errors.Is(err, rooms.ErrNotTheAuthor):
 		return echo.NewHTTPError(http.StatusForbidden, "only the author may change this message")
 	case errors.Is(err, rooms.ErrSlugTaken):
@@ -893,4 +904,30 @@ func (s *Server) retentionDefault() int32 {
 		return 0
 	}
 	return int32(s.settings.Int(context.Background(), settings.RetentionSeconds))
+}
+
+/*
+handlePressAction records somebody pressing a button on a message.
+
+The press becomes an event in the room, which is how it reaches the program
+that posted the message: over the live connection it already holds. Nothing
+here delivers anything itself.
+*/
+func (s *Server) handlePressAction(c *echo.Context) error {
+	user, _ := currentUser(c)
+	ctx := c.Request().Context()
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	event, err := s.rooms.PressAction(ctx, roomID, user.ID,
+		c.Param("eventId"), c.Param("action"))
+	if err != nil {
+		return roomError(err)
+	}
+
+	s.publishEvent(ctx, event)
+	return c.JSON(http.StatusCreated, messageResponseOf(event))
 }

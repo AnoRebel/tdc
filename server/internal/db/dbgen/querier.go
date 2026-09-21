@@ -59,6 +59,9 @@ type Querier interface {
 	// closes, not the first, so someone on a phone and a laptop does not appear
 	// offline when they close one.
 	ConnectionOpened(ctx context.Context, userID uuid.UUID) (UserPresence, error)
+	// How many times a button has been pressed by anybody, for a single-use
+	// action.
+	CountActionPresses(ctx context.Context, arg CountActionPressesParams) (int64, error)
 	// Counts what still points at a stored preview, so its bytes are only removed
 	// once nothing references them.
 	CountAttachmentsWithPreviewKey(ctx context.Context, previewKey *string) (int64, error)
@@ -285,6 +288,8 @@ type Querier interface {
 	// Never the hash. What this returns is what a person is shown, and the token
 	// itself is not recoverable by anybody, including its owner.
 	ListAPITokensForUser(ctx context.Context, userID uuid.UUID) ([]ListAPITokensForUserRow, error)
+	// Who pressed what on one message, oldest first.
+	ListActionPressesForEvent(ctx context.Context, eventID string) ([]ActionPress, error)
 	ListAttachmentsForEvent(ctx context.Context, eventID *string) ([]Attachment, error)
 	// The files carried by a set of messages, so expiring the messages can remove
 	// them too.
@@ -466,6 +471,12 @@ type Querier interface {
 	// a long run of them means nothing is listening, and continuing to try costs
 	// a request per notification forever.
 	PrunePushSubscriptions(ctx context.Context, failures int32) (int64, error)
+	// The press, recorded before it is announced.
+	//
+	// ON CONFLICT DO NOTHING rather than an upsert: a second press of the same
+	// button by the same person is not a change, it is a repeat, and the caller
+	// needs to tell the two apart. No row returned means somebody pressed twice.
+	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
 	// Claims one use, atomically.
 	//

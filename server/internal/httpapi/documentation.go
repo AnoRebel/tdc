@@ -15,7 +15,8 @@ tax at the moment somebody knows the answer, rather than an archaeology problem
 for whoever needs the description later.
 */
 var documentation = map[string]entry{
-	"GET /api/description":                              {Summary: "Describe this API", Authentication: "none"},
+	"GET /api/description": {Summary: "Describe this API", Authentication: "none"},
+	"POST /api/rooms/:id/messages/:eventId/actions/:action": {Summary: "Press an action on a message", Authentication: "session or token"},
 	"GET /api/admin/audit":                              {Summary: "Read audit", Authentication: "session or token", Permission: "server.audit.read"},
 	"GET /api/admin/audit/export":                       {Summary: "Export audit", Authentication: "session or token", Permission: "server.audit.read"},
 	"GET /api/admin/configuration":                      {Summary: "Inspect configuration", Authentication: "session or token", Permission: "server.configure"},

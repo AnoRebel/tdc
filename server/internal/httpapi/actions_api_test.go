@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 /*
@@ -185,5 +186,241 @@ func TestAProgramCanOfferAChoice(t *testing.T) {
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("a program offering a choice was refused: %d %s",
 			recorder.Code, recorder.Body.String())
+	}
+}
+
+// press activates a button on a message.
+func press(
+	t *testing.T,
+	handler http.Handler,
+	token, roomID, eventID, action string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	return call(t, handler, http.MethodPost,
+		"/api/rooms/"+roomID+"/messages/"+eventID+"/actions/"+action, nil, token)
+}
+
+// postAndGetID sends a message with buttons and returns its event identifier.
+func postAndGetID(
+	t *testing.T,
+	handler http.Handler,
+	token, roomID, body string,
+	offered []map[string]any,
+) string {
+	t.Helper()
+	recorder := postWithActions(t, handler, token, roomID, body, offered)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("posting: %d %s", recorder.Code, recorder.Body.String())
+	}
+
+	var message struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &message); err != nil {
+		t.Fatalf("parsing the message: %v", err)
+	}
+	return message.ID
+}
+
+/*
+A press reaches the program that asked the question.
+
+It becomes an event in the room, which is how: over the live connection the
+program already holds, through the same delivery every other event uses. Here
+that is read from the timeline, which is the same log.
+*/
+func TestAPressReachesTheSender(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	eventID := postAndGetID(t, handler, owner, roomID, "Deploy?", []map[string]any{
+		{"name": "deploy", "label": "Deploy"},
+		{"name": "hold", "label": "Not yet"},
+	})
+
+	member := registerAndSignIn(t, handler, "juma")
+	joinRoom(t, handler, member, roomID)
+
+	recorder := press(t, handler, member, roomID, eventID, "deploy")
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("pressing returned %d: %s", recorder.Code, recorder.Body.String())
+	}
+
+	// The event says which button and on which message, and who pressed it.
+	var pressed struct {
+		Type    string `json:"type"`
+		Sender  string `json:"sender"`
+		Content struct {
+			Action  string `json:"action"`
+			Pressed string `json:"pressed"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &pressed); err != nil {
+		t.Fatalf("parsing the press: %v", err)
+	}
+
+	if pressed.Type != "action.pressed" {
+		t.Errorf("the press is a %q event", pressed.Type)
+	}
+	if pressed.Content.Action != "deploy" {
+		t.Errorf("the press names action %q", pressed.Content.Action)
+	}
+	if pressed.Content.Pressed != eventID {
+		t.Errorf("the press names message %q, want %q", pressed.Content.Pressed, eventID)
+	}
+	if !strings.HasPrefix(pressed.Sender, "juma@") {
+		t.Errorf("the press is attributed to %q, not to who pressed it", pressed.Sender)
+	}
+
+	// And it is in the room's log, which is what a program reads.
+	timeline := call(t, handler, http.MethodGet, "/api/rooms/"+roomID+"/timeline", nil, owner)
+	if !strings.Contains(timeline.Body.String(), "action.pressed") {
+		t.Error("the press is not in the timeline the sender reads")
+	}
+}
+
+/*
+A repeated press of a one-shot action is refused.
+
+The verification this task asks for. A program receiving two events for one
+decision cannot tell that from somebody changing their mind.
+*/
+func TestARepeatedPressOfAOneShotActionIsRefused(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	eventID := postAndGetID(t, handler, owner, roomID, "Deploy?", []map[string]any{
+		{"name": "deploy", "label": "Deploy", "once": true},
+	})
+
+	member := registerAndSignIn(t, handler, "juma")
+	joinRoom(t, handler, member, roomID)
+
+	if first := press(t, handler, member, roomID, eventID, "deploy"); first.Code != http.StatusCreated {
+		t.Fatalf("the first press returned %d: %s", first.Code, first.Body.String())
+	}
+
+	second := press(t, handler, member, roomID, eventID, "deploy")
+	if second.Code != http.StatusConflict {
+		t.Errorf("a second press of a one-shot action returned %d, want 409", second.Code)
+	}
+
+	/*
+		And by somebody else, which is what "once" means: one press in total,
+		not one each. A vote offered once to a room is answered once.
+	*/
+	other := registerAndSignIn(t, handler, "neema")
+	joinRoom(t, handler, other, roomID)
+
+	byOther := press(t, handler, other, roomID, eventID, "deploy")
+	if byOther.Code != http.StatusConflict {
+		t.Errorf("a one-shot action was pressed by a second person: %d", byOther.Code)
+	}
+}
+
+/*
+An ordinary action may be pressed by different people, once each.
+
+The counterpart: without this, "once" would be indistinguishable from the
+default and the flag would mean nothing.
+*/
+func TestAnOrdinaryActionIsPressedOncePerPerson(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	eventID := postAndGetID(t, handler, owner, roomID, "Coming?", []map[string]any{
+		{"name": "yes", "label": "Yes"},
+	})
+
+	member := registerAndSignIn(t, handler, "juma")
+	joinRoom(t, handler, member, roomID)
+	other := registerAndSignIn(t, handler, "neema")
+	joinRoom(t, handler, other, roomID)
+
+	if first := press(t, handler, member, roomID, eventID, "yes"); first.Code != http.StatusCreated {
+		t.Fatalf("the first person's press returned %d", first.Code)
+	}
+	if second := press(t, handler, other, roomID, eventID, "yes"); second.Code != http.StatusCreated {
+		t.Errorf("a second person answering the same question returned %d", second.Code)
+	}
+
+	// But not twice by the same person: a repeat is a retry or a mistake, and
+	// neither should count twice.
+	if again := press(t, handler, member, roomID, eventID, "yes"); again.Code != http.StatusConflict {
+		t.Errorf("the same person answered twice: %d", again.Code)
+	}
+}
+
+/*
+A press naming a button the message does not offer is refused.
+
+Accepting it would let anybody send a program any action name they liked, which
+is the same as letting them call its handlers directly.
+*/
+func TestPressingAButtonThatIsNotThereIsRefused(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	eventID := postAndGetID(t, handler, owner, roomID, "Deploy?", []map[string]any{
+		{"name": "deploy", "label": "Deploy"},
+	})
+
+	if recorder := press(t, handler, owner, roomID, eventID, "drop-database"); recorder.Code != http.StatusNotFound {
+		t.Errorf("pressing a button that does not exist returned %d", recorder.Code)
+	}
+
+	// And on a message offering nothing at all.
+	plain := call(t, handler, http.MethodPost, "/api/rooms/"+roomID+"/messages",
+		map[string]any{"body": "just talking"}, owner)
+	var message struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(plain.Body.Bytes(), &message)
+
+	if recorder := press(t, handler, owner, roomID, message.ID, "deploy"); recorder.Code != http.StatusNotFound {
+		t.Errorf("pressing a button on a message with none returned %d", recorder.Code)
+	}
+}
+
+// An expired action is refused, and says so distinctly from a missing one.
+func TestPressingAnExpiredActionIsRefused(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	past := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	eventID := postAndGetID(t, handler, owner, roomID, "Vote now", []map[string]any{
+		{"name": "vote", "label": "Vote", "expires": past},
+	})
+
+	if recorder := press(t, handler, owner, roomID, eventID, "vote"); recorder.Code != http.StatusGone {
+		t.Errorf("pressing a button that expired an hour ago returned %d, want 410", recorder.Code)
+	}
+}
+
+/*
+Somebody who is not in the channel cannot press.
+
+Answering a question in a channel is taking part in it, so it needs membership
+rather than the ability to read — a public channel is readable by everybody on
+the server.
+*/
+func TestPressingNeedsMembership(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, owner, "general", "public")
+
+	eventID := postAndGetID(t, handler, owner, roomID, "Deploy?", []map[string]any{
+		{"name": "deploy", "label": "Deploy"},
+	})
+
+	outsider := registerAndSignIn(t, handler, "juma")
+
+	if recorder := press(t, handler, outsider, roomID, eventID, "deploy"); recorder.Code == http.StatusCreated {
+		t.Error("somebody who is not in the channel answered its question")
 	}
 }

@@ -11,6 +11,16 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+type ActionPress struct {
+	ID          uuid.UUID
+	EventID     string
+	RoomID      uuid.UUID
+	Action      string
+	UserID      uuid.UUID
+	UserAddress string
+	CreatedAt   time.Time
+}
+
 type ApiToken struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID

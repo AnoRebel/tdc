@@ -208,6 +208,17 @@ func (s *Server) routes() {
 	rooms.PUT("/:id/messages/:eventId/reactions", s.handleReact)
 	rooms.DELETE("/:id/messages/:eventId/reactions", s.handleUnreact)
 
+	/*
+		Pressing a button on a message.
+
+		POST because it is an action rather than a state to set: the same
+		button pressed twice is two attempts at one decision, and the server
+		refuses the second rather than making it idempotent. A program
+		receiving two events for one choice cannot tell that from somebody
+		changing their mind.
+	*/
+	rooms.POST("/:id/messages/:eventId/actions/:action", s.handlePressAction)
+
 	// Pinned messages. Pinning speaks for the room, so it takes a permission;
 	// reading what is pinned is part of reading the room.
 	rooms.GET("/:id/pins", s.handleListPinned)
