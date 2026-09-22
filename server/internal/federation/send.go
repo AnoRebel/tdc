@@ -210,3 +210,112 @@ func (s *Sender) FetchEvents(
 	}
 	return answer.Events, nil
 }
+
+/*
+JoinRoom asks a room's home server to admit one of our users.
+
+An ask, not a statement. The home server applies its own rules and may refuse;
+that refusal is the answer, and forwarding it to the user unchanged is more
+useful than this server guessing why.
+*/
+func (s *Sender) JoinRoom(ctx context.Context, peer, slug, member string) error {
+	return s.memberCall(ctx, peer, "/api/federation/rooms/"+slug+"/join", member)
+}
+
+// LeaveRoom tells a room's home server that one of our users has left.
+func (s *Sender) LeaveRoom(ctx context.Context, peer, slug, member string) error {
+	return s.memberCall(ctx, peer, "/api/federation/rooms/"+slug+"/leave", member)
+}
+
+func (s *Sender) memberCall(ctx context.Context, peer, path, member string) error {
+	response, err := s.Send(ctx, peer, path, map[string]any{"member": member})
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		reason, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		return fmt.Errorf("%s refused: %s: %s",
+			peer, response.Status, strings.TrimSpace(string(reason)))
+	}
+	return nil
+}
+
+// PostedEvent is what a home server says it did with a forwarded message.
+type PostedEvent struct {
+	ID       string `json:"id"`
+	Sequence int64  `json:"sequence"`
+	Sender   string `json:"sender"`
+}
+
+/*
+PostMessage forwards one of our users' messages to a room's home server.
+
+The home server assigns the sequence and signs the event, and returns both —
+this server never numbers anything in a room it does not own, which is the
+whole reason the room has one order everybody agrees on.
+*/
+func (s *Sender) PostMessage(
+	ctx context.Context,
+	peer, slug, roomAddress, sender string,
+	content json.RawMessage,
+) (PostedEvent, error) {
+	/*
+		Signed here, by the sender's own server, before it goes anywhere.
+
+		This is what stops the room's home server inventing messages from our
+		users. It orders the room and could drop or reorder anything, which we
+		accept — but authorship is ours to attest, and an event it did not
+		sign is one it cannot fabricate.
+
+		No sequence: the home server assigns that, and it is deliberately not
+		part of what is signed, so it can be added without invalidating this.
+	*/
+	nonce, err := events.NewNonce()
+	if err != nil {
+		return PostedEvent{}, err
+	}
+
+	event := events.Event{
+		Room:      roomAddress,
+		Sender:    sender,
+		Origin:    s.originHost(),
+		Type:      events.TypeMessageSent,
+		CreatedAt: events.Now(),
+		Nonce:     nonce,
+		Content:   content,
+	}
+	if err := s.keyring.Sign(&event); err != nil {
+		return PostedEvent{}, fmt.Errorf("sign the event: %w", err)
+	}
+
+	response, err := s.Send(ctx, peer, "/api/federation/rooms/"+slug+"/post",
+		map[string]any{"event": event})
+	if err != nil {
+		return PostedEvent{}, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusCreated {
+		reason, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		return PostedEvent{}, fmt.Errorf("%s refused the message: %s: %s",
+			peer, response.Status, strings.TrimSpace(string(reason)))
+	}
+
+	var posted PostedEvent
+	if err := json.NewDecoder(response.Body).Decode(&posted); err != nil {
+		return PostedEvent{}, fmt.Errorf("%s gave an unreadable answer: %w", peer, err)
+	}
+	return posted, nil
+}
+
+// originHost is this server's identity as events record it: a host, the same
+// form a room's home_server and a member's address use.
+func (s *Sender) originHost() string {
+	host, err := Host(s.origin)
+	if err != nil {
+		return s.origin
+	}
+	return host
+}

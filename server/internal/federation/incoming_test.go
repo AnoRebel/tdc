@@ -133,24 +133,104 @@ func TestAnEventForAnotherRoomIsRefused(t *testing.T) {
 }
 
 /*
-An event about a room whose home server is somebody else is refused.
+A remote member's message is written by their server and passed on by the home
+server, and both facts are checked separately.
 
-A participating peer relaying its own idea of a room's contents, rather than
-passing on the home server's, is how two servers start disagreeing about a
-room's order — which is the failure the whole protocol exists to prevent.
+This is the case that makes authorship and delivery two questions rather than
+one. B's user posts into A's room: B signs the event, A orders it and relays
+it to C. C must accept it — B really wrote it, A really delivered it — while
+still refusing an event A wrote claiming to be from B's user, and refusing one
+B tries to deliver directly about A's room.
 */
-func TestAnEventFromAPeerThatIsNotTheHomeServerIsRefused(t *testing.T) {
-	signing, verifying := homeServerKeyring(t)
+func TestAuthorshipAndDeliveryAreCheckedSeparately(t *testing.T) {
+	bSigning, bVerifying := homeServerKeyring(t)
 
-	// b.example.org signs an event about a room a.example.org owns, and does
-	// so honestly about its own user — everything is right except that it is
-	// not the room's home server.
-	event := signedEvent(t, signing,
+	// B's user posts into a room A owns. B signs it; A will deliver it.
+	event := signedEvent(t, bSigning,
 		messageFrom("someone@b.example.org", "b.example.org", "general@a.example.org"))
 
-	err := federation.Accept(event, verifying, "general@a.example.org", "a.example.org")
+	// Accept alone is satisfied: B wrote it, honestly, about the right room.
+	if err := federation.Accept(event, bVerifying, "general@a.example.org", "a.example.org"); err != nil {
+		t.Fatalf("a remote member's message was refused on its own merits: %v", err)
+	}
+
+	// Delivered by A, the room's home server: accepted.
+	if err := federation.AcceptDelivered(
+		event, bVerifying, "general@a.example.org", "a.example.org", "a.example.org",
+	); err != nil {
+		t.Fatalf("a remote member's message relayed by the home server was refused: %v", err)
+	}
+
+	/*
+		Delivered by B itself: refused.
+
+		B wrote the event and is entitled to say so, but it is not entitled to
+		put it into A's room directly — only A assigns positions there, and a
+		peer relaying its own idea of a room's contents is where two servers
+		start to disagree about the order.
+	*/
+	err := federation.AcceptDelivered(
+		event, bVerifying, "general@a.example.org", "a.example.org", "b.example.org",
+	)
 	if !errors.Is(err, federation.ErrNotHomeServer) {
-		t.Fatalf("Accept = %v, want ErrNotHomeServer", err)
+		t.Fatalf("AcceptDelivered = %v, want ErrNotHomeServer", err)
+	}
+}
+
+/*
+The home server cannot invent a message from somebody it does not host.
+
+The point of keeping the author's signature rather than re-signing on relay.
+A orders the room and could drop or reorder anything, which is accepted — but
+it holds none of B's keys, so a message attributed to B's user that B never
+signed fails verification wherever it is checked.
+*/
+func TestTheHomeServerCannotForgeARemoteMembersMessage(t *testing.T) {
+	aSigning, _ := homeServerKeyring(t)
+	_, bVerifying := homeServerKeyring(t)
+
+	// A signs an event claiming to be from B's user, and delivers it as the
+	// room's home server — every part of the delivery is legitimate.
+	forged := signedEvent(t, aSigning,
+		messageFrom("someone@b.example.org", "a.example.org", "general@a.example.org"))
+
+	/*
+		Checked against B's keys, because B is who the sender belongs to — and
+		it is the signature check that refuses this, not the impersonation
+		check. Worth stating: A's event is internally consistent (its origin
+		really is A) and would pass a comparison of origin against sender's
+		server if it were checked against A's keys. What defeats it is asking
+		the right keyring, which is the whole reason a batch is verified per
+		author rather than per deliverer.
+	*/
+	err := federation.AcceptDelivered(
+		forged, bVerifying, "general@a.example.org", "a.example.org", "a.example.org",
+	)
+	if !errors.Is(err, federation.ErrEventUnverified) {
+		t.Fatalf("AcceptDelivered = %v, want ErrEventUnverified — "+
+			"the home server forged a message from a member it does not host", err)
+	}
+}
+
+/*
+And the impersonation check covers what a signature alone cannot.
+
+A server signing for somebody else's user produces an event that verifies
+perfectly against its own keys: the cryptography is impeccable and the
+attribution is a lie. Only comparing the sender's server against the origin
+refuses it, which is why both checks exist rather than one.
+*/
+func TestAValidSignatureOverAFalseAttributionIsStillRefused(t *testing.T) {
+	aSigning, aVerifying := homeServerKeyring(t)
+
+	// A signs, honestly as A, an event claiming to be from B's user.
+	event := signedEvent(t, aSigning,
+		messageFrom("someone@b.example.org", "a.example.org", "general@a.example.org"))
+
+	// Verified against A's own keys, so the signature is genuinely valid.
+	err := federation.Accept(event, aVerifying, "general@a.example.org", "a.example.org")
+	if !errors.Is(err, federation.ErrImpersonation) {
+		t.Fatalf("Accept = %v, want ErrImpersonation", err)
 	}
 }
 

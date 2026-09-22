@@ -17,6 +17,10 @@ type Querier interface {
 	// ON CONFLICT DO NOTHING rather than an error: a double click, or two devices
 	// racing, should leave one reaction rather than failing.
 	AddReaction(ctx context.Context, arg AddReactionParams) error
+	// Records that somebody on another server is in a room. Idempotent: joining
+	// twice is being in the room once, and the role is refreshed so a promotion
+	// the home server decided takes effect here.
+	AddRemoteMember(ctx context.Context, arg AddRemoteMemberParams) error
 	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) error
 	// Adds a peer to a room. Adding one twice is the same peer: its cursor is left
 	// alone rather than reset to zero, which would resend the room's whole history,
@@ -48,6 +52,9 @@ type Querier interface {
 	// Claiming by the state the client already holds, for a client with no browser
 	// to receive the redirect. Consumed as it is read, exactly as the handle is.
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
+	// A success resets everything: consecutive failures are what matter, and a
+	// peer that answers has none.
+	ClearDeliveryFailures(ctx context.Context, arg ClearDeliveryFailuresParams) error
 	// A status with an expiry reverts on its own, so a temporary one needs no
 	// later action from the person who set it.
 	ClearExpiredStatuses(ctx context.Context) error
@@ -297,6 +304,7 @@ type Querier interface {
 	// Both are checked in one query: asking twice would mean two round trips on
 	// the path every message takes.
 	IsPostingRestricted(ctx context.Context, arg IsPostingRestrictedParams) (bool, error)
+	IsRemoteMember(ctx context.Context, arg IsRemoteMemberParams) (bool, error)
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
@@ -476,6 +484,7 @@ type Querier interface {
 	// than both reading the same maximum and colliding.
 	NextRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomeParams) (OauthOutcome, error)
+	PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomPeer, error)
 	// Pinning something already pinned updates who pinned it and when, rather than
 	// failing: the second person's intent is the current one.
 	PinMessage(ctx context.Context, arg PinMessageParams) error
@@ -494,6 +503,7 @@ type Querier interface {
 	// button by the same person is not a change, it is a repeat, and the caller
 	// needs to tell the two apart. No row returned means somebody pressed twice.
 	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
+	RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error)
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
 	// Claims one use, atomically.
 	//
@@ -512,11 +522,11 @@ type Querier interface {
 	RecordMessageView(ctx context.Context, arg RecordMessageViewParams) error
 	RecordPushFailure(ctx context.Context, endpoint string) error
 	RecordPushSuccess(ctx context.Context, endpoint string) error
-	// Records that delivery was tried and did not work, leaving the cursor where
-	// it was so the same events are tried again.
-	RecordRoomPeerFailure(ctx context.Context, arg RecordRoomPeerFailureParams) error
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
+	RemoteMember(ctx context.Context, arg RemoteMemberParams) (RemoteMember, error)
+	RemoteMembers(ctx context.Context, roomID uuid.UUID) ([]RemoteMember, error)
 	RemoveReaction(ctx context.Context, arg RemoveReactionParams) error
+	RemoveRemoteMember(ctx context.Context, arg RemoveRemoteMemberParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	RemoveRolePermission(ctx context.Context, arg RemoveRolePermissionParams) error
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) error
@@ -534,6 +544,8 @@ type Querier interface {
 	ResolveReport(ctx context.Context, arg ResolveReportParams) (Report, error)
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RestrictPosting(ctx context.Context, arg RestrictPostingParams) (PostingRestriction, error)
+	// An operator's decision to try an abandoned peer again.
+	ResumePeer(ctx context.Context, arg ResumePeerParams) error
 	// Scoped to the owner, so somebody cannot revoke a token by guessing an
 	// identifier. Returns the row so the caller can name it in the audit entry
 	// and can tell "revoked" from "was not yours".

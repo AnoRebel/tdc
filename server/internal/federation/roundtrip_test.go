@@ -336,3 +336,43 @@ func TestABlockedPeerIsRefusedBeforeItsSignatureIsChecked(t *testing.T) {
 		t.Errorf("the signature was examined despite the peer being blocked: %q", b.refusals[0])
 	}
 }
+
+/*
+A server may act for its own users and for nobody else's.
+
+The request signature proves which server is asking. This is what makes that
+proof mean something about the person named inside it: without the check, any
+server could join or post as any address it cared to invent, and the
+cryptography would be impeccable throughout.
+*/
+func TestAPeerMayNotActForSomebodyElsesUser(t *testing.T) {
+	cases := map[string]struct {
+		peer    string
+		address string
+		allowed bool
+	}{
+		"its own user":           {"https://b.example.org", "amina@b.example.org", true},
+		"another server's user":  {"https://b.example.org", "amina@c.example.org", false},
+		"a user with no server":  {"https://b.example.org", "amina", false},
+		"its own user, odd case": {"https://B.Example.ORG", "amina@b.example.org", true},
+		"its own user on a port": {"https://b.example.org:8443", "amina@b.example.org", true},
+		"a subdomain is not it":  {"https://b.example.org", "amina@evil.b.example.org", false},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			peer, err := federation.Host(test.peer)
+			if err != nil {
+				t.Fatalf("Host: %v", err)
+			}
+
+			claimed, err := federation.ServerOf(test.address)
+			allowed := err == nil && strings.EqualFold(peer, claimed)
+
+			if allowed != test.allowed {
+				t.Fatalf("peer %q acting for %q: allowed=%v, want %v",
+					test.peer, test.address, allowed, test.allowed)
+			}
+		})
+	}
+}

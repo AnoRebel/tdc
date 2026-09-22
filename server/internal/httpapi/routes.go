@@ -75,6 +75,17 @@ func (s *Server) routes() {
 	authenticated.GET("/rooms/:slug/events", s.handleFederatedEvents)
 	authenticated.POST("/rooms/:slug/events", s.handleFederatedDelivery)
 
+	/*
+		The write path: a peer's user joining a room this server owns, and
+		posting into it.
+
+		The member named must be on the peer that signed the request, so a
+		server can act for its own users and nobody else's.
+	*/
+	authenticated.POST("/rooms/:slug/join", s.handleFederatedJoin)
+	authenticated.POST("/rooms/:slug/leave", s.handleFederatedLeave)
+	authenticated.POST("/rooms/:slug/post", s.handleFederatedPost)
+
 	// First-run setup. Available only while the server has no accounts; the
 	// handler refuses once one exists, which is what closes the path.
 	s.echo.GET("/api/setup", s.handleSetupStatus)
@@ -216,6 +227,16 @@ func (s *Server) routes() {
 	rooms.GET("/:id", s.handleGetRoom)
 	rooms.POST("/:id/join", s.handleJoinRoom)
 	rooms.POST("/:id/leave", s.handleLeaveRoom)
+
+	/*
+		Joining and posting in a room another server owns.
+
+		Separate paths rather than the ordinary ones branching, because what
+		happens differs completely: nothing is sequenced here, the home server
+		decides, and a refusal comes from a server this one does not control.
+	*/
+	rooms.POST("/:id/remote/join", s.handleJoinRemoteRoom)
+	rooms.POST("/:id/remote/messages", s.handleSendToRemoteRoom)
 	rooms.GET("/:id/members", s.handleRoomMembers)
 	rooms.GET("/:id/timeline", s.handleRoomTimeline)
 	rooms.POST("/:id/messages", s.handleSendMessage)
@@ -492,6 +513,8 @@ func (s *Server) routes() {
 	admin.POST("/federation/adopt", s.handleAdoptRoom,
 		requirePermission(authz.PermServerConfigure))
 	admin.POST("/rooms/:id/federation/catchup", s.handleCatchUp,
+		requirePermission(authz.PermServerConfigure))
+	admin.POST("/rooms/:id/federation/resume", s.handleResumePeer,
 		requirePermission(authz.PermServerConfigure))
 
 	// Feature toggles. Listed and changed separately from settings because a

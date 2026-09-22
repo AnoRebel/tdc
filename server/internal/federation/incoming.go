@@ -20,11 +20,16 @@ to read it.
      verified against that server's published keys.
   2. Is the sender one that server is entitled to speak for? — a server may
      say anything about its own users and nothing about anybody else's.
-  3. Does it belong to the room it names, on the server that owns that room?
+  3. Does it belong to the room it names?
 
 The first is cryptography and the other two are not, which is the point: a
 perfectly valid signature over a lie about whose message this is would pass
 check one and must still be refused.
+
+Whether the server that *delivered* it was entitled to is a separate question,
+because the answer differs: an event is written by its author's server and
+delivered by the room's home server, and for a remote member's message those
+are two different servers. AcceptDelivered asks both.
 */
 
 var (
@@ -102,17 +107,40 @@ func Accept(event events.Event, keyring *events.Keyring, roomAddress, homeServer
 			ErrWrongRoom, event.Room, roomAddress)
 	}
 
-	/*
-		And the origin must be the room's home server.
+	return nil
+}
 
-		Only the home server assigns sequences and decides membership, so an
-		event about this room signed by any other server is one nobody was
-		entitled to make — a participating peer relaying its own idea of the
-		room's contents rather than passing on the home server's.
-	*/
-	if !strings.EqualFold(strings.ToLower(event.Origin), strings.ToLower(homeServer)) {
-		return fmt.Errorf("%w: %s is not %s", ErrNotHomeServer, event.Origin, homeServer)
+/*
+AcceptDelivered decides whether an event delivered by a peer may be stored.
+
+Accept checks the event itself. This adds the one question that is about the
+delivery rather than the content: is the server that handed it to us entitled
+to be handing it over at all?
+
+That is the room's home server, and only it — because only it assigns
+sequences. An event arriving from anybody else is a participating peer relaying
+its own idea of the room's contents rather than passing on the home server's,
+which is where two servers start to disagree about the order.
+
+Note what this deliberately does not require: that the event was *written* by
+the home server. A member on another server posts through their own server,
+which signs the event and forwards it; the home server orders it and passes it
+on with that signature intact. So a relayed event's origin is the author's
+server while its deliverer is the home server, and both facts are checked —
+the first by Accept, the second here.
+*/
+func AcceptDelivered(
+	event events.Event,
+	keyring *events.Keyring,
+	roomAddress, homeServer, deliveredBy string,
+) error {
+	if err := Accept(event, keyring, roomAddress, homeServer); err != nil {
+		return err
 	}
 
+	if !strings.EqualFold(strings.ToLower(deliveredBy), strings.ToLower(homeServer)) {
+		return fmt.Errorf("%w: delivered by %s, which is not %s",
+			ErrNotHomeServer, deliveredBy, homeServer)
+	}
 	return nil
 }

@@ -9,7 +9,34 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const addRemoteMember = `-- name: AddRemoteMember :exec
+INSERT INTO remote_members (room_id, address, home_server, role)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (room_id, address) DO UPDATE SET role = EXCLUDED.role
+`
+
+type AddRemoteMemberParams struct {
+	RoomID     uuid.UUID
+	Address    string
+	HomeServer string
+	Role       string
+}
+
+// Records that somebody on another server is in a room. Idempotent: joining
+// twice is being in the room once, and the role is refreshed so a promotion
+// the home server decided takes effect here.
+func (q *Queries) AddRemoteMember(ctx context.Context, arg AddRemoteMemberParams) error {
+	_, err := q.db.Exec(ctx, addRemoteMember,
+		arg.RoomID,
+		arg.Address,
+		arg.HomeServer,
+		arg.Role,
+	)
+	return err
+}
 
 const addRoomPeer = `-- name: AddRoomPeer :exec
 INSERT INTO room_peers (room_id, peer, address)
@@ -113,6 +140,24 @@ type AdvanceRoomPeerCursorParams struct {
 // undo a later one, which would resend events the peer already holds.
 func (q *Queries) AdvanceRoomPeerCursor(ctx context.Context, arg AdvanceRoomPeerCursorParams) error {
 	_, err := q.db.Exec(ctx, advanceRoomPeerCursor, arg.RoomID, arg.Peer, arg.Cursor)
+	return err
+}
+
+const clearDeliveryFailures = `-- name: ClearDeliveryFailures :exec
+UPDATE room_peers
+SET failures = 0, next_attempt_at = NULL, abandoned = FALSE, last_error = ''
+WHERE room_id = $1 AND peer = $2
+`
+
+type ClearDeliveryFailuresParams struct {
+	RoomID uuid.UUID
+	Peer   string
+}
+
+// A success resets everything: consecutive failures are what matter, and a
+// peer that answers has none.
+func (q *Queries) ClearDeliveryFailures(ctx context.Context, arg ClearDeliveryFailuresParams) error {
+	_, err := q.db.Exec(ctx, clearDeliveryFailures, arg.RoomID, arg.Peer)
 	return err
 }
 
@@ -231,22 +276,189 @@ func (q *Queries) HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (
 	return column_1, err
 }
 
-const recordRoomPeerFailure = `-- name: RecordRoomPeerFailure :exec
-UPDATE room_peers
-SET attempted_at = NOW(), last_error = $3
-WHERE room_id = $1 AND peer = $2
+const isRemoteMember = `-- name: IsRemoteMember :one
+SELECT EXISTS (
+    SELECT 1 FROM remote_members WHERE room_id = $1 AND address = $2
+)::boolean
 `
 
-type RecordRoomPeerFailureParams struct {
-	RoomID    uuid.UUID
-	Peer      string
-	LastError string
+type IsRemoteMemberParams struct {
+	RoomID  uuid.UUID
+	Address string
 }
 
-// Records that delivery was tried and did not work, leaving the cursor where
-// it was so the same events are tried again.
-func (q *Queries) RecordRoomPeerFailure(ctx context.Context, arg RecordRoomPeerFailureParams) error {
-	_, err := q.db.Exec(ctx, recordRoomPeerFailure, arg.RoomID, arg.Peer, arg.LastError)
+func (q *Queries) IsRemoteMember(ctx context.Context, arg IsRemoteMemberParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isRemoteMember, arg.RoomID, arg.Address)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const peersDueForDelivery = `-- name: PeersDueForDelivery :many
+/*
+Peers with something owed and nothing stopping delivery.
+
+Abandoned peers are excluded here rather than checked by the caller: a peer
+past the ceiling must cost nothing, and leaving it to a caller's if-statement
+is how it ends up being retried by whichever path forgot.
+*/
+SELECT rp.room_id, rp.peer, rp.cursor, rp.delivered_at, rp.attempted_at, rp.last_error, rp.added_at, rp.address, rp.failures, rp.next_attempt_at, rp.abandoned FROM room_peers rp
+WHERE rp.abandoned = FALSE
+  AND (rp.next_attempt_at IS NULL OR rp.next_attempt_at <= NOW())
+  AND EXISTS (
+      SELECT 1 FROM events e
+      WHERE e.room_id = rp.room_id AND e.sequence > rp.cursor
+  )
+ORDER BY rp.room_id, rp.peer
+LIMIT $1
+`
+
+func (q *Queries) PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomPeer, error) {
+	rows, err := q.db.Query(ctx, peersDueForDelivery, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RoomPeer{}
+	for rows.Next() {
+		var i RoomPeer
+		if err := rows.Scan(
+			&i.RoomID,
+			&i.Peer,
+			&i.Cursor,
+			&i.DeliveredAt,
+			&i.AttemptedAt,
+			&i.LastError,
+			&i.AddedAt,
+			&i.Address,
+			&i.Failures,
+			&i.NextAttemptAt,
+			&i.Abandoned,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recordDeliveryFailure = `-- name: RecordDeliveryFailure :one
+/*
+Counts a failure and says when to try again, abandoning past the ceiling.
+
+Returns the row so the caller can tell an operator what happened without a
+second query — and so "this was the attempt that gave up" is knowable at the
+moment it happens rather than inferred later.
+*/
+UPDATE room_peers
+SET failures = failures + 1,
+    attempted_at = NOW(),
+    last_error = $3,
+    next_attempt_at = NOW() + $4::interval,
+    abandoned = (failures + 1) >= $5::int
+WHERE room_id = $1 AND peer = $2
+RETURNING room_id, peer, cursor, delivered_at, attempted_at, last_error, added_at, address, failures, next_attempt_at, abandoned
+`
+
+type RecordDeliveryFailureParams struct {
+	RoomID     uuid.UUID
+	Peer       string
+	LastError  string
+	RetryAfter pgtype.Interval
+	Ceiling    int32
+}
+
+func (q *Queries) RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error) {
+	row := q.db.QueryRow(ctx, recordDeliveryFailure,
+		arg.RoomID,
+		arg.Peer,
+		arg.LastError,
+		arg.RetryAfter,
+		arg.Ceiling,
+	)
+	var i RoomPeer
+	err := row.Scan(
+		&i.RoomID,
+		&i.Peer,
+		&i.Cursor,
+		&i.DeliveredAt,
+		&i.AttemptedAt,
+		&i.LastError,
+		&i.AddedAt,
+		&i.Address,
+		&i.Failures,
+		&i.NextAttemptAt,
+		&i.Abandoned,
+	)
+	return i, err
+}
+
+const remoteMember = `-- name: RemoteMember :one
+SELECT room_id, address, home_server, role, joined_at FROM remote_members WHERE room_id = $1 AND address = $2
+`
+
+type RemoteMemberParams struct {
+	RoomID  uuid.UUID
+	Address string
+}
+
+func (q *Queries) RemoteMember(ctx context.Context, arg RemoteMemberParams) (RemoteMember, error) {
+	row := q.db.QueryRow(ctx, remoteMember, arg.RoomID, arg.Address)
+	var i RemoteMember
+	err := row.Scan(
+		&i.RoomID,
+		&i.Address,
+		&i.HomeServer,
+		&i.Role,
+		&i.JoinedAt,
+	)
+	return i, err
+}
+
+const remoteMembers = `-- name: RemoteMembers :many
+SELECT room_id, address, home_server, role, joined_at FROM remote_members WHERE room_id = $1 ORDER BY address
+`
+
+func (q *Queries) RemoteMembers(ctx context.Context, roomID uuid.UUID) ([]RemoteMember, error) {
+	rows, err := q.db.Query(ctx, remoteMembers, roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RemoteMember{}
+	for rows.Next() {
+		var i RemoteMember
+		if err := rows.Scan(
+			&i.RoomID,
+			&i.Address,
+			&i.HomeServer,
+			&i.Role,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const removeRemoteMember = `-- name: RemoveRemoteMember :exec
+DELETE FROM remote_members WHERE room_id = $1 AND address = $2
+`
+
+type RemoveRemoteMemberParams struct {
+	RoomID  uuid.UUID
+	Address string
+}
+
+func (q *Queries) RemoveRemoteMember(ctx context.Context, arg RemoveRemoteMemberParams) error {
+	_, err := q.db.Exec(ctx, removeRemoteMember, arg.RoomID, arg.Address)
 	return err
 }
 
@@ -264,8 +476,25 @@ func (q *Queries) RemoveRoomPeer(ctx context.Context, arg RemoveRoomPeerParams) 
 	return err
 }
 
+const resumePeer = `-- name: ResumePeer :exec
+UPDATE room_peers
+SET abandoned = FALSE, failures = 0, next_attempt_at = NULL, last_error = ''
+WHERE room_id = $1 AND peer = $2
+`
+
+type ResumePeerParams struct {
+	RoomID uuid.UUID
+	Peer   string
+}
+
+// An operator's decision to try an abandoned peer again.
+func (q *Queries) ResumePeer(ctx context.Context, arg ResumePeerParams) error {
+	_, err := q.db.Exec(ctx, resumePeer, arg.RoomID, arg.Peer)
+	return err
+}
+
 const roomPeer = `-- name: RoomPeer :one
-SELECT room_id, peer, cursor, delivered_at, attempted_at, last_error, added_at, address FROM room_peers WHERE room_id = $1 AND peer = $2
+SELECT room_id, peer, cursor, delivered_at, attempted_at, last_error, added_at, address, failures, next_attempt_at, abandoned FROM room_peers WHERE room_id = $1 AND peer = $2
 `
 
 type RoomPeerParams struct {
@@ -287,12 +516,15 @@ func (q *Queries) RoomPeer(ctx context.Context, arg RoomPeerParams) (RoomPeer, e
 		&i.LastError,
 		&i.AddedAt,
 		&i.Address,
+		&i.Failures,
+		&i.NextAttemptAt,
+		&i.Abandoned,
 	)
 	return i, err
 }
 
 const roomPeers = `-- name: RoomPeers :many
-SELECT room_id, peer, cursor, delivered_at, attempted_at, last_error, added_at, address FROM room_peers WHERE room_id = $1 ORDER BY peer
+SELECT room_id, peer, cursor, delivered_at, attempted_at, last_error, added_at, address, failures, next_attempt_at, abandoned FROM room_peers WHERE room_id = $1 ORDER BY peer
 `
 
 // The peers participating in a room, for delivery and for showing an operator
@@ -315,6 +547,9 @@ func (q *Queries) RoomPeers(ctx context.Context, roomID uuid.UUID) ([]RoomPeer, 
 			&i.LastError,
 			&i.AddedAt,
 			&i.Address,
+			&i.Failures,
+			&i.NextAttemptAt,
+			&i.Abandoned,
 		); err != nil {
 			return nil, err
 		}

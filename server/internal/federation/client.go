@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
 
@@ -226,4 +227,20 @@ func wellKnownURL(address string) (string, error) {
 		trimmed = "https://" + trimmed
 	}
 	return strings.TrimRight(trimmed, "/") + WellKnownPath, nil
+}
+
+/*
+Keys resolves a server's published keys, for verifying what it wrote.
+
+The same discovery and cache as everything else, exposed as the narrow thing a
+caller verifying a batch of events actually needs: once remote members post,
+one delivery can carry events written by several servers, and each must be
+checked against its own author's keys.
+*/
+func (c *Client) Keys(ctx context.Context, server string) (*events.Keyring, error) {
+	document, err := c.Discover(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	return document.Keyring()
 }

@@ -36,13 +36,6 @@ SET cursor = GREATEST(cursor, $3),
     last_error = ''
 WHERE room_id = $1 AND peer = $2;
 
--- name: RecordRoomPeerFailure :exec
--- Records that delivery was tried and did not work, leaving the cursor where
--- it was so the same events are tried again.
-UPDATE room_peers
-SET attempted_at = NOW(), last_error = $3
-WHERE room_id = $1 AND peer = $2;
-
 -- name: EventsForPeerSince :many
 /*
 A room's events after a cursor, for a peer that participates in it.
@@ -113,3 +106,73 @@ INSERT INTO rooms (
 )
 VALUES ($1, $2, $3, $4, '', 'channel', $5, $6, NULL, TRUE)
 RETURNING *;
+
+-- name: AddRemoteMember :exec
+-- Records that somebody on another server is in a room. Idempotent: joining
+-- twice is being in the room once, and the role is refreshed so a promotion
+-- the home server decided takes effect here.
+INSERT INTO remote_members (room_id, address, home_server, role)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (room_id, address) DO UPDATE SET role = EXCLUDED.role;
+
+-- name: RemoveRemoteMember :exec
+DELETE FROM remote_members WHERE room_id = $1 AND address = $2;
+
+-- name: RemoteMembers :many
+SELECT * FROM remote_members WHERE room_id = $1 ORDER BY address;
+
+-- name: IsRemoteMember :one
+SELECT EXISTS (
+    SELECT 1 FROM remote_members WHERE room_id = $1 AND address = $2
+)::boolean;
+
+-- name: RemoteMember :one
+SELECT * FROM remote_members WHERE room_id = $1 AND address = $2;
+
+-- name: RecordDeliveryFailure :one
+/*
+Counts a failure and says when to try again, abandoning past the ceiling.
+
+Returns the row so the caller can tell an operator what happened without a
+second query — and so "this was the attempt that gave up" is knowable at the
+moment it happens rather than inferred later.
+*/
+UPDATE room_peers
+SET failures = failures + 1,
+    attempted_at = NOW(),
+    last_error = $3,
+    next_attempt_at = NOW() + sqlc.arg(retry_after)::interval,
+    abandoned = (failures + 1) >= sqlc.arg(ceiling)::int
+WHERE room_id = $1 AND peer = $2
+RETURNING *;
+
+-- name: ClearDeliveryFailures :exec
+-- A success resets everything: consecutive failures are what matter, and a
+-- peer that answers has none.
+UPDATE room_peers
+SET failures = 0, next_attempt_at = NULL, abandoned = FALSE, last_error = ''
+WHERE room_id = $1 AND peer = $2;
+
+-- name: ResumePeer :exec
+-- An operator's decision to try an abandoned peer again.
+UPDATE room_peers
+SET abandoned = FALSE, failures = 0, next_attempt_at = NULL, last_error = ''
+WHERE room_id = $1 AND peer = $2;
+
+-- name: PeersDueForDelivery :many
+/*
+Peers with something owed and nothing stopping delivery.
+
+Abandoned peers are excluded here rather than checked by the caller: a peer
+past the ceiling must cost nothing, and leaving it to a caller's if-statement
+is how it ends up being retried by whichever path forgot.
+*/
+SELECT rp.* FROM room_peers rp
+WHERE rp.abandoned = FALSE
+  AND (rp.next_attempt_at IS NULL OR rp.next_attempt_at <= NOW())
+  AND EXISTS (
+      SELECT 1 FROM events e
+      WHERE e.room_id = rp.room_id AND e.sequence > rp.cursor
+  )
+ORDER BY rp.room_id, rp.peer
+LIMIT $1;

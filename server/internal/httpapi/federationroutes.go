@@ -3,7 +3,9 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -14,8 +16,10 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/federation"
+	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 )
 
@@ -449,7 +453,7 @@ func (s *Server) handleFederatedDelivery(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadGateway, "the origin publishes no usable keys")
 	}
 
-	stored, err := s.rooms.AcceptForeignEvents(c.Request().Context(), room, origin, keyring, delivery.Events)
+	stored, err := s.rooms.AcceptForeignEvents(c.Request().Context(), room, origin, keyring, peers, delivery.Events)
 	if err != nil {
 		s.log.Warn("refused a federated delivery",
 			"peer", origin, "room", room.ID, "events", len(delivery.Events), "error", err)
@@ -534,6 +538,17 @@ func (s *Server) describeRoomPeers(c *echo.Context, roomID uuid.UUID) error {
 	described := make([]map[string]any, 0, len(peers))
 	for _, peer := range peers {
 		entry := map[string]any{"peer": peer.Peer, "cursor": peer.Cursor}
+		if peer.Failures > 0 {
+			entry["failures"] = peer.Failures
+		}
+		if peer.Abandoned {
+			// The one thing an operator most needs to see, because a peer
+			// that has been given up on will not recover by itself.
+			entry["abandoned"] = true
+		}
+		if peer.NextAttemptAt != nil {
+			entry["nextAttemptAt"] = peer.NextAttemptAt.UTC()
+		}
 		// Only when there is something to say: an empty error field on every
 		// healthy peer is noise that hides the one that is failing.
 		if peer.LastError != "" {
@@ -594,6 +609,15 @@ func (s *Server) handleDeliverRoom(c *echo.Context) error {
 	for _, peer := range peers {
 		result := map[string]any{"peer": peer.Peer}
 
+		if peer.Abandoned {
+			// Given up on. An operator resumes it deliberately; until then it
+			// costs nothing, which is the point of abandoning it.
+			result["abandoned"] = true
+			result["lastError"] = peer.LastError
+			results = append(results, result)
+			continue
+		}
+
 		batch, err := s.rooms.EventsForPeer(ctx, roomID, peer.Peer, peer.Cursor, maxEventsPerBatch)
 		if err != nil {
 			result["error"] = err.Error()
@@ -622,12 +646,30 @@ func (s *Server) handleDeliverRoom(c *echo.Context) error {
 
 		stored, err := sender.DeliverEvents(ctx, reachable, slug, batch)
 		if err != nil {
-			// The cursor stays where it was, so the same events are tried
-			// again rather than skipped.
-			if recordErr := s.rooms.RecordPeerFailure(ctx, roomID, peer.Peer, err.Error()); recordErr != nil {
+			/*
+				The cursor stays where it was, so the same events are tried
+				again rather than skipped, and the failure is counted so the
+				next attempt waits longer than this one did.
+			*/
+			state, recordErr := s.rooms.DeliveryFailed(ctx, roomID, peer.Peer, err.Error(), int(peer.Failures))
+			if recordErr != nil {
 				s.log.Error("cannot record a delivery failure", "peer", peer.Peer, "error", recordErr)
 			}
+
 			result["error"] = err.Error()
+			result["failures"] = state.Failures
+			if state.Abandoned {
+				// Past the ceiling: nothing further is attempted until an
+				// operator says so, and they are told rather than left to
+				// notice a room quietly stopped replicating.
+				result["abandoned"] = true
+				s.log.Warn("abandoned a federation peer after repeated failures",
+					"peer", peer.Peer, "room", roomID,
+					"failures", state.Failures, "error", err)
+			} else if state.NextAttemptAt != nil {
+				result["nextAttemptAt"] = state.NextAttemptAt.UTC()
+			}
+
 			results = append(results, result)
 			continue
 		}
@@ -635,6 +677,10 @@ func (s *Server) handleDeliverRoom(c *echo.Context) error {
 		furthest := batch[len(batch)-1].Sequence
 		if err := s.rooms.AdvancePeer(ctx, roomID, peer.Peer, furthest); err != nil {
 			s.log.Error("cannot advance a peer's cursor", "peer", peer.Peer, "error", err)
+		}
+
+		if err := s.rooms.DeliverySucceeded(ctx, roomID, peer.Peer); err != nil {
+			s.log.Error("cannot clear a peer's failures", "peer", peer.Peer, "error", err)
 		}
 
 		result["sent"] = len(batch)
@@ -782,7 +828,7 @@ func (s *Server) handleCatchUp(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadGateway, "the home server publishes no usable keys")
 	}
 
-	stored, err := s.rooms.AcceptForeignEvents(ctx, room, home.Peer, keyring, batch)
+	stored, err := s.rooms.AcceptForeignEvents(ctx, room, home.Peer, keyring, peers2, batch)
 	if err != nil {
 		s.log.Warn("refused events fetched during catch-up",
 			"room", roomID, "peer", home.Peer, "error", err)
@@ -800,4 +846,362 @@ func (s *Server) federationAuthorityHost() string {
 		return ""
 	}
 	return host
+}
+
+/*
+handleFederatedJoin admits somebody from a peer into a room this server owns.
+
+The member is derived from the verified origin of the signed request: a peer
+may ask to join on behalf of its own users and nobody else's, so the address
+must name the server that signed. Without that check any server could join any
+address it liked to any room, which is impersonation with extra steps.
+*/
+func (s *Server) handleFederatedJoin(c *echo.Context) error {
+	origin, _ := c.Get(peerOrigin).(string)
+	if origin == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unidentified peer")
+	}
+
+	var request struct {
+		Member string `json:"member"`
+	}
+	if err := c.Bind(&request); err != nil || strings.TrimSpace(request.Member) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "name the member joining")
+	}
+
+	if err := s.peerSpeaksFor(origin, request.Member); err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
+
+	ctx := c.Request().Context()
+	room, err := s.rooms.FederatedRoom(ctx, c.Param("slug"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such federated room")
+	}
+
+	if err := s.rooms.JoinRemote(ctx, room, request.Member); err != nil {
+		return federationRefusal(err)
+	}
+
+	// The joining server becomes a participant, so what it just joined starts
+	// reaching it. A member of a room whose server receives nothing about it
+	// would have joined a conversation they cannot see.
+	host, hostErr := federation.Host(origin)
+	if hostErr == nil {
+		if err := s.rooms.AddPeer(ctx, room.ID, origin); err != nil {
+			s.log.Error("cannot add a joining peer", "peer", host, "room", room.ID, "error", err)
+		}
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"joined": true, "member": request.Member})
+}
+
+// handleFederatedLeave removes somebody on a peer from a room this server owns.
+func (s *Server) handleFederatedLeave(c *echo.Context) error {
+	origin, _ := c.Get(peerOrigin).(string)
+	if origin == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unidentified peer")
+	}
+
+	var request struct {
+		Member string `json:"member"`
+	}
+	if err := c.Bind(&request); err != nil || strings.TrimSpace(request.Member) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "name the member leaving")
+	}
+	if err := s.peerSpeaksFor(origin, request.Member); err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
+
+	ctx := c.Request().Context()
+	room, err := s.rooms.FederatedRoom(ctx, c.Param("slug"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such federated room")
+	}
+	if err := s.rooms.LeaveRemote(ctx, room, request.Member); err != nil {
+		return federationRefusal(err)
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"left": true, "member": request.Member})
+}
+
+/*
+handleFederatedPost accepts a message from a member on a peer.
+
+This is where a remote message gets its position in the room's order. The
+peer's own server does not sequence anything — it forwards, and this server
+answers with the event it created, including the sequence it assigned.
+*/
+func (s *Server) handleFederatedPost(c *echo.Context) error {
+	origin, _ := c.Get(peerOrigin).(string)
+	if origin == "" {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unidentified peer")
+	}
+
+	var request struct {
+		Event events.Event `json:"event"`
+	}
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "could not read the event")
+	}
+	if strings.TrimSpace(request.Event.Sender) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "the event names no sender")
+	}
+	if err := s.peerSpeaksFor(origin, request.Event.Sender); err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
+
+	ctx := c.Request().Context()
+	room, err := s.rooms.FederatedRoom(ctx, c.Param("slug"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such federated room")
+	}
+
+	/*
+		Verified against the sender's server's own published keys.
+
+		The request signature proved which server is asking; this proves the
+		event inside was really made by them, which is what a third server
+		will check later when this one relays it on.
+	*/
+	peers, _ := s.federationState()
+	document, err := peers.Discover(ctx, origin)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, "could not fetch the origin's keys")
+	}
+	keyring, err := document.Keyring()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, "the origin publishes no usable keys")
+	}
+
+	stored, err := s.rooms.PostRemote(ctx, room, keyring, request.Event)
+	if err != nil {
+		return federationRefusal(err)
+	}
+
+	return c.JSON(http.StatusCreated, map[string]any{
+		"id":       stored.ID,
+		"sequence": stored.Sequence,
+		"sender":   stored.SenderAddress,
+	})
+}
+
+/*
+peerSpeaksFor refuses a peer acting for somebody it does not host.
+
+A server may say anything about its own users and nothing about anybody
+else's. The request signature proves which server is asking; this is what makes
+that proof mean something about the person named inside.
+*/
+func (s *Server) peerSpeaksFor(origin, address string) error {
+	peer, err := federation.Host(origin)
+	if err != nil {
+		return err
+	}
+	claimed, err := federation.ServerOf(address)
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(peer, claimed) {
+		return fmt.Errorf("%s may not act for %s", peer, address)
+	}
+	return nil
+}
+
+/*
+federationRefusal turns a room service error into the right status.
+
+A room the caller may not see is reported as missing rather than forbidden, so
+that a peer cannot learn which rooms exist, or which are private, by being
+refused differently.
+*/
+func federationRefusal(err error) error {
+	switch {
+	case errors.Is(err, rooms.ErrRoomNotFound):
+		return echo.NewHTTPError(http.StatusNotFound, "no such federated room")
+	case errors.Is(err, rooms.ErrArchived):
+		return echo.NewHTTPError(http.StatusConflict, "that room is archived")
+	case errors.Is(err, rooms.ErrNotAMember):
+		return echo.NewHTTPError(http.StatusForbidden, "not a member of that room")
+	case errors.Is(err, rooms.ErrNotHome):
+		return echo.NewHTTPError(http.StatusConflict, "this server does not own that room")
+	default:
+		return echo.NewHTTPError(http.StatusUnprocessableEntity, err.Error())
+	}
+}
+
+/*
+handleJoinRemoteRoom joins one of this server's people to a room elsewhere.
+
+The person asks their own server, which asks the room's home server, which
+decides. Three steps rather than the person's client talking to a server it has
+no account on — which would mean every client holding credentials for every
+server hosting a room it wanted to read.
+*/
+func (s *Server) handleJoinRemoteRoom(c *echo.Context) error {
+	user, ok := currentUser(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "sign in first")
+	}
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	ctx := c.Request().Context()
+	room, sender, home, err := s.remoteRoomContext(ctx, c, roomID)
+	if err != nil {
+		return err
+	}
+
+	member := s.rooms.UserAddress(user.Username)
+	slug := ""
+	if room.Slug != nil {
+		slug = *room.Slug
+	}
+
+	if err := sender.JoinRoom(ctx, home, slug, member); err != nil {
+		s.log.Warn("a remote join was refused", "room", roomID, "member", member, "error", err)
+		return echo.NewHTTPError(http.StatusConflict, err.Error())
+	}
+
+	/*
+		Joined there, so joined here too.
+
+		The local membership is what makes the room appear in this person's
+		list and what the ordinary read path checks. It is a cache of the home
+		server's decision, not a second source of truth — the home server
+		refusing later is what counts.
+	*/
+	if err := s.rooms.Join(ctx, roomID, user.ID); err != nil {
+		s.log.Error("joined remotely but not locally", "room", roomID, "error", err)
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{"joined": true, "member": member})
+}
+
+/*
+handleSendToRemoteRoom posts one of this server's people into a room elsewhere.
+
+Nothing is stored here on the way out. The home server sequences the message
+and replicates it back through the ordinary delivery path, so the message a
+person sees in the room is the one everybody else sees — rather than a local
+copy that might differ from what was actually accepted.
+*/
+func (s *Server) handleSendToRemoteRoom(c *echo.Context) error {
+	user, ok := currentUser(c)
+	if !ok {
+		return echo.NewHTTPError(http.StatusUnauthorized, "sign in first")
+	}
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	var request struct {
+		Body string `json:"body"`
+	}
+	if err := c.Bind(&request); err != nil || strings.TrimSpace(request.Body) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "the message is empty")
+	}
+
+	ctx := c.Request().Context()
+	room, sender, home, err := s.remoteRoomContext(ctx, c, roomID)
+	if err != nil {
+		return err
+	}
+
+	slug := ""
+	if room.Slug != nil {
+		slug = *room.Slug
+	}
+
+	content, err := json.Marshal(map[string]any{"body": request.Body})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not encode the message")
+	}
+
+	posted, err := sender.PostMessage(ctx, home, slug, s.rooms.RoomAddress(room),
+		s.rooms.UserAddress(user.Username), content)
+	if err != nil {
+		s.log.Warn("a remote post was refused", "room", roomID, "error", err)
+		return echo.NewHTTPError(http.StatusConflict, err.Error())
+	}
+
+	return c.JSON(http.StatusCreated, map[string]any{
+		"id":       posted.ID,
+		"sequence": posted.Sequence,
+		"sender":   posted.Sender,
+	})
+}
+
+/*
+remoteRoomContext gathers what a call to a room's home server needs.
+
+One place, because every one of these calls needs the same four things and
+would otherwise repeat the same five refusals — each of which is a chance for
+one path to refuse differently from another.
+*/
+func (s *Server) remoteRoomContext(
+	ctx context.Context,
+	c *echo.Context,
+	roomID uuid.UUID,
+) (dbgen.Room, *federation.Sender, string, error) {
+	if !s.federationEnabled(c) {
+		return dbgen.Room{}, nil, "", echo.NewHTTPError(http.StatusConflict,
+			"federation is not enabled on this server")
+	}
+
+	room, err := s.rooms.ByID(ctx, roomID)
+	if err != nil {
+		return dbgen.Room{}, nil, "", echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+	if strings.EqualFold(room.HomeServer, s.federationAuthorityHost()) {
+		return dbgen.Room{}, nil, "", echo.NewHTTPError(http.StatusConflict,
+			"this server owns that room; use the ordinary path")
+	}
+
+	peers, err := s.rooms.Peers(ctx, roomID)
+	if err != nil || len(peers) == 0 {
+		return dbgen.Room{}, nil, "", echo.NewHTTPError(http.StatusConflict,
+			"that room has no home server to ask")
+	}
+
+	home := peers[0].Address
+	if home == "" {
+		home = "https://" + peers[0].Peer
+	}
+
+	allowPrivate := s.settings != nil &&
+		s.settings.Get(ctx, settings.FederationAllowPrivateAddresses) == "true"
+
+	return room, federation.NewSender(s.config.CanonicalAddress, s.rooms.Keyring(),
+		s.federationTrust(ctx), allowPrivate), home, nil
+}
+
+// handleResumePeer tries an abandoned peer again, at an operator's word.
+func (s *Server) handleResumePeer(c *echo.Context) error {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	var request struct {
+		Peer string `json:"peer"`
+	}
+	if err := c.Bind(&request); err != nil || strings.TrimSpace(request.Peer) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "name the peer to resume")
+	}
+
+	host, err := federation.Host(request.Peer)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if err := s.rooms.ResumePeer(c.Request().Context(), roomID, host); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not resume the peer")
+	}
+
+	return s.describeRoomPeers(c, roomID)
 }

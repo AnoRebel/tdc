@@ -298,6 +298,14 @@ type RecoveryToken struct {
 	UsedAt        *time.Time
 }
 
+type RemoteMember struct {
+	RoomID     uuid.UUID
+	Address    string
+	HomeServer string
+	Role       string
+	JoinedAt   time.Time
+}
+
 type Report struct {
 	ID              uuid.UUID
 	RoomID          *uuid.UUID
@@ -359,14 +367,17 @@ type RoomMember struct {
 }
 
 type RoomPeer struct {
-	RoomID      uuid.UUID
-	Peer        string
-	Cursor      int64
-	DeliveredAt *time.Time
-	AttemptedAt *time.Time
-	LastError   string
-	AddedAt     time.Time
-	Address     string
+	RoomID        uuid.UUID
+	Peer          string
+	Cursor        int64
+	DeliveredAt   *time.Time
+	AttemptedAt   *time.Time
+	LastError     string
+	AddedAt       time.Time
+	Address       string
+	Failures      int32
+	NextAttemptAt *time.Time
+	Abandoned     bool
 }
 
 type RoomSequence struct {

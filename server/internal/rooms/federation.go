@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
@@ -146,11 +148,21 @@ whole batch. Storing the valid prefix of a batch containing a forgery would
 leave the room half-updated from a delivery nobody should have trusted, and
 would mean the peer's cursor advancing past events that were rejected.
 */
+// AuthorKeys resolves the published keys of whichever server wrote an event.
+//
+// A room's events are not all written by the same server once remote members
+// post, so verifying a batch means asking for keys by origin rather than
+// assuming the deliverer's.
+type AuthorKeys interface {
+	Keys(ctx context.Context, server string) (*events.Keyring, error)
+}
+
 func (s *Service) AcceptForeignEvents(
 	ctx context.Context,
 	room dbgen.Room,
 	origin string,
 	keyring *events.Keyring,
+	authors AuthorKeys,
 	batch []events.Event,
 ) (int, error) {
 	roomAddress := s.RoomAddress(room)
@@ -170,8 +182,20 @@ func (s *Service) AcceptForeignEvents(
 		return 0, ErrNotHome
 	}
 
+	/*
+		Each event is verified against its own author's keys, not the
+		deliverer's — a remote member's message is written by their server and
+		passed on by the home server, so those differ.
+	*/
 	for _, event := range batch {
-		if err := federation.Accept(event, keyring, roomAddress, room.HomeServer); err != nil {
+		verifier, err := s.keysFor(ctx, event.Origin, origin, keyring, authors)
+		if err != nil {
+			return 0, fmt.Errorf("event %s: %w", event.ID, err)
+		}
+
+		if err := federation.AcceptDelivered(
+			event, verifier, roomAddress, room.HomeServer, origin,
+		); err != nil {
 			return 0, fmt.Errorf("event %s: %w", event.ID, err)
 		}
 	}
@@ -243,14 +267,6 @@ func (s *Service) AdvancePeer(ctx context.Context, roomID uuid.UUID, peer string
 	})
 }
 
-// RecordPeerFailure notes that delivery was tried and failed, leaving the
-// cursor alone so the same events are tried again.
-func (s *Service) RecordPeerFailure(ctx context.Context, roomID uuid.UUID, peer, reason string) error {
-	return s.store.RecordRoomPeerFailure(ctx, dbgen.RecordRoomPeerFailureParams{
-		RoomID: roomID, Peer: peer, LastError: reason,
-	})
-}
-
 // ByID reads a room without any membership check.
 //
 // For the federation paths, which decide access by a peer's participation in
@@ -315,4 +331,82 @@ func (s *Service) Adopt(
 // what a catch-up request asks from.
 func (s *Service) HighestSequence(ctx context.Context, roomID uuid.UUID) (int64, error) {
 	return s.store.HighestSequenceInRoom(ctx, roomID)
+}
+
+// DeliveryFailed counts a failure against a peer and schedules the next try,
+// abandoning it past the ceiling. Returns the peer's state afterwards, so a
+// caller can tell an operator what happened without a second query.
+func (s *Service) DeliveryFailed(
+	ctx context.Context,
+	roomID uuid.UUID,
+	peer, reason string,
+	attempts int,
+) (dbgen.RoomPeer, error) {
+	delay := federation.RetryDelay(attempts)
+
+	return s.store.RecordDeliveryFailure(ctx, dbgen.RecordDeliveryFailureParams{
+		RoomID:     roomID,
+		Peer:       peer,
+		LastError:  reason,
+		RetryAfter: pgInterval(delay),
+		Ceiling:    int32(federation.MaxDeliveryAttempts),
+	})
+}
+
+// DeliverySucceeded clears a peer's failure state: consecutive failures are
+// what matter, and a peer that answers has none.
+func (s *Service) DeliverySucceeded(ctx context.Context, roomID uuid.UUID, peer string) error {
+	return s.store.ClearDeliveryFailures(ctx, dbgen.ClearDeliveryFailuresParams{
+		RoomID: roomID, Peer: peer,
+	})
+}
+
+// ResumePeer is an operator deciding to try an abandoned peer again.
+func (s *Service) ResumePeer(ctx context.Context, roomID uuid.UUID, peer string) error {
+	return s.store.ResumePeer(ctx, dbgen.ResumePeerParams{RoomID: roomID, Peer: peer})
+}
+
+// PeersDue lists peers with events owed and nothing stopping delivery.
+func (s *Service) PeersDue(ctx context.Context, limit int32) ([]dbgen.RoomPeer, error) {
+	return s.store.PeersDueForDelivery(ctx, limit)
+}
+
+// pgInterval turns a duration into the interval the query expects.
+func pgInterval(d time.Duration) pgtype.Interval {
+	return pgtype.Interval{Microseconds: d.Microseconds(), Valid: true}
+}
+
+/*
+keysFor resolves the keys that verify one event's author.
+
+Three cases, and the third is easy to miss. The author may be the peer that
+delivered the batch, in which case its keys are already in hand. It may be
+another server, which is what a remote member's message relayed by the home
+server looks like — those keys are fetched.
+
+Or it may be *this* server: a message one of our own users posted into a room
+elsewhere, which the home server sequenced and has now sent back to us. Asking
+discovery for our own keys would mean this server making an HTTP request to
+itself, which fails for every deployment not reachable at its own canonical
+address from inside — and would be absurd even where it worked, since the keys
+are already here.
+*/
+func (s *Service) keysFor(
+	ctx context.Context,
+	author, deliveredBy string,
+	delivererKeys *events.Keyring,
+	authors AuthorKeys,
+) (*events.Keyring, error) {
+	if strings.EqualFold(author, s.serverName) {
+		return s.keyring, nil
+	}
+	if strings.EqualFold(author, deliveredBy) {
+		return delivererKeys, nil
+	}
+
+	keyring, err := authors.Keys(ctx, author)
+	if err != nil {
+		return nil, fmt.Errorf("cannot verify %s: %w", author, err)
+	}
+	return keyring, nil
 }

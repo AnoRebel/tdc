@@ -7,10 +7,10 @@ this source tree could implement the other side of it.
 Federation is optional. A server with it switched off is a complete TDC server;
 nothing on this page is needed to run one.
 
-> **Status.** This document covers discovery, identity, request signing and
-> read-only room replication. Remote posting and membership are being built on
-> top of them and will be described here as they land. Version `tdc/1` is not
-> frozen until they are.
+> **Status.** This document covers discovery, identity, request signing, room
+> replication, and remote membership and posting. Cross-server browsing and
+> moderation are still being built. Version `tdc/1` is not frozen until they
+> land.
 
 ## What a server publishes
 
@@ -313,6 +313,81 @@ remember.
 A server that was unreachable asks its home server for everything after the
 highest sequence it holds, rather than waiting for the home server's retry
 queue to walk through a backlog of individual pushes.
+
+## A member on another server
+
+A room's home server decides who is in it and what order things happened in.
+It does **not** get to decide what its members said.
+
+### Who signs what
+
+When a user on server B posts into a room hosted on A:
+
+1. **B builds and signs the event.** `origin` is B, `sender` is `user@b`.
+   There is no sequence yet.
+2. **B forwards it to A**, over a signed request.
+3. **A verifies B's signature** against B's published keys, checks membership,
+   assigns the sequence, and stores it — **without re-signing**.
+4. **A relays it** to every other participating server, B's signature intact.
+
+This split is the security property, and it is why `sequence` is deliberately
+not part of what is signed: A can assign one without invalidating anything, so
+**ordering is A's and authorship is B's**. A compromised home server can drop,
+delay or reorder messages — which is inherent in one server holding the order —
+but it cannot invent a message from a member it does not host, because it holds
+none of their keys.
+
+### Two questions, not one
+
+A receiving server checks both:
+
+- **Who wrote it** — `origin` must equal `sender`'s server, and the signature
+  must verify against _that_ server's keys. Not the deliverer's: one batch can
+  carry events written by several servers.
+- **Who delivered it** — must be the room's home server, because only the home
+  server assigns positions.
+
+For a local member's message these are the same server; for a remote member's
+they are not, and conflating them either blocks remote posting or lets any peer
+inject events into any room.
+
+### Membership events
+
+A join or leave is the home server's own decision, so the home server signs it
+as itself: `sender` is `server@its-host`, with the person named in the content.
+An event claiming to be _from_ somebody on another server while signed by this
+one is exactly the impersonation the checks above refuse — including when the
+statement itself is true.
+
+### Joining
+
+```
+POST /api/federation/rooms/{slug}/join    {"member": "user@b"}
+POST /api/federation/rooms/{slug}/leave   {"member": "user@b"}
+POST /api/federation/rooms/{slug}/post    {"event": {...}}
+```
+
+All three require a signed request, and **the member named must be on the
+server that signed it**. A server may act for its own users and nobody else's.
+
+The room's own rules apply to a remote join exactly as to a local one — public
+rooms only, not archived. The joining server's rules are irrelevant: the room's
+home server decides who is in its rooms, or membership means nothing.
+
+### Retry, and giving up
+
+Delivery retries with exponential backoff and jitter (2s doubling to 5 minutes,
+randomised between half and full). The jitter matters: without it every
+delivery failing when a peer goes down retries in the same instant and arrives
+as a thundering herd the moment it returns.
+
+After **10 consecutive failures** — roughly forty minutes — the peer is
+abandoned: delivery stops, the reason is recorded, and the operator is told.
+It resumes only when they say so. A peer unreachable for a day is not coming
+back on the next attempt.
+
+A success resets the count. Consecutive failures are what matter; a peer that
+fails once an hour is not one that has been down for an hour.
 
 ## Whether a server will deal with you at all
 
