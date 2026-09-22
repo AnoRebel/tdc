@@ -294,6 +294,56 @@ func (q *Queries) IsRemoteMember(ctx context.Context, arg IsRemoteMemberParams) 
 	return column_1, err
 }
 
+const knownPeers = `-- name: KnownPeers :many
+/*
+Every server this one participates with, once each.
+
+Peers are recorded per room, so a server sharing four rooms appears four times;
+this collapses that to the server itself, which is what "who are we connected
+to" actually asks. The counts come along because an operator looking at a peer
+wants to know how much is riding on it.
+*/
+SELECT peer,
+       MIN(address)::text AS address,
+       COUNT(*)::bigint AS rooms,
+       BOOL_OR(abandoned)::boolean AS any_abandoned
+FROM room_peers
+GROUP BY peer
+ORDER BY peer
+`
+
+type KnownPeersRow struct {
+	Peer         string
+	Address      string
+	Rooms        int64
+	AnyAbandoned bool
+}
+
+func (q *Queries) KnownPeers(ctx context.Context) ([]KnownPeersRow, error) {
+	rows, err := q.db.Query(ctx, knownPeers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []KnownPeersRow{}
+	for rows.Next() {
+		var i KnownPeersRow
+		if err := rows.Scan(
+			&i.Peer,
+			&i.Address,
+			&i.Rooms,
+			&i.AnyAbandoned,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const peersDueForDelivery = `-- name: PeersDueForDelivery :many
 /*
 Peers with something owed and nothing stopping delivery.
@@ -334,6 +384,64 @@ func (q *Queries) PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomP
 			&i.Failures,
 			&i.NextAttemptAt,
 			&i.Abandoned,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const publishedRooms = `-- name: PublishedRooms :many
+/*
+The rooms this server offers to a peer browsing it.
+
+Public rooms only, and never archived ones. A private room is excluded here
+rather than filtered by the caller, so "a private room on a public server
+remains undiscoverable" is a property of the query rather than of whoever
+remembers to check — the spec's requirement, made structural.
+
+Direct conversations are excluded by kind: they have no slug and are found by
+their participants, so listing them would disclose who talks to whom.
+*/
+SELECT id, slug, name, topic, home_server, federated
+FROM rooms
+WHERE visibility = 'public'
+  AND archived_at IS NULL
+  AND kind = 'channel'
+  AND slug IS NOT NULL
+ORDER BY name
+LIMIT $1
+`
+
+type PublishedRoomsRow struct {
+	ID         uuid.UUID
+	Slug       *string
+	Name       string
+	Topic      string
+	HomeServer string
+	Federated  bool
+}
+
+func (q *Queries) PublishedRooms(ctx context.Context, limit int32) ([]PublishedRoomsRow, error) {
+	rows, err := q.db.Query(ctx, publishedRooms, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PublishedRoomsRow{}
+	for rows.Next() {
+		var i PublishedRoomsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.Topic,
+			&i.HomeServer,
+			&i.Federated,
 		); err != nil {
 			return nil, err
 		}

@@ -410,3 +410,81 @@ func (s *Service) keysFor(
 	}
 	return keyring, nil
 }
+
+// PublishedRoom is a room as a peer browsing this server sees it.
+type PublishedRoom struct {
+	Slug      string `json:"slug"`
+	Name      string `json:"name"`
+	Topic     string `json:"topic"`
+	Address   string `json:"address"`
+	Federated bool   `json:"federated"`
+}
+
+/*
+Published lists the rooms this server offers to a peer.
+
+Public, unarchived channels only, which the query enforces rather than the
+caller — so a private room stays undiscoverable whether or not somebody
+remembers to filter. Whether this peer may see the list at all is a separate,
+earlier question about the server, asked before this is called.
+*/
+func (s *Service) Published(ctx context.Context, limit int32) ([]PublishedRoom, error) {
+	rows, err := s.store.PublishedRooms(ctx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("read published rooms: %w", err)
+	}
+
+	published := make([]PublishedRoom, 0, len(rows))
+	for _, row := range rows {
+		slug := ""
+		if row.Slug != nil {
+			slug = *row.Slug
+		}
+
+		home := row.HomeServer
+		if home == "" {
+			home = s.serverName
+		}
+
+		published = append(published, PublishedRoom{
+			Slug:      slug,
+			Name:      row.Name,
+			Topic:     row.Topic,
+			Address:   slug + "@" + home,
+			Federated: row.Federated,
+		})
+	}
+	return published, nil
+}
+
+// Peer is a server this one is connected to, as a person browsing sees it.
+type Peer struct {
+	Server  string `json:"server"`
+	Address string `json:"address"`
+	// Rooms is how many rooms this server shares with the peer, which is what
+	// makes a connection more than a name in a list.
+	Rooms int64 `json:"rooms"`
+	// Reachable is false when delivery to this peer has been abandoned in any
+	// shared room — the one thing worth surfacing, since a peer given up on
+	// will not recover by itself.
+	Reachable bool `json:"reachable"`
+}
+
+// KnownPeers lists the servers this one participates with.
+func (s *Service) KnownPeers(ctx context.Context) ([]Peer, error) {
+	rows, err := s.store.KnownPeers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read peers: %w", err)
+	}
+
+	peers := make([]Peer, 0, len(rows))
+	for _, row := range rows {
+		peers = append(peers, Peer{
+			Server:    row.Peer,
+			Address:   row.Address,
+			Rooms:     row.Rooms,
+			Reachable: !row.AnyAbandoned,
+		})
+	}
+	return peers, nil
+}

@@ -2,6 +2,7 @@ package federation_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -374,5 +375,50 @@ func TestAPeerMayNotActForSomebodyElsesUser(t *testing.T) {
 					test.peer, test.address, allowed, test.allowed)
 			}
 		})
+	}
+}
+
+/*
+A peer that has not listed us learns nothing, and is told nothing either.
+
+An empty list rather than a refusal: a distinct refusal would itself disclose
+that there is something to be refused, which is exactly what limited
+visibility exists to avoid.
+*/
+func TestBrowsingAServerThatDoesNotListUsReturnsNothing(t *testing.T) {
+	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// What a limited server answers a peer it has not listed.
+		_ = json.NewEncoder(w).Encode(map[string]any{"rooms": []any{}})
+	}))
+	defer peer.Close()
+
+	key, err := events.NewKeyPair("browser-key")
+	if err != nil {
+		t.Fatalf("NewKeyPair: %v", err)
+	}
+	sender := federation.NewSender("https://a.example.org", events.NewKeyring(key),
+		federation.Trust{Mode: federation.ModeOpen}, true)
+
+	rooms, err := sender.BrowseRooms(context.Background(), peer.URL)
+	if err != nil {
+		t.Fatalf("BrowseRooms: %v", err)
+	}
+	if len(rooms) != 0 {
+		t.Fatalf("a server that has not listed us returned %d rooms", len(rooms))
+	}
+}
+
+// A blocked peer is not browsed, for the same reason it is not delivered to:
+// one list, consulted from every direction.
+func TestABlockedPeerIsNotBrowsed(t *testing.T) {
+	key, err := events.NewKeyPair("browser-key")
+	if err != nil {
+		t.Fatalf("NewKeyPair: %v", err)
+	}
+	sender := federation.NewSender("https://a.example.org", events.NewKeyring(key),
+		federation.Trust{Mode: federation.ModeOpen, Blocked: []string{"nuisance.example.org"}}, true)
+
+	if _, err := sender.BrowseRooms(context.Background(), "https://nuisance.example.org"); err == nil {
+		t.Fatal("a blocked peer was browsed")
 	}
 }

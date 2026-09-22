@@ -1205,3 +1205,248 @@ func (s *Server) handleResumePeer(c *echo.Context) error {
 
 	return s.describeRoomPeers(c, roomID)
 }
+
+// maxPublishedRooms bounds a browse response, so listing a large server is a
+// page rather than everything it holds.
+const maxPublishedRooms = 100
+
+/*
+handleFederatedRoomList serves this server's public rooms to a peer.
+
+Two checks in series, neither substituting for the other. First whether this
+server is discoverable by this peer at all — mayDiscover, reading the identity
+the signature established rather than a header. Then which rooms are public,
+which the query decides.
+
+A limited server that has not listed this peer answers with an empty list
+rather than a refusal: the peer learns nothing about what is here, which is
+what limited visibility means, and a distinct refusal would itself disclose
+that something exists to be refused.
+*/
+func (s *Server) handleFederatedRoomList(c *echo.Context) error {
+	if !s.mayDiscover(c) {
+		return c.JSON(http.StatusOK, map[string]any{"rooms": []any{}})
+	}
+
+	published, err := s.rooms.Published(c.Request().Context(), maxPublishedRooms)
+	if err != nil {
+		s.log.Error("cannot list published rooms", "error", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not list the rooms")
+	}
+
+	return c.JSON(http.StatusOK, map[string]any{
+		"server": s.config.CanonicalAddress,
+		"rooms":  published,
+	})
+}
+
+// connectedServer is a peer as a person browsing this server sees it.
+//
+// The shape the clients were written against before there was a server to
+// answer them: a domain that identifies it, what it calls itself, and whether
+// it can currently be reached.
+type connectedServer struct {
+	Domain string `json:"domain"`
+	Name   string `json:"name"`
+	// Description is what the peer says it is for, when it publishes one.
+	Description string `json:"description"`
+	Visibility  string `json:"visibility"`
+	/*
+		Reachable is false when delivery to this peer has been abandoned.
+
+		A listed but unreachable server is still shown rather than omitted, so
+		that its absence from a conversation is visible instead of silent —
+		somebody wondering why a room has gone quiet deserves to see that the
+		server holding it has been unreachable for an hour.
+	*/
+	Reachable bool `json:"reachable"`
+	// PublishedRoomCount is how many rooms this person may browse there,
+	// absent when it publishes none or could not be asked.
+	PublishedRoomCount *int `json:"publishedRoomCount,omitempty"`
+}
+
+/*
+handleConnectedServers tells a person which servers this one is connected to.
+
+A session rather than an administrative permission: which servers a community
+federates with is not privileged from its own members. It is the shape of the
+network they are part of, and hiding it would mean people cannot tell where the
+rooms they are in actually live.
+*/
+func (s *Server) handleConnectedServers(c *echo.Context) error {
+	peers, err := s.rooms.KnownPeers(c.Request().Context())
+	if err != nil {
+		s.log.Error("cannot list peers", "error", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "could not list the connected servers")
+	}
+
+	// A bare array: what the clients ask for, and what a list of things
+	// ordinarily is.
+	described := make([]connectedServer, 0, len(peers))
+	for _, peer := range peers {
+		described = append(described, connectedServer{
+			Domain: peer.Server,
+			// Its own name is not known without asking it, which a list of
+			// twenty servers should not do twenty times. The domain is what
+			// identifies it, and the detail view fills in the rest.
+			Name:       peer.Server,
+			Visibility: string(VisibilityPublic),
+			Reachable:  peer.Reachable,
+		})
+	}
+
+	return c.JSON(http.StatusOK, described)
+}
+
+/*
+handleConnectedServer describes one peer, asking it about itself.
+
+Unlike the list, this is one server and one round trip, so it can afford to
+fetch what the peer publishes about itself rather than showing only what this
+server already knew.
+*/
+func (s *Server) handleConnectedServer(c *echo.Context) error {
+	domain := strings.TrimSpace(c.Param("domain"))
+	if domain == "" {
+		return echo.NewHTTPError(http.StatusNotFound, "no such server")
+	}
+
+	ctx := c.Request().Context()
+	known, err := s.knownPeer(ctx, domain)
+	if err != nil {
+		return err
+	}
+
+	described := connectedServer{
+		Domain:     known.Server,
+		Name:       known.Server,
+		Visibility: string(VisibilityPublic),
+		Reachable:  known.Reachable,
+	}
+
+	// What it publishes about itself, when it can be reached. A peer that
+	// cannot be asked is still described, from what we already hold.
+	if peers, _ := s.federationState(); peers != nil {
+		if document, docErr := peers.Discover(ctx, known.Address); docErr == nil {
+			described.Domain = known.Server
+			if !document.Enabled {
+				described.Reachable = false
+			}
+		}
+	}
+
+	return c.JSON(http.StatusOK, described)
+}
+
+// knownPeer finds a peer this server participates with, by host.
+func (s *Server) knownPeer(ctx context.Context, domain string) (rooms.Peer, error) {
+	host, err := federation.Host(domain)
+	if err != nil {
+		return rooms.Peer{}, echo.NewHTTPError(http.StatusNotFound, "no such server")
+	}
+
+	peers, err := s.rooms.KnownPeers(ctx)
+	if err != nil {
+		return rooms.Peer{}, echo.NewHTTPError(http.StatusInternalServerError,
+			"could not read the connected servers")
+	}
+
+	for _, peer := range peers {
+		if strings.EqualFold(peer.Server, host) {
+			return peer, nil
+		}
+	}
+	return rooms.Peer{}, echo.NewHTTPError(http.StatusNotFound, "no such server")
+}
+
+/*
+handleBrowsePeer lists a peer's public rooms, asked on a person's behalf.
+
+This server does the asking, because the person's browser holds no credential
+the peer would recognise and the peer decides what to show based on which
+server is asking. So the request is signed by this server, and what comes back
+is what the peer chose to publish to us — not to them.
+*/
+func (s *Server) handleBrowsePeer(c *echo.Context) error {
+	peer := strings.TrimSpace(c.Param("domain"))
+	if peer == "" {
+		return echo.NewHTTPError(http.StatusNotFound, "no such server")
+	}
+
+	ctx := c.Request().Context()
+	if !s.federationEnabled(c) {
+		return echo.NewHTTPError(http.StatusConflict, "federation is not enabled on this server")
+	}
+	if s.config.CanonicalAddress == "" {
+		return echo.NewHTTPError(http.StatusConflict, "this server has no canonical address")
+	}
+
+	/*
+		Reached at the address we know for it where we have one.
+
+		A peer is named by host, which is its identity rather than its
+		address — assuming https on the default port would make every peer
+		behind another port unbrowsable.
+	*/
+	address := peer
+	if known, err := s.knownPeer(ctx, peer); err == nil && known.Address != "" {
+		address = known.Address
+	}
+
+	allowPrivate := s.settings != nil &&
+		s.settings.Get(ctx, settings.FederationAllowPrivateAddresses) == "true"
+	sender := federation.NewSender(s.config.CanonicalAddress, s.rooms.Keyring(),
+		s.federationTrust(ctx), allowPrivate)
+
+	published, err := sender.BrowseRooms(ctx, address)
+	if err != nil {
+		/*
+			An empty list rather than an error.
+
+			A peer that does not list us is indistinguishable from one that
+			publishes nothing, deliberately — and a peer that is simply down
+			should leave the page saying "nothing to show" rather than
+			throwing, since the person browsing can do nothing about either.
+		*/
+		s.log.Warn("could not browse a peer", "peer", peer, "error", err)
+		return c.JSON(http.StatusOK, []any{})
+	}
+
+	// Described the way a room is described everywhere else, so the client
+	// renders them with the components it already has.
+	described := make([]map[string]any, 0, len(published))
+	for _, room := range published {
+		described = append(described, map[string]any{
+			"id":         room.Address,
+			"slug":       room.Slug,
+			"name":       room.Name,
+			"topic":      room.Topic,
+			"kind":       "channel",
+			"visibility": "public",
+			"address":    room.Address,
+			"archived":   false,
+			"member":     false,
+		})
+	}
+
+	return c.JSON(http.StatusOK, described)
+}
+
+// PublishedRoomsForTest exposes what this server publishes to peers, so a test
+// can check the filtering against a real database rather than against a mock
+// peer that was never given a private room to hide.
+func (s *Server) PublishedRoomsForTest(ctx context.Context) ([]rooms.PublishedRoom, error) {
+	return s.rooms.Published(ctx, maxPublishedRooms)
+}
+
+// MayDiscoverForTest answers the visibility question for a given verified peer,
+// so a test can check the rule without standing up a second signing server.
+func (s *Server) MayDiscoverForTest(ctx context.Context, verifiedPeer string) bool {
+	if s.visibility(ctx) != VisibilityLimited {
+		return s.visibility(ctx) == VisibilityPublic
+	}
+	if strings.TrimSpace(verifiedPeer) == "" {
+		return false
+	}
+	return s.listsPeer(ctx, verifiedPeer)
+}

@@ -35,6 +35,18 @@ func (s *Server) routes() {
 	s.echo.GET("/api/server", s.handleServerInfo)
 
 	/*
+		The shape of the network this community is part of.
+
+		A session rather than an administrative permission: which servers a
+		community federates with is not privileged from its own members, and
+		hiding it would mean people cannot tell where the rooms they are in
+		actually live.
+	*/
+	s.echo.GET("/api/federation/servers", s.handleConnectedServers, requireAuthentication)
+	s.echo.GET("/api/federation/servers/:domain", s.handleConnectedServer, requireAuthentication)
+	s.echo.GET("/api/federation/servers/:domain/rooms", s.handleBrowsePeer, requireAuthentication)
+
+	/*
 		This server's identity, for peers.
 
 		Unauthenticated and served whether or not federation is enabled: a peer
@@ -85,6 +97,11 @@ func (s *Server) routes() {
 	authenticated.POST("/rooms/:slug/join", s.handleFederatedJoin)
 	authenticated.POST("/rooms/:slug/leave", s.handleFederatedLeave)
 	authenticated.POST("/rooms/:slug/post", s.handleFederatedPost)
+
+	// What this server publishes to a peer browsing it. Signed like
+	// everything else here, so the visibility rules see a peer identity this
+	// server verified rather than one the request asserted.
+	authenticated.GET("/rooms", s.handleFederatedRoomList)
 
 	// First-run setup. Available only while the server has no accounts; the
 	// handler refuses once one exists, which is what closes the path.

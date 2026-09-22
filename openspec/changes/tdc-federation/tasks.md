@@ -70,12 +70,12 @@ Goal: the write path. A user whose home server is not the room's home server par
 
 Goal: finish the `TDC-Peer-Server` stub `httpapi/visibility.go` already left — real peer discovery and room browsing, not a header nobody legitimately sets.
 
-- [ ] 6.1 Populate `TDC-Peer-Server` from the verified origin of a signed federated request rather than trusting a client-supplied header; verify the visibility checks already in `httpapi/visibility.go` now receive a value the requesting server cannot forge (`federation/protocol`)
-- [ ] 6.2 Implement `GET /federation/rooms`, an authenticated federated endpoint returning the rooms this server publishes to the requesting peer under `server.visibility` and each room's own visibility; verify a limited server returns nothing to a peer it has not listed, and a public server's private rooms are still excluded (`federation/protocol`)
-- [ ] 6.3 Implement a client-facing endpoint listing this server's known peers with their visibility as seen by this server; verify a person can retrieve the list of connected servers this server can currently reach
-- [ ] 6.4 Implement browsing a peer's published rooms through this server, calling 6.2 on the person's behalf; verify browsing a public peer lists its public rooms, and a private room on that same public peer is not returned (`federation/protocol`)
-- [ ] 6.5 Build the web client screens for viewing connected servers and browsing a peer's rooms; verify a person can see connected servers and browse a public one's rooms end to end without using the API directly
-- [ ] **MILESTONE 6** — Demonstrate: with servers A and B connected (from Phase 3) and a room federated between them (from Phase 4), a person on a third server C — connected to A but not federated into any shared room — browses A's connected-servers list, sees B listed, and browses B's public rooms; a private room on B is not shown to C. Tag `v1.7.0-dev`.
+- [x] 6.1 Populate `TDC-Peer-Server` from the verified origin of a signed federated request rather than trusting a client-supplied header; verify the visibility checks already in `httpapi/visibility.go` now receive a value the requesting server cannot forge (`federation/protocol`)
+- [x] 6.2 Implement `GET /federation/rooms`, an authenticated federated endpoint returning the rooms this server publishes to the requesting peer under `server.visibility` and each room's own visibility; verify a limited server returns nothing to a peer it has not listed, and a public server's private rooms are still excluded (`federation/protocol`)
+- [x] 6.3 Implement a client-facing endpoint listing this server's known peers with their visibility as seen by this server; verify a person can retrieve the list of connected servers this server can currently reach
+- [x] 6.4 Implement browsing a peer's published rooms through this server, calling 6.2 on the person's behalf; verify browsing a public peer lists its public rooms, and a private room on that same public peer is not returned (`federation/protocol`)
+- [x] 6.5 Build the web client screens for viewing connected servers and browsing a peer's rooms; verify a person can see connected servers and browse a public one's rooms end to end without using the API directly
+- [x] **MILESTONE 6** — Demonstrate: with servers A and B connected (from Phase 3) and a room federated between them (from Phase 4), a person on a third server C — connected to A but not federated into any shared room — browses A's connected-servers list, sees B listed, and browses B's public rooms; a private room on B is not shown to C. Tag `v1.7.0-dev`.
 
 ## 7. Phase 7 — Local authority and privacy hold across the boundary
 

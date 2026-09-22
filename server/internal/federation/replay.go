@@ -38,11 +38,16 @@ type seen struct {
 /*
 ReplayCache remembers signatures inside their validity window.
 
-Keyed by the signature bytes themselves rather than by (key, nonce): the
-signature is already unique per request by construction — it covers a timestamp
-— so it needs no separate nonce to be a usable identity, and using it means
-there is no second field a sender could vary to get a fresh identity for the
-same request.
+Keyed by the signature bytes themselves, which is the whole request condensed:
+every covered field, the timestamps, and the nonce that distinguishes two
+otherwise identical requests. That last part is load-bearing and was learned
+the hard way — a timestamp alone does not make a GET with no body unique, so
+two such requests in the same second signed identically and the second was
+refused as a replay of the first.
+
+Keying on the signature rather than on the nonce alone means a sender cannot
+vary one field to get a fresh identity for the same request: change anything
+covered and it is a different request, which is what it should be.
 */
 type ReplayCache struct {
 	mu       sync.Mutex

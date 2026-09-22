@@ -306,6 +306,7 @@ type Querier interface {
 	IsPostingRestricted(ctx context.Context, arg IsPostingRestrictedParams) (bool, error)
 	IsRemoteMember(ctx context.Context, arg IsRemoteMemberParams) (bool, error)
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
+	KnownPeers(ctx context.Context) ([]KnownPeersRow, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
 	LiftPostingRestriction(ctx context.Context, arg LiftPostingRestrictionParams) (int64, error)
@@ -497,6 +498,7 @@ type Querier interface {
 	// a long run of them means nothing is listening, and continuing to try costs
 	// a request per notification forever.
 	PrunePushSubscriptions(ctx context.Context, failures int32) (int64, error)
+	PublishedRooms(ctx context.Context, limit int32) ([]PublishedRoomsRow, error)
 	// The press, recorded before it is announced.
 	//
 	// ON CONFLICT DO NOTHING rather than an upsert: a second press of the same

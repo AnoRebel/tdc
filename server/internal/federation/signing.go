@@ -1,6 +1,7 @@
 package federation
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
@@ -126,7 +127,7 @@ ending with the @signature-params line that repeats the covered list and the
 parameters. Both sides build this identically from the request itself, which is
 what makes altering any covered field break the signature.
 */
-func signatureBase(method, path, authority, digest string, created, expires int64, keyID string) string {
+func signatureBase(method, path, authority, digest string, created, expires int64, keyID, nonce string) string {
 	values := map[string]string{
 		"@method":        strings.ToUpper(method),
 		"@path":          path,
@@ -144,13 +145,13 @@ func signatureBase(method, path, authority, digest string, created, expires int6
 	}
 
 	builder.WriteString(`"@signature-params": `)
-	builder.WriteString(signatureParams(created, expires, keyID))
+	builder.WriteString(signatureParams(created, expires, keyID, nonce))
 	return builder.String()
 }
 
 // signatureParams serialises the inner list and parameters, the form that
 // appears both in the Signature-Input header and as the base's final line.
-func signatureParams(created, expires int64, keyID string) string {
+func signatureParams(created, expires int64, keyID, nonce string) string {
 	quoted := make([]string, 0, len(coveredComponents))
 	for _, component := range coveredComponents {
 		quoted = append(quoted, `"`+component+`"`)
@@ -159,8 +160,8 @@ func signatureParams(created, expires int64, keyID string) string {
 	// created and expires are integer seconds since the epoch: absolute
 	// instants with no zone, which is what makes two servers in different
 	// timezones agree about when a signature stops being valid.
-	return fmt.Sprintf(`(%s);created=%d;expires=%d;keyid="%s";alg="ed25519"`,
-		strings.Join(quoted, " "), created, expires, keyID)
+	return fmt.Sprintf(`(%s);created=%d;expires=%d;nonce="%s";keyid="%s";alg="ed25519"`,
+		strings.Join(quoted, " "), created, expires, nonce, keyID)
 }
 
 /*
@@ -197,14 +198,32 @@ func Sign(request *http.Request, body []byte, keyring *events.Keyring, now time.
 		return fmt.Errorf("determine the destination: %w", err)
 	}
 
-	base := signatureBase(request.Method, request.URL.EscapedPath(), authority, digest, created, expires, key.ID)
+	/*
+		A nonce, because a timestamp is not unique enough.
+
+		Two identical requests inside the same second — which is what a GET
+		with no body repeated quickly is — produce byte-identical signature
+		bases and therefore identical signatures. The receiver's replay cache
+		cannot tell that from an attacker resending one, so it refuses the
+		second, and a server browsing a peer twice in a second is refused for
+		having done nothing wrong.
+
+		RFC 9421 defines this parameter for exactly this.
+	*/
+	nonce, err := newNonce()
+	if err != nil {
+		return err
+	}
+
+	base := signatureBase(request.Method, request.URL.EscapedPath(), authority, digest,
+		created, expires, key.ID, nonce)
 
 	signature, err := key.SignBytes([]byte(base))
 	if err != nil {
 		return fmt.Errorf("sign the request: %w", err)
 	}
 
-	request.Header.Set("Signature-Input", signatureLabel+"="+signatureParams(created, expires, key.ID))
+	request.Header.Set("Signature-Input", signatureLabel+"="+signatureParams(created, expires, key.ID, nonce))
 	request.Header.Set("Signature", signatureLabel+"=:"+base64.StdEncoding.EncodeToString(signature)+":")
 	return nil
 }
@@ -271,7 +290,7 @@ func Verify(request *http.Request, body []byte, keyring *events.Keyring, authori
 	}
 
 	base := signatureBase(request.Method, request.URL.EscapedPath(), authority, digest,
-		params.created, params.expires, params.keyID)
+		params.created, params.expires, params.keyID, params.nonce)
 
 	if !key.VerifyBytes([]byte(base), signature) {
 		/*
@@ -304,6 +323,7 @@ func Verify(request *http.Request, body []byte, keyring *events.Keyring, authori
 // signatureInput is the parsed Signature-Input header.
 type signatureInput struct {
 	keyID   string
+	nonce   string
 	created int64
 	expires int64
 }
@@ -341,6 +361,8 @@ func parseSignatureInput(header string) (signatureInput, error) {
 			parsed.expires, err = strconv.ParseInt(value, 10, 64)
 		case "keyid":
 			parsed.keyID = value
+		case "nonce":
+			parsed.nonce = value
 		}
 		if err != nil {
 			return signatureInput{}, fmt.Errorf("%w: %s is not an integer", ErrSignatureMalformed, name)
@@ -395,4 +417,13 @@ func parseSignature(header string) ([]byte, error) {
 		return nil, fmt.Errorf("%w: signature is not base64", ErrSignatureMalformed)
 	}
 	return signature, nil
+}
+
+// newNonce makes a value distinguishing two otherwise identical requests.
+func newNonce() (string, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return "", fmt.Errorf("generate a nonce: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
 }

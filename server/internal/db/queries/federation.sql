@@ -176,3 +176,41 @@ WHERE rp.abandoned = FALSE
   )
 ORDER BY rp.room_id, rp.peer
 LIMIT $1;
+
+-- name: PublishedRooms :many
+/*
+The rooms this server offers to a peer browsing it.
+
+Public rooms only, and never archived ones. A private room is excluded here
+rather than filtered by the caller, so "a private room on a public server
+remains undiscoverable" is a property of the query rather than of whoever
+remembers to check — the spec's requirement, made structural.
+
+Direct conversations are excluded by kind: they have no slug and are found by
+their participants, so listing them would disclose who talks to whom.
+*/
+SELECT id, slug, name, topic, home_server, federated
+FROM rooms
+WHERE visibility = 'public'
+  AND archived_at IS NULL
+  AND kind = 'channel'
+  AND slug IS NOT NULL
+ORDER BY name
+LIMIT $1;
+
+-- name: KnownPeers :many
+/*
+Every server this one participates with, once each.
+
+Peers are recorded per room, so a server sharing four rooms appears four times;
+this collapses that to the server itself, which is what "who are we connected
+to" actually asks. The counts come along because an operator looking at a peer
+wants to know how much is riding on it.
+*/
+SELECT peer,
+       MIN(address)::text AS address,
+       COUNT(*)::bigint AS rooms,
+       BOOL_OR(abandoned)::boolean AS any_abandoned
+FROM room_peers
+GROUP BY peer
+ORDER BY peer;

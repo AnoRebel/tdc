@@ -339,3 +339,74 @@ func TestSigningAgreesOnANonDefaultPort(t *testing.T) {
 		t.Fatal("a signature for :8443 verified against the default port")
 	}
 }
+
+/*
+Two identical requests in the same second are both accepted.
+
+A GET with no body has nothing varying in it: same method, path, authority and
+empty digest. With only a timestamp to distinguish them, two such requests a
+millisecond apart produce byte-identical signatures, and the receiver's replay
+cache correctly refuses the second — refusing a server that did nothing wrong.
+
+Found by a demonstration where browsing a peer twice failed the second time,
+reported as "replayed signature". The nonce is what separates them.
+*/
+func TestTwoIdenticalRequestsInTheSameSecondAreBothAccepted(t *testing.T) {
+	signer := signingKeyring(t, "key-1")
+	verifier := verifying(t, signer)
+	cache := NewReplayCache()
+	now := time.Now()
+
+	accepted := 0
+	for attempt := range 5 {
+		// Identical in every respect, signed at the very same instant.
+		signed := signedRequest(t, signer, http.MethodGet,
+			"https://b.example.org/api/federation/rooms", nil, now)
+
+		signature, err := Verify(received(signed, nil), nil, verifier, "b.example.org", now)
+		if err != nil {
+			t.Fatalf("request %d was refused: %v", attempt, err)
+		}
+		if !cache.Remember(signature.Raw, signature.Expires) {
+			t.Fatalf("request %d was taken for a replay of request %d", attempt, attempt-1)
+		}
+		accepted++
+	}
+
+	if accepted != 5 {
+		t.Fatalf("%d of 5 identical-but-distinct requests were accepted", accepted)
+	}
+}
+
+/*
+And a genuine replay — the same signature presented twice — is still refused.
+
+The nonce distinguishes two requests; it must not make a captured one reusable,
+which is what a test of the previous behaviour alone would have missed.
+*/
+func TestAGenuineReplayIsStillRefusedWithNonces(t *testing.T) {
+	signer := signingKeyring(t, "key-1")
+	verifier := verifying(t, signer)
+	cache := NewReplayCache()
+	now := time.Now()
+
+	signed := signedRequest(t, signer, http.MethodGet,
+		"https://b.example.org/api/federation/rooms", nil, now)
+
+	first, err := Verify(received(signed, nil), nil, verifier, "b.example.org", now)
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if !cache.Remember(first.Raw, first.Expires) {
+		t.Fatal("the first presentation was refused")
+	}
+
+	// The very same captured request, sent again.
+	second, err := Verify(received(signed, nil), nil, verifier, "b.example.org", now)
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if cache.Remember(second.Raw, second.Expires) {
+		t.Fatal("a captured request was accepted twice")
+	}
+}

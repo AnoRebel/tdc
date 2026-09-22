@@ -210,6 +210,12 @@ against itself would check nothing.
 
 ### Time
 
+Every signature also carries a **`nonce`**, and it is not optional. A GET with
+no body has nothing varying in it — same method, path, authority, empty digest
+— so with only a timestamp to separate them, two such requests in the same
+second sign identically and the second is refused as a replay of the first. A
+server browsing a peer twice in a second is not an attacker.
+
 `created` and `expires` are **integer seconds since the Unix epoch** — absolute
 instants, with no timezone. This is not incidental. Two servers in different
 zones must agree about when a signature stops being valid, and any
@@ -404,6 +410,37 @@ Servers are identified by **hostname**, without the port: `peer.example.org` on
 `:8443` and on `:443` are the same server to these lists. Note this is the
 opposite of `@authority` above, which must carry the port — identity and
 addressing are different questions.
+
+## Browsing what a server publishes
+
+```
+GET /api/federation/rooms
+```
+
+Signed like everything else, which is the point: the answer depends on which
+server is asking, and that must be a server the responder has identified rather
+than one a request claims to be.
+
+**Two checks in series, neither substituting for the other:**
+
+1. **Server visibility** — may this peer see anything here at all? A `limited`
+   server answers only peers its operator listed.
+2. **Room visibility** — which rooms are public? Private and archived rooms are
+   excluded by the query itself, so "a private room on a public server remains
+   undiscoverable" holds whether or not a caller remembers to filter.
+
+A limited server that has not listed the asking peer returns an **empty list,
+not a refusal**. A distinct refusal would itself disclose that there is
+something to be refused, which is what limited visibility exists to avoid — so
+"nothing for you" and "nothing here" are deliberately the same answer.
+
+### The header that used to matter
+
+`TDC-Peer-Server` exists on unsigned client-facing routes and is a claim
+anybody can make. On signed federated routes it is ignored entirely: the peer
+identity comes from the signature, verified before any handler runs. What the
+header still protects on an unsigned route is correspondingly weak — it keeps a
+limited server out of casual listings, not away from a determined caller.
 
 ## Reaching private networks
 

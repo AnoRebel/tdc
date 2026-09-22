@@ -319,3 +319,61 @@ func (s *Sender) originHost() string {
 	}
 	return host
 }
+
+// PublishedRoom is a room a peer offers to servers browsing it.
+type PublishedRoom struct {
+	Slug      string `json:"slug"`
+	Name      string `json:"name"`
+	Topic     string `json:"topic"`
+	Address   string `json:"address"`
+	Federated bool   `json:"federated"`
+}
+
+/*
+BrowseRooms asks a peer what rooms it publishes to us.
+
+Signed like every other federated request, which is what lets the peer apply
+its own visibility rules to a server it has actually identified. A peer that
+does not list us answers with an empty list rather than a refusal, so an empty
+result means "nothing for you" without saying whether that is because there is
+nothing or because we are not admitted.
+*/
+func (s *Sender) BrowseRooms(ctx context.Context, peer string) ([]PublishedRoom, error) {
+	if allowed, why := s.trust.Allows(peer); !allowed {
+		return nil, fmt.Errorf("refusing to reach %s: %w", peer, why)
+	}
+
+	endpoint, err := peerURL(peer, "/api/federation/rooms")
+	if err != nil {
+		return nil, err
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build the request: %w", err)
+	}
+	request.Header.Set("TDC-Origin-Server", s.origin)
+	if err := Sign(request, nil, s.keyring, s.now()); err != nil {
+		return nil, fmt.Errorf("sign the request: %w", err)
+	}
+
+	response, err := s.client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("reach %s: %w", peer, err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		reason, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		return nil, fmt.Errorf("peer %s refused the request: %s: %s",
+			peer, response.Status, strings.TrimSpace(string(reason)))
+	}
+
+	var answer struct {
+		Rooms []PublishedRoom `json:"rooms"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&answer); err != nil {
+		return nil, fmt.Errorf("peer %s gave an unreadable answer: %w", peer, err)
+	}
+	return answer.Rooms, nil
+}
