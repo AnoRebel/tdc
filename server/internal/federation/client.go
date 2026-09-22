@@ -80,27 +80,36 @@ outbound request; an operator federating servers inside one network sets it
 true, having decided that deliberately.
 */
 func NewClient(allowPrivate bool) *Client {
+	return &Client{
+		http:      newPeerHTTPClient(allowPrivate),
+		ttl:       DefaultTTL,
+		now:       time.Now,
+		documents: make(map[string]cached),
+	}
+}
+
+/*
+newPeerHTTPClient builds the HTTP client used to reach peers.
+
+One constructor for discovery and for delivery, so the two cannot end up with
+different answers to "may this server reach a private address" — a drift that
+would let a peer be discoverable but undeliverable, or the reverse.
+
+Redirects are never followed: a redirect would let a server answer for a domain
+it does not serve, which is the claim the domain check exists to refuse.
+*/
+func newPeerHTTPClient(allowPrivate bool) *http.Client {
 	dial := unfurl.DialContext
 	if allowPrivate {
 		dial = (&net.Dialer{Timeout: fetchTimeout}).DialContext
 	}
 
-	return &Client{
-		http: &http.Client{
-			Timeout: fetchTimeout,
-			Transport: &http.Transport{
-				DialContext: dial,
-			},
-			// Deliberately not following redirects. A redirect would let a
-			// server answer for a domain it does not serve, which is exactly
-			// the claim the domain check exists to refuse.
-			CheckRedirect: func(*http.Request, []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
+	return &http.Client{
+		Timeout:   fetchTimeout,
+		Transport: &http.Transport{DialContext: dial},
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
 		},
-		ttl:       DefaultTTL,
-		now:       time.Now,
-		documents: make(map[string]cached),
 	}
 }
 

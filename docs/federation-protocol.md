@@ -7,10 +7,10 @@ this source tree could implement the other side of it.
 Federation is optional. A server with it switched off is a complete TDC server;
 nothing on this page is needed to run one.
 
-> **Status.** This document covers discovery and identity — what a server
-> publishes and how a peer checks it. Request signing, room federation and
-> message propagation are being built on top of it and will be described here
-> as they land. Version `tdc/1` is not frozen until they are.
+> **Status.** This document covers discovery, identity and request signing.
+> Room federation and message propagation are being built on top of them and
+> will be described here as they land. Version `tdc/1` is not frozen until they
+> are.
 
 ## What a server publishes
 
@@ -134,6 +134,113 @@ Two servers far enough apart in age genuinely cannot talk to each other; the
 requirement is not that this never happens but that it fails legibly rather
 than as a parse error several layers down that nobody can trace back to a
 version mismatch.
+
+## Signing a request
+
+Every federated request except version negotiation carries an RFC 9421
+signature. Version negotiation is exempt because a peer has to agree a version
+before it can sign anything the other side knows how to read.
+
+A signed request carries three headers:
+
+```
+TDC-Origin-Server: https://a.example.org
+Content-Digest: sha-256=:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=:
+Signature-Input: tdc=("@method" "@path" "@authority" "content-digest")
+  ;created=1758553650;expires=1758553680;keyid="2026-07-key";alg="ed25519"
+Signature: tdc=:base64signature:
+```
+
+- **`TDC-Origin-Server`** says whose keys to fetch. It is only a claim; the
+  signature is what makes it worth anything.
+- **`Content-Digest`** is SHA-256 of the body, in the RFC 9530 form, present
+  even for an empty body — a covered component that is sometimes absent is one
+  an attacker can remove.
+- **`Signature-Input`** lists the covered components and the parameters.
+- **`Signature`** is the Ed25519 signature over the signature base, base64.
+
+### What must be covered
+
+All four of `@method`, `@path`, `@authority` and `content-digest`. A receiver
+MUST refuse a signature covering fewer, even though it verifies: a signature
+over `@method` alone is cryptographically perfect and means nothing. What is
+covered is the receiver's decision, not the sender's.
+
+Each one refuses a specific attack: `@method` and `@path` stop the request
+being turned into a different one, `@authority` stops it being replayed against
+a different server, and `content-digest` stops the body being altered.
+
+### `@authority` is not the same as the server's identity
+
+This distinction costs people an afternoon, so it is worth stating plainly.
+
+For **identity** — deciding which server this is — the port is irrelevant.
+`tdc.example.org` on `:8443` is the same server as on `:443`.
+
+For **`@authority`** — the string both sides must reproduce to build the same
+signature base — the port is part of the value, normalised per RFC 9110
+§4.2.3: host lowercased, default port for the scheme omitted, any other port
+included.
+
+```
+https://example.org        -> example.org
+https://example.org:443    -> example.org
+https://example.org:8443   -> example.org:8443
+```
+
+Strip the port where it belongs and every signature verifies on a server
+running on `:443` and fails on every deployment behind any other port.
+
+### The signature base
+
+One line per covered component, then the parameters, LF-separated:
+
+```
+"@method": POST
+"@path": /api/federation/ping
+"@authority": b.example.org:8443
+"content-digest": sha-256=:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=:
+"@signature-params": ("@method" "@path" "@authority" "content-digest");created=1758553650;expires=1758553680;keyid="2026-07-key";alg="ed25519"
+```
+
+The receiver rebuilds this from the request it actually received, using the
+authority **it knows itself to be** rather than anything the sender supplied.
+That is what makes the destination binding real: comparing the sender's claim
+against itself would check nothing.
+
+### Time
+
+`created` and `expires` are **integer seconds since the Unix epoch** — absolute
+instants, with no timezone. This is not incidental. Two servers in different
+zones must agree about when a signature stops being valid, and any
+representation carrying a local offset, or derived from wall-clock fields, gets
+this wrong in a way that works perfectly in one deployment and fails by hours
+in another.
+
+Signatures are valid for **30 seconds**. A receiver:
+
+1. refuses anything past `expires`;
+2. refuses anything whose `created` is more than **5 seconds** in the future;
+3. refuses a signature it has already seen inside its window.
+
+Step 2 is a choice this protocol makes, not something RFC 9421 requires — the
+RFC defines no skew tolerance and leaves it to the application. Zero tolerance
+would mean a peer whose clock is a second fast has every request refused, and
+the failure presents as a signature problem when it is really an NTP problem.
+
+Step 3 is what the window alone cannot do. A captured request replayed to the
+same destination inside its window is valid by every other check; only
+remembering it refuses it.
+
+**If pings fail between two servers that look correctly configured, check the
+clocks first.** A refusal naming an expiry that has already passed, or a
+creation time in the future, is a clock fault rather than a key fault.
+
+### Key rotation during verification
+
+A signature naming a `keyid` the receiver does not hold is not immediately a
+failure. Re-fetch the sender's discovery document once and try again: an
+unrecognised key id is what a rotation looks like from the far side.
 
 ## Reaching private networks
 

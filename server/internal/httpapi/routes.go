@@ -54,6 +54,17 @@ func (s *Server) routes() {
 	federated := s.echo.Group("/api/federation", s.requireFederation)
 	federated.POST("/version", s.handleFederationVersion)
 
+	/*
+		Routes a peer must prove itself to reach.
+
+		Version negotiation above is deliberately not among them: a peer has
+		to agree a version before it can sign anything the other side knows
+		how to read, so requiring a signature there would be a handshake that
+		could never complete.
+	*/
+	authenticated := federated.Group("", s.requireSignature)
+	authenticated.POST("/ping", s.handlePing)
+
 	// First-run setup. Available only while the server has no accounts; the
 	// handler refuses once one exists, which is what closes the path.
 	s.echo.GET("/api/setup", s.handleSetupStatus)
@@ -450,6 +461,11 @@ func (s *Server) routes() {
 	admin.GET("/settings", s.handleListSettings,
 		requirePermission(authz.PermServerConfigure))
 	admin.PUT("/settings/:key", s.handleSetSetting,
+		requirePermission(authz.PermServerConfigure))
+
+	// Whether a peer can be reached and will accept our signature. A
+	// diagnostic an operator runs before trusting anything to the transport.
+	admin.POST("/federation/ping", s.handleFederationPing,
 		requirePermission(authz.PermServerConfigure))
 
 	// Feature toggles. Listed and changed separately from settings because a

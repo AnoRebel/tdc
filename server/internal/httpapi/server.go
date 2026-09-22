@@ -21,6 +21,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/config"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/federation"
 	"github.com/AnoRebel/tdc/server/internal/gifs"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/invitations"
@@ -141,6 +142,18 @@ type Server struct {
 	broker   realtime.Broker
 	realtime *realtime.Server
 	config   Config
+
+	/*
+		What federation needs to hold between requests.
+
+		The discovery client caches peers' keys; the replay cache remembers
+		signatures inside their window. Both are per-server rather than
+		per-request, and both are built lazily because a server with federation
+		off should carry neither.
+	*/
+	federationOnce  sync.Once
+	federationPeers *federation.Client
+	federationSeen  *federation.ReplayCache
 
 	// shell is the built application's index.html, held in memory so social
 	// metadata can be inserted per request.

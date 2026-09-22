@@ -128,3 +128,45 @@ func TestAPeerWithNoSharedVersionIsRefusedLegibly(t *testing.T) {
 		}
 	}
 }
+
+/*
+The ping route is signed, and an unsigned call never reaches the handler.
+
+Both halves matter. That it refuses proves the middleware runs; that the body
+says nothing about pings proves the refusal happened before the handler rather
+than inside it.
+*/
+func TestTheSignedPingRefusesAnUnsignedCaller(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := completeSetup(t, handler)
+
+	set := call(t, handler, http.MethodPut, "/api/admin/settings/federation.enabled",
+		map[string]any{"value": "true"}, owner)
+	if set.Code != http.StatusNoContent {
+		t.Fatalf("enabling federation returned %d", set.Code)
+	}
+
+	recorder := call(t, handler, http.MethodPost, "/api/federation/ping",
+		map[string]any{"ping": true}, "")
+
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("an unsigned ping returned %d, want 401", recorder.Code)
+	}
+	if strings.Contains(recorder.Body.String(), "pong") {
+		t.Error("the handler ran for an unsigned request")
+	}
+}
+
+// And with federation off, the signed route is refused by the outer gate
+// before signature verification is even attempted.
+func TestTheSignedPingIsGatedByFederationBeingOff(t *testing.T) {
+	handler := newTestAPI(t)
+	_ = completeSetup(t, handler)
+
+	recorder := call(t, handler, http.MethodPost, "/api/federation/ping",
+		map[string]any{"ping": true}, "")
+
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("with federation off the ping returned %d, want 404", recorder.Code)
+	}
+}

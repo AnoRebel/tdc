@@ -168,3 +168,59 @@ func Parse(body []byte) (Document, error) {
 	}
 	return doc, nil
 }
+
+/*
+Authority reduces an address to the RFC 9421 `@authority` component.
+
+Deliberately not Host. The two answer different questions and must not be
+conflated:
+
+  - Host asks "which server is this?" — a matter of identity, where a port is
+    irrelevant, because tdc.example.org on :8443 is the same server as on :443.
+  - Authority asks "what did the signature say it was addressed to?" — a matter
+    of exact bytes, where the port is part of the value both sides must
+    reproduce identically or the signature will not verify.
+
+Normalised per RFC 9110 §4.2.3, as RFC 9421 requires: the host lowercased, and
+the default port for the scheme omitted, so that https://example.org and
+https://example.org:443 produce the same authority rather than two signatures
+that disagree about the same destination.
+*/
+func Authority(address string) (string, error) {
+	trimmed := strings.TrimSpace(address)
+	if trimmed == "" {
+		return "", ErrNoAddress
+	}
+	if !strings.Contains(trimmed, "://") {
+		trimmed = "https://" + trimmed
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", ErrNoAddress, address)
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" {
+		return "", fmt.Errorf("%w: %s", ErrNoAddress, address)
+	}
+
+	port := parsed.Port()
+	if port == "" || isDefaultPort(parsed.Scheme, port) {
+		return host, nil
+	}
+	return host + ":" + port, nil
+}
+
+// isDefaultPort reports whether a port is the scheme's default, and so must be
+// left out of the authority.
+func isDefaultPort(scheme, port string) bool {
+	switch strings.ToLower(scheme) {
+	case "https":
+		return port == "443"
+	case "http":
+		return port == "80"
+	default:
+		return false
+	}
+}

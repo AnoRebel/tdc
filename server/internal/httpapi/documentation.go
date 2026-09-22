@@ -17,6 +17,8 @@ for whoever needs the description later.
 var documentation = map[string]entry{
 	"GET /api/description":                                  {Summary: "Describe this API", Authentication: "none"},
 	"POST /api/federation/version":                          {Summary: "Agree a federation protocol version", Authentication: "none"},
+	"POST /api/federation/ping":                             {Summary: "Signed federation ping", Authentication: "federation signature"},
+	"POST /api/admin/federation/ping":                       {Summary: "Ping a federation peer", Authentication: "session or token", Permission: "server.configure"},
 	"POST /api/rooms/:id/messages/:eventId/actions/:action": {Summary: "Press an action on a message", Authentication: "session or token"},
 	"GET /api/admin/audit":                                  {Summary: "Read audit", Authentication: "session or token", Permission: "server.audit.read"},
 	"GET /api/admin/audit/export":                           {Summary: "Export audit", Authentication: "session or token", Permission: "server.audit.read"},

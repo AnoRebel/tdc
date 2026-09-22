@@ -152,6 +152,31 @@ func (r *Keyring) Published() []PublishedKey {
 	return published
 }
 
+/*
+SignBytes signs arbitrary bytes with this key.
+
+For signing things that are not events — a federated HTTP request's signature
+base, which RFC 9421 defines its own canonical form for. The alternative was
+exposing the private key so another package could call ed25519.Sign itself,
+which would mean the secret leaving this file to serve a caller that only ever
+wanted a signature.
+
+Returns nothing on a key that cannot sign, which is what a peer's published key
+is: holding one must not silently produce an empty signature that then fails
+verification somewhere less obvious.
+*/
+func (k *KeyPair) SignBytes(message []byte) ([]byte, error) {
+	if k.private == nil {
+		return nil, fmt.Errorf("key %s cannot sign: it holds only a public half", k.ID)
+	}
+	return ed25519.Sign(k.private, message), nil
+}
+
+// VerifyBytes checks a signature this key made over arbitrary bytes.
+func (k *KeyPair) VerifyBytes(message, signature []byte) bool {
+	return ed25519.Verify(k.Public, message, signature)
+}
+
 // Seed returns the private seed, for storage. It is a secret: anything holding
 // it can sign as this server.
 func (k *KeyPair) Seed() []byte {

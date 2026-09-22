@@ -106,3 +106,48 @@ func TestParseRefusesRubbish(t *testing.T) {
 		t.Fatal("a document with no keys must be refused by Parse, not only by Valid")
 	}
 }
+
+/*
+Authority and Host answer different questions, and conflating them breaks
+signing on any server not on a default port.
+
+Host is identity: a server on :8443 is the same server as on :443. Authority is
+the exact string both sides must reproduce to build the same signature base,
+and RFC 9421 requires the non-default port be part of it. Using Host where
+Authority belongs verified fine in every test on a default port and failed on
+every real deployment behind one.
+*/
+func TestAuthorityKeepsTheNonDefaultPortThatHostDiscards(t *testing.T) {
+	cases := []struct {
+		address       string
+		wantAuthority string
+		wantHost      string
+	}{
+		{"https://example.org", "example.org", "example.org"},
+		{"https://example.org:443", "example.org", "example.org"},
+		{"http://example.org:80", "example.org", "example.org"},
+		{"https://example.org:8443", "example.org:8443", "example.org"},
+		{"http://127.0.0.1:44415", "127.0.0.1:44415", "127.0.0.1"},
+		{"https://EXAMPLE.org:8443", "example.org:8443", "example.org"},
+	}
+
+	for _, test := range cases {
+		t.Run(test.address, func(t *testing.T) {
+			authority, err := Authority(test.address)
+			if err != nil {
+				t.Fatalf("Authority(%q): %v", test.address, err)
+			}
+			if authority != test.wantAuthority {
+				t.Errorf("Authority = %q, want %q", authority, test.wantAuthority)
+			}
+
+			host, err := Host(test.address)
+			if err != nil {
+				t.Fatalf("Host(%q): %v", test.address, err)
+			}
+			if host != test.wantHost {
+				t.Errorf("Host = %q, want %q", host, test.wantHost)
+			}
+		})
+	}
+}

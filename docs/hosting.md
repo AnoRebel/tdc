@@ -382,6 +382,27 @@ a refused connection cannot tell a server that does not federate from one that i
 down, and an operator debugging the difference deserves an answer. Everything
 else federated refuses outright.
 
+**Keep the clock right.** Federated requests are signed with a thirty-second
+validity window, and a receiving server refuses anything already expired or
+more than five seconds in the future. A server whose clock has drifted will
+have every federated request refused, and the refusal reads as a signature
+problem rather than the clock problem it is. Run NTP; the container images
+already do.
+
+Once federation is on, an administrator can check a peer before trusting
+anything to it:
+
+```sh
+curl -X POST https://your.server/api/admin/federation/ping \
+  -H 'Content-Type: application/json' \
+  -b "$YOUR_SESSION" \
+  -d '{"peer":"https://their.server"}'
+```
+
+It answers `{"reached":true}` or reports why not — an unreachable address, an
+unpublished key, an expired signature from a bad clock. One request, before
+rooms and messages depend on it.
+
 The [federation protocol](federation-protocol.md) describes what is published
 and how a peer checks it.
 
