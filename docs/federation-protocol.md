@@ -324,6 +324,17 @@ have trusted.
    own account of a room, rather than passing on the home server's, is how two
    servers start to disagree.
 
+### A receiver may refuse what its own policy forbids
+
+A server is never obliged to store content its operator's policy forbids, even
+from a peer it trusts entirely. A delivery containing such an event is refused
+with `422`, naming the event so the sender knows which one.
+
+Refusal is the only action available on arrival. Masking would rewrite a body
+the signature covers, producing an event that verifies nowhere — including on
+the next server the sender relays it to. So a receiving server refuses or
+accepts; it does not alter.
+
 ### Sequences are never reassigned
 
 A receiving server stores the sequence the home server assigned and orders by

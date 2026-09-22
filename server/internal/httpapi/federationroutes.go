@@ -19,6 +19,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/federation"
+	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 )
@@ -451,6 +452,27 @@ func (s *Server) handleFederatedDelivery(c *echo.Context) error {
 	keyring, err := document.Keyring()
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadGateway, "the origin publishes no usable keys")
+	}
+
+	/*
+		This server's own content policy, applied before anything is stored.
+
+		The spec is explicit that a server must not be required to store
+		content its policy forbids, and a filter that only ran on locally
+		composed messages would leave federation as the way around it.
+
+		Refusal is the only action available here. Masking rewrites the body,
+		which would break the signature the event carries — and an event this
+		server had altered would fail verification everywhere, including on the
+		next server it reached. So a forbidden event is not stored, and the
+		peer is told which one; flagging is left to the local moderation queue,
+		which sees stored events.
+	*/
+	if refused := s.refusedByPolicy(c.Request().Context(), delivery.Events); refused != "" {
+		s.log.Info("refused a federated event under this server's content policy",
+			"peer", origin, "room", room.ID, "event", refused)
+		return echo.NewHTTPError(http.StatusUnprocessableEntity,
+			"event "+refused+" was refused by this server's content policy")
 	}
 
 	stored, err := s.rooms.AcceptForeignEvents(c.Request().Context(), room, origin, keyring, peers, delivery.Events)
@@ -1459,4 +1481,56 @@ func (s *Server) EventsForPeerTest(ctx context.Context, roomID, peer string) ([]
 		return nil, err
 	}
 	return s.rooms.EventsForPeer(ctx, id, peer, 0, maxEventsPerBatch)
+}
+
+/*
+refusedByPolicy names the first event this server's filter forbids, if any.
+
+Only the blocking action applies to arriving events: masking would rewrite a
+body the signature covers, leaving an event that verifies nowhere — including
+on the next server this one relays it to. Flagging is for events that are
+stored, which these are not.
+
+Returns the identifier rather than a boolean so the peer can be told which of
+its batch was the problem, since a batch refused as a whole is otherwise a
+thing it cannot act on.
+*/
+func (s *Server) refusedByPolicy(ctx context.Context, batch []events.Event) string {
+	if s.settings == nil {
+		return ""
+	}
+	if moderation.Action(s.settings.Get(ctx, settings.FilterAction)) != moderation.ActionBlock {
+		return ""
+	}
+
+	words := splitList(s.settings.Get(ctx, settings.FilterWords))
+	if len(words) == 0 {
+		return ""
+	}
+	filter := moderation.NewFilter(words)
+
+	for _, event := range batch {
+		var content struct {
+			Body string `json:"body"`
+		}
+		if err := json.Unmarshal(event.Content, &content); err != nil {
+			// Content this server cannot read is content it cannot filter.
+			// Verification has already accepted it, and refusing what we
+			// simply do not understand would refuse every future event type.
+			continue
+		}
+		if content.Body == "" {
+			continue
+		}
+		if _, matched := filter.Check(content.Body); matched {
+			return event.ID
+		}
+	}
+	return ""
+}
+
+// RefusedByPolicyForTest exposes the content-policy decision for arriving
+// events, so a test can check it without standing up a signing peer.
+func (s *Server) RefusedByPolicyForTest(ctx context.Context, batch []events.Event) string {
+	return s.refusedByPolicy(ctx, batch)
 }

@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/AnoRebel/tdc/server/internal/events"
 )
 
 /*
@@ -274,5 +276,62 @@ func TestFederatedEventsCarryNothingBeyondTheirRoom(t *testing.T) {
 		if !strings.HasPrefix(event.Room, "shared@") {
 			t.Errorf("an event for room %q appeared in the shared room's delivery", event.Room)
 		}
+	}
+}
+
+/*
+This server does not store content its own policy forbids, whoever sent it.
+
+The spec is explicit about this, and a filter that ran only on locally composed
+messages would leave federation as the way around it — post the forbidden thing
+from a server without the filter and have it replicated in.
+
+Refusal is the only action available on arrival. Masking rewrites a body the
+signature covers, producing an event that verifies nowhere.
+*/
+func TestAFederatedEventIsRefusedByTheLocalContentPolicy(t *testing.T) {
+	handler := newTestAPIWithAddress(t, "https://b.example.org")
+	owner := enableFederation(t, handler)
+
+	setSetting(t, handler, owner, "filter.words", "forbidden")
+	setSetting(t, handler, owner, "filter.action", "block")
+
+	server := serverBehind(t, handler)
+	ctx := t.Context()
+
+	clean := []events.Event{{ID: "$clean", Content: json.RawMessage(`{"body":"ordinary words"}`)}}
+	if refused := server.RefusedByPolicyForTest(ctx, clean); refused != "" {
+		t.Errorf("an ordinary event was refused: %s", refused)
+	}
+
+	forbidden := []events.Event{
+		{ID: "$clean", Content: json.RawMessage(`{"body":"ordinary words"}`)},
+		{ID: "$dirty", Content: json.RawMessage(`{"body":"a forbidden thing"}`)},
+	}
+	refused := server.RefusedByPolicyForTest(ctx, forbidden)
+	if refused != "$dirty" {
+		t.Fatalf("the policy refused %q, want $dirty", refused)
+	}
+}
+
+/*
+And under any action but blocking, nothing arriving is refused.
+
+Flagging and masking are for events this server stores; an arriving event that
+was masked would no longer verify, so the gentler actions deliberately do
+nothing here rather than doing something harmful.
+*/
+func TestFlaggingDoesNotRefuseFederatedEvents(t *testing.T) {
+	handler := newTestAPIWithAddress(t, "https://b.example.org")
+	owner := enableFederation(t, handler)
+
+	setSetting(t, handler, owner, "filter.words", "forbidden")
+	setSetting(t, handler, owner, "filter.action", "flag")
+
+	server := serverBehind(t, handler)
+	batch := []events.Event{{ID: "$dirty", Content: json.RawMessage(`{"body":"a forbidden thing"}`)}}
+
+	if refused := server.RefusedByPolicyForTest(t.Context(), batch); refused != "" {
+		t.Errorf("flagging refused an arriving event (%s); it should only refuse under block", refused)
 	}
 }
