@@ -153,6 +153,31 @@ const (
 		joins, and an operator who wants that should choose it rather than
 		discover they have it.
 	*/
+	/*
+		FederationEnabled decides whether this server talks to other servers
+		at all.
+
+		Off by default: a server joins a network because an operator chose
+		that, never because it was the default. Turning it off does not make
+		the server unreachable to peers, only unwilling — the discovery
+		document still answers, so a peer learns federation is disabled here
+		instead of waiting out a timeout it cannot interpret.
+	*/
+	FederationEnabled Key = "federation.enabled"
+	/*
+		FederationAllowPrivateAddresses permits reaching peers on private
+		networks.
+
+		Off by default, matching the connect-time guard that protects every
+		other outbound request this server makes. It is a separate setting
+		rather than the same judgement because a federation peer is named by
+		an operator, where a link to unfurl is named by whoever typed it — an
+		operator federating two servers on one private network is doing
+		something ordinary, and refusing it outright would rule out a
+		deployment that has no way around the restriction.
+	*/
+	FederationAllowPrivateAddresses Key = "federation.allow_private_addresses"
+
 	ServerVisibility Key = "server.visibility"
 	// VisibilityAllowedServers lists the peers a limited server admits,
 	// comma separated. Meaningless under any other visibility.
@@ -323,6 +348,16 @@ var definitions = map[Key]definition{
 			}
 			return fmt.Errorf(`%w: expected "public", "limited" or "private"`, ErrInvalidValue)
 		},
+	},
+	FederationAllowPrivateAddresses: {
+		fallback:    "false",
+		description: "Allow federating with peers on private network addresses.",
+		validate:    boolean,
+	},
+	FederationEnabled: {
+		fallback:    "false",
+		description: "Whether this server exchanges rooms and messages with other servers.",
+		validate:    boolean,
 	},
 	VisibilityAllowedServers: {
 		fallback:    "",

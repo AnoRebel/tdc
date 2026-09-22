@@ -10,6 +10,8 @@
   several at once, and what rolling back involves.
 - **[Integrating](integrating.md)** — the HTTP API and the live connection, for
   anybody writing a bot, a bridge or another client.
+- **[Federation protocol](federation-protocol.md)** — how two servers find
+  each other and prove who they are, for anybody implementing the other side.
 - **[Contributing](contributing.md)** — how changes reach this project, what the
   licence requires, and what a pull request has to say.
 - **[Privacy policy](privacy-policy.md)** — a template an operator adapts,

@@ -10,6 +10,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
+	"github.com/AnoRebel/tdc/server/internal/federation"
 	"github.com/AnoRebel/tdc/server/internal/oauth"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 )
@@ -32,6 +33,26 @@ func (s *Server) routes() {
 	s.echo.GET("/api/description", s.handleDescription)
 	s.echo.GET("/api/version", s.handleVersion)
 	s.echo.GET("/api/server", s.handleServerInfo)
+
+	/*
+		This server's identity, for peers.
+
+		Unauthenticated and served whether or not federation is enabled: a peer
+		must be able to learn who this server is and whether it federates at
+		all before it holds any credential here, and "not participating" is a
+		more useful answer than a refused connection.
+	*/
+	s.echo.GET(federation.WellKnownPath, s.handleWellKnown)
+
+	/*
+		Federated routes, refused entirely while federation is off.
+
+		The gate is middleware on the group rather than a check inside each
+		handler, so that adding a federated endpoint cannot accidentally omit
+		it.
+	*/
+	federated := s.echo.Group("/api/federation", s.requireFederation)
+	federated.POST("/version", s.handleFederationVersion)
 
 	// First-run setup. Available only while the server has no accounts; the
 	// handler refuses once one exists, which is what closes the path.

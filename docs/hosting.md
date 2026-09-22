@@ -357,6 +357,34 @@ require a deployment.
 
 Every such change is recorded in the audit log.
 
+### Talking to other servers
+
+Federation is off until you turn it on, and a server does not need it: everything
+in this guide describes a complete TDC server that talks to nobody else.
+
+| Setting                              | Default | What it does                                               |
+| ------------------------------------ | ------- | ---------------------------------------------------------- |
+| `federation.enabled`                 | `false` | Whether this server exchanges anything with other servers. |
+| `federation.allow_private_addresses` | `false` | Whether peers on private network addresses may be reached. |
+
+Two things are worth knowing before you enable it.
+
+**Your canonical address has to be right.** A peer decides whether to trust this
+server by fetching `https://<your domain>/.well-known/tdc-federation` and
+checking that the address inside names the same domain it fetched from. If
+`server.canonical_address` says something else — a stale value, an internal
+hostname, an IP — every peer will correctly refuse you as an impostor. The
+symptom is peers rejecting you while the server itself looks healthy.
+
+**Turning it off does not hide you.** A disabled server still answers at the
+well-known path, saying `"enabled": false`. That is deliberate: a peer that gets
+a refused connection cannot tell a server that does not federate from one that is
+down, and an operator debugging the difference deserves an answer. Everything
+else federated refuses outright.
+
+The [federation protocol](federation-protocol.md) describes what is published
+and how a peer checks it.
+
 ## TLS
 
 **The server does not terminate TLS.** It speaks plain HTTP on its configured
