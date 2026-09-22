@@ -29,6 +29,74 @@ const DAR = "Africa/Dar_es_Salaam"; // UTC+3, and no daylight saving to complica
 // A Tuesday, deliberately: the weekday is part of what onDay promises.
 const afternoon = "2026-09-08T11:32:00Z"; // 14:32 in Dar es Salaam
 
+/*
+ * What the server actually sends, and what the reader must make of it.
+ *
+ * The server encodes every instant with its offset — "…Z" for UTC or
+ * "…+03:00" — so a reader anywhere reconstructs the same moment. These pin
+ * that, because the failure mode is silent: a timestamp parsed as local time
+ * when it was meant as UTC is not an error, it is a plausible-looking time
+ * that is wrong by the offset, and it is wrong by a different amount for
+ * every reader.
+ */
+describe("reading what the server sent", () => {
+  it("reconstructs one instant from every way of writing it", () => {
+    // The same moment, written four ways a server might legitimately send it.
+    const spellings = [
+      "2026-09-08T11:32:00Z",
+      "2026-09-08T11:32:00.000Z",
+      "2026-09-08T14:32:00+03:00",
+      "2026-09-08T01:32:00-10:00",
+    ];
+
+    // Displayed in one zone, they must all be the same o'clock.
+    for (const spelling of spellings) {
+      expect(atTime(spelling, DAR), spelling).toBe("14:32");
+    }
+  });
+
+  it("shows one instant as the local o'clock of wherever it is read", () => {
+    // The instant does not move; the clock on the wall does.
+    expect(atTime(afternoon, "UTC")).toBe("11:32");
+    expect(atTime(afternoon, DAR)).toBe("14:32");
+    expect(atTime(afternoon, "Pacific/Honolulu")).toBe("01:32");
+    expect(atTime(afternoon, "Asia/Tokyo")).toBe("20:32");
+  });
+
+  it("carries a day change across the date line rather than only an hour change", () => {
+    // Late evening in Dar es Salaam is already the next morning in Tokyo, and
+    // still the previous afternoon in Honolulu. A formatter that shifted the
+    // time but not the date would pass an hours-only check and fail here.
+    const lateEvening = "2026-09-08T22:30:00+03:00"; // 19:30 UTC
+
+    expect(onDayAtTime(lateEvening, "Asia/Tokyo")).toBe("9 Sep 04:30");
+    expect(onDayAtTime(lateEvening, DAR)).toBe("8 Sep 22:30");
+    expect(onDayAtTime(lateEvening, "Pacific/Honolulu")).toBe("8 Sep 09:30");
+  });
+
+  it("accepts the epoch milliseconds the API sends for a scheduled message", () => {
+    // Scheduled sends come back as UnixMilli rather than a string, and a
+    // number is unambiguous — but only if it is read as milliseconds. Seconds
+    // would land in 1970 and still format without complaint.
+    const epochMillis = Date.UTC(2026, 8, 8, 11, 32, 0);
+
+    expect(atTime(epochMillis, DAR)).toBe("14:32");
+    expect(onDate(epochMillis, DAR)).toBe("8 Sep 2026");
+  });
+
+  it("survives the round trip a scheduled message actually makes", () => {
+    // The dialog builds a Date in the reader's zone, sends toISOString(), and
+    // the server parses RFC 3339. Whatever the reader's zone, the instant that
+    // comes back must be the instant they chose.
+    const chosen = new Date("2026-09-08T14:32:00+03:00");
+    const sent = chosen.toISOString();
+
+    expect(sent).toBe("2026-09-08T11:32:00.000Z");
+    expect(atTime(sent, DAR)).toBe("14:32");
+    expect(new Date(sent).getTime()).toBe(chosen.getTime());
+  });
+});
+
 describe("saying when", () => {
   it("gives the time alone for a message", () => {
     expect(atTime(afternoon, DAR)).toBe("14:32");
