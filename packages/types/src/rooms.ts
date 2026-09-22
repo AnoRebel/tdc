@@ -19,6 +19,15 @@ export interface Room {
    */
   member: boolean;
   /**
+   * The server that owns this room, when it is not this one.
+   *
+   * Absent for an ordinary room. Present for a replica of a room hosted
+   * elsewhere, which behaves differently in two ways worth telling somebody
+   * about: joining and posting go through that server, and if it is
+   * unreachable the room is unavailable here even though this server is fine.
+   */
+  homeServer?: string;
+  /**
    * How long messages here are kept, in seconds. Absent when they are kept
    * indefinitely.
    *

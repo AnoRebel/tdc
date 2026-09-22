@@ -196,6 +196,28 @@ say "What B holds now"
 timeline "$PORT_B" "$ROOM_B"
 
 export PORT_A PORT_B ROOM_A ROOM_B
+say "And the client is told where the room lives"
+# The room response carries homeServer only for a replica, which is what the
+# web client branches on: join and post go through a different path, and the
+# header says which server actually holds the room.
+api "$PORT_B" GET "/api/rooms/${ROOM_B}" | python3 -c '
+import json, sys
+room = json.load(sys.stdin)
+home = room.get("homeServer")
+if not home:
+    print("  FAILED: B does not report that the room is hosted elsewhere")
+    raise SystemExit(1)
+print("  B reports homeServer=%s — the client knows to use the remote path" % home)
+'
+api "$PORT_A" GET "/api/rooms/${ROOM_A}" | python3 -c '
+import json, sys
+room = json.load(sys.stdin)
+if room.get("homeServer"):
+    print("  FAILED: A reports a home server for a room it owns")
+    raise SystemExit(1)
+print("  A reports no homeServer for its own room — unchanged for ordinary rooms")
+'
+
 say "The two servers agree, message for message"
 python3 - "$WORK" <<'PYEOF'
 import json, subprocess, sys

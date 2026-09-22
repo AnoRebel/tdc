@@ -191,6 +191,7 @@
     "keyboardShortcuts": "Njia za mkato za kibodi"
   },
   "room": {
+    "hostedElsewhereHint": "Chumba hiki kipo kwenye {server}. Seva hiyo isipopatikana, chumba pia hakitapatikana.",
     "messagePlaceholder": "Andika kwenye {room}",
     "startOf": "Huu ndio mwanzo wa",
     "sendFirstMessage": "Tuma ujumbe wa kwanza.",

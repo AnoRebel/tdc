@@ -40,6 +40,30 @@ export function useRooms() {
     return api.post<Room>(`/api/rooms/${roomId}/join`);
   }
 
+  /**
+   * Join a room another server hosts.
+   *
+   * A separate call because what happens differs: this server asks the room's
+   * home server, which applies its own rules and may refuse. A refusal here
+   * comes from a server this one does not control, so it is reported rather
+   * than interpreted.
+   */
+  function joinRemote(roomId: string): Promise<{ joined: boolean; member: string }> {
+    return api.post(`/api/rooms/${roomId}/remote/join`);
+  }
+
+  /**
+   * Post into a room another server hosts.
+   *
+   * Nothing is stored locally on the way out. The home server assigns the
+   * message its position and replicates it back, so what appears in the room
+   * is what everybody else sees rather than a local copy that might differ
+   * from what was actually accepted.
+   */
+  function sendRemote(roomId: string, body: string): Promise<{ id: string; sequence: number }> {
+    return api.post(`/api/rooms/${roomId}/remote/messages`, { body });
+  }
+
   function leave(roomId: string): Promise<void> {
     return api.post(`/api/rooms/${roomId}/leave`);
   }
@@ -232,6 +256,8 @@ export function useRooms() {
     get,
     create,
     join,
+    joinRemote,
+    sendRemote,
     leave,
     timeline,
     members,

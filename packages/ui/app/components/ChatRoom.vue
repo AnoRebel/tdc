@@ -25,6 +25,7 @@ import {
   FileText,
   Flag,
   Forward,
+  Globe,
   Hash,
   Image as ImageIcon,
   Lock,
@@ -1157,6 +1158,21 @@ async function send() {
   const attachmentIds = ready.map((attachment) => attachment.id);
 
   try {
+    /*
+     * A room hosted elsewhere takes a different path, and cannot carry
+     * attachments yet: those are stored by the server that holds the room,
+     * and this one has nowhere to put them that the other could read.
+     */
+    if (room.value?.homeServer) {
+      await roomsApi.sendRemote(roomId.value, body);
+      uploads.clearFinished();
+      pending.clear();
+      // Nothing is added to the list here. The home server assigns the
+      // message its position and sends it back, so what appears is what
+      // everybody else sees rather than a local guess at it.
+      return;
+    }
+
     const sent = await roomsApi.send(roomId.value, body, clientToken, attachmentIds);
     uploads.clearFinished();
     pending.clear();
@@ -1532,7 +1548,19 @@ async function remove(messageId: string) {
 
 async function join() {
   try {
-    room.value = await roomsApi.join(roomId.value);
+    /*
+     * A room hosted elsewhere is joined by asking that server, through ours.
+     *
+     * The refusal, when there is one, comes from a server we do not control —
+     * so it is shown as it arrived rather than replaced with a guess about
+     * what went wrong.
+     */
+    if (room.value?.homeServer) {
+      await roomsApi.joinRemote(roomId.value);
+      room.value = await roomsApi.get(roomId.value);
+    } else {
+      room.value = await roomsApi.join(roomId.value);
+    }
     await refreshRooms();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not join this room.";
@@ -1608,6 +1636,21 @@ watch(roomId, load, { immediate: true });
             {{ room.topic }}
           </p>
         </div>
+
+        <!-- Which server holds this room, when it is not this one.
+
+             Worth saying rather than hiding: a room hosted elsewhere is
+             unavailable when that server is down, even though this one is
+             running perfectly, and somebody meeting that for the first time
+             deserves to have been told where the room actually lives. -->
+        <span
+          v-if="room?.homeServer"
+          class="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+          :title="$ts('room.hostedElsewhereHint', { server: room.homeServer })"
+        >
+          <Globe class="size-3" aria-hidden="true" />
+          {{ room.homeServer }}
+        </span>
 
         <div class="ml-auto flex shrink-0 items-center gap-3 text-xs">
           <!-- The retention policy, said where somebody about to type can see

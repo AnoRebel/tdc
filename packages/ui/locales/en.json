@@ -191,6 +191,7 @@
     "keyboardShortcuts": "Keyboard shortcuts"
   },
   "room": {
+    "hostedElsewhereHint": "This room is hosted on {server}. If that server is unavailable, the room is too.",
     "messagePlaceholder": "Message {room}",
     "startOf": "This is the start of",
     "sendFirstMessage": "Send the first message.",
