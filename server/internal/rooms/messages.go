@@ -39,7 +39,7 @@ func (s *Service) append(
 	content json.RawMessage,
 	clientToken string,
 ) (dbgen.Event, error) {
-	sequence, err := s.store.NextRoomSequence(ctx, room.ID)
+	sequence, err := s.nextSequence(ctx, room)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("allocate sequence: %w", err)
 	}
@@ -273,6 +273,24 @@ func (s *Service) DeleteMessage(
 	actor, err := s.store.GetUserByID(ctx, actorID)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("read actor: %w", err)
+	}
+
+	/*
+		On a replica, the redaction is complete and stays here.
+
+		The content is gone from this server, which is the whole of what a
+		moderator here can decide and the whole of what the spec asks: local
+		authority applies to federated content without the origin's
+		cooperation. What cannot follow is a deletion *event*, because writing
+		one would take a position in an order this server does not own.
+
+		So the origin's copy is untouched, deliberately. A server cannot
+		compel another to forget something, and pretending otherwise — by
+		sending a request the far side is free to ignore — would tell a
+		moderator their decision travelled when it did not.
+	*/
+	if room.HomeServer != "" && !strings.EqualFold(room.HomeServer, s.serverName) {
+		return target, ErrRedactedLocally
 	}
 
 	content, err := json.Marshal(map[string]any{

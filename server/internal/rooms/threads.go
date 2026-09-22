@@ -105,7 +105,7 @@ func (s *Service) appendThreaded(
 	clientToken string,
 	threadRootID *string,
 ) (dbgen.Event, error) {
-	sequence, err := s.store.NextRoomSequence(ctx, room.ID)
+	sequence, err := s.nextSequence(ctx, room)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("allocate sequence: %w", err)
 	}

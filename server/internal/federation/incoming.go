@@ -138,9 +138,27 @@ func AcceptDelivered(
 		return err
 	}
 
-	if !strings.EqualFold(strings.ToLower(deliveredBy), strings.ToLower(homeServer)) {
+	/*
+		Compared as hosts, because one side is an address and the other an
+		identity.
+
+		deliveredBy is whatever the caller had — often a full canonical
+		address — while a room's home server is recorded as a host, the way
+		every peer is. Comparing them raw refused every legitimate delivery
+		whose caller passed an address, which is most of them.
+	*/
+	deliverer, err := Host(deliveredBy)
+	if err != nil {
+		return fmt.Errorf("%w: %q is not an address", ErrNotHomeServer, deliveredBy)
+	}
+	home, err := Host(homeServer)
+	if err != nil {
+		return fmt.Errorf("%w: room's home server %q is not an address", ErrNotHomeServer, homeServer)
+	}
+
+	if !strings.EqualFold(deliverer, home) {
 		return fmt.Errorf("%w: delivered by %s, which is not %s",
-			ErrNotHomeServer, deliveredBy, homeServer)
+			ErrNotHomeServer, deliverer, home)
 	}
 	return nil
 }

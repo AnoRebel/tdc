@@ -488,3 +488,24 @@ func (s *Service) KnownPeers(ctx context.Context) ([]Peer, error) {
 	}
 	return peers, nil
 }
+
+/*
+nextSequence allocates a position in a room's order, refusing on a replica.
+
+Only a room's home server numbers its events. A replica that allocated one
+would take a position the home server is also going to use, and the unique
+index on (room, sequence) then rejects the home server's own event — so a
+single local write into a replicated room permanently breaks replication into
+it, which is precisely the divergence the protocol exists to prevent.
+
+Every path that appends goes through here rather than calling the query
+directly, because there are a dozen such paths and guarding each one is a dozen
+chances to forget. The one that matters is not the obvious one: it is a local
+join, which happens automatically when somebody opens a replicated room.
+*/
+func (s *Service) nextSequence(ctx context.Context, room dbgen.Room) (int64, error) {
+	if room.HomeServer != "" && !strings.EqualFold(room.HomeServer, s.serverName) {
+		return 0, fmt.Errorf("%w: %s orders %s", ErrNotHome, room.HomeServer, s.RoomAddress(room))
+	}
+	return s.store.NextRoomSequence(ctx, room.ID)
+}

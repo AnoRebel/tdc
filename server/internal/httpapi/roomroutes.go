@@ -552,6 +552,27 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 	moderator := currentPermissions(c).AllowsChannel(authz.PermMessageDeleteAny, roomID).Allowed
 
 	event, err := s.rooms.DeleteMessage(ctx, roomID, user.ID, eventIDParam(c), moderator)
+
+	/*
+		A redaction on a replica removes the content and writes no event,
+		because this server does not number events in a room it does not own.
+
+		It is a success, and the act most worth recording: somebody here
+		decided, unilaterally and without the origin's agreement, that this
+		server would stop carrying something. The origin keeps its copy, so
+		the only account of what happened is the one kept here.
+	*/
+	if errors.Is(err, rooms.ErrRedactedLocally) {
+		if moderator {
+			s.recordModeration(c, user, audit.ActionMessageRemoved, "event", eventIDParam(c), nil)
+		}
+		if err := s.attachments.DeleteForEvent(ctx, eventIDParam(c)); err != nil {
+			s.log.Error("cannot remove a locally redacted message's attachments",
+				"event", eventIDParam(c), "error", err)
+		}
+		return c.NoContent(http.StatusNoContent)
+	}
+
 	if err != nil {
 		return roomError(err)
 	}

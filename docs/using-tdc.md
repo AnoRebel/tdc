@@ -442,6 +442,22 @@ Your operator may also have a word filter configured, which can flag a message
 for a human, mask the word, or block the message outright. It is off unless
 somebody set it up.
 
+### Messages from other servers
+
+If your server federates, some messages in a room come from people on other
+servers. Your moderators can act on them exactly as on local ones: remove them,
+filter them, and take reports about them. Nothing about a message being foreign
+puts it out of reach.
+
+**What your moderators cannot do is make it go away everywhere.** Removing a
+message here removes it here. The server it came from keeps its own copy, and
+so does every other server in the room, because no server can compel another to
+forget something. A protocol that claimed otherwise would be telling your
+moderators their decision travelled when it had not.
+
+This works both ways: a moderator on another server can remove one of your
+messages from their copy, and your server keeps it.
+
 ## Making it yours
 
 ### Appearance

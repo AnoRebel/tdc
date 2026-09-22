@@ -29,6 +29,18 @@ var (
 	ErrArchived     = errors.New("this room is archived")
 	ErrNotAMember   = errors.New("you are not a member of this room")
 	ErrNotTheAuthor = errors.New("only the author may change this message")
+	/*
+		ErrRedactedLocally reports a redaction that happened and produced no
+		event, which is what a redaction on a replica is.
+
+		A sentinel rather than a silent success, because a caller that
+		mistakes it for an ordinary deletion looks for fields in an event that
+		was never written — which is how the audit entry for a unilateral
+		redaction came to be silently skipped. Not an error in the sense of
+		something having gone wrong: the content is gone, which is the whole
+		of what was asked.
+	*/
+	ErrRedactedLocally = errors.New("redacted locally, without a deletion event")
 )
 
 // Store is the database surface this package needs.

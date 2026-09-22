@@ -185,7 +185,7 @@ func (s *Service) PostRemote(
 		return dbgen.Event{}, ErrNotAMember
 	}
 
-	sequence, err := s.store.NextRoomSequence(ctx, room.ID)
+	sequence, err := s.nextSequence(ctx, room)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("allocate sequence: %w", err)
 	}
@@ -236,7 +236,7 @@ func (s *Service) appendFrom(
 	eventType events.Type,
 	content json.RawMessage,
 ) (dbgen.Event, error) {
-	sequence, err := s.store.NextRoomSequence(ctx, room.ID)
+	sequence, err := s.nextSequence(ctx, room)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("allocate sequence: %w", err)
 	}

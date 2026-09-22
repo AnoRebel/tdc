@@ -1,6 +1,7 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -165,5 +166,113 @@ func TestTheForgeableHeaderBuysNothingOnASignedRoute(t *testing.T) {
 	}
 	if strings.Contains(recorder.Body.String(), "market") {
 		t.Error("the header disclosed a room on a signed route")
+	}
+}
+
+/*
+A peer with no participant in a room receives no mention of it.
+
+Scoped by actual participation, never by content visibility alone. A private
+room is excluded from browsing because it is private; a *public* room the peer
+has no part in must also be absent from its event deliveries, or an allowlist
+that permits discovery would permit reading everything.
+*/
+func TestAPeerReceivesNothingForARoomItDoesNotParticipateIn(t *testing.T) {
+	handler := newTestAPIWithAddress(t, "https://a.example.org")
+	owner := enableFederation(t, handler)
+
+	shared := makeRoom(t, handler, owner, "shared", "public")
+	unshared := makeRoom(t, handler, owner, "unshared", "public")
+
+	/*
+		Both rooms are federated and both have a peer — a different one for
+		the unshared room.
+
+		An earlier version left the second room with no peers at all, so the
+		join in the query matched nothing whatever the scoping did, and the
+		test passed with participation entirely disabled. A room with a
+		*different* participant is the case that distinguishes scoping by
+		participation from scoping by visibility.
+	*/
+	mustCall(t, handler, http.MethodPut, "/api/admin/rooms/"+shared+"/federation",
+		map[string]any{"federated": true, "peers": []string{"b.example.org"}}, owner, http.StatusOK)
+	mustCall(t, handler, http.MethodPut, "/api/admin/rooms/"+unshared+"/federation",
+		map[string]any{"federated": true, "peers": []string{"c.example.org"}}, owner, http.StatusOK)
+
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+shared+"/messages",
+		map[string]any{"body": "in the shared room"}, owner, http.StatusCreated)
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+unshared+"/messages",
+		map[string]any{"body": "in the unshared room"}, owner, http.StatusCreated)
+
+	server := serverBehind(t, handler)
+	ctx := t.Context()
+
+	// The room it participates in: events reach it.
+	inShared, err := server.EventsForPeerTest(ctx, shared, "b.example.org")
+	if err != nil {
+		t.Fatalf("events for the shared room: %v", err)
+	}
+	if len(inShared) == 0 {
+		t.Fatal("a participating peer received nothing from the room it participates in")
+	}
+
+	// The room it does not: nothing at all, not a refusal.
+	inUnshared, err := server.EventsForPeerTest(ctx, unshared, "b.example.org")
+	if err != nil {
+		t.Fatalf("events for the unshared room: %v", err)
+	}
+	if len(inUnshared) != 0 {
+		t.Fatalf("a peer with no part in a room received %d of its events", len(inUnshared))
+	}
+}
+
+/*
+A federated event delivery carries nothing beyond the room it is about.
+
+The concern is not what the room contains but what travels alongside it: no
+local user directory, no presence, no membership of other rooms. Asserted by
+reading every field of what would actually be sent, rather than by trusting
+that nothing was added.
+*/
+func TestFederatedEventsCarryNothingBeyondTheirRoom(t *testing.T) {
+	handler := newTestAPIWithAddress(t, "https://a.example.org")
+	owner := enableFederation(t, handler)
+
+	shared := makeRoom(t, handler, owner, "shared", "public")
+	makeRoom(t, handler, owner, "elsewhere", "private")
+
+	mustCall(t, handler, http.MethodPut, "/api/admin/rooms/"+shared+"/federation",
+		map[string]any{"federated": true, "peers": []string{"b.example.org"}}, owner, http.StatusOK)
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+shared+"/messages",
+		map[string]any{"body": "hello"}, owner, http.StatusCreated)
+
+	server := serverBehind(t, handler)
+	batch, err := server.EventsForPeerTest(t.Context(), shared, "b.example.org")
+	if err != nil {
+		t.Fatalf("events: %v", err)
+	}
+	if len(batch) == 0 {
+		t.Fatal("nothing to inspect")
+	}
+
+	encoded, err := json.Marshal(batch)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	payload := string(encoded)
+
+	// Nothing about another room, and nothing about anybody's account beyond
+	// the addresses the events themselves carry.
+	for _, forbidden := range []string{"elsewhere", "passwordHash", "email", "presence", "lastSeen"} {
+		if strings.Contains(payload, forbidden) {
+			t.Errorf("a federated delivery mentions %q: %s", forbidden, payload)
+		}
+	}
+
+	// And every event named is in the room being delivered.
+	for _, event := range batch {
+		if !strings.HasPrefix(event.Room, "shared@") {
+			t.Errorf("an event for room %q appeared in the shared room's delivery", event.Room)
+		}
 	}
 }

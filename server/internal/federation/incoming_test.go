@@ -313,3 +313,40 @@ func TestAForeignEventStillVerifiesAfterStorageNormalisesIt(t *testing.T) {
 		t.Fatal("an event whose recorded digest does not match its content was accepted")
 	}
 }
+
+/*
+The deliverer is matched as a host, whichever form the caller had.
+
+A room's home server is recorded as a host; the server delivering is often
+known by its full canonical address. Comparing those raw refused every
+legitimate delivery whose caller happened to hold an address — which was most
+of them, and which the unit tests missed because they all passed bare hosts.
+*/
+func TestTheDelivererIsMatchedAsAHostNotAString(t *testing.T) {
+	signing, verifying := homeServerKeyring(t)
+
+	event := signedEvent(t, signing,
+		messageFrom("amina@a.example.org", "a.example.org", "general@a.example.org"))
+
+	// Every way a caller might legitimately name the delivering server.
+	for _, deliveredBy := range []string{
+		"a.example.org",
+		"https://a.example.org",
+		"http://a.example.org:8111",
+		"https://A.Example.ORG/",
+	} {
+		if err := federation.AcceptDelivered(
+			event, verifying, "general@a.example.org", "a.example.org", deliveredBy,
+		); err != nil {
+			t.Errorf("delivery named as %q was refused: %v", deliveredBy, err)
+		}
+	}
+
+	// And a genuinely different server is still refused, or the above would
+	// be satisfied by a check that accepted anything.
+	err := federation.AcceptDelivered(
+		event, verifying, "general@a.example.org", "a.example.org", "https://c.example.org")
+	if !errors.Is(err, federation.ErrNotHomeServer) {
+		t.Fatalf("AcceptDelivered from a stranger = %v, want ErrNotHomeServer", err)
+	}
+}

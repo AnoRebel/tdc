@@ -459,6 +459,24 @@ The other standing cost is that **you inherit some of your peers' problems**:
 their spam reaches your users in shared rooms, and their moderation decisions
 are theirs to make. The blocklist is the remedy, and it is a blunt one.
 
+### Moderating what arrives from elsewhere
+
+Your moderation applies to federated content exactly as to local content —
+removal, filters, reports — and it applies **only here**.
+
+Removing a federated message empties it on this server. No request is sent to
+the server it came from, and none would help: it is not obliged to agree, and
+asking would either be ignored or become a way for any server to delete from
+any other. So the origin keeps its copy, every other participating server keeps
+theirs, and what your moderator decided is what this server carries.
+
+The audit log records it, and for a federated message that record is the only
+account of what happened anywhere — the origin has no idea it occurred.
+
+The same holds in reverse. A moderator on a peer can remove your community's
+message from their copy without telling you, which is worth knowing before
+federating with a server whose moderation you have not thought about.
+
 The [federation protocol](federation-protocol.md) describes what is published
 and how a peer checks it.
 

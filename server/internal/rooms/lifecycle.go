@@ -162,6 +162,21 @@ func (s *Service) Join(ctx context.Context, roomID, userID uuid.UUID) error {
 		return fmt.Errorf("add member: %w", err)
 	}
 
+	/*
+		On a replica, the local membership row is the whole of it.
+
+		A replicated room's events are the home server's, numbered by it, and
+		writing one here would take a position it is also going to use — after
+		which its own event is rejected by the unique index and replication
+		into this room stops for good. The membership that matters was already
+		recorded by the home server when it admitted this person; this row is
+		what makes the room appear in their list and what the ordinary read
+		path checks.
+	*/
+	if room.HomeServer != "" && !strings.EqualFold(room.HomeServer, s.serverName) {
+		return nil
+	}
+
 	user, err := s.store.GetUserByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("read user: %w", err)

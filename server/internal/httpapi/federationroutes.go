@@ -1450,3 +1450,13 @@ func (s *Server) MayDiscoverForTest(ctx context.Context, verifiedPeer string) bo
 	}
 	return s.listsPeer(ctx, verifiedPeer)
 }
+
+// EventsForPeerTest exposes what would be delivered to a peer, so a test can
+// inspect every field of it rather than trust that nothing was added.
+func (s *Server) EventsForPeerTest(ctx context.Context, roomID, peer string) ([]events.Event, error) {
+	id, err := uuid.Parse(roomID)
+	if err != nil {
+		return nil, err
+	}
+	return s.rooms.EventsForPeer(ctx, id, peer, 0, maxEventsPerBatch)
+}

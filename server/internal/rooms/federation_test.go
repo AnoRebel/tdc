@@ -2,8 +2,13 @@ package rooms_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"slices"
 	"testing"
+
+	"github.com/AnoRebel/tdc/server/internal/events"
+	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
 /*
@@ -117,4 +122,111 @@ func TestAPeerInSeveralRoomsIsListedOnce(t *testing.T) {
 	if peers[0].Rooms != 3 {
 		t.Errorf("Rooms = %d, want 3", peers[0].Rooms)
 	}
+}
+
+/*
+A replica never numbers events in a room it does not own.
+
+This is the bug that matters most in this phase, and it was invisible until
+somebody opened a replicated room: joining writes a member.joined event, which
+took sequence 1 — the position the home server was also about to use. Its own
+event is then rejected by the unique index on (room, sequence), and replication
+into that room is broken for good.
+
+So a local join on a replica records the membership and writes no event, and
+every other path that would allocate a position refuses outright.
+*/
+func TestAReplicaAssignsNoSequences(t *testing.T) {
+	service, queries, _ := newTestService(t)
+	ctx := context.Background()
+
+	owner := makeUser(t, queries, "amina")
+	replica, err := service.Adopt(ctx, "townsquare", "Town square", "a.example.org", "public")
+	if err != nil {
+		t.Fatalf("Adopt: %v", err)
+	}
+
+	// Joining is the ordinary thing a person does, and must cost no position.
+	if err := service.Join(ctx, replica.ID, owner.ID); err != nil {
+		t.Fatalf("Join: %v", err)
+	}
+
+	highest, err := service.HighestSequence(ctx, replica.ID)
+	if err != nil {
+		t.Fatalf("HighestSequence: %v", err)
+	}
+	if highest != 0 {
+		t.Fatalf("a local join took sequence %d in a replicated room", highest)
+	}
+
+	// And posting locally is refused rather than silently taking one.
+	if _, err := service.SendMessage(ctx, replica.ID, owner.ID, "local write", ""); !errors.Is(err, rooms.ErrNotHome) {
+		t.Fatalf("posting into a replica = %v, want ErrNotHome", err)
+	}
+}
+
+/*
+The home server's events fit, because nothing local took their positions.
+
+The other half: a test that only checked "no local sequence" would pass against
+a replica that refused everything. What must work is the home server's own
+event arriving at the position it assigned.
+*/
+func TestAHomeServersEventFitsIntoAReplicaAfterALocalJoin(t *testing.T) {
+	service, queries, _ := newTestService(t)
+	ctx := context.Background()
+
+	owner := makeUser(t, queries, "amina")
+	replica, err := service.Adopt(ctx, "townsquare", "Town square", "a.example.org", "public")
+	if err != nil {
+		t.Fatalf("Adopt: %v", err)
+	}
+	if err := service.Join(ctx, replica.ID, owner.ID); err != nil {
+		t.Fatalf("Join: %v", err)
+	}
+
+	homeKey, err := events.NewKeyPair("home-key")
+	if err != nil {
+		t.Fatalf("NewKeyPair: %v", err)
+	}
+	homeRing := events.NewKeyring(homeKey)
+	verifying, err := events.KeyringFromPublished(homeRing.Published())
+	if err != nil {
+		t.Fatalf("KeyringFromPublished: %v", err)
+	}
+
+	nonce, err := events.NewNonce()
+	if err != nil {
+		t.Fatalf("NewNonce: %v", err)
+	}
+	incoming := events.Event{
+		Room:      "townsquare@a.example.org",
+		Sender:    "someone@a.example.org",
+		Origin:    "a.example.org",
+		Type:      events.TypeMessageSent,
+		Sequence:  1,
+		CreatedAt: events.Now(),
+		Nonce:     nonce,
+		Content:   json.RawMessage(`{"body":"the home server's first event"}`),
+	}
+	if err := homeRing.Sign(&incoming); err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	stored, err := service.AcceptForeignEvents(ctx, replica, "a.example.org", verifying,
+		keysOnlyFromDeliverer{}, []events.Event{incoming})
+	if err != nil {
+		t.Fatalf("the home server's sequence 1 was refused: %v", err)
+	}
+	if stored != 1 {
+		t.Fatalf("stored %d events, want 1", stored)
+	}
+}
+
+// keysOnlyFromDeliverer stands in for discovery in tests where every event was
+// written by the server that delivered it, so no lookup should happen.
+type keysOnlyFromDeliverer struct{}
+
+func (keysOnlyFromDeliverer) Keys(context.Context, string) (*events.Keyring, error) {
+	return nil, errors.New("no author keys should be needed here")
 }
