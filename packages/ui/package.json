@@ -31,5 +31,8 @@
     "@vueuse/nuxt": "catalog:vue",
     "tailwindcss": "^4.3.3",
     "vitest": "catalog:testing"
+  },
+  "scripts": {
+    "test": "vitest run"
   }
 }
