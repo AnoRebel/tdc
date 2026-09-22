@@ -133,6 +133,25 @@ func (s *Server) federationState() (*federation.Client, *federation.ReplayCache)
 }
 
 /*
+federationTrust reads the operator's answer to "which peers?".
+
+Read whole, once per request, so that one decision cannot see the mode from
+before an operator's change and the lists from after it. Settings are cached in
+the settings service, so this costs nothing per request and takes effect on the
+next one after a change — no restart, which is what the requirement asks.
+*/
+func (s *Server) federationTrust(ctx context.Context) federation.Trust {
+	if s.settings == nil {
+		return federation.Trust{Mode: federation.ModeOpen}
+	}
+	return federation.Trust{
+		Mode:    federation.ParseMode(s.settings.Get(ctx, settings.FederationMode)),
+		Allowed: federation.SplitList(s.settings.Get(ctx, settings.FederationAllowedServers)),
+		Blocked: federation.SplitList(s.settings.Get(ctx, settings.FederationBlockedServers)),
+	}
+}
+
+/*
 federationAuthority is what this server believes it is called.
 
 Read from the operator's configuration, never from the request. The signature
@@ -168,6 +187,17 @@ func (s *Server) requireSignature(next echo.HandlerFunc) echo.HandlerFunc {
 		origin := strings.TrimSpace(request.Header.Get("TDC-Origin-Server"))
 		if origin == "" {
 			return s.refuseFederated(c, "no origin server named", federation.ErrNotSigned)
+		}
+
+		/*
+			Refused before the signature is even looked at.
+
+			A peer the operator has refused should cost this server the price
+			of a string comparison, not of fetching its keys and verifying
+			Ed25519 over a body it was never going to accept.
+		*/
+		if allowed, why := s.federationTrust(request.Context()).Allows(origin); !allowed {
+			return s.refuseFederated(c, "this server does not federate with that peer", why)
 		}
 
 		// Read the body here: verification needs it whole to check the digest,
@@ -299,7 +329,8 @@ func (s *Server) handleFederationPing(c *echo.Context) error {
 	allowPrivate := s.settings != nil &&
 		s.settings.Get(c.Request().Context(), settings.FederationAllowPrivateAddresses) == "true"
 
-	sender := federation.NewSender(s.config.CanonicalAddress, s.rooms.Keyring(), allowPrivate)
+	sender := federation.NewSender(s.config.CanonicalAddress, s.rooms.Keyring(),
+		s.federationTrust(c.Request().Context()), allowPrivate)
 
 	if err := sender.Ping(c.Request().Context(), asked.Peer); err != nil {
 		s.log.Warn("federation ping failed", "peer", asked.Peer, "error", err)

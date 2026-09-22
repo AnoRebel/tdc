@@ -61,6 +61,7 @@ const groupTitles: Record<string, string> = {
   limits: $ts("admin.capacity"),
   filter: $ts("admin.contentFilter"),
   server: $ts("admin.howThisServerIsFound"),
+  federation: $ts("admin.otherServers"),
   brand: $ts("admin.howThisServerLooks"),
   audit: $ts("moderation.auditLog"),
 };
@@ -87,6 +88,11 @@ const choices: Record<string, { value: string; label: string }[]> = {
     { value: "limited", label: $ts("admin.onlyServersListedBelow") },
     { value: "private", label: $ts("admin.nobodyReachableOnlyByInvitation") },
   ],
+  "federation.mode": [
+    { value: "open", label: $ts("admin.anyServerThatProvesWhoItIs") },
+    { value: "allowlist", label: $ts("admin.onlyTheServersListedBelow") },
+    { value: "blocklist", label: $ts("admin.anyServerExceptThoseListed") },
+  ],
   "filter.action": [
     { value: "flag", label: $ts("admin.deliverAndShowModerator") },
     { value: "mask", label: $ts("admin.deliverWithWordsReplaced") },
@@ -95,7 +101,13 @@ const choices: Record<string, { value: string; label: string }[]> = {
 };
 
 /** Settings better typed into a box than a line. */
-const multiline = new Set(["filter.words", "registration.domains", "server.visible_to"]);
+const multiline = new Set([
+  "filter.words",
+  "registration.domains",
+  "server.visible_to",
+  "federation.allowed_servers",
+  "federation.blocked_servers",
+]);
 
 /** The last segment of a key, as a label. */
 function settingLabel(key: string): string {

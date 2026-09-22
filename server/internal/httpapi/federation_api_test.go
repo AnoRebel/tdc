@@ -170,3 +170,151 @@ func TestTheSignedPingIsGatedByFederationBeingOff(t *testing.T) {
 		t.Fatalf("with federation off the ping returned %d, want 404", recorder.Code)
 	}
 }
+
+// enableFederation turns federation on and returns the owner's credential.
+func enableFederation(t *testing.T, handler http.Handler) string {
+	t.Helper()
+	owner := completeSetup(t, handler)
+
+	set := call(t, handler, http.MethodPut, "/api/admin/settings/federation.enabled",
+		map[string]any{"value": "true"}, owner)
+	if set.Code != http.StatusNoContent {
+		t.Fatalf("enabling federation returned %d", set.Code)
+	}
+	return owner
+}
+
+/*
+A blocked peer is refused on the way out, before anything is dialed.
+
+The ping reports the refusal rather than a connection failure, which is what
+distinguishes "this server will not talk to them" from "they were unreachable"
+— two situations an operator must be able to tell apart.
+*/
+func TestABlockedPeerIsNotEvenDialed(t *testing.T) {
+	handler := newTestAPIWithAddress(t, "https://this.example.org")
+	owner := enableFederation(t, handler)
+
+	setSetting(t, handler, owner, "federation.blocked_servers", "nuisance.example.org")
+
+	recorder := call(t, handler, http.MethodPost, "/api/admin/federation/ping",
+		map[string]any{"peer": "https://nuisance.example.org"}, owner)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("the ping endpoint returned %d", recorder.Code)
+	}
+
+	body := recorder.Body.String()
+	if !strings.Contains(body, `"reached":false`) {
+		t.Fatalf("a blocked peer was reported as reached: %s", body)
+	}
+	if !strings.Contains(body, "blocked") {
+		t.Errorf("the refusal should say the peer is blocked, got %s", body)
+	}
+	// A dial would have produced a connection error instead; this refusal
+	// happened before the address was ever looked up.
+	if strings.Contains(body, "dial") || strings.Contains(body, "no such host") {
+		t.Errorf("the peer was dialed despite being blocked: %s", body)
+	}
+}
+
+/*
+Under an allowlist, an unlisted peer is refused and a listed one is not.
+
+Both halves: a test that only checked the refusal would pass against a server
+that refused everybody.
+*/
+func TestAnAllowlistRefusesTheUnlistedAndNotTheListed(t *testing.T) {
+	handler := newTestAPIWithAddress(t, "https://this.example.org")
+	owner := enableFederation(t, handler)
+
+	setSetting(t, handler, owner, "federation.mode", "allowlist")
+	setSetting(t, handler, owner, "federation.allowed_servers", "friend.example.org")
+
+	unlisted := call(t, handler, http.MethodPost, "/api/admin/federation/ping",
+		map[string]any{"peer": "https://stranger.example.org"}, owner)
+	if !strings.Contains(unlisted.Body.String(), "allowlist") {
+		t.Errorf("an unlisted peer should be refused by the allowlist, got %s", unlisted.Body)
+	}
+
+	// The listed peer does not exist, so it cannot be reached — but it must
+	// fail by being unreachable rather than by being refused.
+	listedPeer := call(t, handler, http.MethodPost, "/api/admin/federation/ping",
+		map[string]any{"peer": "https://friend.example.org"}, owner)
+	if strings.Contains(listedPeer.Body.String(), "allowlist") {
+		t.Errorf("a listed peer was refused by the allowlist: %s", listedPeer.Body)
+	}
+}
+
+/*
+An operator's change takes effect on the next request, with no restart.
+
+The requirement says "immediately", and the way that could quietly fail is a
+value read once at startup — so this blocks a peer and pings it in the same
+test, against a server that has been running throughout.
+*/
+func TestBlockingTakesEffectWithoutARestart(t *testing.T) {
+	handler := newTestAPIWithAddress(t, "https://this.example.org")
+	owner := enableFederation(t, handler)
+
+	before := call(t, handler, http.MethodPost, "/api/admin/federation/ping",
+		map[string]any{"peer": "https://peer.example.org"}, owner)
+	if strings.Contains(before.Body.String(), "blocked") {
+		t.Fatalf("the peer was blocked before anybody blocked it: %s", before.Body)
+	}
+
+	setSetting(t, handler, owner, "federation.blocked_servers", "peer.example.org")
+
+	after := call(t, handler, http.MethodPost, "/api/admin/federation/ping",
+		map[string]any{"peer": "https://peer.example.org"}, owner)
+	if !strings.Contains(after.Body.String(), "blocked") {
+		t.Fatalf("the block did not take effect on the same running server: %s", after.Body)
+	}
+}
+
+/*
+Each kind of federation change is its own audit entry.
+
+Not a generic "setting changed" among hundreds: somebody asking later when a
+relationship started, and who decided it, should find an entry that says so.
+*/
+func TestFederationChangesAreEachAudited(t *testing.T) {
+	handler := newTestAPI(t)
+	owner := enableFederation(t, handler)
+
+	setSetting(t, handler, owner, "federation.mode", "allowlist")
+	setSetting(t, handler, owner, "federation.allowed_servers", "friend.example.org")
+	setSetting(t, handler, owner, "federation.blocked_servers", "nuisance.example.org")
+
+	entries := decodeAudit(t, call(t, handler, http.MethodGet,
+		"/api/admin/audit?limit=50", nil, owner))
+
+	found := map[string]bool{}
+	for _, entry := range entries {
+		found[entry.Action] = true
+	}
+
+	for _, wanted := range []string{
+		"server.federation.enablement_changed",
+		"server.federation.mode_changed",
+		"server.federation.peers_changed",
+	} {
+		if !found[wanted] {
+			t.Errorf("no audit entry for %s; saw %v", wanted, found)
+		}
+	}
+
+	// And the entry records what the value became, so the log can be read
+	// without going to look at the current settings.
+	var enablement auditEntry
+	for _, entry := range entries {
+		if entry.Action == "server.federation.enablement_changed" {
+			enablement = entry
+		}
+	}
+	if !strings.Contains(enablement.Detail, "true") {
+		t.Errorf("the enablement entry should record the new value, got %q", enablement.Detail)
+	}
+	if enablement.TargetID != "federation.enabled" {
+		t.Errorf("the entry names %q, want federation.enabled", enablement.TargetID)
+	}
+}

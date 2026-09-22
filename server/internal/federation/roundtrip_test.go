@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +29,9 @@ type peerServer struct {
 	http    *httptest.Server
 	keyring *events.Keyring
 	seen    *federation.ReplayCache
+	// trust is the operator's answer to "which peers?", open unless a test
+	// sets otherwise.
+	trust federation.Trust
 	// refusals records why requests were turned away, standing in for the log
 	// an operator would read.
 	refusals []string
@@ -41,7 +45,11 @@ func newPeerServer(t *testing.T, id string) *peerServer {
 		t.Fatalf("NewKeyPair: %v", err)
 	}
 
-	peer := &peerServer{keyring: events.NewKeyring(key), seen: federation.NewReplayCache()}
+	peer := &peerServer{
+		keyring: events.NewKeyring(key),
+		seen:    federation.NewReplayCache(),
+		trust:   federation.Trust{Mode: federation.ModeOpen},
+	}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc(federation.WellKnownPath, func(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +65,13 @@ func newPeerServer(t *testing.T, id string) *peerServer {
 		body, _ := io.ReadAll(r.Body)
 
 		origin := r.Header.Get("TDC-Origin-Server")
+
+		// Before the keys are fetched or the signature examined.
+		if allowed, why := peer.trust.Allows(origin); !allowed {
+			peer.refuse(w, "this server does not federate with that peer", why)
+			return
+		}
+
 		document, err := federation.NewClient(true).Discover(r.Context(), origin)
 		if err != nil {
 			peer.refuse(w, "could not verify the origin server", err)
@@ -285,5 +300,39 @@ func TestAnUnsignedPingIsRefused(t *testing.T) {
 
 	if response.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", response.StatusCode)
+	}
+}
+
+/*
+A blocked peer is refused before its signature is checked.
+
+The refusal must not depend on the cryptography: a peer the operator has
+refused should cost the price of a string comparison, not of fetching its keys
+and verifying Ed25519 over a body that was never going to be accepted. So this
+sends a perfectly valid signed ping from a peer the receiver has blocked, and
+requires the refusal to name the block rather than the signature.
+*/
+func TestABlockedPeerIsRefusedBeforeItsSignatureIsChecked(t *testing.T) {
+	a := newPeerServer(t, "a-key")
+	b := newPeerServer(t, "b-key")
+
+	// B blocks A, having consulted nothing about A's keys.
+	b.trust = federation.Trust{Mode: federation.ModeOpen, Blocked: []string{a.http.URL}}
+
+	response := a.ping(t, b, time.Now())
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 — a blocked peer was admitted", response.StatusCode)
+	}
+	if len(b.refusals) == 0 {
+		t.Fatal("the refusal was not recorded")
+	}
+	if !strings.Contains(b.refusals[0], "blocked") {
+		t.Errorf("the refusal should name the block, got %q", b.refusals[0])
+	}
+	// And it must not have got as far as talking about signatures.
+	if strings.Contains(b.refusals[0], "signature") {
+		t.Errorf("the signature was examined despite the peer being blocked: %q", b.refusals[0])
 	}
 }

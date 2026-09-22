@@ -178,6 +178,33 @@ const (
 	*/
 	FederationAllowPrivateAddresses Key = "federation.allow_private_addresses"
 
+	/*
+		FederationMode decides which peers this server will deal with.
+
+		"open"      — any server that can prove who it is.
+		"allowlist" — only the servers an operator has listed.
+		"blocklist" — any server except the ones an operator has listed.
+
+		Open by default once federation is enabled, mirroring the
+		default-public stance of server.visibility: a feature nobody has
+		configured should behave predictably rather than silently restrict.
+		An operator who wants a closed network chooses it, rather than
+		discovering later that they had one.
+	*/
+	FederationMode Key = "federation.mode"
+	// FederationAllowedServers lists the peers an allowlist admits, comma
+	// separated. Meaningless under any other mode.
+	FederationAllowedServers Key = "federation.allowed_servers"
+	/*
+		FederationBlockedServers lists peers this server refuses, comma
+		separated.
+
+		Consulted under every mode, not only "blocklist". A block is an
+		operator saying "not this one" and it would be a trap for that to
+		quietly stop meaning anything because the mode changed.
+	*/
+	FederationBlockedServers Key = "federation.blocked_servers"
+
 	ServerVisibility Key = "server.visibility"
 	// VisibilityAllowedServers lists the peers a limited server admits,
 	// comma separated. Meaningless under any other visibility.
@@ -348,6 +375,25 @@ var definitions = map[Key]definition{
 			}
 			return fmt.Errorf(`%w: expected "public", "limited" or "private"`, ErrInvalidValue)
 		},
+	},
+	FederationMode: {
+		fallback:    "open",
+		description: `Which peers this server deals with: "open", "allowlist" or "blocklist".`,
+		validate: func(value string) error {
+			switch value {
+			case "open", "allowlist", "blocklist":
+				return nil
+			}
+			return fmt.Errorf(`%w: expected "open", "allowlist" or "blocklist"`, ErrInvalidValue)
+		},
+	},
+	FederationAllowedServers: {
+		fallback:    "",
+		description: "Servers this one federates with under allowlist mode, comma separated.",
+	},
+	FederationBlockedServers: {
+		fallback:    "",
+		description: "Servers this one refuses entirely, comma separated.",
 	},
 	FederationAllowPrivateAddresses: {
 		fallback:    "false",

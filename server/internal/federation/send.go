@@ -33,15 +33,21 @@ type Sender struct {
 	// worth anything.
 	origin  string
 	keyring *events.Keyring
-	now     func() time.Time
+	// trust is the operator's answer to "which peers?", consulted before
+	// dialing. The same answer the receiving side uses, from the same lists:
+	// a block that stopped arriving requests but not departing ones would
+	// leave this server still reaching out to a peer its operator refused.
+	trust Trust
+	now   func() time.Time
 }
 
 // NewSender builds a sender for this server.
-func NewSender(origin string, keyring *events.Keyring, allowPrivate bool) *Sender {
+func NewSender(origin string, keyring *events.Keyring, trust Trust, allowPrivate bool) *Sender {
 	return &Sender{
 		client:  newPeerHTTPClient(allowPrivate),
 		origin:  origin,
 		keyring: keyring,
+		trust:   trust,
 		now:     time.Now,
 	}
 }
@@ -54,6 +60,12 @@ signature covers a digest of the exact bytes sent — and a reader could only be
 read once, so signing from it would leave nothing to deliver.
 */
 func (s *Sender) Send(ctx context.Context, peer, path string, payload any) (*http.Response, error) {
+	// Before anything else, including resolving the address: a refused peer
+	// should not even be looked up, let alone dialed.
+	if allowed, why := s.trust.Allows(peer); !allowed {
+		return nil, fmt.Errorf("refusing to reach %s: %w", peer, why)
+	}
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("encode the request: %w", err)

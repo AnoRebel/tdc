@@ -109,6 +109,20 @@ const (
 	*/
 	ActionRetentionShortened Action = "server.retention.shortened"
 
+	/*
+		Federation changes, recorded under their own names.
+
+		Who a server will talk to is not an ordinary setting. Enabling
+		federation exposes rooms beyond this server; adding a peer to an
+		allowlist admits somebody; blocking one severs an existing
+		relationship. Somebody asking later "when did we start federating with
+		them, and who decided that" should find an entry that says so, rather
+		than reconstruct it from a generic setting change among hundreds.
+	*/
+	ActionFederationEnablementChanged Action = "server.federation.enablement_changed"
+	ActionFederationModeChanged       Action = "server.federation.mode_changed"
+	ActionFederationPeersChanged      Action = "server.federation.peers_changed"
+
 	// ActionMessageLifetimeSet records a moderator putting an expiry on
 	// somebody else's message, which is deletion on a delay and deserves the
 	// same trail deletion gets.

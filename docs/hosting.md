@@ -403,6 +403,62 @@ It answers `{"reached":true}` or reports why not — an unreachable address, an
 unpublished key, an expired signature from a bad clock. One request, before
 rooms and messages depend on it.
 
+### Choosing who to federate with
+
+Three settings, and a block beats everything.
+
+| Setting                      | Default | What it does                                                                                                                                 |
+| ---------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `federation.mode`            | `open`  | `open` deals with any server that proves who it is, `allowlist` only with servers you list, `blocklist` with anyone except servers you list. |
+| `federation.allowed_servers` | —       | Comma-separated, used under `allowlist`.                                                                                                     |
+| `federation.blocked_servers` | —       | Comma-separated, honoured under **every** mode.                                                                                              |
+
+The blocklist is consulted whatever the mode is. Blocking a server is you
+saying "not this one", and it would be a trap for that to quietly stop meaning
+anything because you later switched to `open`.
+
+Blocking stops traffic **both ways**, immediately, with no restart: requests
+from that server are refused before their signature is even examined, and
+nothing is sent to them — the address is not even looked up. One list, read
+from both directions, so the two cannot drift apart.
+
+Servers are identified by **hostname**, not hostname and port. Blocking
+`peer.example.org` blocks it on every port, because a server on `:8443` is the
+same server as on `:443`.
+
+Every change here is in the audit log under its own name —
+`server.federation.enablement_changed`, `.mode_changed`, `.peers_changed` — so
+"when did we start federating with them, and who decided that" is a question
+the log answers directly.
+
+### What federation costs
+
+Federation is not free, and the cost is worth understanding before you enable
+it rather than after.
+
+**A room belongs to one server.** Whichever server a room was created on is its
+home server: it assigns the order of messages, and it decides membership. Other
+servers hold a replica.
+
+**If a room's home server goes down, remote participants lose that room** until
+it comes back. Not degraded — gone. Their own server is running perfectly and
+still cannot serve them that room, because the alternative is for it to start
+making decisions the home server is supposed to make, and two servers deciding
+a room's state independently is precisely the failure federation must not have.
+
+The reverse is better: if a _participating_ server goes down, everyone else
+carries on. Only that server's own users are affected, and they get the room
+back when it returns.
+
+So the practical question is not "should we federate" but "which rooms should
+this server host". A room your community depends on daily is better hosted
+here, where your uptime is your own. A room you join on somebody else's server
+is a room whose availability is theirs.
+
+The other standing cost is that **you inherit some of your peers' problems**:
+their spam reaches your users in shared rooms, and their moderation decisions
+are theirs to make. The blocklist is the remedy, and it is a blunt one.
+
 The [federation protocol](federation-protocol.md) describes what is published
 and how a peer checks it.
 

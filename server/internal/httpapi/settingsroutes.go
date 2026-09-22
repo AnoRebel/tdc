@@ -115,6 +115,24 @@ func (s *Server) handleSetSetting(c *echo.Context) error {
 		action = audit.ActionRetentionShortened
 	}
 
+	/*
+		Federation changes get their own names, for the same reason.
+
+		Who a server talks to is not an ordinary setting: enabling federation
+		exposes rooms beyond this server, and adding or removing a peer admits
+		or severs somebody. Somebody asking later when a relationship started
+		should find an entry saying so rather than reconstruct it from a
+		generic setting change among hundreds.
+	*/
+	switch key {
+	case settings.FederationEnabled:
+		action = audit.ActionFederationEnablementChanged
+	case settings.FederationMode:
+		action = audit.ActionFederationModeChanged
+	case settings.FederationAllowedServers, settings.FederationBlockedServers:
+		action = audit.ActionFederationPeersChanged
+	}
+
 	if err := s.audit.Record(c.Request().Context(), audit.Entry{
 		ActorID:    &user.ID,
 		ActorLabel: user.Username,

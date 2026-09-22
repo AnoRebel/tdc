@@ -242,6 +242,22 @@ A signature naming a `keyid` the receiver does not hold is not immediately a
 failure. Re-fetch the sender's discovery document once and try again: an
 unrecognised key id is what a rotation looks like from the far side.
 
+## Whether a server will deal with you at all
+
+Before a signature is examined, the receiving server decides whether it deals
+with your server at all. Three modes — `open`, `allowlist`, `blocklist` — and a
+block is honoured under every one of them.
+
+A refusal here arrives as `401` before any cryptography runs, so an
+implementation seeing every request refused regardless of signature should
+check whether it has been blocked or left off an allowlist rather than looking
+for a signing fault.
+
+Servers are identified by **hostname**, without the port: `peer.example.org` on
+`:8443` and on `:443` are the same server to these lists. Note this is the
+opposite of `@authority` above, which must carry the port — identity and
+addressing are different questions.
+
 ## Reaching private networks
 
 TDC refuses to open outbound connections to private address ranges by default,
