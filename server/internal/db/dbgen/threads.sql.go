@@ -118,7 +118,7 @@ func (q *Queries) CountUnread(ctx context.Context, arg CountUnreadParams) (int64
 const createDirectRoom = `-- name: CreateDirectRoom :one
 INSERT INTO rooms (id, name, kind, visibility, home_server, created_by, participant_key)
 VALUES ($1, $2, 'direct', 'private', $3, $4, $5)
-RETURNING id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key
+RETURNING id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key, federated
 `
 
 type CreateDirectRoomParams struct {
@@ -154,12 +154,13 @@ func (q *Queries) CreateDirectRoom(ctx context.Context, arg CreateDirectRoomPara
 		&i.ArchivedBy,
 		&i.MessageTtlSeconds,
 		&i.ParticipantKey,
+		&i.Federated,
 	)
 	return i, err
 }
 
 const findDirectRoom = `-- name: FindDirectRoom :one
-SELECT id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key FROM rooms WHERE participant_key = $1
+SELECT id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key, federated FROM rooms WHERE participant_key = $1
 `
 
 func (q *Queries) FindDirectRoom(ctx context.Context, participantKey *string) (Room, error) {
@@ -181,12 +182,13 @@ func (q *Queries) FindDirectRoom(ctx context.Context, participantKey *string) (R
 		&i.ArchivedBy,
 		&i.MessageTtlSeconds,
 		&i.ParticipantKey,
+		&i.Federated,
 	)
 	return i, err
 }
 
 const listDirectRoomsForUser = `-- name: ListDirectRoomsForUser :many
-SELECT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.kind, rooms.visibility, rooms.home_server, rooms.created_by, rooms.created_at, rooms.updated_at, rooms.archived_at, rooms.archived_by, rooms.message_ttl_seconds, rooms.participant_key
+SELECT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.kind, rooms.visibility, rooms.home_server, rooms.created_by, rooms.created_at, rooms.updated_at, rooms.archived_at, rooms.archived_by, rooms.message_ttl_seconds, rooms.participant_key, rooms.federated
 FROM rooms
 JOIN room_members ON room_members.room_id = rooms.id
 WHERE room_members.user_id = $1 AND rooms.kind = 'direct'
@@ -218,6 +220,7 @@ func (q *Queries) ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) 
 			&i.ArchivedBy,
 			&i.MessageTtlSeconds,
 			&i.ParticipantKey,
+			&i.Federated,
 		); err != nil {
 			return nil, err
 		}

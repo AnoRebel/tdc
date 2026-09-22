@@ -347,6 +347,7 @@ type Room struct {
 	ArchivedBy        *uuid.UUID
 	MessageTtlSeconds *int32
 	ParticipantKey    *string
+	Federated         bool
 }
 
 type RoomMember struct {
@@ -355,6 +356,17 @@ type RoomMember struct {
 	JoinedAt     time.Time
 	InvitedBy    *uuid.UUID
 	ReadSequence *int64
+}
+
+type RoomPeer struct {
+	RoomID      uuid.UUID
+	Peer        string
+	Cursor      int64
+	DeliveredAt *time.Time
+	AttemptedAt *time.Time
+	LastError   string
+	AddedAt     time.Time
+	Address     string
 }
 
 type RoomSequence struct {

@@ -28,6 +28,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
+	"github.com/AnoRebel/tdc/server/internal/federation"
 	"github.com/AnoRebel/tdc/server/internal/gifs"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
 	"github.com/AnoRebel/tdc/server/internal/identity"
@@ -423,11 +424,28 @@ func parseLevel(level string) slog.Level {
 // The canonical address when the operator has set one, since that is what
 // clients and peers use to reach this server; otherwise a local default, which
 // is adequate until the server federates.
+/*
+serverName is what this server calls itself inside addresses.
+
+A host, not a URL. Addresses are room@server and user@server, and an operator
+who configured "https://tdc.example.org" would otherwise get
+"general@https://tdc.example.org" — which is wrong everywhere it appears and
+catastrophic in federation, where two servers computing an address for the same
+room must reach the same string or neither will accept the other's events.
+
+The host is also how peers are identified in the trust lists and how a room's
+home server is recorded, so deriving it the same way here keeps those three
+agreeing by construction rather than by coincidence.
+*/
 func serverName(cfg config.Config) string {
-	if cfg.Server.CanonicalAddress != "" {
+	if cfg.Server.CanonicalAddress == "" {
+		return "localhost"
+	}
+	host, err := federation.Host(cfg.Server.CanonicalAddress)
+	if err != nil {
 		return cfg.Server.CanonicalAddress
 	}
-	return "localhost"
+	return host
 }
 
 // signingKeyConfigKey is where the server's signing seed is stored.

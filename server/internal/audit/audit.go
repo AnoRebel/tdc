@@ -122,6 +122,10 @@ const (
 	ActionFederationEnablementChanged Action = "server.federation.enablement_changed"
 	ActionFederationModeChanged       Action = "server.federation.mode_changed"
 	ActionFederationPeersChanged      Action = "server.federation.peers_changed"
+	// ActionRoomFederationChanged records a room being opened to peers, or
+	// closed. Distinct from the server-wide settings above: this exposes one
+	// room's contents beyond this server.
+	ActionRoomFederationChanged Action = "room.federation.changed"
 
 	// ActionMessageLifetimeSet records a moderator putting an expiry on
 	// somebody else's message, which is deletion on a delay and deserves the

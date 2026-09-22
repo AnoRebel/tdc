@@ -18,6 +18,16 @@ type Querier interface {
 	// racing, should leave one reaction rather than failing.
 	AddReaction(ctx context.Context, arg AddReactionParams) error
 	AddRoomMember(ctx context.Context, arg AddRoomMemberParams) error
+	// Adds a peer to a room. Adding one twice is the same peer: its cursor is left
+	// alone rather than reset to zero, which would resend the room's whole history,
+	// but its address is refreshed so an operator can correct one in place.
+	AddRoomPeer(ctx context.Context, arg AddRoomPeerParams) error
+	AdoptForeignRoom(ctx context.Context, arg AdoptForeignRoomParams) (Room, error)
+	// Records how far a peer has been told.
+	//
+	// Never moves backwards: a late acknowledgement of an earlier batch must not
+	// undo a later one, which would resend events the peer already holds.
+	AdvanceRoomPeerCursor(ctx context.Context, arg AdvanceRoomPeerCursorParams) error
 	AdvanceTOTPPeriod(ctx context.Context, arg AdvanceTOTPPeriodParams) (Credential, error)
 	AppendAuditEntry(ctx context.Context, arg AppendAuditEntryParams) (AuditEntry, error)
 	AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error)
@@ -165,6 +175,7 @@ type Querier interface {
 	ErasePersonsEvents(ctx context.Context, senderID *uuid.UUID) (int64, error)
 	ErasePersonsReportedContent(ctx context.Context, senderID *uuid.UUID) (int64, error)
 	ErasePersonsSearchIndex(ctx context.Context, senderID *uuid.UUID) (int64, error)
+	EventsForPeerSince(ctx context.Context, arg EventsForPeerSinceParams) ([]Event, error)
 	// Redacts messages past their channel's retention period.
 	//
 	// The channel's own period where it has one, and the server's default
@@ -192,6 +203,9 @@ type Querier interface {
 	// re-scan everything before it. The id is the order entries were written, so
 	// an export is the log as it happened.
 	ExportAuditEntries(ctx context.Context, arg ExportAuditEntriesParams) ([]AuditEntry, error)
+	// Finds a federated room by the address an event names, which is how an
+	// incoming event says which room it belongs to.
+	FederatedRoomByAddress(ctx context.Context, slugFolded *string) (Room, error)
 	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)
@@ -265,6 +279,9 @@ type Querier interface {
 	// The passkeys an account could answer a second-factor challenge with.
 	HasPasskey(ctx context.Context, userID uuid.UUID) (bool, error)
 	HasUsedInvitation(ctx context.Context, arg HasUsedInvitationParams) (bool, error)
+	// The furthest this server has stored for a room, which is what a catch-up
+	// request asks from.
+	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
 	// Issuing a new one invalidates the old, so somebody who asks twice is not left
 	// holding two working links.
@@ -495,11 +512,15 @@ type Querier interface {
 	RecordMessageView(ctx context.Context, arg RecordMessageViewParams) error
 	RecordPushFailure(ctx context.Context, endpoint string) error
 	RecordPushSuccess(ctx context.Context, endpoint string) error
+	// Records that delivery was tried and did not work, leaving the cursor where
+	// it was so the same events are tried again.
+	RecordRoomPeerFailure(ctx context.Context, arg RecordRoomPeerFailureParams) error
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
 	RemoveReaction(ctx context.Context, arg RemoveReactionParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	RemoveRolePermission(ctx context.Context, arg RemoveRolePermissionParams) error
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) error
+	RemoveRoomPeer(ctx context.Context, arg RemoveRoomPeerParams) error
 	RenamePasskey(ctx context.Context, arg RenamePasskeyParams) (Credential, error)
 	RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
@@ -526,6 +547,12 @@ type Querier interface {
 	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (Invitation, error)
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	// One peer's participation, which is also the check for whether a peer may
+	// read a room at all.
+	RoomPeer(ctx context.Context, arg RoomPeerParams) (RoomPeer, error)
+	// The peers participating in a room, for delivery and for showing an operator
+	// who can see it.
+	RoomPeers(ctx context.Context, roomID uuid.UUID) ([]RoomPeer, error)
 	// Records where a device can be reached.
 	//
 	// A browser resubscribing returns the same endpoint, so this updates rather
@@ -595,6 +622,9 @@ type Querier interface {
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.
 	SetRolePermission(ctx context.Context, arg SetRolePermissionParams) error
+	// Opts a room in or out of federation. Explicit, never implied by a server
+	// setting: enabling federation must not silently expose existing rooms.
+	SetRoomFederated(ctx context.Context, arg SetRoomFederatedParams) error
 	SetRoomNotificationPreference(ctx context.Context, arg SetRoomNotificationPreferenceParams) error
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
 	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
@@ -615,6 +645,7 @@ type Querier interface {
 	StartTyping(ctx context.Context, arg StartTypingParams) error
 	StartWebauthnCeremony(ctx context.Context, arg StartWebauthnCeremonyParams) (WebauthnCeremony, error)
 	StopTyping(ctx context.Context, arg StopTypingParams) error
+	StoreForeignEvent(ctx context.Context, arg StoreForeignEventParams) (int64, error)
 	SuspendUser(ctx context.Context, arg SuspendUserParams) error
 	// Taking the authorization consumes it: the row is deleted as it is read, so a
 	// state value cannot be presented twice even if two callbacks arrive at once.

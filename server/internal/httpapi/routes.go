@@ -65,6 +65,16 @@ func (s *Server) routes() {
 	authenticated := federated.Group("", s.requireSignature)
 	authenticated.POST("/ping", s.handlePing)
 
+	/*
+		A room's events, in both directions.
+
+		The peer is the verified origin of the signed request rather than
+		anything it names, so a server cannot read a room by claiming to be
+		somebody who participates in it.
+	*/
+	authenticated.GET("/rooms/:slug/events", s.handleFederatedEvents)
+	authenticated.POST("/rooms/:slug/events", s.handleFederatedDelivery)
+
 	// First-run setup. Available only while the server has no accounts; the
 	// handler refuses once one exists, which is what closes the path.
 	s.echo.GET("/api/setup", s.handleSetupStatus)
@@ -466,6 +476,22 @@ func (s *Server) routes() {
 	// Whether a peer can be reached and will accept our signature. A
 	// diagnostic an operator runs before trusting anything to the transport.
 	admin.POST("/federation/ping", s.handleFederationPing,
+		requirePermission(authz.PermServerConfigure))
+
+	// Which rooms cross between servers. A server-level decision rather than a
+	// room moderator's: it exposes the room's contents beyond this server.
+	admin.PUT("/rooms/:id/federation", s.handleFederateRoom,
+		requirePermission(authz.PermServerConfigure))
+	admin.GET("/rooms/:id/federation", s.handleRoomPeers,
+		requirePermission(authz.PermServerConfigure))
+	admin.POST("/rooms/:id/federation/deliver", s.handleDeliverRoom,
+		requirePermission(authz.PermServerConfigure))
+
+	// Adopting a room another server owns, and asking that server for what
+	// this one has not seen.
+	admin.POST("/federation/adopt", s.handleAdoptRoom,
+		requirePermission(authz.PermServerConfigure))
+	admin.POST("/rooms/:id/federation/catchup", s.handleCatchUp,
 		requirePermission(authz.PermServerConfigure))
 
 	// Feature toggles. Listed and changed separately from settings because a

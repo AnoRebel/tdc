@@ -63,12 +63,28 @@ func (s *Service) Address(slug *string) string {
 	return *slug + "@" + s.serverName
 }
 
-// RoomAddress returns an address for any room, including one with no slug.
+/*
+RoomAddress returns an address for any room, including one with no slug.
+
+Named after the room's home server, not after whichever server is asking. A
+room replicated onto three servers has one address on all three, because the
+address is part of what its events are signed over — if each server computed
+its own, every server would reject every other's events as belonging to a room
+it had never heard of.
+
+home_server is this server for a room created here, so the ordinary case is
+unchanged.
+*/
 func (s *Service) RoomAddress(room dbgen.Room) string {
-	if address := s.Address(room.Slug); address != "" {
-		return address
+	home := room.HomeServer
+	if home == "" {
+		home = s.serverName
 	}
-	return room.ID.String() + "@" + s.serverName
+
+	if room.Slug != nil && *room.Slug != "" {
+		return *room.Slug + "@" + home
+	}
+	return room.ID.String() + "@" + home
 }
 
 // UserAddress returns the federated address of a local user.

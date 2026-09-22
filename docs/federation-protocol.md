@@ -7,10 +7,10 @@ this source tree could implement the other side of it.
 Federation is optional. A server with it switched off is a complete TDC server;
 nothing on this page is needed to run one.
 
-> **Status.** This document covers discovery, identity and request signing.
-> Room federation and message propagation are being built on top of them and
-> will be described here as they land. Version `tdc/1` is not frozen until they
-> are.
+> **Status.** This document covers discovery, identity, request signing and
+> read-only room replication. Remote posting and membership are being built on
+> top of them and will be described here as they land. Version `tdc/1` is not
+> frozen until they are.
 
 ## What a server publishes
 
@@ -241,6 +241,78 @@ creation time in the future, is a clock fault rather than a key fault.
 A signature naming a `keyid` the receiver does not hold is not immediately a
 failure. Re-fetch the sender's discovery document once and try again: an
 unrecognised key id is what a rotation looks like from the far side.
+
+## Replicating a room
+
+A room belongs to exactly one server — its **home server** — which assigns every
+event's position in the room's order. Other servers hold a replica.
+
+### Addresses name the home server
+
+A room's address is `slug@home-server`, and it is the same string on every
+server holding the room. This matters more than it looks: the address is part
+of what each event is signed over, so if each server computed its own version
+of it, every server would reject every other's events as belonging to a room it
+had never heard of.
+
+The same goes for a user: `name@their-server`.
+
+### Two endpoints
+
+```
+GET  /api/federation/rooms/{slug}/events?since={cursor}
+POST /api/federation/rooms/{slug}/events
+```
+
+Both require a signed request. The peer is taken from the **verified origin of
+that signature**, never from a header — otherwise any server could read any
+room by naming a peer that participates in it.
+
+`GET` serves events after a cursor, to a peer that participates in the room. A
+peer with no part in the room receives nothing, reported the same way as a room
+with no new events: telling the two apart would disclose which rooms exist.
+
+`POST` delivers events. The response says how many were **newly stored**, which
+is not how many were sent — a redelivery stores nothing, and saying otherwise
+would imply it did something.
+
+Both are capped at 200 events. A peer returning from a long outage asks
+repeatedly; `"more": true` says another request would bring more.
+
+### What a receiver checks before storing anything
+
+Four checks, and all four run on **every event before any is stored**. One bad
+event refuses the whole batch: storing the valid prefix of a delivery
+containing a forgery leaves a room half-updated from something nobody should
+have trusted.
+
+1. **The signature verifies** against the claimed origin's published keys.
+2. **The origin hosts the sender** — `sender`'s server half must equal
+   `origin`. A server may speak for its own users and nobody else's, and a
+   flawless signature over a lie about whose message this is passes check 1.
+3. **The event names this room.**
+4. **The origin is the room's home server.** A participating peer relaying its
+   own account of a room, rather than passing on the home server's, is how two
+   servers start to disagree.
+
+### Sequences are never reassigned
+
+A receiving server stores the sequence the home server assigned and orders by
+it. Renumbering locally is the first step toward two servers deciding a room's
+order independently, and there is no correct way to reconcile that afterwards.
+
+### Redelivery is a no-op
+
+Storage is idempotent on the event's content-derived id. A retry, an
+overlapping catch-up, or a peer sending a batch twice writes nothing — this is
+a uniqueness constraint in the database rather than a check a caller has to
+remember.
+
+### Catch-up is a pull
+
+A server that was unreachable asks its home server for everything after the
+highest sequence it holds, rather than waiting for the home server's retry
+queue to walk through a backlog of individual pushes.
 
 ## Whether a server will deal with you at all
 

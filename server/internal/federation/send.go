@@ -126,3 +126,87 @@ func peerURL(peer, path string) (string, error) {
 	}
 	return strings.TrimRight(trimmed, "/") + path, nil
 }
+
+/*
+DeliverEvents pushes a room's events to a peer.
+
+Returns how many the peer stored, which is not how many were sent: a peer that
+already held some of them stores fewer, and that is a successful delivery
+rather than a partial one.
+*/
+func (s *Sender) DeliverEvents(ctx context.Context, peer, slug string, batch any) (int, error) {
+	response, err := s.Send(ctx, peer, "/api/federation/rooms/"+slug+"/events",
+		map[string]any{"events": batch})
+	if err != nil {
+		return 0, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		reason, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		return 0, fmt.Errorf("peer %s refused the delivery: %s: %s",
+			peer, response.Status, strings.TrimSpace(string(reason)))
+	}
+
+	var accepted struct {
+		Stored int `json:"stored"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&accepted); err != nil {
+		return 0, fmt.Errorf("peer %s gave an unreadable answer: %w", peer, err)
+	}
+	return accepted.Stored, nil
+}
+
+/*
+FetchEvents asks a peer for a room's events after a cursor.
+
+The pull half of catch-up. Push and pull ask the same underlying question —
+what has this server not seen yet — so a peer returning from an outage asks
+once rather than waiting out a retry queue.
+*/
+func (s *Sender) FetchEvents(
+	ctx context.Context,
+	peer, slug string,
+	since int64,
+) ([]events.Event, error) {
+	if allowed, why := s.trust.Allows(peer); !allowed {
+		return nil, fmt.Errorf("refusing to reach %s: %w", peer, why)
+	}
+
+	endpoint, err := peerURL(peer, fmt.Sprintf("/api/federation/rooms/%s/events?since=%d", slug, since))
+	if err != nil {
+		return nil, err
+	}
+
+	// A GET still carries a signature, over an empty body: the destination and
+	// path are covered, which is what stops the request being replayed
+	// elsewhere.
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build the request: %w", err)
+	}
+	request.Header.Set("TDC-Origin-Server", s.origin)
+	if err := Sign(request, nil, s.keyring, s.now()); err != nil {
+		return nil, fmt.Errorf("sign the request: %w", err)
+	}
+
+	response, err := s.client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("reach %s: %w", peer, err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		reason, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		return nil, fmt.Errorf("peer %s refused the request: %s: %s",
+			peer, response.Status, strings.TrimSpace(string(reason)))
+	}
+
+	var answer struct {
+		Events []events.Event `json:"events"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&answer); err != nil {
+		return nil, fmt.Errorf("peer %s gave an unreadable answer: %w", peer, err)
+	}
+	return answer.Events, nil
+}
