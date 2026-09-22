@@ -431,6 +431,22 @@ Every change here is in the audit log under its own name —
 "when did we start federating with them, and who decided that" is a question
 the log answers directly.
 
+### If a signing key is compromised
+
+Rotate it. That is the only mechanism, and you should know what it does not do.
+
+Peers cache your published keys for up to an hour. A peer that fetched your
+document before you rotated **keeps accepting signatures from the old key until
+its cache expires** — there is no revocation message, and sending one that
+peers were free to ignore would look like revocation without being it.
+
+So: rotate at once, then contact your peers' operators and ask them to refresh.
+That is what shortens the window, and nothing else does.
+
+The retired key stays published deliberately, so that everything it signed
+before the compromise keeps verifying. "Retired" means "still verifies old
+events" — it does not mean "safe".
+
 ### What federation costs
 
 Federation is not free, and the cost is worth understanding before you enable
@@ -454,6 +470,26 @@ So the practical question is not "should we federate" but "which rooms should
 this server host". A room your community depends on daily is better hosted
 here, where your uptime is your own. A room you join on somebody else's server
 is a room whose availability is theirs.
+
+**The two failures are not the same, and it is worth being precise:**
+
+| What goes down             | Who loses what                                                                                                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A **participating** server | Only that server's own users, and only until it returns. Everyone else carries on; the room is unaffected. Its users catch up on everything they missed in one request. |
+| A room's **home** server   | Every remote participant loses that room entirely until it comes back. Their own servers are healthy and still cannot serve it.                                         |
+
+The asymmetry is the design, not a defect. A replica could keep the room usable
+during a home-server outage only by deciding message order itself — and two
+servers ordering the same room independently produces two different
+conversations that can never be reconciled. Losing a room for an afternoon is
+recoverable. Two divergent histories are not.
+
+**What this means for you as an operator.** If you host rooms that other
+communities join, your downtime is their downtime, and they will notice.
+Deciding to host for others is taking on that obligation; deciding to join
+rooms elsewhere is accepting it from somebody else. Neither is wrong — but a
+community whose main channels live on a server run by somebody they have never
+met should know that is the arrangement.
 
 The other standing cost is that **you inherit some of your peers' problems**:
 their spam reaches your users in shared rooms, and their moderation decisions

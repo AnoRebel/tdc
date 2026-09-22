@@ -636,6 +636,107 @@ cookie together with that origin allowlist. An integration using a bearer token
 is not exposed to the question at all, and a bearer token is the right choice
 for anything that is not a browser.
 
+## Federated rooms
+
+**Nothing about federation changes how your program authenticates.** You hold
+an API token on one server, you call that server, and it deals with the others.
+Server-to-server signing is between servers; your token never touches it.
+
+What changes is what some rooms are. A room whose `homeServer` is set in the
+room response lives on another server:
+
+```sh
+curl -H "Authorization: Bearer $TDC_TOKEN" \
+  http://localhost:8080/api/rooms/$ROOM
+```
+
+```json
+{
+  "id": "…",
+  "slug": "townsquare",
+  "address": "townsquare@a.example.org",
+  "homeServer": "a.example.org",
+  "member": true
+}
+```
+
+An ordinary room omits `homeServer` entirely, so a program written before
+federation existed behaves exactly as it did.
+
+### Reading is the same
+
+The timeline, search, and the live connection all work unchanged on a
+replicated room. Your server holds a full copy, so reading costs no round trip
+to the home server and does not stop working when it is unreachable.
+
+Messages carry a `sender` in `name@server` form, and for a federated room some
+of those servers will not be yours. Treat the whole address as the identity —
+two people called `amina` on different servers are different people, and
+matching on the local part alone will eventually confuse them.
+
+### Posting takes a different endpoint
+
+```sh
+# An ordinary room
+curl -X POST -H "Authorization: Bearer $TDC_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"body":"hello"}' \
+  http://localhost:8080/api/rooms/$ROOM/messages
+
+# A room another server owns
+curl -X POST -H "Authorization: Bearer $TDC_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"body":"hello"}' \
+  http://localhost:8080/api/rooms/$ROOM/remote/messages
+```
+
+Branch on `homeServer` being present. The remote endpoint answers with the
+event the home server created, including the `sequence` it assigned:
+
+```json
+{ "id": "$abc…", "sequence": 42, "sender": "yourbot@your.server" }
+```
+
+Note what it does **not** do: it stores nothing locally on the way out. Your
+message appears in the room when the home server replicates it back, which is
+moments later and is the same copy everybody else sees. A program that posts
+and then immediately reads its own message from the timeline should retry
+rather than conclude the post failed.
+
+Joining follows the same shape: `/api/rooms/{id}/remote/join` rather than
+`/api/rooms/{id}/join`.
+
+### What can fail that could not before
+
+| Status | What happened                                                                                                               |
+| ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `409`  | The home server refused — not a member, room archived, or its own rules said no. The message is its answer, passed through. |
+| `409`  | The home server could not be reached. Retry; it is an outage, not a refusal.                                                |
+| `404`  | The room is not federated, or your server no longer participates in it.                                                     |
+
+A `409` whose body mentions reaching the peer is worth retrying with backoff. A
+`409` naming a rule is not: retrying will produce the same answer.
+
+**Attachments are not forwarded yet.** They are held by the server that holds
+the room, and yours has nowhere to put them that the other could read. Posting
+text into a federated room works; posting a file does not.
+
+### Finding federated rooms
+
+```sh
+curl -H "Authorization: Bearer $TDC_TOKEN" \
+  http://localhost:8080/api/federation/servers
+
+curl -H "Authorization: Bearer $TDC_TOKEN" \
+  http://localhost:8080/api/federation/servers/a.example.org/rooms
+```
+
+The first lists servers yours is connected to; the second lists what one of
+them publishes to yours. Both need only your ordinary token. An empty list from
+the second means "nothing for you", which deliberately covers both "that server
+publishes nothing" and "that server has not listed us" — the two are not
+distinguishable, by design.
+
 ## Administration
 
 The endpoints under `/api/admin` each name the permission that governs them, and

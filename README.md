@@ -224,9 +224,25 @@ invitations by pasting them somewhere that renders previews.
 
 ### Federation
 
-Off. Servers do not yet exchange events. The groundwork is in place — every
-event is signed, and addresses name their home server — but nothing crosses a
-server boundary today.
+Off until an operator turns it on, and then per-room: enabling federation does
+not expose rooms a community already has.
+
+Servers discover each other at a well-known path, sign every request, and
+replicate a room's events with the home server deciding their order. A member
+on one server can join and post into a room on another; their own server signs
+what they wrote, so the room's host orders it without being able to invent it.
+Operators choose who to federate with, and a block stops traffic both ways.
+
+Two things it deliberately does not do. A room's home server going down takes
+that room away from remote participants until it returns — the alternative is
+two servers ordering the same room independently, which produces two
+conversations that can never be reconciled. And moderation is local: removing a
+federated message removes it here, and the origin keeps its copy, because no
+server can compel another to forget something.
+
+The [protocol](docs/federation-protocol.md) is published in full, including the
+event format and how identifiers are derived, so another implementation can
+talk to this one without reading this source.
 
 ## Contributing
 

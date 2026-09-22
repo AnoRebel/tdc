@@ -121,6 +121,8 @@ is correct.
 
 ## Agreeing on a version
 
+**This document describes `tdc/1`.**
+
 Both servers advertise a list. The newest version present in both is the one
 they use.
 
@@ -242,11 +244,32 @@ remembering it refuses it.
 clocks first.** A refusal naming an expiry that has already passed, or a
 creation time in the future, is a clock fault rather than a key fault.
 
-### Key rotation during verification
+### Key rotation, and what it does not do
 
-A signature naming a `keyid` the receiver does not hold is not immediately a
+A signature naming a `keyId` the receiver does not hold is not immediately a
 failure. Re-fetch the sender's discovery document once and try again: an
 unrecognised key id is what a rotation looks like from the far side.
+
+**There is no revocation.** Rotating is the only mechanism, and it is not
+instant. A peer that fetched your document an hour ago holds the key you have
+just rotated away from, and will keep accepting signatures made with it until
+its cache expires — up to the TTL, which in this implementation is an hour.
+
+So the honest statement of the exposure is: **a compromised key stays usable
+against any given peer until that peer next fetches your document.** Publishing
+a new key does not reach out to anybody; peers discover it when they look.
+
+If a key is compromised, rotate immediately and then tell your peers' operators
+to refresh, because that is the only thing that shortens the window. There is
+no message you can send that makes their caches forget sooner, and none is
+planned: a "forget this key" request that a peer is free to ignore would look
+like revocation without being it, which is worse than having none.
+
+Retired keys stay published for verification and must never sign again. Peers
+keep accepting what they signed in the past, which is what keeps history
+verifiable across rotations — a retired key and a compromised one are not the
+same thing, and a compromised key should be rotated away from _and_ its
+retirement understood as "this still verifies old events", not "this is safe".
 
 ## Replicating a room
 
@@ -441,6 +464,30 @@ anybody can make. On signed federated routes it is ignored entirely: the peer
 identity comes from the signature, verified before any handler runs. What the
 header still protects on an unsigned route is correspondingly weak — it keeps a
 limited server out of casual listings, not away from a determined caller.
+
+## What a version bump requires
+
+`tdc/1` is not frozen while federation is still being built. Once it is, these
+are the rules.
+
+**A new version is required when** a receiving server built against the old one
+would misunderstand something rather than merely miss it: a change to the
+canonical form or to how identifiers are derived, a new required field, a
+changed meaning for an existing field, or a new check a sender must satisfy.
+
+**A new version is not required when** an old implementation can ignore the
+change safely: a new event type, a new optional field in `content`, a new
+endpoint, or a new setting. Unknown event types are stored and relayed
+unchanged precisely so that adding one is not a network-wide breaking change.
+
+**When a version is added**, servers advertise both for at least one release
+cycle, this document describes both, and the older one is removed only after
+the network has had time to move. A server supporting exactly one version is a
+server that cannot talk to anybody mid-upgrade.
+
+The negotiation above is what makes this survivable: two servers pick the
+newest they share, so a server that has learned a new version keeps talking to
+one that has not.
 
 ## Reaching private networks
 

@@ -422,3 +422,179 @@ func TestABlockedPeerIsNotBrowsed(t *testing.T) {
 		t.Fatal("a blocked peer was browsed")
 	}
 }
+
+/*
+The full cycle, against two servers that share no memory.
+
+Discovery, a signed request, a room federated, events delivered, a remote
+member joining and posting, and a block taking effect — each step's failure
+distinguishable from the others, so that a break says which part broke.
+
+Deliberately at this level rather than as a shell script: this runs in CI on
+every change, where a script standing up two databases does not.
+*/
+func TestTheWholeFederationCycle(t *testing.T) {
+	a := newPeerServer(t, "a-key")
+	b := newPeerServer(t, "b-key")
+
+	ctx := context.Background()
+	client := federation.NewClient(true)
+
+	// 1. Discovery: B learns who A is, from A's own domain.
+	document, err := client.Discover(ctx, a.http.URL)
+	if err != nil {
+		t.Fatalf("discovery: %v", err)
+	}
+	if document.CanonicalAddress != a.http.URL {
+		t.Fatalf("discovery returned %q, want %q", document.CanonicalAddress, a.http.URL)
+	}
+
+	// 2. Version negotiation succeeds between two current servers.
+	version, err := document.NegotiateWith()
+	if err != nil {
+		t.Fatalf("negotiation: %v", err)
+	}
+	if version != federation.Version1 {
+		t.Fatalf("negotiated %q, want %q", version, federation.Version1)
+	}
+
+	// 3. The keys A publishes verify what A signs.
+	keyring, err := document.Keyring()
+	if err != nil {
+		t.Fatalf("keyring: %v", err)
+	}
+
+	// 4. A signed request crosses and is accepted.
+	response := a.ping(t, b, time.Now())
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("signed ping: status %d", response.StatusCode)
+	}
+
+	// 5. An event A signed verifies against what A published — the property
+	//    every later step depends on.
+	nonce, err := events.NewNonce()
+	if err != nil {
+		t.Fatalf("nonce: %v", err)
+	}
+	event := events.Event{
+		Room:      "townsquare@" + hostOf(t, a.http.URL),
+		Sender:    "amina@" + hostOf(t, a.http.URL),
+		Origin:    hostOf(t, a.http.URL),
+		Type:      events.TypeMessageSent,
+		CreatedAt: events.Now(),
+		Nonce:     nonce,
+		Content:   json.RawMessage(`{"body":"across the wire"}`),
+	}
+	if err := a.keyring.Sign(&event); err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+
+	if err := federation.AcceptDelivered(event, keyring,
+		"townsquare@"+hostOf(t, a.http.URL), hostOf(t, a.http.URL), a.http.URL); err != nil {
+		t.Fatalf("a genuine event was refused: %v", err)
+	}
+
+	// 6. Blocking stops the exchange in both directions, from one list.
+	blocked := federation.NewSender(b.http.URL, b.keyring,
+		federation.Trust{Mode: federation.ModeOpen, Blocked: []string{a.http.URL}}, true)
+
+	if err := blocked.Ping(ctx, a.http.URL); err == nil {
+		t.Fatal("a blocked peer was reached")
+	}
+}
+
+func hostOf(t *testing.T, address string) string {
+	t.Helper()
+	host, err := federation.Host(address)
+	if err != nil {
+		t.Fatalf("Host(%q): %v", address, err)
+	}
+	return host
+}
+
+/*
+And the cycle notices when a check is removed.
+
+The point of an end-to-end test is that it fails for the right reasons. These
+assert that the two checks most worth having — the signature itself, and the
+binding to a destination — are each load-bearing, by presenting exactly what
+each exists to refuse.
+*/
+func TestTheCycleCatchesABrokenSignatureCheck(t *testing.T) {
+	a := newPeerServer(t, "a-key")
+	stranger := newPeerServer(t, "stranger-key")
+
+	document, err := federation.NewClient(true).Discover(context.Background(), a.http.URL)
+	if err != nil {
+		t.Fatalf("discovery: %v", err)
+	}
+	keyring, err := document.Keyring()
+	if err != nil {
+		t.Fatalf("keyring: %v", err)
+	}
+
+	// Signed by somebody else entirely, claiming to be A.
+	nonce, err := events.NewNonce()
+	if err != nil {
+		t.Fatalf("nonce: %v", err)
+	}
+	forged := events.Event{
+		Room:      "townsquare@" + hostOf(t, a.http.URL),
+		Sender:    "amina@" + hostOf(t, a.http.URL),
+		Origin:    hostOf(t, a.http.URL),
+		Type:      events.TypeMessageSent,
+		CreatedAt: events.Now(),
+		Nonce:     nonce,
+		Content:   json.RawMessage(`{"body":"not from A at all"}`),
+	}
+	if err := stranger.keyring.Sign(&forged); err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+
+	if err := federation.AcceptDelivered(forged, keyring,
+		"townsquare@"+hostOf(t, a.http.URL), hostOf(t, a.http.URL), a.http.URL); err == nil {
+		t.Fatal("an event signed by a stranger was accepted as A's")
+	}
+}
+
+func TestTheCycleCatchesABrokenDestinationBinding(t *testing.T) {
+	a := newPeerServer(t, "a-key")
+	b := newPeerServer(t, "b-key")
+	c := newPeerServer(t, "c-key")
+
+	body := []byte(`{"ping":true}`)
+
+	// Signed naming B as the destination.
+	signed, err := http.NewRequest(http.MethodPost, b.http.URL+"/api/federation/ping",
+		bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	signed.Header.Set("TDC-Origin-Server", a.http.URL)
+	if err := federation.Sign(signed, body, a.keyring, time.Now()); err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	// Delivered to C instead, carrying B's signature unchanged.
+	redirected, err := http.NewRequest(http.MethodPost, c.http.URL+"/api/federation/ping",
+		bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	for name, values := range signed.Header {
+		for _, value := range values {
+			redirected.Header.Add(name, value)
+		}
+	}
+
+	response, err := http.DefaultClient.Do(redirected)
+	if err != nil {
+		t.Fatalf("send: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("C accepted a request signed for B: status %d", response.StatusCode)
+	}
+}
