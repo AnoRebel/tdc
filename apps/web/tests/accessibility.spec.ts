@@ -149,6 +149,43 @@ test.describe("the pages somebody arrives at", () => {
     expect(violations, `\n  ${describe(violations)}\n`).toEqual([]);
   });
 
+  /*
+   * A message open for editing, which the audit had never seen.
+   *
+   * The hint under the box — "Enter to save, Esc to cancel" — is only in the
+   * document while an edit is in progress, so every previous run audited a
+   * conversation without it. Its silence was not evidence that the hint was
+   * readable; it was evidence that nothing had looked.
+   */
+  test("a message being edited has no accessibility violations", async ({ page }) => {
+    const slug = `a11y-edit-${Date.now().toString(36)}`;
+
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: /new channel/i })
+      .first()
+      .click();
+    await page.getByLabel(/name/i).first().fill(slug);
+    await page.getByRole("button", { name: /^create$/i }).click();
+    await page.getByRole("textbox", { name: /message/i }).waitFor();
+
+    const body = `to edit ${Date.now().toString(36)}`;
+    await page.getByRole("textbox", { name: /message/i }).fill(body);
+    await page.keyboard.press("Enter");
+    await expect(page.getByText(body, { exact: true })).toBeVisible();
+
+    // The controls appear on the message, so it has to be hovered first.
+    await page.getByText(body, { exact: true }).hover();
+    await page.locator('button[title="Edit"]').last().click();
+    await page.locator("input:focus").waitFor();
+
+    await settled(page);
+
+    const { violations } = await auditor(page).analyze();
+
+    expect(violations, `\n  ${describe(violations)}\n`).toEqual([]);
+  });
+
   test("settings has no accessibility violations", async ({ page }) => {
     await page.goto("/settings");
 

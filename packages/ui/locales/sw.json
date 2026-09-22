@@ -248,7 +248,8 @@
     "actionNoLongerOffered": "{label} — haitolewi tena",
     "actionTaken": "{label} — imejibiwa",
     "actionAlreadyAnswered": "Hilo limeshajibiwa.",
-    "actionFailed": "Hilo halikuweza kujibiwa. Jaribu tena."
+    "actionFailed": "Hilo halikuweza kujibiwa. Jaribu tena.",
+    "editThisMessage": "Hariri ujumbe huu"
   },
   "channel": {
     "create": "Kipindi kipya",

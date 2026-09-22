@@ -1913,14 +1913,38 @@ watch(roomId, load, { immediate: true });
                     :continued="position > 0"
                   >
                     <form v-if="editing === message.id" @submit.prevent="saveEdit(message.id)">
+                      <!-- Named, because a screen reader otherwise announces
+                           this as an unlabelled text field: somebody editing
+                           would be told they are typing into something, but
+                           not what. There is no visible label to point at —
+                           the box replaces the message in place — so the name
+                           is carried on the control itself. -->
                       <Input
                         class="h-8"
+                        :aria-label="$ts('room.editThisMessage')"
                         v-model="editDraft"
                         @keydown.esc="editing = null"
                         autofocus
                       />
-                      <p class="mt-1 text-[0.6875rem] opacity-70">
-                        <Kbd>Enter</Kbd> to save, <Kbd>Esc</Kbd> to cancel
+                      <!-- Not dimmed at all.
+                           
+                           This hint sits inside the sender's own bubble, which
+                           is a saturated ground: at 70% it measured 4.18:1 and
+                           at 85% it was still 4.35, both under the 4.5 this
+                           project holds itself to. Opacity was the wrong lever
+                           — the fix is to let the text be the colour the theme
+                           already guarantees against this background.
+                           
+                           It went unnoticed because the accessibility audit
+                           never ran with a message open for editing: the hint
+                           is only in the document then, so its silence was not
+                           evidence anybody had looked. There is a check for
+                           that state now. -->
+                      <p class="mt-1 text-[0.6875rem]">
+                        <Kbd class="border-current/30 bg-transparent text-current">Enter</Kbd>
+                        to save,
+                        <Kbd class="border-current/30 bg-transparent text-current">Esc</Kbd>
+                        to cancel
                       </p>
                     </form>
 

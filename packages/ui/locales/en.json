@@ -248,7 +248,8 @@
     "actionNoLongerOffered": "{label} — no longer offered",
     "actionTaken": "{label} — answered",
     "actionAlreadyAnswered": "That has already been answered.",
-    "actionFailed": "That could not be answered. Try again."
+    "actionFailed": "That could not be answered. Try again.",
+    "editThisMessage": "Edit this message"
   },
   "channel": {
     "create": "New channel",

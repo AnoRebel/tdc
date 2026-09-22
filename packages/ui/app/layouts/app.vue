@@ -285,6 +285,56 @@ await refresh();
  * fetches it. A Promise is always truthy, so forgetting to await would show
  * the introduction to everybody on every visit.
  */
+/**
+ * Whether a selector turns up shortly, rather than whether it is there now.
+ *
+ * The sidebar mounts after this layout, so asking once finds nothing even on
+ * the screen the tour is about. A short wait distinguishes "not yet" from "not
+ * here", which is the whole question — and answering it wrongly either loses
+ * the introduction or shows it somewhere it cannot point at anything.
+ */
+async function appears(selector: string, within = 2000): Promise<boolean> {
+  const deadline = Date.now() + within;
+
+  while (Date.now() < deadline) {
+    if (document.querySelector(selector)) return true;
+    await new Promise((resume) => requestAnimationFrame(() => resume(undefined)));
+  }
+  return Boolean(document.querySelector(selector));
+}
+
+/**
+ * Whether this is a screen the chat introduction is about.
+ *
+ * The conversation list and a conversation. Not settings, administration,
+ * reports or the audit log, which share this layout and its sidebar.
+ *
+ * Gating on the route rather than on whether the tour's targets are present,
+ * which was the first attempt and was wrong: all four live in AppSidebar,
+ * which this layout renders on every one of those pages. The elements are
+ * always there; it is the screen beside them that differs.
+ */
+function describesThisScreen(path: string): boolean {
+  return path === "/" || path.startsWith("/rooms/");
+}
+
+/*
+ * And taken down when the screen it describes goes away.
+ *
+ * Navigation here is client-side, so a tour begun on the conversation screen
+ * survives a move to settings — where it then explains a sidebar beside a
+ * page it knows nothing about.
+ *
+ * Withdrawn rather than dismissed: somebody who navigated away has not said
+ * they have read it, and should be offered it again.
+ */
+watch(
+  () => route.path,
+  (path) => {
+    if (!describesThisScreen(path)) tour.withdraw();
+  },
+);
+
 watch(
   () => tour.changed.value,
   async () => {
@@ -292,9 +342,32 @@ watch(
 
     await nextTick();
 
+    /*
+     * Only where the tour has something to point at.
+     *
+     * This layout is shared by settings, administration, reports and the
+     * audit log, and the chat tour's four steps all name controls that live
+     * on the conversation screen. On any other page every selector misses,
+     * and driver.js falls back to an empty div at the centre of the screen —
+     * which it then marks aria-haspopup on a plain div (a critical axe
+     * violation) and traps Tab inside, so a keyboard user on their first
+     * visit can reach Next and Close and nothing else.
+     *
+     * Checking the first step is enough: they are all on the same screen, and
+     * a partial match would be a change to the tour rather than a page it was
+     * never meant for.
+     */
+    if (!describesThisScreen(route.path)) return;
+
+    const steps = chatTour();
+    // The sidebar mounts after this layout, so the tour's targets are not
+    // there the instant this runs even on the screen it is about.
+    const anchor = steps[0]?.element;
+    if (typeof anchor === "string" && !(await appears(anchor))) return;
+
     // Still worth giving by the time we get here: somebody who saw it in
     // another tab meanwhile should not be interrupted by a second copy.
-    if (await tour.offered("chat")) void tour.give("chat", chatTour());
+    if (await tour.offered("chat")) void tour.give("chat", steps);
   },
   { immediate: true },
 );

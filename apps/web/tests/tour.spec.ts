@@ -52,3 +52,65 @@ test("the introduction can be left from the keyboard", async ({ page }) => {
     .waitFor();
   await expect(tour).toHaveCount(0);
 });
+
+/*
+The introduction is not given where it has nothing to point at.
+
+The chat tour names four controls, all of them on the conversation screen. The
+layout it starts from is shared by settings, administration, reports and the
+audit log — and on any of those every selector misses, so driver.js falls back
+to an empty div at the centre of the screen. It then marks that div
+aria-haspopup, which axe reports as a critical violation, and traps Tab inside
+its own two buttons, so somebody navigating by keyboard on their first visit
+can reach Next and Close and nothing else.
+
+Neither was visible for a long time, because the suite dismisses the tour
+before everything else runs: every other check sees the application as somebody
+who has already been through it.
+*/
+test("the introduction is not given on a page it cannot describe", async ({ page }) => {
+  const username = `settler${Date.now().toString(36)}`;
+  const password = "correct horse battery staple";
+
+  await page.goto("/register");
+  await page.getByRole("button", { name: /create account/i }).waitFor();
+  await page.getByLabel(/^username/i).fill(username);
+  await page.getByLabel(/^password/i).fill(password);
+  await page.getByRole("button", { name: /create account/i }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith("/register"));
+
+  /*
+   * Straight to settings without dismissing anything.
+   *
+   * The dismissal is the trap in writing this test: pressing Escape marks the
+   * tour seen on the account, and it would then never appear anywhere — so
+   * the test would pass with every guard removed. An account that has not
+   * seen it, on a page the tour cannot describe, is the only state that
+   * actually asks the question.
+   */
+  await page.goto("/settings");
+  await page
+    .getByRole("heading", { name: /settings/i })
+    .first()
+    .waitFor();
+
+  // Long enough that a tour which was going to appear has.
+  await page.waitForTimeout(3000);
+
+  const tour = page.locator(".driver-popover");
+  await expect(tour, "the chat tour was given on the settings page").toHaveCount(0);
+
+  /*
+   * And the empty div driver.js falls back to is not in the document.
+   *
+   * That element is the whole problem: it carries aria-haspopup on a plain
+   * div, which axe reports as critical, and Tab is trapped in the popover
+   * beside it.
+   */
+  await expect(page.locator("#driver-dummy-element")).toHaveCount(0);
+
+  // Tab still goes somewhere, which it would not inside a trap.
+  await page.keyboard.press("Tab");
+  const focused = await page.evaluate(() => document.activeElement?.tagName ?? "none");
+  expect(focused, "Tab reached nothing, which is what a focus trap looks like").not.toBe("none");
+});

@@ -154,6 +154,16 @@ export function useTour() {
    * introduction is seen once and then never again, and everybody would carry
    * the weight of it on every visit thereafter.
    */
+  /**
+   * The tour currently on screen, if any.
+   *
+   * Held so it can be taken down when the screen it describes goes away. A
+   * tour pointing at a sidebar that has been navigated away from is pointing
+   * at nothing, and driver.js answers that by marking an empty div and
+   * trapping Tab inside its own buttons.
+   */
+  let showing: Driver | undefined;
+
   async function give(tour: TourName, steps: DriveStep[]) {
     if (import.meta.server) return;
 
@@ -211,11 +221,24 @@ export function useTour() {
         const progress = afterSeeing(read(), tour);
         write(progress);
         publish(progress);
+        showing = undefined;
         instance.destroy();
       },
     });
 
+    showing = instance;
     instance.drive(resumeAt(read(), tour));
+  }
+
+  /**
+   * Takes the introduction down without marking it seen.
+   *
+   * For leaving the screen it describes, which is not somebody dismissing it:
+   * they should still be offered it when they come back.
+   */
+  function withdraw() {
+    showing?.destroy();
+    showing = undefined;
   }
 
   /**
@@ -239,5 +262,5 @@ export function useTour() {
     changed.value += 1;
   }
 
-  return { offered, give, forget, changed };
+  return { offered, give, forget, withdraw, changed };
 }
