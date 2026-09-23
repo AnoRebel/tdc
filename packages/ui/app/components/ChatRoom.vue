@@ -6,6 +6,8 @@ import type {
   MessageAction,
   MessageLifetime,
   Presence,
+  PrivateReply,
+  ControlsUpdate,
   Room,
   TypingPerson,
 } from "@tdc/types";
@@ -571,23 +573,55 @@ const pressOutcome = ref<Record<string, string>>({});
  * answered — including this person, from another tab — and saying "try again"
  * to that would be wrong. Anything else is worth retrying.
  */
-async function pressAction(message: { id: string; actions: MessageAction[] }, name: string) {
+async function pressAction(
+  message: { id: string; actions: MessageAction[]; controlsVersion: number },
+  name: string,
+  value?: string,
+) {
   const action = message.actions.find((one) => one.name === name);
   if (!action) return;
 
   try {
-    await roomsApi.pressAction(props.roomId, message.id, name);
+    // The version on screen goes with the press, so a program that has since
+    // replaced these controls has the press refused rather than miscounted.
+    await roomsApi.pressAction(props.roomId, message.id, name, {
+      value,
+      version: message.controlsVersion,
+    });
     pressOutcome.value = {
       ...pressOutcome.value,
       [message.id]: $ts("room.actionTaken", { label: action.label }),
     };
   } catch (cause) {
-    const already = isApiError(cause) && cause.status === 409;
+    const conflict = isApiError(cause) && cause.status === 409;
+    // Two different conflicts, told apart by what the server said: an answer
+    // already given, or a question that changed while it was being answered.
+    const changed = conflict && /changed/.test(cause.message);
     pressOutcome.value = {
       ...pressOutcome.value,
-      [message.id]: already ? $ts("room.actionAlreadyAnswered") : $ts("room.actionFailed"),
+      [message.id]: changed
+        ? $ts("integrations.controlsChanged")
+        : conflict
+          ? $ts("room.actionAlreadyAnswered")
+          : $ts("room.actionFailed"),
     };
   }
+}
+
+/**
+ * Programs' answers meant for this person alone, by the message they answer.
+ *
+ * Held only here: they are not part of the room's log and the server keeps no
+ * copy, so leaving the conversation lets them go — which is what somebody
+ * told "only you can see this" would expect.
+ */
+const privateReplies = ref<Record<string, PrivateReply[]>>({});
+
+function dismissPrivate(messageId: string, replyId: string) {
+  privateReplies.value = {
+    ...privateReplies.value,
+    [messageId]: (privateReplies.value[messageId] ?? []).filter((one) => one.id !== replyId),
+  };
 }
 
 /** Every other room this person can post in, as forwarding destinations. */
@@ -686,10 +720,22 @@ const visible = computed(() => {
   const byId = new Map<string, Message>();
   const replaced = new Map<string, string>();
   const redacted = new Set<string>();
+  // A program's latest replacement of a message's text and controls. The
+  // highest version wins rather than the last to arrive, so a replay out of
+  // order cannot put an older question back on screen.
+  const updated = new Map<string, ControlsUpdate>();
 
   for (const message of messages.value) {
     if (message.type === "message.edited" && message.content.replaces) {
       replaced.set(message.content.replaces, message.content.body ?? "");
+      continue;
+    }
+    if (message.type === "message.updated") {
+      const update = message.content as unknown as ControlsUpdate;
+      const previous = updated.get(update.updates);
+      if (update.updates && (!previous || previous.version < update.version)) {
+        updated.set(update.updates, update);
+      }
       continue;
     }
     if (message.type === "message.deleted" && message.content.redacts) {
@@ -702,21 +748,29 @@ const visible = computed(() => {
   return [...byId.values()]
     .filter((message) => message.type === "message.sent")
     .sort((a, b) => a.sequence - b.sequence)
-    .map((message) => ({
-      ...message,
-      attachments: message.attachments ?? [],
-      body: replaced.get(message.id) ?? message.content.body ?? "",
-      edited: replaced.has(message.id),
-      removed: redacted.has(message.id) || message.redacted,
-      /*
-       * The buttons this message offers.
-       *
-       * Dropped from a removed message: a question whose text is gone is not a
-       * question anybody can answer, and leaving the buttons would invite
-       * somebody to answer something they can no longer read.
-       */
-      actions: redacted.has(message.id) || message.redacted ? [] : (message.content.actions ?? []),
-    }));
+    .map((message) => {
+      const update = updated.get(message.id);
+      return {
+        ...message,
+        attachments: message.attachments ?? [],
+        body: update?.body ?? replaced.get(message.id) ?? message.content.body ?? "",
+        edited: replaced.has(message.id),
+        removed: redacted.has(message.id) || message.redacted,
+        /*
+         * The controls this message offers, as its program last left them.
+         *
+         * Dropped from a removed message: a question whose text is gone is not
+         * a question anybody can answer, and leaving the controls would invite
+         * somebody to answer something they can no longer read.
+         */
+        actions:
+          redacted.has(message.id) || message.redacted
+            ? []
+            : (update?.actions ?? message.content.actions ?? []),
+        // Which version of the controls is on screen, sent with a press.
+        controlsVersion: update?.version ?? 0,
+      };
+    });
 });
 
 /**
@@ -809,6 +863,14 @@ const live = useLiveConnection({
   onResync(eventRoomId) {
     // Too far behind to replay: refetch rather than leave a hole.
     if (eventRoomId === roomId.value) void load();
+  },
+
+  onPrivate(eventRoomId, reply) {
+    if (eventRoomId !== roomId.value) return;
+    privateReplies.value = {
+      ...privateReplies.value,
+      [reply.message]: [...(privateReplies.value[reply.message] ?? []), reply],
+    };
   },
 });
 
@@ -2001,11 +2063,41 @@ watch(roomId, load, { immediate: true });
                            change still has to be told the press landed. -->
                       <MessageActions
                         v-if="!message.removed && message.actions.length"
+                        :key="`${message.id}-${message.controlsVersion}`"
                         :actions="message.actions"
+                        :message-id="message.id"
                         :can-press="Boolean(room?.member)"
                         :outcome="pressOutcome[message.id] ?? ''"
-                        @press="(name: string) => pressAction(message, name)"
+                        @press="(name: string, value?: string) => pressAction(message, name, value)"
                       />
+                      <!-- A program's answer to this reader alone. Marked as
+                           such in words, not only by colour, because "only you
+                           can see this" is the whole of what makes it
+                           different from an ordinary reply. -->
+                      <div
+                        v-for="reply in privateReplies[message.id] ?? []"
+                        :key="reply.id"
+                        class="mt-2 flex items-start gap-2 rounded-md border border-dashed border-border bg-muted/40 px-2.5 py-1.5 text-sm"
+                        role="note"
+                        :aria-label="$ts('integrations.onlyYouCanSee')"
+                      >
+                        <EyeOff class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                        <div class="min-w-0 flex-1">
+                          <p class="text-[0.6875rem] font-medium">
+                            {{ $t("integrations.onlyYouCanSee") }}
+                          </p>
+                          <MessageBody :body="reply.body" />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="size-6"
+                          :label="$ts('integrations.dismiss')"
+                          @click="dismissPrivate(message.id, reply.id)"
+                        >
+                          <X class="size-3.5" aria-hidden="true" />
+                        </Button>
+                      </div>
                       <!-- Dimmed, but not below what can be read. At 60% this
                            fell under 4.5:1 against a sender's own bubble,
                            which axe caught and an eye would forgive until it

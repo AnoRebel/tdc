@@ -548,5 +548,12 @@
     "withdrawn": "Withdrawn",
     "withdrawThisInvitation": "Withdraw this invitation?",
     "worthChecking": "Worth checking"
+  },
+  "integrations": {
+    "chooseOne": "Choose one",
+    "controlsChanged": "That question changed while you were answering. Look again.",
+    "dismiss": "Dismiss",
+    "onlyYouCanSee": "Only you can see this",
+    "sendAnswer": "Send {label}"
   }
 }

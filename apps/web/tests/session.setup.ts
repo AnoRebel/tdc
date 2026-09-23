@@ -15,11 +15,11 @@ import { SESSION } from "../playwright.config";
  */
 setup("sign in once", async ({ page }) => {
   await page.goto("/signin");
-  await page.getByRole("button", { name: "Sign in" }).waitFor();
+  await page.getByRole("button", { name: "Sign in", exact: true }).waitFor();
 
   await page.getByLabel("Username or email").fill("founder");
   await page.getByLabel("Password").fill("correct horse battery staple");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   await page.waitForURL((url) => !url.pathname.startsWith("/signin"));
 

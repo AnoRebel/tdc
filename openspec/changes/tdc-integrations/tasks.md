@@ -10,13 +10,13 @@ Scope note: this implements `integrations/webhooks`, `integrations/apps`, and th
 
 Goal: close the built part of `integrations/interactive-messages` against the spec — selection menus, input fields, and the three response modes — before anything talks to an external process at all.
 
-- [ ] 1.1 Add selection-menu and input-field element kinds to the existing action schema in `server/internal/actions/`, validated by the existing `Check` at post time; verify a message with a menu carrying too many options, or an input with no field name, is refused before posting rather than on render (`integrations/interactive-messages`)
-- [ ] 1.2 Render menus and inputs in both clients as accessible controls, reusing the button rendering path's keyboard/announcement pattern from the foundation change; verify with a screen reader that a menu is announced as a list of choices and an input as a labelled field
-- [ ] 1.3 Add a version/generation counter to a message's action state and implement updating the originating message atomically on it; verify two concurrent responses to the same invocation result in one applied update and one refused as stale
-- [ ] 1.4 Implement private responses delivered only to the invoking user's live connection(s), not through the room's event log; verify a second room member's live connection never receives a private response addressed to someone else
-- [ ] 1.5 Implement the multi-step context store keyed to (integration, conversation, invoking user), discarded when either is removed; verify one user's stored context is unreadable through any endpoint by another user, and that removing the integration discards it
-- [ ] 1.6 Extend `docs/integrating.md`'s interactive-messages section with menus, inputs, updating in place, and private responses, alongside the existing button example; verify the documented examples run against a live server
-- [ ] **MILESTONE 1** — Demonstrate: a message offers a selection menu and an input field in the web client, an update-in-place response replaces its controls for every viewer, a private response is visible only to the person who triggered it, and a stale second activation is refused. Tag `v1.12.0-dev`.
+- [x] 1.1 Add selection-menu and input-field element kinds to the existing action schema in `server/internal/actions/`, validated by the existing `Check` at post time; verify a message with a menu carrying too many options, or an input with no field name, is refused before posting rather than on render (`integrations/interactive-messages`)
+- [x] 1.2 Render menus and inputs in both clients as accessible controls, reusing the button rendering path's keyboard/announcement pattern from the foundation change; verify with a screen reader that a menu is announced as a list of choices and an input as a labelled field
+- [x] 1.3 Add a version/generation counter to a message's action state and implement updating the originating message atomically on it; verify two concurrent responses to the same invocation result in one applied update and one refused as stale
+- [x] 1.4 Implement private responses delivered only to the invoking user's live connection(s), not through the room's event log; verify a second room member's live connection never receives a private response addressed to someone else
+- [x] 1.5 Implement the multi-step context store keyed to (integration, conversation, invoking user), discarded when either is removed; verify one user's stored context is unreadable through any endpoint by another user, and that removing the integration discards it
+- [x] 1.6 Extend `docs/integrating.md`'s interactive-messages section with menus, inputs, updating in place, and private responses, alongside the existing button example; verify the documented examples run against a live server
+- [x] **MILESTONE 1** — Demonstrate: a message offers a selection menu and an input field in the web client, an update-in-place response replaces its controls for every viewer, a private response is visible only to the person who triggered it, and a stale second activation is refused. Tag `v1.12.0-dev`.
 
 ## 2. Phase 2 — Deliveries can be signed and verified
 

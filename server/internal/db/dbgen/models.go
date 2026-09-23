@@ -19,6 +19,8 @@ type ActionPress struct {
 	UserID      uuid.UUID
 	UserAddress string
 	CreatedAt   time.Time
+	Version     int32
+	Value       *string
 }
 
 type ApiToken struct {
@@ -135,6 +137,14 @@ type EventIdempotency struct {
 	CreatedAt   time.Time
 }
 
+type IntegrationContext struct {
+	IntegrationID uuid.UUID
+	RoomID        uuid.UUID
+	UserID        uuid.UUID
+	State         []byte
+	UpdatedAt     time.Time
+}
+
 type Invitation struct {
 	ID               uuid.UUID
 	TokenHash        []byte
@@ -155,6 +165,16 @@ type InvitationUse struct {
 	InvitationID uuid.UUID
 	UserID       uuid.UUID
 	UsedAt       time.Time
+}
+
+type MessageInteraction struct {
+	EventID   string
+	RoomID    uuid.UUID
+	Version   int32
+	Body      string
+	Actions   []byte
+	UpdatedBy *uuid.UUID
+	UpdatedAt time.Time
 }
 
 type MessageLifetime struct {

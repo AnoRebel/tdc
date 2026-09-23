@@ -1,4 +1,4 @@
-import type { LiveEventPayload, LiveFrame } from "@tdc/types";
+import type { LiveEventPayload, LiveFrame, PrivateReply } from "@tdc/types";
 
 /**
  * The live connection to a TDC server.
@@ -19,6 +19,12 @@ interface LiveHandlers {
    * must refetch the timeline: continuing would leave a hole.
    */
   onResync: (roomId: string) => void;
+  /**
+   * Called for a program's answer meant for this person alone. Optional,
+   * because only a view showing that room has anywhere to put it; it is not
+   * part of the room's log, so it has no sequence and is never replayed.
+   */
+  onPrivate?: (roomId: string, reply: PrivateReply) => void;
 }
 
 // Backoff bounds. The first retry is quick, because most disconnections are
@@ -150,6 +156,12 @@ export function useLiveConnection(handlers: LiveHandlers) {
         // subscription does not ask for a gap the server will not serve.
         lastSequence.delete(frame.roomId);
         handlers.onResync(frame.roomId);
+        break;
+      }
+
+      case "private": {
+        if (!frame.roomId || !frame.payload) return;
+        handlers.onPrivate?.(frame.roomId, frame.payload as unknown as PrivateReply);
         break;
       }
 

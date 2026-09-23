@@ -219,6 +219,30 @@ only lets a message offer `http` and `https` links; anything else is refused
 when the message is posted, so a button in a message cannot be a way to run
 something on your machine.
 
+#### Menus, fields, and answers only you can see
+
+Some questions are not yes or no. A program may offer a **menu** — pick one of
+a list, and your choice is sent as soon as you make it — or a short **field** to
+type into, sent with Enter or the arrow beside it. A screen reader announces a
+menu as a list of choices and a field by the label written above it.
+
+What you choose or type is checked before the program sees it: a menu only
+accepts one of its own choices, and a field only as much text as it asked for.
+Some controls are for particular people — approving a deployment, say — and
+refuse anybody without the right permission, saying so, without the program
+ever hearing that you tried.
+
+A program may answer by changing the message itself, so everybody sees the
+question has been settled. If it changes while you are answering, your answer
+is refused and you are asked to look again, rather than being counted against
+a question you were never shown.
+
+It may also answer **you alone**. That answer appears under the message, marked
+"Only you can see this", and nobody else in the channel receives it. It is not
+kept: close the conversation and it is gone, and if you were not connected when
+it was sent you will not see it later. Anything a program needs you to be sure
+to see, it posts as an ordinary message.
+
 ### Links
 
 Message text is plain text. Links, addresses and phone numbers in it are

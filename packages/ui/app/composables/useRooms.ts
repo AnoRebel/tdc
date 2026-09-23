@@ -1,5 +1,6 @@
 import type {
   Message,
+  PressRequest,
   Presence,
   Room,
   RoomMember,
@@ -142,9 +143,18 @@ export function useRooms() {
    * arrives the same way every other event does, so a client showing the
    * outcome shows what actually happened rather than what it assumed.
    */
-  function pressAction(roomId: string, eventId: string, action: string): Promise<Message> {
+  function pressAction(
+    roomId: string,
+    eventId: string,
+    action: string,
+    // The choice or text a menu or field carries, and the version of the
+    // controls the person was looking at — so a press through a view the
+    // program has since replaced is refused rather than miscounted.
+    press?: PressRequest,
+  ): Promise<Message> {
     return api.post<Message>(
       `/api/rooms/${roomId}/messages/${encodeURIComponent(eventId)}/actions/${encodeURIComponent(action)}`,
+      press,
     );
   }
 

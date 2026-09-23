@@ -145,7 +145,15 @@ export interface MessageContent {
 }
 
 /** Frame types the server sends over the live connection. */
-export type LiveFrameType = "event" | "ready" | "subscribed" | "resync" | "error" | "pong";
+export type LiveFrameType =
+  | "event"
+  | "ready"
+  | "subscribed"
+  | "resync"
+  | "error"
+  | "pong"
+  // A program's answer to one person, never part of a room's log.
+  | "private";
 
 /** One frame from the live connection. */
 export interface LiveFrame {

@@ -478,6 +478,179 @@ Answers **201** with the `action.pressed` event. Pressing needs membership of
 the channel, not merely the ability to read it — answering a question in a
 channel is taking part in it.
 
+### Menus and fields
+
+Buttons answer yes-or-no questions. A **menu** offers a list to choose one
+from, and a **field** asks for a short line of text. Both sit in `actions`
+beside buttons, marked by `kind`:
+
+<!-- demo: post-menu -->
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/messages" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "body": "Build 41 is ready. Where should it go?",
+    "clientToken": "3f9a2c7e-3",
+    "actions": [
+      {"name": "environment", "label": "Environment", "kind": "select",
+       "options": [{"value": "staging", "label": "Staging"},
+                   {"value": "production", "label": "Production"}]},
+      {"name": "note", "label": "Release note", "kind": "input",
+       "placeholder": "What changed?", "maxLength": 120}
+    ]
+  }'
+```
+
+| Field         | Applies to | Meaning                                                             |
+| ------------- | ---------- | ------------------------------------------------------------------- |
+| `kind`        | all        | Absent for a button; `select` for a menu; `input` for a field       |
+| `options`     | `select`   | One to 25 choices, each `value` (reported back) and `label` (shown) |
+| `placeholder` | `input`    | A hint while the field is empty, at most 80 characters              |
+| `maxLength`   | `input`    | The most that may be typed, at most 200 — also the default          |
+| `requires`    | all        | A permission the person answering must hold in this channel         |
+
+The same rule as buttons applies: **a malformed control is refused when you
+post it**, with a 400 naming what was wrong, and the message is not posted. A
+menu with no options or more than 25, two options sharing a value, a field with
+no `name` to report its value under, a `capability` on anything but a button, or
+a `kind` this server does not know are all refused.
+
+A press of a menu or a field carries a `value`, and the server checks it against
+what you offered before you ever see it: a choice that is not one of your
+`options`, or text longer than your `maxLength`, is refused with **400**. You
+receive only what your control allowed.
+
+```json
+{
+  "type": "action.pressed",
+  "sender": "juma@chat.example.test",
+  "content": { "action": "environment", "pressed": "$abc123…", "value": "staging", "version": 0 }
+}
+```
+
+`requires` is checked against the **person answering**, never against you: a
+control restricted to `moderation.review` refuses anybody who does not hold it
+in that channel with **403**, and the press never reaches you at all.
+
+A client that meets a `kind` it does not understand leaves that control out and
+shows the rest of the message — it never draws an unknown control as a button.
+
+### Answering a press
+
+A program told that somebody pressed has three ways to answer. Posting an
+ordinary message is the first and needs nothing new. The other two follow.
+
+**Replace the message's text and controls**, so everybody sees that the
+question has been answered:
+
+<!-- demo: update-controls -->
+
+```sh
+curl -X PUT "http://localhost:8080/api/rooms/$ROOM/messages/$EVENT/controls" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "version": 0,
+    "body": "Build 41 is going to staging, at Juma'"'"'s word.",
+    "actions": [{"name": "rollback", "label": "Roll back"}]
+  }'
+```
+
+Only the message's author may. The answer is **200** with the new
+`message.updated` event and the `version` now current. Every reader's client
+receives that event over the live connection and redraws the message in place.
+
+`version` is the version you are replacing — zero for a message as posted, then
+one more for each update. **The update is applied only if that is still the
+current version**; otherwise it is refused with **409**. That is a database
+rule, not a check this server makes before writing: two answers to the same
+press, racing, produce one update and one 409, however they interleave. When
+you get a 409, read the message again and decide afresh.
+
+Every press carries the `version` of the controls it answered, and a client
+sends the version it was showing. **A press through a view that has since been
+replaced is refused with 409** rather than counted against the new question —
+the person answered what they were shown. A press naming no version is judged
+against whatever is current, and refused if the control no longer exists.
+
+**Reply to the person who pressed, and nobody else**:
+
+<!-- demo: private-reply -->
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/presses/$PRESS/reply" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"body": "Only you can see this: staging is locked until 17:00."}'
+```
+
+`$PRESS` is the `id` of the `action.pressed` event, not a person. You can only
+answer somebody who pressed one of **your** messages, only within **15 minutes**
+of the press, and only while they are still in the channel — there is no way to
+use this to reach somebody who did not ask.
+
+The reply never enters the room's log. It is sent over the live connection to
+the presser's open connections as a frame of its own:
+
+```json
+{
+  "type": "private",
+  "roomId": "5a1c…",
+  "payload": {
+    "id": "…",
+    "press": "$def456…",
+    "message": "$abc123…",
+    "sender": "deploybot@chat.example.test",
+    "body": "…",
+    "createdAt": 1758099731000
+  }
+}
+```
+
+The answer is **201** with `{"delivered": 1}` — how many of their connections
+received it. **Nothing is kept.** Somebody not connected when you reply does not
+see it later, so post an ordinary message for anything that must not be missed.
+On a server running several nodes, only connections on the node that handled
+your request receive it.
+
+### Remembering an exchange
+
+A program asking a follow-up question needs to know what was said at the last
+step. Keep it here rather than in a database of your own — it is bound to the
+conversation and the person, and it goes when either does:
+
+<!-- demo: context -->
+
+```sh
+# Remember where this exchange got to.
+curl -X PUT "http://localhost:8080/api/rooms/$ROOM/context/$PERSON" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"state": {"build": 41, "step": "chose-environment"}}'
+
+# Read it back at the next step.
+curl "http://localhost:8080/api/rooms/$ROOM/context/$PERSON" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+`$PERSON` is the presser's account identifier. The state is any JSON up to 16
+KiB. `DELETE` on the same path ends the exchange.
+
+**What you store is readable by you and nobody else.** There is no parameter
+naming the program: whoever calls is the program, so another program, the
+person it is about, and an administrator using these endpoints all find nothing
+(**404**). It is discarded when your account is removed, when the conversation
+is, or when you `DELETE` it. Both you and the person must be in the room.
+
+### Throttling
+
+Presses are limited per person (`integrations.presses_per_user_per_minute`,
+default 30) and per program, counting every press of that program's controls
+by everybody together (`integrations.presses_per_integration_per_minute`,
+default 600). Past either, a press is refused with **429** and `Retry-After`.
+
 ### Attachments
 
 A file is uploaded to the room first, and the returned identifier is then

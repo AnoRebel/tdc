@@ -27,6 +27,8 @@ type Querier interface {
 	// but its address is refreshed so an operator can correct one in place.
 	AddRoomPeer(ctx context.Context, arg AddRoomPeerParams) error
 	AdoptForeignRoom(ctx context.Context, arg AdoptForeignRoomParams) (Room, error)
+	// Every later update, which succeeds only against the version it names.
+	AdvanceMessageInteraction(ctx context.Context, arg AdvanceMessageInteractionParams) (MessageInteraction, error)
 	// Records how far a peer has been told.
 	//
 	// Never moves backwards: a late acknowledgement of an earlier batch must not
@@ -77,7 +79,7 @@ type Querier interface {
 	// offline when they close one.
 	ConnectionOpened(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	// How many times a button has been pressed by anybody, for a single-use
-	// action.
+	// action, on the version of the controls that offered it.
 	CountActionPresses(ctx context.Context, arg CountActionPressesParams) (int64, error)
 	// Counts what still points at a stored preview, so its bytes are only removed
 	// once nothing references them.
@@ -125,6 +127,12 @@ type Querier interface {
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
 	CreateEmailConfirmation(ctx context.Context, arg CreateEmailConfirmationParams) (EmailConfirmation, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
+	// The first update to a message, from version zero to one.
+	//
+	// ON CONFLICT DO NOTHING is the compare-and-swap for the first step: two
+	// updates both expecting version zero both try to insert, and exactly one
+	// row is written. The loser gets no row back and is told it was stale.
+	CreateMessageInteraction(ctx context.Context, arg CreateMessageInteractionParams) (MessageInteraction, error)
 	// Raises a notification, once.
 	//
 	// The conflict clause is what stops a redelivered or edited message notifying
@@ -155,6 +163,9 @@ type Querier interface {
 	DeleteExpiredRecoveryTokens(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteExpiredWebauthnCeremonies(ctx context.Context) (int64, error)
+	DeleteIntegrationContext(ctx context.Context, arg DeleteIntegrationContextParams) (int64, error)
+	// Everything a program remembered, for when it is removed.
+	DeleteIntegrationContextForIntegration(ctx context.Context, integrationID uuid.UUID) (int64, error)
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
 	DeleteLapsedBans(ctx context.Context) (int64, error)
@@ -243,7 +254,12 @@ type Querier interface {
 	// settings discloses all three.
 	GetDisclosurePreferences(ctx context.Context, userID uuid.UUID) (GetDisclosurePreferencesRow, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
+	// What one program remembers about one person in one conversation.
+	GetIntegrationContext(ctx context.Context, arg GetIntegrationContextParams) (IntegrationContext, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
+	// A message's controls as its program last left them. No row means the
+	// message is as it was posted.
+	GetMessageInteraction(ctx context.Context, eventID string) (MessageInteraction, error)
 	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
 	// The preference that applies to one conversation.
 	//
@@ -499,11 +515,16 @@ type Querier interface {
 	// a request per notification forever.
 	PrunePushSubscriptions(ctx context.Context, failures int32) (int64, error)
 	PublishedRooms(ctx context.Context, limit int32) ([]PublishedRoomsRow, error)
+	PutIntegrationContext(ctx context.Context, arg PutIntegrationContextParams) (IntegrationContext, error)
 	// The press, recorded before it is announced.
 	//
 	// ON CONFLICT DO NOTHING rather than an upsert: a second press of the same
 	// button by the same person is not a change, it is a repeat, and the caller
 	// needs to tell the two apart. No row returned means somebody pressed twice.
+	//
+	// The version is part of what makes it the same button: a program that
+	// replaced a message's controls has asked a new question, even under an old
+	// name.
 	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
 	RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error)
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error

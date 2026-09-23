@@ -548,5 +548,12 @@
     "withdrawn": "Kimeondolewa",
     "withdrawThisInvitation": "Ondoa mwaliko huu?",
     "worthChecking": "Inafaa kuangaliwa"
+  },
+  "integrations": {
+    "chooseOne": "Chagua moja",
+    "controlsChanged": "Swali hilo limebadilika ulipokuwa ukijibu. Liangalie tena.",
+    "dismiss": "Ondoa",
+    "onlyYouCanSee": "Ni wewe tu unayeona hili",
+    "sendAnswer": "Tuma {label}"
   }
 }
