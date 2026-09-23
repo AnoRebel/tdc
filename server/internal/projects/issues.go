@@ -164,11 +164,17 @@ func (s *Service) CreateIssue(ctx context.Context, actor Actor, access Access, i
 		if err != nil {
 			return fmt.Errorf("create discussion: %w", err)
 		}
-		// The author takes part from the start, as a room's creator does.
+		// The author takes part from the start, as a room's creator does, and
+		// hears what is said about what they filed.
 		if err := q.AddRoomMember(ctx, dbgen.AddRoomMemberParams{
 			RoomID: discussion.ID, UserID: actor.ID,
 		}); err != nil {
 			return fmt.Errorf("add author to discussion: %w", err)
+		}
+		if err := q.WatchDiscussion(ctx, dbgen.WatchDiscussionParams{
+			UserID: actor.ID, RoomID: &discussion.ID,
+		}); err != nil {
+			return fmt.Errorf("watch discussion: %w", err)
 		}
 		if _, err := s.appendTo(ctx, q, discussion, author, events.TypeRoomCreated, map[string]any{
 			"name": discussion.Name, "topic": discussion.Topic,

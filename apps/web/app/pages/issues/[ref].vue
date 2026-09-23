@@ -170,88 +170,108 @@ async function confirmDelete() {
         </Button>
       </header>
 
-      <div class="flex-1 overflow-y-auto">
-        <div class="mx-auto grid max-w-5xl gap-6 px-4 py-6 lg:grid-cols-[1fr_16rem]">
-          <main class="min-w-0 space-y-6">
-            <p v-if="failed" class="text-sm text-destructive" role="alert">{{ failed }}</p>
+      <!-- The issue beside its discussion on a wide screen, above it on a
+           narrow one: the conversation about the work is part of the work. -->
+      <div class="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+        <div class="min-w-0 flex-1 lg:overflow-y-auto">
+          <div class="mx-auto grid max-w-5xl gap-6 px-4 py-6 xl:grid-cols-[1fr_16rem]">
+            <div class="min-w-0 space-y-6">
+              <p v-if="failed" class="text-sm text-destructive" role="alert">{{ failed }}</p>
 
-            <section v-if="editing" class="space-y-3" :aria-label="$ts('action.edit')">
-              <Field :label="$ts('projects.issueTitle')">
-                <template #default="{ id }">
-                  <Input :id="id" v-model="draftTitle" class="text-base" />
-                </template>
-              </Field>
-              <Field :label="$ts('projects.description')">
-                <template #default="{ id }">
-                  <Textarea :id="id" v-model="draftDescription" class="h-auto py-2" rows="8" />
-                </template>
-              </Field>
-              <div class="flex justify-end gap-2">
-                <Button variant="ghost" @click="editing = false">{{ $t("action.cancel") }}</Button>
-                <Button :disabled="saving" @click="saveEdits">{{ $t("action.save") }}</Button>
-              </div>
-            </section>
+              <section v-if="editing" class="space-y-3" :aria-label="$ts('action.edit')">
+                <Field :label="$ts('projects.issueTitle')">
+                  <template #default="{ id }">
+                    <Input :id="id" v-model="draftTitle" class="text-base" />
+                  </template>
+                </Field>
+                <Field :label="$ts('projects.description')">
+                  <template #default="{ id }">
+                    <Textarea :id="id" v-model="draftDescription" class="h-auto py-2" rows="8" />
+                  </template>
+                </Field>
+                <div class="flex justify-end gap-2">
+                  <Button variant="ghost" @click="editing = false">{{
+                    $t("action.cancel")
+                  }}</Button>
+                  <Button :disabled="saving" @click="saveEdits">{{ $t("action.save") }}</Button>
+                </div>
+              </section>
 
-            <section v-else>
-              <div class="flex items-start gap-2">
-                <h1 class="min-w-0 flex-1 text-lg font-semibold break-words">{{ issue.title }}</h1>
-                <Button
-                  v-if="issue.can?.edit"
-                  variant="ghost"
-                  size="icon"
-                  :label="$ts('action.edit')"
-                  @click="startEditing"
+              <section v-else>
+                <div class="flex items-start gap-2">
+                  <h1 class="min-w-0 flex-1 text-lg font-semibold break-words">
+                    {{ issue.title }}
+                  </h1>
+                  <Button
+                    v-if="issue.can?.edit"
+                    variant="ghost"
+                    size="icon"
+                    :label="$ts('action.edit')"
+                    @click="startEditing"
+                  >
+                    <Icon name="lucide:pencil" class="size-3.5" />
+                  </Button>
+                </div>
+                <p
+                  v-if="issue.description"
+                  class="mt-3 text-sm leading-relaxed break-words whitespace-pre-wrap"
                 >
-                  <Icon name="lucide:pencil" class="size-3.5" />
-                </Button>
+                  {{ issue.description }}
+                </p>
+                <p v-else class="mt-3 text-sm text-muted-foreground italic">
+                  {{ $t("projects.noDescription") }}
+                </p>
+              </section>
+
+              <ProjectsIssueOrigin v-if="issue.origin" :origin="issue.origin" />
+
+              <section :aria-label="$ts('projects.historyTitle')">
+                <h2 class="mb-2 text-xs font-semibold text-muted-foreground uppercase">
+                  {{ $t("projects.historyTitle") }}
+                </h2>
+                <ProjectsIssueHistory :entries="history" />
+              </section>
+            </div>
+
+            <aside class="space-y-4 text-sm" :aria-label="$ts('projects.details')">
+              <Field v-if="issue.can?.transition" :label="$ts('projects.state')">
+                <template #default="{ id }">
+                  <Select
+                    :id="id"
+                    :model-value="issue.state.id"
+                    :label="$ts('projects.state')"
+                    :options="stateOptions"
+                    :disabled="saving"
+                    @update:model-value="move"
+                  />
+                </template>
+              </Field>
+              <div v-else>
+                <h2 class="mb-1 text-xs font-semibold text-muted-foreground">
+                  {{ $t("projects.state") }}
+                </h2>
+                <ProjectsStateBadge :state="issue.state" />
               </div>
-              <p
-                v-if="issue.description"
-                class="mt-3 text-sm leading-relaxed break-words whitespace-pre-wrap"
-              >
-                {{ issue.description }}
-              </p>
-              <p v-else class="mt-3 text-sm text-muted-foreground italic">
-                {{ $t("projects.noDescription") }}
-              </p>
-            </section>
-
-            <section :aria-label="$ts('projects.historyTitle')">
-              <h2 class="mb-2 text-xs font-semibold text-muted-foreground uppercase">
-                {{ $t("projects.historyTitle") }}
-              </h2>
-              <ProjectsIssueHistory :entries="history" />
-            </section>
-          </main>
-
-          <aside class="space-y-4 text-sm" :aria-label="$ts('projects.details')">
-            <Field v-if="issue.can?.transition" :label="$ts('projects.state')">
-              <template #default="{ id }">
-                <Select
-                  :id="id"
-                  :model-value="issue.state.id"
-                  :label="$ts('projects.state')"
-                  :options="stateOptions"
-                  :disabled="saving"
-                  @update:model-value="move"
-                />
-              </template>
-            </Field>
-            <div v-else>
-              <h2 class="mb-1 text-xs font-semibold text-muted-foreground">
-                {{ $t("projects.state") }}
-              </h2>
-              <ProjectsStateBadge :state="issue.state" />
-            </div>
-            <div>
-              <h2 class="mb-1 text-xs font-semibold text-muted-foreground">
-                {{ $t("projects.filedBy") }}
-              </h2>
-              <p class="text-xs">{{ issue.author }}</p>
-              <p class="text-xs text-muted-foreground">{{ fully(issue.createdAt) }}</p>
-            </div>
-          </aside>
+              <div>
+                <h2 class="mb-1 text-xs font-semibold text-muted-foreground">
+                  {{ $t("projects.filedBy") }}
+                </h2>
+                <p class="text-xs">{{ issue.author }}</p>
+                <p class="text-xs text-muted-foreground">{{ fully(issue.createdAt) }}</p>
+              </div>
+            </aside>
+          </div>
         </div>
+
+        <!-- The discussion is a room, so it is the conversation component
+             every channel uses: formatting, files, mentions and notifications
+             behave exactly as they do anywhere else. -->
+        <section
+          class="flex h-[70vh] min-h-0 shrink-0 flex-col border-t lg:h-auto lg:w-[26rem] lg:border-t-0 lg:border-l"
+          :aria-label="$ts('projects.discussion')"
+        >
+          <ChatRoom :room-id="issue.id" />
+        </section>
       </div>
     </template>
 

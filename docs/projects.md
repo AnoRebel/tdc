@@ -108,3 +108,52 @@ A refusal says which permission would have allowed the action.
 
 Commenting on an issue has no permission of its own: it is posting in the
 issue's discussion, which is governed like posting in any conversation.
+
+## Discussing an issue
+
+Every issue has a discussion beside it, and it is a conversation like any
+channel: formatting, files, reactions, threads, editing and deleting your own
+messages, and mentions all work as they do everywhere else, because it is the
+same conversation underneath. Anybody who can see the issue can read the
+discussion; **Join** it to take part, the way you would join a public channel.
+In a private project only its members can see either.
+
+Taking part is following:
+
+- Whoever filed an issue, and anybody who comments on it, hears about every
+  later comment — as if they had set that discussion to **All** themselves. If
+  you would rather not, change the setting for that discussion like any other;
+  and if you have asked to hear nothing anywhere, commenting does not change
+  that.
+- Naming somebody — `@amina` — reaches them if they may see the issue,
+  according to their own notification settings, exactly as a mention in a
+  channel does. They are brought into the discussion so it can. Naming somebody
+  outside a private project does nothing at all: they are not told, and not
+  told they were named.
+
+Somebody looking at the discussion when a comment arrives is not interrupted
+about it, as in a channel.
+
+## Turning a message into an issue
+
+When a conversation agrees that something needs doing, open the message's menu
+— right-click, or press and hold on a phone — and choose **Create an issue from
+this**. Pick the project; the title and description start as the message's
+first line and the rest of it, and are yours to change before filing.
+
+The issue keeps a **link** to the message, not a copy of it. On the issue's
+page, **Where this came from** shows the message as it reads in its
+conversation now — edited, or removed if it has since been deleted — with a way
+back to it, to anybody who can read that conversation. Anybody who cannot sees
+only that the issue was made from a message in a conversation they cannot see:
+not which conversation, not who wrote it, not what it said, and not whether it
+is still there. A private conversation and a message deleted from one look
+exactly the same from outside, because telling them apart would itself say
+something.
+
+The message, in turn, shows the issue it became — to people who can see that
+issue. A message that became an issue in a private project shows nothing to the
+conversation's members outside that project, so the conversation does not tell
+them the project exists.
+
+You can only link an issue to a message you can read yourself.

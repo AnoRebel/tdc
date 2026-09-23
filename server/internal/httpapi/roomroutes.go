@@ -859,6 +859,12 @@ func (s *Server) notifyRecipients(
 		return
 	}
 
+	// A room belonging to something else may change who is in it before the
+	// list below is read; see beforeNotifying.
+	for _, hook := range beforeNotifying {
+		hook(s, ctx, event, body, roomID)
+	}
+
 	members, err := s.queries.ListRoomMembers(ctx, roomID)
 	if err != nil {
 		s.log.Error("cannot read a room's members to notify them",

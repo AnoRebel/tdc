@@ -375,6 +375,13 @@ type Querier interface {
 	// its state, and a state cannot go while anything names it.
 	ListIssueIDsInState(ctx context.Context, stateID uuid.UUID) ([]uuid.UUID, error)
 	ListIssueStates(ctx context.Context, projectID uuid.UUID) ([]IssueState, error)
+	// The issues made from a room's messages, that this person may see.
+	//
+	// The project's visibility is the authorisation, joined rather than filtered
+	// afterwards: an issue in a private project the reader is not in is never
+	// fetched, so the room's members learn nothing about it — not its title, and
+	// not that it exists.
+	ListIssuesFromRoom(ctx context.Context, arg ListIssuesFromRoomParams) ([]ListIssuesFromRoomRow, error)
 	// The lifetimes carried by a page of messages, so a timeline can disclose them
 	// without a query per message.
 	ListLifetimesForEvents(ctx context.Context, eventIds []string) ([]MessageLifetime, error)
@@ -769,6 +776,11 @@ type Querier interface {
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
+	// Somebody taking part in an issue's discussion hears about everything said
+	// in it, as a tracker's participants expect — unless they have said
+	// otherwise: a setting of their own for this discussion is left alone, and so
+	// is somebody who has asked to hear nothing anywhere.
+	WatchDiscussion(ctx context.Context, arg WatchDiscussionParams) error
 }
 
 var _ Querier = (*Queries)(nil)

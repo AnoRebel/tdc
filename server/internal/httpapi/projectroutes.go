@@ -247,12 +247,19 @@ func (s *Server) handleListProjects(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	actor := actorOf(c)
 	response := make([]projectResponse, 0, len(rows))
 	for _, row := range rows {
-		response = append(response, projectResponseOf(dbgen.Project{
+		project := dbgen.Project{
 			ID: row.ID, Key: row.Key, Name: row.Name, Description: row.Description,
 			Visibility: row.Visibility, CreatedAt: row.CreatedAt,
-		}, row.MyRole))
+		}
+		listed := projectResponseOf(project, row.MyRole)
+		// What the reader may do in each, so a client choosing where to file
+		// something offers only the projects that would accept it.
+		abilities := abilitiesOf(projects.AccessWithRole(actor, project, row.MyRole))
+		listed.Can = &abilities
+		response = append(response, listed)
 	}
 	return c.JSON(http.StatusOK, response)
 }

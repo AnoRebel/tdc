@@ -122,6 +122,21 @@ export interface IssueHistoryEntry {
   content: Record<string, unknown>;
 }
 
+/**
+ * An issue made from one of a room's messages, as that room's reader may see
+ * it. Issues in projects the reader cannot see are simply not listed.
+ */
+export interface IssueFromMessage {
+  /** The message it was made from. */
+  eventId: string;
+  key: string;
+  title: string;
+  /** The name of the state it is in. */
+  state: string;
+  /** Whether that state means done. */
+  completed: boolean;
+}
+
 /** Refused because the issue changed first: here is what it became. */
 export interface IssueConflict {
   message: string;

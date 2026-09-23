@@ -788,6 +788,30 @@ curl -X POST http://localhost:8080/api/issues/WEB-1/state \
 | `DELETE /api/issues/:ref`                     | Delete it (`issue.delete`); its history is kept                  |
 | `POST /api/issues/:ref/state`                 | Move it                                                          |
 | `GET /api/issues/:ref/history`                | Every recorded change, oldest first                              |
+| `GET /api/rooms/:id/issues`                   | Issues made from a room's messages, as the caller may see them   |
+
+An issue made from a message names it on creation, as two identifiers — the
+message is referred to, never copied:
+
+```sh
+curl -X POST http://localhost:8080/api/projects/WEB/issues \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"title":"…","originChannel":"'$ROOM'","originEvent":"'$MESSAGE'"}'
+```
+
+The caller must be able to read the message; one they cannot answers 404,
+exactly as one that does not exist. `GET /api/issues/:ref` then carries
+`origin`: `{"disclosed": false}` and nothing else for a reader who cannot see
+the room, or `disclosed`, `roomId`, `roomName`, `eventId` and `message`
+(`sender`, `sentAt`, and `body` as it reads now, or `removed`) for one who can.
+`GET /api/rooms/:id/issues` lists the issues made from a room's messages that the
+caller may see, as `eventId`, `key`, `title`, `state` and `completed`.
+
+An issue's discussion is a room whose id is the issue's `id`. Read, post, edit
+and react through the ordinary room endpoints — `POST /api/rooms/:id/join` to
+take part, then `POST /api/rooms/:id/messages` — with the issue's visibility as
+the room's. Its `kind` is `issue-discussion`, and it never appears in
+`GET /api/rooms`.
 
 A history entry is an event from the project's stream, as recorded: `type`
 (`issue.created`, `issue.state_changed`, `issue.title_changed`, …), `actor`

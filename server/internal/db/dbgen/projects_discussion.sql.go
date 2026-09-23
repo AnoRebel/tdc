@@ -93,6 +93,76 @@ func (q *Queries) LatestMessageEdit(ctx context.Context, arg LatestMessageEditPa
 	return i, err
 }
 
+const listIssuesFromRoom = `-- name: ListIssuesFromRoom :many
+SELECT
+    (e.content->>'originEvent')::text AS event_id,
+    i.id AS issue_id,
+    i.number,
+    i.title,
+    p.key AS project_key,
+    s.name AS state_name,
+    s.is_completion
+FROM events e
+JOIN issues i ON i.id = (e.content->>'issue')::uuid
+JOIN projects p ON p.id = i.project_id
+JOIN issue_states s ON s.id = i.state_id
+LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+WHERE e.type = 'issue.created'
+  AND e.content->>'originChannel' = $2::text
+  AND i.deleted_at IS NULL
+  AND (p.visibility = 'public' OR pm.user_id IS NOT NULL)
+ORDER BY e.sequence
+`
+
+type ListIssuesFromRoomParams struct {
+	UserID uuid.UUID
+	RoomID string
+}
+
+type ListIssuesFromRoomRow struct {
+	EventID      string
+	IssueID      uuid.UUID
+	Number       int64
+	Title        string
+	ProjectKey   string
+	StateName    string
+	IsCompletion bool
+}
+
+// The issues made from a room's messages, that this person may see.
+//
+// The project's visibility is the authorisation, joined rather than filtered
+// afterwards: an issue in a private project the reader is not in is never
+// fetched, so the room's members learn nothing about it — not its title, and
+// not that it exists.
+func (q *Queries) ListIssuesFromRoom(ctx context.Context, arg ListIssuesFromRoomParams) ([]ListIssuesFromRoomRow, error) {
+	rows, err := q.db.Query(ctx, listIssuesFromRoom, arg.UserID, arg.RoomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListIssuesFromRoomRow{}
+	for rows.Next() {
+		var i ListIssuesFromRoomRow
+		if err := rows.Scan(
+			&i.EventID,
+			&i.IssueID,
+			&i.Number,
+			&i.Title,
+			&i.ProjectKey,
+			&i.StateName,
+			&i.IsCompletion,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeDiscussionOutsiders = `-- name: RemoveDiscussionOutsiders :exec
 DELETE FROM room_members
 USING issues
@@ -132,5 +202,31 @@ type RemoveFromProjectDiscussionsParams struct {
 // discussion's notifications to somebody who may no longer read it.
 func (q *Queries) RemoveFromProjectDiscussions(ctx context.Context, arg RemoveFromProjectDiscussionsParams) error {
 	_, err := q.db.Exec(ctx, removeFromProjectDiscussions, arg.ProjectID, arg.UserID)
+	return err
+}
+
+const watchDiscussion = `-- name: WatchDiscussion :exec
+INSERT INTO notification_preferences (user_id, room_id, level, muted)
+SELECT $1, $2, 'all', FALSE
+WHERE NOT EXISTS (
+    SELECT 1 FROM notification_preferences global
+    WHERE global.user_id = $1
+      AND global.room_id IS NULL
+      AND (global.level = 'none' OR global.muted)
+)
+ON CONFLICT (user_id, room_id) WHERE room_id IS NOT NULL DO NOTHING
+`
+
+type WatchDiscussionParams struct {
+	UserID uuid.UUID
+	RoomID *uuid.UUID
+}
+
+// Somebody taking part in an issue's discussion hears about everything said
+// in it, as a tracker's participants expect — unless they have said
+// otherwise: a setting of their own for this discussion is left alone, and so
+// is somebody who has asked to hear nothing anywhere.
+func (q *Queries) WatchDiscussion(ctx context.Context, arg WatchDiscussionParams) error {
+	_, err := q.db.Exec(ctx, watchDiscussion, arg.UserID, arg.RoomID)
 	return err
 }

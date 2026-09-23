@@ -651,6 +651,25 @@
       "blocks": "blocking",
       "blocked_by": "blocked by"
     },
-    "usernameRequired": "Say whose username to add."
+    "usernameRequired": "Say whose username to add.",
+    "discussion": "Discussion",
+    "fromMessage": {
+      "action": "Create an issue from this",
+      "title": "Create an issue from this message",
+      "hint": "The message is kept as a link, not copied. Anybody opening the issue sees it only if they could read it here.",
+      "project": "Project",
+      "chooseProject": "Choose a project to file it in.",
+      "noProjects": "There is no project you can file issues in yet.",
+      "link": "Link it to this message",
+      "linkHint": "The issue will show where it came from, and this message will show the issue.",
+      "trackedAs": "Tracked as {issue}: {title}"
+    },
+    "origin": {
+      "title": "Where this came from",
+      "undisclosed": "This issue was made from a message in a conversation you cannot see.",
+      "removed": "The message in {room} it was made from has been removed.",
+      "edited": "edited",
+      "open": "Open it in {room}"
+    }
   }
 }

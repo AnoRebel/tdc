@@ -396,6 +396,18 @@ func (a Access) MayEdit(issue dbgen.Issue) authz.Decision {
 	return decision
 }
 
+/*
+AccessWithRole is what somebody may do in a project, given their role in it
+as a listing already read it.
+
+For a list of projects, where each row carries the reader's role: resolving
+access again per row would be a query per project for an answer already in
+hand. Only for a project the list itself established the reader may see.
+*/
+func AccessWithRole(actor Actor, project dbgen.Project, role string) Access {
+	return Access{Project: project, Role: role, userID: actor.ID, permissions: actor.Permissions}
+}
+
 // UserID is who this access belongs to.
 func (a Access) UserID() uuid.UUID { return a.userID }
 

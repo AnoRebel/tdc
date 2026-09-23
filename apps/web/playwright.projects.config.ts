@@ -15,9 +15,14 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   reporter: "list",
-  timeout: 120_000,
+  // Generous: a demonstration signs several people in and waits on live
+  // delivery between browsers, and a slow machine is not a failed milestone.
+  timeout: 300_000,
   use: {
     baseURL: process.env.TDC_TEST_URL ?? "http://localhost:8401",
+    // A step that cannot happen says so, rather than waiting out the test.
+    actionTimeout: 20_000,
+    navigationTimeout: 30_000,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

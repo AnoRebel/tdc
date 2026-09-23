@@ -466,6 +466,11 @@ holds issues named by the project's key and a number — `WEB-12` — that never
 changes. An issue moves through the states its project defines, and everything
 that happens to it is kept in a history nobody can edit.
 
+A message becomes an issue from its own menu — **Create an issue from this** —
+and the two stay linked: the issue shows where it came from to anybody who can
+read that conversation, and the message shows the issue. Each issue has a
+discussion beside it that works like any channel.
+
 [Projects and issues](projects.md) is the whole guide: starting a project,
 configuring its states, filing and moving issues, and who may do what.
 

@@ -651,6 +651,25 @@
       "blocks": "linalozuia",
       "blocked_by": "linalozuiwa na"
     },
-    "usernameRequired": "Taja jina la mtumiaji wa kuongeza."
+    "usernameRequired": "Taja jina la mtumiaji wa kuongeza.",
+    "discussion": "Majadiliano",
+    "fromMessage": {
+      "action": "Unda suala kutokana na hili",
+      "title": "Unda suala kutokana na ujumbe huu",
+      "hint": "Ujumbe unahifadhiwa kama kiungo, haunakiliwi. Yeyote anayefungua suala ataona ujumbe tu kama angeweza kuusoma hapa.",
+      "project": "Mradi",
+      "chooseProject": "Chagua mradi wa kuliwasilisha.",
+      "noProjects": "Bado hakuna mradi unaoweza kuwasilisha masuala ndani yake.",
+      "link": "Liunganishe na ujumbe huu",
+      "linkHint": "Suala litaonyesha lilikotoka, na ujumbe huu utaonyesha suala hilo.",
+      "trackedAs": "Linafuatiliwa kama {issue}: {title}"
+    },
+    "origin": {
+      "title": "Chanzo cha suala hili",
+      "undisclosed": "Suala hili liliundwa kutokana na ujumbe katika mazungumzo usiyoweza kuyaona.",
+      "removed": "Ujumbe katika {room} ulioanzisha suala hili umeondolewa.",
+      "edited": "umehaririwa",
+      "open": "Ufungue katika {room}"
+    }
   }
 }
