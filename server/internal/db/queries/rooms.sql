@@ -13,11 +13,15 @@ SELECT * FROM rooms WHERE slug_folded = $1;
 -- Rooms the user is a member of, plus public rooms they could join. A private
 -- room they are not in never appears, which is what keeps its existence
 -- undisclosed.
+--
+-- A project's event stream and an issue's discussion are rooms too, and are
+-- reached through their project rather than listed among conversations.
 SELECT DISTINCT rooms.*
 FROM rooms
 LEFT JOIN room_members ON room_members.room_id = rooms.id AND room_members.user_id = $1
-WHERE room_members.user_id IS NOT NULL
-   OR rooms.visibility = 'public'
+WHERE (room_members.user_id IS NOT NULL
+   OR rooms.visibility = 'public')
+  AND rooms.kind NOT IN ('project', 'issue-discussion')
 ORDER BY rooms.name;
 
 -- name: ListRoomsUserIsIn :many
@@ -25,6 +29,8 @@ SELECT rooms.*
 FROM rooms
 JOIN room_members ON room_members.room_id = rooms.id
 WHERE room_members.user_id = $1
+  -- Taking part in an issue's discussion is not joining a channel.
+  AND rooms.kind NOT IN ('project', 'issue-discussion')
 ORDER BY rooms.name;
 
 -- name: RenameRoom :one
@@ -141,4 +147,7 @@ WHERE room_id = $1 AND user_id = $2;
 -- each other rather than by anybody choosing to add a channel, and counting
 -- them would make the limit refuse conversations an operator never meant to
 -- cap.
-SELECT count(*) FROM rooms WHERE kind <> 'direct';
+--
+-- Nor are a project's stream or an issue's discussion, which exist because
+-- somebody filed work rather than because anybody added a channel.
+SELECT count(*) FROM rooms WHERE kind NOT IN ('direct', 'project', 'issue-discussion');

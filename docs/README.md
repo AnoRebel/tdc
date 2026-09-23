@@ -2,6 +2,9 @@
 
 - **[Using TDC](using-tdc.md)** — what the application does, for the people who
   use it.
+- **[Projects and issues](projects.md)** — tracking the work a conversation
+  agrees: projects, states, issues and their history, who may do what, and the
+  endpoints behind them.
 - **[Moving from Telegram and WhatsApp](moving-from-telegram-and-whatsapp.md)** —
   what a community decides before it moves, how its groups map onto channels,
   and what is better and worse afterwards.

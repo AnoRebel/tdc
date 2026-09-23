@@ -50,6 +50,7 @@ const { branding } = useServerInfo();
 const showNotifications = ref(false);
 const showAppearance = ref(false);
 const router = useRouter();
+const hasProjects = router.hasRoute("projects");
 
 /*
  * The badge, refreshed on a timer.
@@ -138,6 +139,22 @@ function conversationName(room: Room): string {
     </div>
 
     <nav data-tour="channels" class="flex-1 space-y-4 overflow-y-auto px-2 pb-3">
+      <!-- Projects: where work agreed in these conversations is tracked. Only
+           where the client has somewhere to show them — the desktop client
+           shares this sidebar and does not, yet. -->
+      <ul v-if="hasProjects" class="space-y-px">
+        <li>
+          <NuxtLink
+            :to="localeRoute({ name: 'projects' })"
+            class="nav-item"
+            :data-active="route.path.startsWith('/projects')"
+          >
+            <Icon name="lucide:kanban" class="size-3.5 shrink-0 opacity-60" />
+            <span class="truncate">{{ $t("projects.title") }}</span>
+          </NuxtLink>
+        </li>
+      </ul>
+
       <section v-if="joined.length">
         <h2
           class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"

@@ -157,6 +157,30 @@ type InvitationUse struct {
 	UsedAt       time.Time
 }
 
+type Issue struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Number      int64
+	Title       string
+	Description string
+	StateID     uuid.UUID
+	AuthorID    *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
+	DeletedBy   *uuid.UUID
+}
+
+type IssueState struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	Name         string
+	NameFolded   string
+	Position     int32
+	IsCompletion bool
+	CreatedAt    time.Time
+}
+
 type MessageLifetime struct {
 	EventID   string
 	RoomID    uuid.UUID
@@ -263,6 +287,27 @@ type PostingRestriction struct {
 	CreatedAt           time.Time
 	LiftedAt            *time.Time
 	LiftedBy            *uuid.UUID
+}
+
+type Project struct {
+	ID              uuid.UUID
+	Key             string
+	KeyFolded       string
+	Name            string
+	Description     string
+	Visibility      string
+	NextIssueNumber int64
+	CreatedBy       *uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type ProjectMember struct {
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+	Role      string
+	JoinedAt  time.Time
+	AddedBy   *uuid.UUID
 }
 
 type PushSubscription struct {

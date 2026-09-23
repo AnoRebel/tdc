@@ -737,6 +737,64 @@ the second means "nothing for you", which deliberately covers both "that server
 publishes nothing" and "that server has not listed us" — the two are not
 distinguishable, by design.
 
+## Projects and issues
+
+Projects are named by their key and issues by their identifier — `WEB-12` —
+rather than by internal ids, in paths as in conversation. Both are matched
+without regard to case. [Projects and issues](projects.md) explains what the
+objects are and who may do what; this is how to reach them.
+
+A private project, and every issue in it, answers a non-member exactly as a
+project that does not exist does: 404, with the same body. A refusal to act on
+something the caller can see is 403 and names the permission.
+
+```sh
+# Start a project. Answers 201 with the project, its states, and what the
+# caller may do in it ("can").
+curl -X POST http://localhost:8080/api/projects \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"key":"WEB","name":"Community website","visibility":"public"}'
+
+# File an issue. It starts in the first state unless stateId says otherwise.
+curl -X POST http://localhost:8080/api/projects/WEB/issues \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"title":"Search ignores diacritics","description":"…"}'
+
+# Move it. expectedStateId is the state you saw it in; give it, and a move made
+# against an issue somebody else has just moved answers 409 with the issue as
+# it now is, instead of overwriting their move.
+curl -X POST http://localhost:8080/api/issues/WEB-1/state \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"stateId":"…","expectedStateId":"…"}'
+```
+
+| Endpoint                                      | What it does                                                     |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| `GET /api/projects`                           | Projects the caller can see, with their role in each             |
+| `POST /api/projects`                          | Start a project (`project.create`)                               |
+| `GET /api/projects/:key`                      | A project, its states in board order, and `can`                  |
+| `PATCH /api/projects/:key`                    | Change `name`, `description` or `visibility`                     |
+| `GET /api/projects/:key/members`              | Its members and their roles                                      |
+| `PUT /api/projects/:key/members/:username`    | Add somebody, or change their `role` (`admin` or `member`)       |
+| `DELETE /api/projects/:key/members/:username` | Remove somebody; anybody may remove themselves                   |
+| `POST /api/projects/:key/states`              | Add a state: `name`, `isCompletion`                              |
+| `PATCH /api/projects/:key/states/:id`         | Rename a state or change whether it means done                   |
+| `PUT /api/projects/:key/states`               | Reorder: `order` names every state's id exactly once             |
+| `DELETE /api/projects/:key/states/:id`        | Remove a state; `?moveTo=:id` is required while issues are in it |
+| `GET /api/projects/:key/issues`               | Newest first; `state`, `limit` (≤200), `before` (a number)       |
+| `POST /api/projects/:key/issues`              | File an issue                                                    |
+| `GET /api/issues/:ref`                        | One issue, with its project, `can`, and where it came from       |
+| `PATCH /api/issues/:ref`                      | Change `title` or `description`                                  |
+| `DELETE /api/issues/:ref`                     | Delete it (`issue.delete`); its history is kept                  |
+| `POST /api/issues/:ref/state`                 | Move it                                                          |
+| `GET /api/issues/:ref/history`                | Every recorded change, oldest first                              |
+
+A history entry is an event from the project's stream, as recorded: `type`
+(`issue.created`, `issue.state_changed`, `issue.title_changed`, …), `actor`
+(user@server), `at`, `sequence`, and `content`. A change to a field carries
+`field`, `previous` and `new`; a move also carries `previousName` and
+`newName`, the names the states had at the time. Times are RFC 3339 instants.
+
 ## Administration
 
 The endpoints under `/api/admin` each name the permission that governs them, and

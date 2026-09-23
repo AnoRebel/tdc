@@ -226,8 +226,9 @@ it with no administrator at all, and one that would remove the authority of the
 person making it. The second can be overridden — somebody stepping down
 deliberately is a real thing — by repeating the request with `confirmed`.
 
-Thirteen of the twenty-three catalogued permissions are enforced; the rest are
-names waiting for features. Notably `channel.post` is not enforced: who may
+Thirteen of the twenty-three permissions catalogued before projects are
+enforced; the rest are names waiting for features. The nine that projects added
+are all enforced — see [Projects](#projects). Notably `channel.post` is not enforced: who may
 speak in a channel is governed by membership, bans and posting restrictions.
 
 ### Mail, and the account recovery that depends on it
@@ -515,6 +516,31 @@ federating with a server whose moderation you have not thought about.
 
 The [federation protocol](federation-protocol.md) describes what is published
 and how a peer checks it.
+
+### Projects
+
+Projects need nothing configured and nothing extra running: they are tables in
+the same database, and their history is the same event log messages use. Two
+things about how they are stored are worth knowing when you look at the
+database or its backups.
+
+- **Every project and every issue has a room behind it.** A project's history is
+  a room of kind `project` — its event stream, which nobody is a member of and
+  which no room endpoint serves — and each issue's discussion is a room of kind
+  `issue-discussion`. Neither kind appears among anybody's conversations, and
+  neither counts towards `limits.max_channels`. A backup of the database is a
+  backup of all of it.
+- **Upgrading grants `project.create` to the `Member` role**, the same way a new
+  server's `Member` role is made with it, so ordinary accounts can start
+  projects as they can make channels. Withdraw it like any other permission if
+  you want projects started only by some people.
+
+The audit log records the administrative acts around projects — one started,
+its visibility changed, somebody added to or removed from it, a role granted a
+permission in one — as `project.*` actions. What happens to issues is not
+copied there: it is each project's own history, in the event log.
+
+[Projects and issues](projects.md) covers the rest.
 
 ## TLS
 

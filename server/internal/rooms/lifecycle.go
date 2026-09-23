@@ -137,7 +137,16 @@ func (s *Service) Join(ctx context.Context, roomID, userID uuid.UUID) error {
 		return fmt.Errorf("read room: %w", err)
 	}
 
-	if room.Visibility != "public" {
+	// A room belonging to something else is joinable by whoever may see it,
+	// the way a public channel is by everybody.
+	joinable := room.Visibility == "public"
+	if handled, visible, err := s.delegated(ctx, room, userID); handled {
+		if err != nil {
+			return fmt.Errorf("decide access: %w", err)
+		}
+		joinable = visible
+	}
+	if !joinable {
 		// Reported as missing rather than forbidden, so a private room's
 		// existence cannot be probed by attempting to join it.
 		return ErrRoomNotFound
