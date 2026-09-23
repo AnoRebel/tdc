@@ -766,6 +766,220 @@ Fanout is scoped by authorisation on every frame, and that is evaluated live. A
 member removed from a channel stops receiving its events immediately, without
 the connection being re-established.
 
+## Signed deliveries
+
+Some things arrive at **your** endpoint rather than over a connection you
+opened: the events an outgoing webhook subscribes to, and presses on a message
+your program posted. Your endpoint has no session with this server, so each
+delivery carries what you need to prove, from the request alone, that this
+server sent it, that nothing in it changed on the way, and that it is not an old
+delivery played back.
+
+Every delivery is a `POST` with a JSON body and these headers:
+
+| Header               | What it is                                                          |
+| -------------------- | ------------------------------------------------------------------- |
+| `TDC-Delivery`       | The delivery's identifier — the same across retries of one delivery |
+| `TDC-Event`          | What kind of delivery it is, e.g. `message.sent` or `delivery.test` |
+| `Content-Digest`     | `sha-256=:<base64>:`, the SHA-256 of the body (RFC 9530)            |
+| `Signature-Input`    | `tdc=("content-digest" "tdc-delivery");created=…;keyid="…";alg=…`   |
+| `Signature`          | `tdc=:<base64>:`, an Ed25519 signature (RFC 9421 shape)             |
+| `TDC-Signature-HMAC` | `t=<unix seconds>,v1=<hex>`, present when you were given a secret   |
+
+There are **two** signatures, for two kinds of receiver. Check whichever suits
+you; both are always valid together.
+
+**The Ed25519 signature proves the delivery came from this server** with nothing
+shared in advance. It is made with the key the server signs its event log with,
+and the keys are published, without any credential, at:
+
+```sh
+curl http://localhost:8080/.well-known/tdc-delivery-keys
+```
+
+```json
+{
+  "algorithm": "ed25519",
+  "replayWindowSeconds": 300,
+  "keys": [{ "id": "…", "publicKey": "<base64url, 32 bytes>" }]
+}
+```
+
+Retired keys stay in that list, marked `"retired": true`, because they still
+verify what they signed. Cache the document; fetch it again when a delivery
+names a `keyid` you do not have, which is what a rotation looks like.
+
+The signature is over exactly these bytes, lines joined by `\n` with none after
+the last:
+
+```text
+"content-digest": sha-256=:…:
+"tdc-delivery": 0199f1f2-…
+"@signature-params": ("content-digest" "tdc-delivery");created=1758099731;keyid="…";alg="ed25519"
+```
+
+The last line repeats `Signature-Input` after its `tdc=`. Not the method, path
+or host: a receiver behind a proxy often sees all three rewritten, and a
+signature that failed there would be one nobody could use. The delivery's
+identifier is covered instead, so a signature cannot be moved onto a different
+delivery.
+
+**The HMAC is the check most webhook receivers already know.** It is
+HMAC-SHA256, keyed with the secret you set, over `<t>.<body>` — the timestamp
+from the header, a full stop, and the raw body.
+
+**Both cover a timestamp, and that is what bounds a replay.** Refuse any
+delivery whose signed time — `created`, or the HMAC's `t` — is more than **five
+minutes** from your own clock, in either direction. Both are Unix seconds, so
+there is no timezone to get wrong. A retry is signed afresh when it is sent, so
+a delivery retried an hour later still arrives inside its own window. To refuse
+a replay _inside_ the window as well, remember the `TDC-Delivery` identifiers
+you have handled for five minutes; you want that anyway, because retries mean
+you may receive one delivery more than once.
+
+### Verifying a delivery
+
+In TypeScript, for Bun or Node, with nothing but the standard library. Hand it
+the request's headers, the body exactly as received — verify before parsing,
+since re-serialised JSON is different bytes — and the published keys:
+
+<!-- demo: verify-delivery -->
+
+```ts
+import { createHash, createHmac, createPublicKey, timingSafeEqual, verify } from "node:crypto";
+
+export const REPLAY_WINDOW_SECONDS = 300;
+
+type PublishedKey = { id: string; publicKey: string };
+
+function withinWindow(created: number, now: number) {
+  if (!Number.isInteger(created) || Math.abs(now / 1000 - created) > REPLAY_WINDOW_SECONDS) {
+    throw new Error("the delivery was signed outside the replay window");
+  }
+}
+
+/** Throws unless the delivery was signed by the server publishing `keys`. */
+export function verifyDelivery(
+  headers: Headers,
+  body: string,
+  keys: PublishedKey[],
+  now = Date.now(),
+): void {
+  const input = headers.get("signature-input") ?? "";
+  const signature = headers.get("signature") ?? "";
+  const digest = headers.get("content-digest") ?? "";
+  const delivery = headers.get("tdc-delivery") ?? "";
+
+  const params = input.replace(/^tdc=/, "");
+  if (params === input || !/\("content-digest" "tdc-delivery"\)/.test(params)) {
+    throw new Error("the signature does not cover what it must");
+  }
+  const created = Number(/;created=(\d+)/.exec(params)?.[1]);
+  const keyId = /;keyid="([^"]+)"/.exec(params)?.[1];
+  withinWindow(created, now);
+
+  const sum = createHash("sha256").update(body).digest("base64");
+  if (digest !== `sha-256=:${sum}:`) throw new Error("the body does not match its digest");
+
+  const key = keys.find((candidate) => candidate.id === keyId);
+  if (!key) throw new Error(`unknown key ${keyId}: fetch the published keys again`);
+
+  const base =
+    `"content-digest": ${digest}\n` +
+    `"tdc-delivery": ${delivery}\n` +
+    `"@signature-params": ${params}`;
+  const publicKey = createPublicKey({
+    key: { kty: "OKP", crv: "Ed25519", x: key.publicKey },
+    format: "jwk",
+  });
+  const bytes = Buffer.from(signature.replace(/^tdc=:/, "").replace(/:$/, ""), "base64");
+  if (!verify(null, Buffer.from(base), publicKey, bytes)) {
+    throw new Error("the signature does not verify");
+  }
+}
+
+/** Throws unless the delivery carries a valid HMAC for `secret`. */
+export function verifyHMAC(headers: Headers, body: string, secret: string, now = Date.now()): void {
+  const header = headers.get("tdc-signature-hmac") ?? "";
+  const created = Number(/(?:^|,)t=(\d+)/.exec(header)?.[1]);
+  const claimed = /(?:^|,)v1=([0-9a-f]+)/.exec(header)?.[1] ?? "";
+  withinWindow(created, now);
+
+  const expected = createHmac("sha256", secret).update(`${created}.${body}`).digest("hex");
+  if (
+    claimed.length !== expected.length ||
+    !timingSafeEqual(Buffer.from(claimed), Buffer.from(expected))
+  ) {
+    throw new Error("the HMAC does not match");
+  }
+}
+```
+
+And a receiver using it, which answers 2xx only once a delivery has checked
+out — anything else is retried by the server, which is what you want for a
+delivery you could not prove:
+
+<!-- demo: delivery-receiver -->
+
+```ts
+import { verifyDelivery } from "./verify-delivery";
+
+const SERVER = process.env.TDC_SERVER ?? "http://localhost:8080";
+let keys = (await (await fetch(`${SERVER}/.well-known/tdc-delivery-keys`)).json()).keys;
+
+Bun.serve({
+  port: 9000,
+  async fetch(request) {
+    const body = await request.text();
+    try {
+      verifyDelivery(request.headers, body, keys);
+    } catch (error) {
+      // A key rotated since the list was fetched: refetch once, then retry.
+      keys = (await (await fetch(`${SERVER}/.well-known/tdc-delivery-keys`)).json()).keys;
+      try {
+        verifyDelivery(request.headers, body, keys);
+      } catch {
+        return new Response(String(error), { status: 401 });
+      }
+    }
+    const delivery = JSON.parse(body);
+    console.log(request.headers.get("tdc-event"), delivery.id);
+    return new Response(null, { status: 204 });
+  },
+});
+```
+
+### Sending yourself a test delivery
+
+Before anything depends on your receiver, ask the server to send it one:
+
+<!-- demo: test-delivery -->
+
+```sh
+curl -X POST http://localhost:8080/api/integrations/test-delivery \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://hooks.example.test/tdc", "secret": "the secret you will use"}'
+```
+
+```json
+{ "id": "0199f1f2-…", "delivered": true, "status": 204 }
+```
+
+It is signed exactly as every other delivery, with `TDC-Event: delivery.test`,
+and it goes through everything a real one does: the same destination check, the
+same guard at connection time, the same timeout. `delivered` is true only for a
+2xx answer; otherwise `status` or `error` says what happened, and `response`
+carries the start of what your receiver said. Ten a minute per account.
+
+**An endpoint on a private network is refused** — loopback, `10.0.0.0/8`,
+`192.168.0.0/16`, link-local, and the rest of the reserved ranges — with
+**403**, both when you name it and again when a delivery connects, so a name
+that resolves somewhere else a moment later gains nothing. Redirects are never
+followed: a 3xx is your receiver's answer, recorded as a failure. An operator
+whose receivers genuinely live beside the server turns on
+`integrations.allow_private_addresses`; see the hosting guide.
+
 ## Search
 
 Two endpoints, both taking the search text as `q`:

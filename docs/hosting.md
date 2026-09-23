@@ -516,6 +516,42 @@ federating with a server whose moderation you have not thought about.
 The [federation protocol](federation-protocol.md) describes what is published
 and how a peer checks it.
 
+### Deliveries to other people's endpoints
+
+Webhooks and applications make this server send HTTP requests to addresses
+somebody else chose. Your network has to let it reach them, and you decide one
+thing about where it may not.
+
+**Private addresses are refused by default.** An endpoint on loopback, on
+`10.0.0.0/8`, `172.16.0.0/12` or `192.168.0.0/16`, on a link-local or
+carrier-grade NAT address, or anywhere else reserved, is refused when somebody
+names it and again at the moment of connection — so a name that resolves to a
+public address when it is checked and a private one when it is used gains
+nothing. This matters most where anybody may set up a webhook: without it, a
+webhook is a way to make your server talk to your database, your metadata
+service, or anything else behind your firewall.
+
+If your receivers genuinely live beside the server — a build system on the same
+private network, say — turn it off deliberately:
+
+```sh
+curl -X PUT https://chat.example.org/api/admin/settings/integrations.allow_private_addresses \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value":"true"}'
+```
+
+Redirects are never followed either way. Each attempt is bounded by
+`integrations.delivery_timeout_seconds` (default 5).
+
+The keys receivers verify deliveries with are the event log's own signing keys,
+published at `/.well-known/tdc-delivery-keys`, retired ones included. Rotating
+the signing key — see [If a signing key is compromised](#if-a-signing-key-is-compromised)
+— rotates them too, with the same caveat: a receiver that cached the list keeps
+trusting the old key until it refetches. Receivers following the integration
+guide refetch when a delivery names a key they do not hold, so new deliveries
+reach them at once; telling their owners to refetch is what closes the window
+for the old one.
+
 ## TLS
 
 **The server does not terminate TLS.** It speaks plain HTTP on its configured

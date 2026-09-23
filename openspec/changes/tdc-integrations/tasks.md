@@ -22,11 +22,11 @@ Goal: close the built part of `integrations/interactive-messages` against the sp
 
 Goal: the signing mechanism every later phase depends on, built once and shared, before there is anything to sign.
 
-- [ ] 2.1 Expose the server's Ed25519 public signing keys at a well-known unauthenticated path, reusing `events.Keyring.Published()`; verify a request with no credential receives the current and any retired keys
-- [ ] 2.2 Implement a delivery envelope — payload, timestamp, and Ed25519 signature over both, following the RFC 9421 shape the foundation design already committed to — as a shared function usable by both webhook delivery and invocation delivery; verify an altered payload byte fails verification and an unaltered one succeeds
-- [ ] 2.3 Implement the replay window check — a documented number of minutes between the signed timestamp and receipt — as a function the delivery envelope's consumer runs, and document it for integrators; verify a delivery replayed outside the window is detectably invalid by the documented scheme
-- [ ] 2.4 Write the delivery-signing section of `docs/integrating.md` with a worked verification example in the same language as the existing worked example; verify the documented verification code correctly accepts a real delivery and rejects a tampered one
-- [ ] **MILESTONE 2** — Demonstrate: fetch the published keys from a live server, receive a hand-crafted signed test delivery, and verify it with the documented scheme using nothing but the published keys and the delivery's own content. Tag `v1.13.0-dev`.
+- [x] 2.1 Expose the server's Ed25519 public signing keys at a well-known unauthenticated path, reusing `events.Keyring.Published()`; verify a request with no credential receives the current and any retired keys
+- [x] 2.2 Implement a delivery envelope — payload, timestamp, and Ed25519 signature over both, following the RFC 9421 shape the foundation design already committed to — as a shared function usable by both webhook delivery and invocation delivery; verify an altered payload byte fails verification and an unaltered one succeeds
+- [x] 2.3 Implement the replay window check — a documented number of minutes between the signed timestamp and receipt — as a function the delivery envelope's consumer runs, and document it for integrators; verify a delivery replayed outside the window is detectably invalid by the documented scheme
+- [x] 2.4 Write the delivery-signing section of `docs/integrating.md` with a worked verification example in the same language as the existing worked example; verify the documented verification code correctly accepts a real delivery and rejects a tampered one
+- [x] **MILESTONE 2** — Demonstrate: fetch the published keys from a live server, receive a hand-crafted signed test delivery, and verify it with the documented scheme using nothing but the published keys and the delivery's own content. Tag `v1.13.0-dev`.
 
 ## 3. Phase 3 — Outgoing webhooks deliver, retry, and stay out of the way
 
@@ -90,6 +90,6 @@ These run continuously from the phase in which they first apply, not only at the
 
 - [ ] 7.1 Add end-to-end tests covering the full outgoing-webhook cycle — subscribe, receive, fail, retry, disable — against a local test receiver; verify they pass on Chromium per the existing CI tier — from Phase 3
 - [ ] 7.2 Add a load test establishing a baseline for outbound delivery throughput and confirming a stalled receiver does not measurably affect chat message latency in the same run; verify the documented target is met and recorded — from Phase 3
-- [ ] 7.3 Add a test proving delivery signature verification succeeds using only the published keys and a delivery's own content, mirroring the existing federation-readiness test's independence from server-side database access; verify it passes with no database connection to the originating server — from Phase 2
+- [x] 7.3 Add a test proving delivery signature verification succeeds using only the published keys and a delivery's own content, mirroring the existing federation-readiness test's independence from server-side database access; verify it passes with no database connection to the originating server — from Phase 2
 - [ ] 7.4 Keep documentation current in the same change that alters the behaviour it describes; verify a behaviour change without a documentation update is rejected in review — from Phase 1
 - [ ] 7.5 Add server memory measurement for the webhook delivery worker pool under sustained load to the existing CI memory report; verify the figures are reported and an increase is surfaced for justification — from Phase 3

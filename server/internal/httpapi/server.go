@@ -155,6 +155,10 @@ type Server struct {
 	federationPeers *federation.Client
 	federationSeen  *federation.ReplayCache
 
+	// What webhooks and applications hold between requests: the signer, the
+	// outbound client and the delivery queue. Built lazily, in integrations.go.
+	integrations integrationsState
+
 	// shell is the built application's index.html, held in memory so social
 	// metadata can be inserted per request.
 	shell []byte

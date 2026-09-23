@@ -150,6 +150,9 @@ run_doc_example() {
   local script
   script="$(doc_example "$1" "$2" "${3:-$ROOT/docs/integrating.md}")"
   [[ -n "$script" ]] || fail "the documentation has no example marked ${1}"
+  # An example naming a placeholder address is pointed at a real one, and
+  # nothing else about it is changed.
+  [[ -n "${DOC_SED:-}" ]] && script="$(sed "$DOC_SED" <<<"$script")"
   bash -c "curl() { command curl -sS -w '\nHTTP %{http_code}\n' \"\$@\"; }; set -e; ${script}"
 }
 

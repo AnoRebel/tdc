@@ -1,5 +1,10 @@
 package settings
 
+import (
+	"fmt"
+	"strconv"
+)
+
 /*
 Settings for programs that act on this server: interactive messages, webhooks
 and applications.
@@ -30,7 +35,38 @@ const (
 		server too.
 	*/
 	PressesPerIntegrationPerMinute Key = "integrations.presses_per_integration_per_minute"
+
+	/*
+		DeliveriesAllowPrivateAddresses permits deliveries to endpoints on
+		private networks.
+
+		Off by default, matching the guard on every other outbound request
+		this server makes. An endpoint is named by whoever set up a webhook,
+		and on a server where anybody may, reaching the server's own network
+		is exactly what somebody would try. An operator whose receivers live
+		beside the server on a network they control turns it on knowingly.
+	*/
+	DeliveriesAllowPrivateAddresses Key = "integrations.allow_private_addresses"
+
+	/*
+		DeliveryTimeoutSeconds bounds one delivery attempt, connection to
+		answer.
+
+		Five seconds. A receiver that has not answered by then is not going
+		to, and every second waited is a delivery worker nobody else can use.
+	*/
+	DeliveryTimeoutSeconds Key = "integrations.delivery_timeout_seconds"
 )
+
+// positive accepts a whole number of at least one, for a bound where zero
+// would mean "never" rather than "no limit".
+func positive(value string) error {
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed < 1 {
+		return fmt.Errorf("%w: expected a whole number, one or more", ErrInvalidValue)
+	}
+	return nil
+}
 
 func init() {
 	define(map[Key]definition{
@@ -43,6 +79,16 @@ func init() {
 			fallback:    "600",
 			description: "How many activations of one integration's controls are accepted per minute, or 0 for no limit.",
 			validate:    nonNegative,
+		},
+		DeliveriesAllowPrivateAddresses: {
+			fallback:    "false",
+			description: "Allow webhook and integration deliveries to endpoints on private network addresses.",
+			validate:    boolean,
+		},
+		DeliveryTimeoutSeconds: {
+			fallback:    "5",
+			description: "How long one delivery attempt may take, in seconds.",
+			validate:    positive,
 		},
 	})
 }
