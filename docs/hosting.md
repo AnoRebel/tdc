@@ -516,6 +516,35 @@ federating with a server whose moderation you have not thought about.
 The [federation protocol](federation-protocol.md) describes what is published
 and how a peer checks it.
 
+### The directory
+
+The developer and company directory is **off by default**. A server that only
+wants chat never has to think about it: every directory route answers `404`,
+nothing is listed, and the sidebar shows no link to it.
+
+Turning it on is a feature toggle, changed while the server runs:
+
+```sh
+curl -X PUT https://tdc.example/api/admin/features/directory \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled": true}'
+```
+
+or the **What this server offers** list on the server settings page of the web
+client (Settings → Administration). It takes effect
+on the next request, needs no restart and no migration, and turning it off
+again hides everything without deleting any of it — profiles are there as they
+were when it comes back on.
+
+Nobody appears in the directory because it was switched on; each person decides
+for themselves by creating a profile. Whether people who are not signed in can
+read profiles marked _Anyone_ follows the server's own discoverability
+(`server.visibility`): only a public server shows them to strangers.
+
+Moderating the directory takes **`directory.profile.manage`**, a server-scoped
+permission to grant to whichever role your moderators hold. See
+[the directory](directory.md#moderation) for what it allows and what it records.
+
 ## TLS
 
 **The server does not terminate TLS.** It speaks plain HTTP on its configured

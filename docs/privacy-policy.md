@@ -179,6 +179,32 @@ times it may be used, when it expires, and — where an invitation was bound to
 one person — the email address it was bound to. The invitation's secret is
 stored only as a hash. A record of who accepted which invitation is kept.
 
+### Your directory profile
+
+`[DELETE THIS SECTION IF THE DIRECTORY IS SWITCHED OFF ON THIS SERVER.]`
+
+Only if you create one. A directory profile holds what you choose to write — a
+headline, a location, a description of your experience, an about section,
+portfolio links, and contact details (an email address, a phone number, a
+website) — along with who you have chosen may see each part, and when it was
+created and last changed. None of it is required.
+
+Contact details are separate from the rest and visible to nobody but you unless
+you choose otherwise. What you have hidden from somebody is left out of what the
+server sends them, not sent and hidden by the application.
+
+If you are listed by a company, the record holds which company, the role it
+gave you, who invited you, and when you accepted. A company's own page holds its
+name, description, location and who created it.
+
+A moderator dealing with abuse can read your profile including what you have
+hidden, and can change or clear it; each read and each change is written to the
+audit log with the moderator's name and, for a change, the reason.
+
+Deleting your profile removes all of it, and your company associations, at once,
+and leaves your account as it was. Deleting your account removes your profile
+with it. The directory is not shared with other servers.
+
 ## What the software does not collect
 
 **There is no analytics and no telemetry.** TDC contains no analytics library,

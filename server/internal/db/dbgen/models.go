@@ -79,6 +79,31 @@ type ChannelBan struct {
 	CreatedAt       time.Time
 }
 
+type CompanyMember struct {
+	CompanyID     uuid.UUID
+	UserID        uuid.UUID
+	Role          string
+	Administrator bool
+	Status        string
+	InvitedBy     *uuid.UUID
+	InvitedAt     time.Time
+	AcceptedAt    *time.Time
+}
+
+type CompanyProfile struct {
+	ID          uuid.UUID
+	Slug        string
+	SlugFolded  string
+	Name        string
+	Description string
+	Location    string
+	Visibility  string
+	ProfileRank *int16
+	CreatedBy   *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Credential struct {
 	ID                    uuid.UUID
 	UserID                uuid.UUID
@@ -96,6 +121,25 @@ type Credential struct {
 	UsedAt                *time.Time
 	LastPeriod            *int64
 	ConfirmedAt           *time.Time
+}
+
+type DirectoryProfile struct {
+	UserID            uuid.UUID
+	Headline          string
+	Bio               string
+	Location          string
+	Experience        string
+	ContactEmail      string
+	ContactPhone      string
+	ContactUrl        string
+	Visibility        string
+	DetailsVisibility string
+	ContactVisibility string
+	ProfileRank       *int16
+	DetailsRank       *int16
+	ContactRank       *int16
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type EmailConfirmation struct {
@@ -250,6 +294,17 @@ type PinnedRoom struct {
 	RoomID   uuid.UUID
 	Position int32
 	PinnedAt time.Time
+}
+
+type PortfolioItem struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	Title       string
+	Url         string
+	Description string
+	Position    int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type PostingRestriction struct {

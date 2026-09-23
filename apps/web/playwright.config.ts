@@ -152,5 +152,22 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       testMatch: /milestone-8\.spec\.ts/,
     },
+    /*
+     * The directory, on a phone.
+     *
+     * A phone rather than a desktop, because that is where a developer
+     * answering a client is most likely to be — and a form that works at 1280
+     * pixels and scrolls sideways at 412 is a form that does not work. No
+     * stored session: these sign in the people they need, since a directory
+     * is about two strangers and the founder alone cannot play both.
+     */
+    {
+      name: "directory",
+      use: { ...devices["Pixel 7"] },
+      // Each one is a whole journey between two people, several sign-ins
+      // and page loads long, rather than one check on one screen.
+      timeout: 120_000,
+      testMatch: /directory-.*\.spec\.ts/,
+    },
   ],
 });

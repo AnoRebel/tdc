@@ -5,6 +5,9 @@
 - **[Moving from Telegram and WhatsApp](moving-from-telegram-and-whatsapp.md)** —
   what a community decides before it moves, how its groups map onto channels,
   and what is better and worse afterwards.
+- **[The directory](directory.md)** — profiles somebody chooses to publish,
+  companies, and who sees what; switched on by an operator, joined by nobody
+  who did not decide to.
 - **[Hosting](hosting.md)** — deploying a server, TLS, backup and restore.
 - **[Upgrading](upgrading.md)** — moving between releases, including across
   several at once, and what rolling back involves.

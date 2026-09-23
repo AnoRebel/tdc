@@ -12,6 +12,10 @@ import (
 )
 
 type Querier interface {
+	AcceptCompanyMembership(ctx context.Context, arg AcceptCompanyMembershipParams) (int64, error)
+	// Whoever creates a company is its first administrator, accepted from the
+	// start: they are consenting by creating it.
+	AddCompanyFounder(ctx context.Context, arg AddCompanyFounderParams) error
 	// Reacting twice with the same emoji is the same as reacting once.
 	//
 	// ON CONFLICT DO NOTHING rather than an error: a double click, or two devices
@@ -91,6 +95,7 @@ type Querier interface {
 	// "entries older than a year were removed" is not an account of anything, and
 	// afterwards there is nothing left to count.
 	CountAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (CountAuditEntriesBeforeRow, error)
+	CountCompanyAdministrators(ctx context.Context, companyID uuid.UUID) (int64, error)
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
@@ -121,6 +126,7 @@ type Querier interface {
 	CountUsersWithPermission(ctx context.Context, permission string) (int64, error)
 	CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) (ApiToken, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
+	CreateCompanyProfile(ctx context.Context, arg CreateCompanyProfileParams) (CompanyProfile, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
 	CreateEmailConfirmation(ctx context.Context, arg CreateEmailConfirmationParams) (EmailConfirmation, error)
@@ -146,7 +152,11 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
+	DeleteCompanyProfile(ctx context.Context, id uuid.UUID) error
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
+	// Removes the profile and, by cascade, its portfolio. The account, its
+	// messages and its sessions are other tables and are not touched.
+	DeleteDirectoryProfile(ctx context.Context, userID uuid.UUID) (int64, error)
 	DeleteExpiredEmailConfirmations(ctx context.Context) (int64, error)
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
@@ -158,6 +168,8 @@ type Querier interface {
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
 	DeleteLapsedBans(ctx context.Context) (int64, error)
+	// Everything the owner did not send back, which is how an item is removed.
+	DeletePortfolioItemsExcept(ctx context.Context, arg DeletePortfolioItemsExceptParams) error
 	// Scoped to the owner, so one person cannot unsubscribe another's device.
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) (int64, error)
 	// Used when the push service reports a subscription gone, where the endpoint
@@ -234,8 +246,13 @@ type Querier interface {
 	// server reports what was chosen, and choosing nothing is an answer.
 	GetAppearance(ctx context.Context, id uuid.UUID) (GetAppearanceRow, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
+	// For the company's own administrators, whatever its visibility.
+	GetCompanyBySlug(ctx context.Context, slug string) (CompanyProfile, error)
+	GetCompanyMembership(ctx context.Context, arg GetCompanyMembershipParams) (CompanyMember, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetDirectMessagePolicy(ctx context.Context, userID uuid.UUID) (string, error)
+	// For moderation: whose profile a username names, if they have one.
+	GetDirectoryProfileOwnerByUsername(ctx context.Context, username string) (GetDirectoryProfileOwnerByUsernameRow, error)
 	// What this person lets a member list say about them.
 	//
 	// Defaults when there is no row, which is the ordinary case: user_privacy is
@@ -252,6 +269,9 @@ type Querier interface {
 	// means: a channel setting beats the default rather than merging with it.
 	GetNotificationPreference(ctx context.Context, arg GetNotificationPreferenceParams) (GetNotificationPreferenceRow, error)
 	GetOAuthCredential(ctx context.Context, arg GetOAuthCredentialParams) (Credential, error)
+	// The owner's own profile, all of it. Only ever called with the signed-in
+	// person's own identifier.
+	GetOwnDirectoryProfile(ctx context.Context, userID uuid.UUID) (GetOwnDirectoryProfileRow, error)
 	GetPasskeyByCredentialID(ctx context.Context, externalID *string) (Credential, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	// Read without consuming: a wrong code must leave the ticket usable, or one
@@ -290,10 +310,14 @@ type Querier interface {
 	// request asks from.
 	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
+	InsertPortfolioItem(ctx context.Context, arg InsertPortfolioItemParams) error
 	// Issuing a new one invalidates the old, so somebody who asks twice is not left
 	// holding two working links.
 	InvalidateEmailConfirmations(ctx context.Context, userID uuid.UUID) (int64, error)
 	InvalidateRecoveryTokens(ctx context.Context, userID uuid.UUID) (int64, error)
+	// Asks somebody to be listed. Does nothing if they already are, or were
+	// already asked: inviting twice is not a second question.
+	InviteCompanyMember(ctx context.Context, arg InviteCompanyMemberParams) (int64, error)
 	// Asked before joining and before posting.
 	//
 	// The expiry is evaluated here rather than by a sweep, so a temporary ban
@@ -314,6 +338,8 @@ type Querier interface {
 	// Never the hash. What this returns is what a person is shown, and the token
 	// itself is not recoverable by anybody, including its owner.
 	ListAPITokensForUser(ctx context.Context, userID uuid.UUID) ([]ListAPITokensForUserRow, error)
+	// The people a company may list: those who agreed.
+	ListAcceptedCompanyMembers(ctx context.Context, companyID uuid.UUID) ([]ListAcceptedCompanyMembersRow, error)
 	// Who pressed what on one message, oldest first.
 	ListActionPressesForEvent(ctx context.Context, eventID string) ([]ActionPress, error)
 	ListAttachmentsForEvent(ctx context.Context, eventID *string) ([]Attachment, error)
@@ -347,6 +373,8 @@ type Querier interface {
 	// The lifetimes carried by a page of messages, so a timeline can disclose them
 	// without a query per message.
 	ListLifetimesForEvents(ctx context.Context, eventIds []string) ([]MessageLifetime, error)
+	// Somebody's own associations, answered and unanswered.
+	ListMyCompanies(ctx context.Context, userID uuid.UUID) ([]ListMyCompaniesRow, error)
 	ListNotificationPreferences(ctx context.Context, userID uuid.UUID) ([]ListNotificationPreferencesRow, error)
 	ListOAuthCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	// The moderation queue: oldest first, so nothing waits indefinitely behind
@@ -355,6 +383,9 @@ type Querier interface {
 	// Attachments that never became part of a message, oldest first.
 	ListOrphanedAttachments(ctx context.Context, arg ListOrphanedAttachmentsParams) ([]Attachment, error)
 	ListPasskeysForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
+	// Invitations still unanswered. Only a company's administrators see these,
+	// and they already know: they sent them.
+	ListPendingCompanyMembers(ctx context.Context, companyID uuid.UUID) ([]ListPendingCompanyMembersRow, error)
 	// Just the identifiers, so a timeline can mark which messages are pinned
 	// without fetching them a second time.
 	ListPinnedEventIDs(ctx context.Context, roomID uuid.UUID) ([]string, error)
@@ -366,6 +397,8 @@ type Querier interface {
 	// silently stop it reaching this query's callers.
 	ListPinnedMessages(ctx context.Context, roomID uuid.UUID) ([]ListPinnedMessagesRow, error)
 	ListPinnedRooms(ctx context.Context, userID uuid.UUID) ([]ListPinnedRoomsRow, error)
+	// The owner's own portfolio.
+	ListPortfolioItems(ctx context.Context, userID uuid.UUID) ([]PortfolioItem, error)
 	ListPostingRestrictions(ctx context.Context, limit int32) ([]ListPostingRestrictionsRow, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
 	ListPushSubscriptions(ctx context.Context, userID uuid.UUID) ([]PushSubscription, error)
@@ -479,6 +512,10 @@ type Querier interface {
 	MarkRoomNotificationsReadForUser(ctx context.Context, arg MarkRoomNotificationsReadForUserParams) error
 	MarkScheduledMessageFailed(ctx context.Context, arg MarkScheduledMessageFailedParams) error
 	MarkScheduledMessageSent(ctx context.Context, arg MarkScheduledMessageSentParams) error
+	// A moderator replacing what a profile says — in practice, clearing it. The
+	// visibility can be lowered in the same change, so abusive content can be
+	// taken out of the directory while it is dealt with.
+	ModerateDirectoryProfile(ctx context.Context, arg ModerateDirectoryProfileParams) error
 	// Allocates the next position in a room's total order.
 	//
 	// The UPDATE takes a row lock, so two concurrent writers serialise here rather
@@ -527,6 +564,9 @@ type Querier interface {
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
 	RemoteMember(ctx context.Context, arg RemoteMemberParams) (RemoteMember, error)
 	RemoteMembers(ctx context.Context, roomID uuid.UUID) ([]RemoteMember, error)
+	// Leaving, declining, or being removed. The row goes, so neither side displays
+	// it from this moment.
+	RemoveCompanyMember(ctx context.Context, arg RemoveCompanyMemberParams) (int64, error)
 	RemoveReaction(ctx context.Context, arg RemoveReactionParams) error
 	RemoveRemoteMember(ctx context.Context, arg RemoveRemoteMemberParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
@@ -567,6 +607,10 @@ type Querier interface {
 	// The peers participating in a room, for delivery and for showing an operator
 	// who can see it.
 	RoomPeers(ctx context.Context, roomID uuid.UUID) ([]RoomPeer, error)
+	// Creates the profile or replaces what it says. One statement for both, so a
+	// person saving twice from two tabs cannot end up with two profiles or with
+	// one half-written.
+	SaveDirectoryProfile(ctx context.Context, arg SaveDirectoryProfileParams) (bool, error)
 	// Records where a device can be reached.
 	//
 	// A browser resubscribing returns the same endpoint, so this updates rather
@@ -693,11 +737,27 @@ type Querier interface {
 	UnmarkAttachmentSensitive(ctx context.Context, arg UnmarkAttachmentSensitiveParams) (int64, error)
 	UnpinMessage(ctx context.Context, arg UnpinMessageParams) error
 	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error
+	UpdateCompanyProfile(ctx context.Context, arg UpdateCompanyProfileParams) (CompanyProfile, error)
 	// The provider's claim about the account may change between sign-ins, so it is
 	// refreshed rather than left at whatever it was the first time.
 	UpdateOAuthCredentialEmail(ctx context.Context, arg UpdateOAuthCredentialEmailParams) error
+	// Scoped to the owner, so an identifier from somebody else's portfolio
+	// changes nothing. updated_at moves only when the content does, which is what
+	// lets a verification tell an edited item from one merely reordered.
+	UpdatePortfolioItem(ctx context.Context, arg UpdatePortfolioItemParams) (int64, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
+	// A company as a viewer of the given rank may see it, or nothing.
+	ViewCompanyProfile(ctx context.Context, arg ViewCompanyProfileParams) (CompanyProfile, error)
+	ViewDirectoryProfile(ctx context.Context, arg ViewDirectoryProfileParams) (ViewDirectoryProfileRow, error)
+	// A portfolio as a viewer may see it: all of it, or none of it. The rank is
+	// read from the profile in the same statement, so there is no window in which
+	// a profile made hidden still shows its links.
+	ViewPortfolioItems(ctx context.Context, arg ViewPortfolioItemsParams) ([]PortfolioItem, error)
+	// The companies a profile references, as a viewer may see them: accepted
+	// associations only, with companies the viewer may see, on a profile whose
+	// details the viewer may see — the companies are part of what it says.
+	ViewProfileCompanies(ctx context.Context, arg ViewProfileCompaniesParams) ([]ViewProfileCompaniesRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

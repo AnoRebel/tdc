@@ -153,7 +153,10 @@ export type Capability =
   // Writing a message now and sending it later.
   | "scheduled-messages"
   // Uploading files and images.
-  | "attachments";
+  | "attachments"
+  // The developer and company directory, enquiries and engagements. Off
+  // unless an operator turns it on.
+  | "directory";
 
 /** Health of a running server, for operators and uptime checks. */
 export interface HealthStatus {

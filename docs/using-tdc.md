@@ -412,6 +412,28 @@ chat is previewed for everybody in it, not only the person being invited. It
 also previews identically whether it is valid, revoked or invented, so nobody
 can test invitations by pasting them.
 
+## The directory
+
+Where the operator has switched it on, **Directory** appears in the sidebar. It
+lists people on this server who chose to be found, and the companies they
+agreed to be listed by. [The directory](directory.md) describes all of it; the
+short version:
+
+- **Nobody is in it unless they put themselves there.** Without a directory
+  profile you are not listed, and nothing else about your account changes.
+- **Your profile has three visibility settings** — for the profile as a whole,
+  for what you wrote, and for your contact details — each _Anyone_, _Members_
+  or _Only you_. Contact details start as _Only you_. A section is never more
+  visible than the profile it is in.
+- **It does not touch your privacy settings.** Having a public profile does not
+  make you visible as online, and hiding your presence does not take you out of
+  the directory. They are separate decisions.
+- **You can delete your profile** at any time without deleting your account,
+  and **export it** as a file you can bring back later or elsewhere.
+- **A company can ask to list you; only you can accept**, from your profile
+  page. Leave, and it is gone from both the company's page and your profile at
+  once.
+
 ## When something is wrong
 
 ### Blocking
