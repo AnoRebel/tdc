@@ -77,10 +77,22 @@ func (s *Server) userResponse(user dbgen.User) userResponse {
 	}
 }
 
-// serverName is the host part of federated addresses.
+/*
+serverName is the host part of federated addresses.
+
+The name events are signed with, and nothing else. It used to be the canonical
+address as configured, scheme and port included, while every event named its
+sender by host alone — so a server configured as https://chat.example told
+each person they were amina@https://chat.example, and the client, comparing
+that against amina@chat.example on the messages, decided none of them were
+hers: no edit, no delete, and an offer to block herself.
+*/
 func (s *Server) serverName() string {
-	if s.config.CanonicalAddress != "" {
-		return s.config.CanonicalAddress
+	if s.rooms != nil {
+		return s.rooms.ServerName()
+	}
+	if host := s.federationAuthorityHost(); host != "" {
+		return host
 	}
 	return "localhost"
 }
