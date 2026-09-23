@@ -43,7 +43,22 @@ func URL(t *testing.T, suite string) string {
 		t.Skip("set TDC_TEST_DATABASE_URL to run database tests")
 	}
 
-	name := "tdc_test_" + suite
+	/*
+		Named per suite, and optionally per run.
+
+		Two runs of the same package share its database, so a second run
+		started while the first is going deletes the first's fixtures and each
+		fails in ways that look like real bugs. TDC_TEST_DATABASE_PREFIX gives
+		a run a namespace of its own — which is what lets several checkouts of
+		this repository, each on a different branch with different migrations,
+		test at once against one Postgres without migrating each other's
+		databases out from under them.
+	*/
+	prefix := os.Getenv("TDC_TEST_DATABASE_PREFIX")
+	if prefix == "" {
+		prefix = "tdc_test_"
+	}
+	name := prefix + suite
 	target, err := databaseURL(base, name)
 	if err != nil {
 		t.Fatalf("derive test database url: %v", err)

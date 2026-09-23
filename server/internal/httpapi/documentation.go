@@ -180,3 +180,24 @@ var documentation = map[string]entry{
 	"GET /api/statuses":                                     {Summary: "List statuses", Authentication: "session or token"},
 	"GET /api/version":                                      {Summary: "Version", Authentication: "none"},
 }
+
+/*
+documentRoutes adds catalogue entries from another file.
+
+For a feature whose routes live in a file of their own, so its descriptions can
+live there too rather than all of them competing for the same lines of this
+map. Called from init.
+
+A route documented twice panics rather than letting the later description win:
+two descriptions of one route means two people believe they own it, and
+finding that out at startup is much cheaper than finding it in the published
+description.
+*/
+func documentRoutes(entries map[string]entry) {
+	for route, described := range entries {
+		if _, taken := documentation[route]; taken {
+			panic("route documented twice: " + route)
+		}
+		documentation[route] = described
+	}
+}

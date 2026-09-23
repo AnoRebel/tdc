@@ -557,9 +557,29 @@ func (s *Server) routes() {
 	admin.GET("/usage", s.handleUsage,
 		requirePermission(authz.PermServerConfigure))
 
+	// Features whose routes live in files of their own.
+	for _, register := range routeRegistrars {
+		register(s)
+	}
+
 	// Registered last: the catch-all serving the web application must not
 	// shadow an endpoint above it.
 	s.mountWebApp(s.config.WebRoot)
+}
+
+/*
+routeRegistrars are features that mount their own routes.
+
+A feature large enough to have a file of its own registers here from init
+rather than adding lines to routes(), which every feature would otherwise be
+editing at once. They run before the web application's catch-all, so nothing
+they mount is shadowed by it.
+*/
+var routeRegistrars []func(*Server)
+
+// registerRoutes adds a feature's route mounting. Called from init.
+func registerRoutes(register func(*Server)) {
+	routeRegistrars = append(routeRegistrars, register)
 }
 
 // healthResponse reports whether the server can serve requests.

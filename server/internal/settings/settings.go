@@ -746,3 +746,23 @@ func IsSecret(key Key) bool {
 	definition, known := definitions[key]
 	return known && definition.secret
 }
+
+/*
+define adds settings from another file.
+
+For a feature whose settings are declared beside the code that reads them.
+Called from init, before anything can read a setting.
+
+A key defined twice panics: two definitions of one setting would mean one
+default and one validator silently replacing another's, and a server running
+with the wrong fallback for a setting nobody knew was contested is the kind of
+failure nobody traces.
+*/
+func define(additions map[Key]definition) {
+	for key, described := range additions {
+		if _, taken := definitions[key]; taken {
+			panic("setting defined twice: " + string(key))
+		}
+		definitions[key] = described
+	}
+}
