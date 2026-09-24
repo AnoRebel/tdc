@@ -111,11 +111,50 @@ export interface DirectoryFilters {
   page?: number;
 }
 
+/**
+ * That a moderator verified one claim: who, and when.
+ *
+ * `note` — what they checked — reaches only the profile's owner, since it may
+ * mention something the owner hides from everybody else.
+ */
+export interface Verified {
+  by: string;
+  at: string;
+  note?: string;
+}
+
 /** A company a profile's owner has agreed to be listed by. */
 export interface CompanyReference {
   slug: string;
   name: string;
   role?: string;
+  verified?: Verified;
+}
+
+/** What sort of thing a verifiable claim is. */
+export type ClaimKind = "skill" | "portfolio" | "identity" | "company";
+
+/** One of the owner's own verifications. */
+export interface OwnVerification extends Verified {
+  kind: ClaimKind;
+  claimId: string;
+}
+
+/** A verifiable claim on a profile, as a verifier reads it. */
+export interface Claim {
+  kind: ClaimKind;
+  id: string;
+  label: string;
+  content: Record<string, string>;
+  /** The standing verification, whose `id` is what revoking takes. */
+  verification?: Verified & { id: string };
+}
+
+/** Every verifiable claim on one profile. */
+export interface ProfileClaims {
+  username: string;
+  displayName: string;
+  claims: Claim[];
 }
 
 /** Somebody's own profile. */
@@ -125,6 +164,7 @@ export interface OwnProfile {
   address: string;
   profile: ProfileDocument;
   companies: CompanyReference[];
+  verifications: OwnVerification[];
   createdAt: string;
   updatedAt: string;
 }
@@ -141,9 +181,11 @@ export interface ProfileView {
   contactEmail?: string;
   contactPhone?: string;
   contactUrl?: string;
-  portfolio?: (PortfolioLink & { id: string })[];
+  portfolio?: (PortfolioLink & { id: string; verified?: Verified })[];
   companies?: CompanyReference[];
-  skills?: { id: string; name: string; description?: string }[];
+  skills?: { id: string; name: string; description?: string; verified?: Verified }[];
+  /** Present when a moderator verified the person is who the profile says. */
+  identityVerified?: Verified;
   /** Present only while the owner's availability is current. */
   available?: boolean;
   availabilityNote?: string;

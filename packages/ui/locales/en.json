@@ -715,6 +715,30 @@
       "reject": "Reject",
       "rejectTitle": "Reject {skill}?",
       "why": "Why? This is kept with the record."
+    },
+    "verification": {
+      "verified": "Verified",
+      "meaning": "A moderator, {by}, checked the evidence for this one claim on {date} and judged it credible. It is not an endorsement of the person, their work, or whether they will deliver.",
+      "whatWasChecked": "What was checked: {note}",
+      "identity": "Identity",
+      "company": "Company",
+      "yours": "Your verified claims",
+      "editClears": "Editing a verified claim clears its verification: what you change is not what the moderator checked.",
+      "title": "Verify claims",
+      "reviewHint": "Open a profile, check the evidence for one claim at a time, and say what you checked. A verification is about that claim only, and is recorded.",
+      "open": "Open profile",
+      "verify": "Verify",
+      "revoke": "Revoke",
+      "whatYouChecked": "What you checked for {claim}",
+      "whatYouCheckedHint": "What you checked, for the record",
+      "whyRevoke": "Why you are revoking {claim}",
+      "whyRevokeHint": "Why, for the record",
+      "kinds": {
+        "skill": "Skill",
+        "portfolio": "Portfolio",
+        "identity": "Identity",
+        "company": "Company"
+      }
     }
   }
 }

@@ -35,13 +35,13 @@ Goal: the controlled skill vocabulary, availability, and directory search — th
 
 Goal: a moderator can attest to a specific claim on a profile, distinguishably from the self-asserted claim, and that attestation can be wrong or withdrawn.
 
-- [ ] 3.1 Add the `profile_verifications` migration referencing a specific claim (skill, identity, portfolio item) with an immutable snapshot of the claim's content at verification time; verify a verification record cannot be attached without naming exactly which claim it covers
-- [ ] 3.2 Implement the `directory.verify` permission and the moderator action of granting a verification with a required note on what was checked; verify granting is refused without a permission check and is recorded in the audit log with actor and reason
-- [ ] 3.3 Implement verification revocation, also audited; verify a revoked verification is immediately no longer shown as verified and the revocation reason is in the audit log
-- [ ] 3.4 Implement automatic clearing of a verification when the underlying claim is edited; verify editing a verified skill or portfolio item reverts its display to self-asserted until re-verified
-- [ ] 3.5 Build the web verification display — visually distinct verified vs. self-asserted state, with the fixed disclosure text on what a verification means (a specific claim checked by a moderator, not an endorsement of the person) shown wherever a verified badge appears; verify the same disclosure text renders identically on every screen that shows a verified claim
-- [ ] 3.6 Build the moderator verification-review interface (grant, note, revoke) reusing the existing moderation-queue pattern; verify a moderator can perform every verification action above without using the API directly
-- [ ] **MILESTONE 3** — Demonstrate: a moderator verifies one skill on a profile that has three; the profile shows one verified and two self-asserted claims, distinguishably. The user edits the verified skill's description and it reverts to unverified. A moderator revokes a separate verification and the audit log shows who, when, and why for every action in this sequence. Tag `v1.24.0-dev`.
+- [x] 3.1 Add the `profile_verifications` migration referencing a specific claim (skill, identity, portfolio item) with an immutable snapshot of the claim's content at verification time; verify a verification record cannot be attached without naming exactly which claim it covers
+- [x] 3.2 Implement the `directory.verify` permission and the moderator action of granting a verification with a required note on what was checked; verify granting is refused without a permission check and is recorded in the audit log with actor and reason
+- [x] 3.3 Implement verification revocation, also audited; verify a revoked verification is immediately no longer shown as verified and the revocation reason is in the audit log
+- [x] 3.4 Implement automatic clearing of a verification when the underlying claim is edited; verify editing a verified skill or portfolio item reverts its display to self-asserted until re-verified
+- [x] 3.5 Build the web verification display — visually distinct verified vs. self-asserted state, with the fixed disclosure text on what a verification means (a specific claim checked by a moderator, not an endorsement of the person) shown wherever a verified badge appears; verify the same disclosure text renders identically on every screen that shows a verified claim
+- [x] 3.6 Build the moderator verification-review interface (grant, note, revoke) reusing the existing moderation-queue pattern; verify a moderator can perform every verification action above without using the API directly
+- [x] **MILESTONE 3** — Demonstrate: a moderator verifies one skill on a profile that has three; the profile shows one verified and two self-asserted claims, distinguishably. The user edits the verified skill's description and it reverts to unverified. A moderator revokes a separate verification and the audit log shows who, when, and why for every action in this sequence. Tag `v1.24.0-dev`.
 
 ## 4. Phase 4 — First contact: enquiries
 

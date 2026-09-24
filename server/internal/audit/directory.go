@@ -40,4 +40,16 @@ const (
 	ActionDirectorySkillApproved Action = "directory.skill.approved"
 	ActionDirectorySkillRejected Action = "directory.skill.rejected"
 	ActionDirectorySkillMerged   Action = "directory.skill.merged"
+
+	/*
+		The life of a verification: granted with what was checked, revoked
+		with why, and cleared when the claim it covered was edited.
+
+		Cleared is attributed to the owner whose edit caused it. Without it a
+		reader would see a verification granted and never withdrawn, and could
+		not tell why the profile stopped showing it.
+	*/
+	ActionDirectoryVerificationGranted Action = "directory.verification.granted"
+	ActionDirectoryVerificationRevoked Action = "directory.verification.revoked"
+	ActionDirectoryVerificationCleared Action = "directory.verification.cleared"
 )

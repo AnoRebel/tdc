@@ -165,7 +165,9 @@ func (s *Service) Export(ctx context.Context, userID uuid.UUID, server string) (
 		UpdatedAt:   profile.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 	for _, company := range profile.Companies {
-		export.Companies = append(export.Companies, ExportCompany(company))
+		export.Companies = append(export.Companies, ExportCompany{
+			Slug: company.Slug, Name: company.Name, Role: company.Role,
+		})
 	}
 	return export, nil
 }

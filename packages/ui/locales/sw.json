@@ -715,6 +715,30 @@
       "reject": "Kataa",
       "rejectTitle": "Ukatae {skill}?",
       "why": "Kwa nini? Hii inahifadhiwa kwenye kumbukumbu."
+    },
+    "verification": {
+      "verified": "Imethibitishwa",
+      "meaning": "Msimamizi, {by}, alikagua ushahidi wa dai hili moja tarehe {date} na kuuona wa kuaminika. Si pendekezo kuhusu mtu huyu, kazi yake, wala kama atatimiza ahadi.",
+      "whatWasChecked": "Kilichokaguliwa: {note}",
+      "identity": "Utambulisho",
+      "company": "Kampuni",
+      "yours": "Madai yako yaliyothibitishwa",
+      "editClears": "Ukihariri dai lililothibitishwa, uthibitisho wake unaondoka: unachobadilisha si kile msimamizi alichokagua.",
+      "title": "Thibitisha madai",
+      "reviewHint": "Fungua wasifu, kagua ushahidi wa dai moja moja, na useme ulichokagua. Uthibitisho unahusu dai hilo tu, na unarekodiwa.",
+      "open": "Fungua wasifu",
+      "verify": "Thibitisha",
+      "revoke": "Futa uthibitisho",
+      "whatYouChecked": "Ulichokagua kwa {claim}",
+      "whatYouCheckedHint": "Ulichokagua, kwa kumbukumbu",
+      "whyRevoke": "Kwa nini unafuta uthibitisho wa {claim}",
+      "whyRevokeHint": "Kwa nini, kwa kumbukumbu",
+      "kinds": {
+        "skill": "Ujuzi",
+        "portfolio": "Kazi",
+        "identity": "Utambulisho",
+        "company": "Kampuni"
+      }
     }
   }
 }

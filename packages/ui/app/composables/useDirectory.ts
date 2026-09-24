@@ -5,6 +5,7 @@ import type {
   DirectoryResults,
   DirectoryVisibility,
   OwnProfile,
+  ProfileClaims,
   ProfileDocument,
   ProfileView,
   QueuedSkill,
@@ -178,7 +179,28 @@ export function useDirectory() {
     return api.post<Skill>(`/api/directory/moderation/skills/${id}/merge`, { into });
   }
 
+  /** The verifiable claims on a profile, for somebody who verifies. */
+  function claims(username: string) {
+    return api.get<ProfileClaims>(
+      `/api/directory/moderation/profiles/${encodeURIComponent(username)}/claims`,
+    );
+  }
+
+  function verifyClaim(username: string, kind: string, claimId: string, note: string) {
+    return api.post<unknown>(
+      `/api/directory/moderation/profiles/${encodeURIComponent(username)}/verifications`,
+      { kind, claimId, note },
+    );
+  }
+
+  function revokeVerification(id: string, reason: string) {
+    return api.post<void>(`/api/directory/moderation/verifications/${id}/revoke`, { reason });
+  }
+
   return {
+    claims,
+    verifyClaim,
+    revokeVerification,
     search,
     skills,
     proposeSkill,

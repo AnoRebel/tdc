@@ -50,6 +50,16 @@ await load();
 
 const initial = computed<ProfileDocument>(() => own.value?.profile ?? emptyProfile());
 
+/** What each of the owner's verifications is about, in words. */
+function claimLabel(kind: string, claimId: string): string {
+  const profile = own.value?.profile;
+  if (kind === "identity") return $ts("directory.verification.identity");
+  if (kind === "skill") return profile?.skills.find((skill) => skill.id === claimId)?.name ?? "";
+  if (kind === "portfolio")
+    return profile?.portfolio.find((item) => item.id === claimId)?.title ?? "";
+  return $ts("directory.verification.company");
+}
+
 async function saved() {
   const wasCreating = !own.value;
   await load();
@@ -163,6 +173,23 @@ async function leave(association: CompanyAssociation) {
           {{ $t("directory.profile.delete") }}
         </Button>
       </div>
+
+      <section v-if="own?.verifications.length" class="space-y-2 rounded-lg border p-3">
+        <h2 class="text-sm font-semibold">{{ $t("directory.verification.yours") }}</h2>
+        <p class="text-xs text-muted-foreground">{{ $t("directory.verification.editClears") }}</p>
+        <ul class="space-y-2">
+          <li
+            v-for="verification in own.verifications"
+            :key="verification.kind + verification.claimId"
+            class="flex flex-wrap items-start gap-2 text-sm"
+          >
+            <span class="font-medium">{{
+              claimLabel(verification.kind, verification.claimId)
+            }}</span>
+            <DirectoryVerifiedBadge :verified="verification" />
+          </li>
+        </ul>
+      </section>
 
       <DirectoryProfileEditor
         v-if="loaded"

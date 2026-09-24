@@ -332,6 +332,23 @@ type ProfileSkill struct {
 	UpdatedAt   time.Time
 }
 
+type ProfileVerification struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	ClaimKind       string
+	ClaimID         uuid.UUID
+	ClaimDigest     string
+	ClaimSnapshot   []byte
+	Note            string
+	VerifiedBy      *uuid.UUID
+	VerifiedByLabel string
+	VerifiedAt      time.Time
+	RevokedAt       *time.Time
+	RevokedBy       *uuid.UUID
+	RevokeReason    *string
+	ClearedAt       *time.Time
+}
+
 type PushSubscription struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID

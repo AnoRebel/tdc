@@ -552,6 +552,10 @@ and anything they propose goes straight in, while everybody else's proposals
 wait for them. Seeding a longer list is a matter of that person proposing each
 one — `POST /api/directory/skills` with a `name` — which is scriptable.
 
+**Verifying claims** takes **`directory.verify`**. It is separate from the other
+two because it is a different judgement — whether evidence for a claim is
+credible — and a community may want it held by different people.
+
 **How fast the directory may be read** is policy, changed like any other
 setting:
 

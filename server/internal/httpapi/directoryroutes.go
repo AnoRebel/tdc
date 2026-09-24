@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"sort"
@@ -117,6 +118,7 @@ func (api *directoryAPI) mount() {
 	// The rest of the directory, from files of their own.
 	api.mountSkills(directoryGroup, moderation)
 	api.mountSearch(directoryGroup)
+	api.mountVerification(moderation)
 }
 
 /*
@@ -217,6 +219,10 @@ type profileView struct {
 	Companies []companyRefView `json:"companies,omitempty"`
 	Skills    []skillClaimView `json:"skills,omitempty"`
 
+	// IdentityVerified is present when a moderator has verified that the
+	// person is who their profile says.
+	IdentityVerified *verifiedView `json:"identityVerified,omitempty"`
+
 	// Available is present only when true: whether somebody is not looking,
 	// or has hidden whether they are, is not something to announce.
 	Available        bool   `json:"available,omitempty"`
@@ -227,25 +233,54 @@ type profileView struct {
 }
 
 type skillClaimView struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	Description string        `json:"description,omitempty"`
+	Verified    *verifiedView `json:"verified,omitempty"`
 }
 
 type portfolioView struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	URL         string `json:"url"`
-	Description string `json:"description,omitempty"`
+	ID          string        `json:"id"`
+	Title       string        `json:"title"`
+	URL         string        `json:"url"`
+	Description string        `json:"description,omitempty"`
+	Verified    *verifiedView `json:"verified,omitempty"`
 }
 
 type companyRefView struct {
-	Slug string `json:"slug"`
-	Name string `json:"name"`
-	Role string `json:"role,omitempty"`
+	Slug     string        `json:"slug"`
+	Name     string        `json:"name"`
+	Role     string        `json:"role,omitempty"`
+	Verified *verifiedView `json:"verified,omitempty"`
 }
 
-func (api *directoryAPI) viewOf(profile directory.Profile) profileView {
+/*
+verifiedView says a claim was verified: by whom and when.
+
+The note — what the moderator checked — is shown only to the profile's owner.
+It is the moderator's own words, and may mention something the owner has
+hidden from other viewers, such as the link that was checked.
+*/
+type verifiedView struct {
+	By   string `json:"by"`
+	At   string `json:"at"`
+	Note string `json:"note,omitempty"`
+}
+
+// verifiedOf describes a standing verification of a claim, or nil.
+func verifiedOf(verifications map[string]directory.Verification, kind directory.ClaimKind, id uuid.UUID, withNote bool) *verifiedView {
+	verification, ok := verifications[directory.ClaimKey(kind, id)]
+	if !ok {
+		return nil
+	}
+	view := &verifiedView{By: verification.VerifiedBy, At: verification.VerifiedAt.UTC().Format(time.RFC3339)}
+	if withNote {
+		view.Note = verification.Note
+	}
+	return view
+}
+
+func (api *directoryAPI) viewOf(profile directory.Profile, verifications map[string]directory.Verification) profileView {
 	view := profileView{
 		Username:    profile.Username,
 		DisplayName: profile.DisplayName,
@@ -267,16 +302,25 @@ func (api *directoryAPI) viewOf(profile directory.Profile) profileView {
 	for _, item := range profile.Portfolio {
 		view.Portfolio = append(view.Portfolio, portfolioView{
 			ID: item.ID.String(), Title: item.Title, URL: item.URL, Description: item.Description,
+			Verified: verifiedOf(verifications, directory.ClaimPortfolio, item.ID, false),
 		})
 	}
 	for _, company := range profile.Companies {
-		view.Companies = append(view.Companies, companyRefView(company))
+		view.Companies = append(view.Companies, companyRefView{
+			Slug: company.Slug, Name: company.Name, Role: company.Role,
+			Verified: verifiedOf(verifications, directory.ClaimCompany, company.ID, false),
+		})
 	}
 	for _, skill := range profile.Skills {
 		view.Skills = append(view.Skills, skillClaimView{
 			ID: skill.ID.String(), Name: skill.Name, Description: skill.Description,
+			Verified: verifiedOf(verifications, directory.ClaimSkill, skill.ID, false),
 		})
 	}
+	// Only a verification of something shown is shown: the identity always is,
+	// since a name is never withheld; the rest ride on the claims above, which
+	// are present only where the viewer may see them.
+	view.IdentityVerified = verifiedOf(verifications, directory.ClaimIdentity, profile.UserID, false)
 	if profile.Available && profile.AvailableUntil != nil {
 		view.Available = true
 		view.AvailabilityNote = profile.AvailabilityNote
@@ -293,33 +337,68 @@ type ownProfileResponse struct {
 	Address     string                    `json:"address"`
 	Profile     directory.ProfileDocument `json:"profile"`
 	Companies   []companyRefView          `json:"companies"`
-	CreatedAt   string                    `json:"createdAt"`
-	UpdatedAt   string                    `json:"updatedAt"`
+	// Verifications are the owner's own, with what each moderator checked.
+	Verifications []ownVerificationView `json:"verifications"`
+	CreatedAt     string                `json:"createdAt"`
+	UpdatedAt     string                `json:"updatedAt"`
 }
 
-func (api *directoryAPI) ownResponse(profile directory.Profile) ownProfileResponse {
+// ownVerificationView is one of the owner's verifications, in full.
+type ownVerificationView struct {
+	Kind    string `json:"kind"`
+	ClaimID string `json:"claimId"`
+	verifiedView
+}
+
+func (api *directoryAPI) ownResponse(profile directory.Profile, verifications map[string]directory.Verification) ownProfileResponse {
 	response := ownProfileResponse{
-		Username:    profile.Username,
-		DisplayName: profile.DisplayName,
-		Address:     api.rooms.UserAddress(profile.Username),
-		Profile:     profile.Document(),
-		Companies:   []companyRefView{},
-		CreatedAt:   profile.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:   profile.UpdatedAt.UTC().Format(time.RFC3339),
+		Username:      profile.Username,
+		DisplayName:   profile.DisplayName,
+		Address:       api.rooms.UserAddress(profile.Username),
+		Profile:       profile.Document(),
+		Companies:     []companyRefView{},
+		Verifications: []ownVerificationView{},
+		CreatedAt:     profile.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:     profile.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 	for _, company := range profile.Companies {
-		response.Companies = append(response.Companies, companyRefView(company))
+		response.Companies = append(response.Companies, companyRefView{
+			Slug: company.Slug, Name: company.Name, Role: company.Role,
+			Verified: verifiedOf(verifications, directory.ClaimCompany, company.ID, true),
+		})
 	}
+	for _, verification := range verifications {
+		response.Verifications = append(response.Verifications, ownVerificationView{
+			Kind: string(verification.Kind), ClaimID: verification.ClaimID.String(),
+			verifiedView: *verifiedOf(verifications, verification.Kind, verification.ClaimID, true),
+		})
+	}
+	sort.Slice(response.Verifications, func(i, j int) bool {
+		return response.Verifications[i].At < response.Verifications[j].At
+	})
 	return response
+}
+
+// ownWithVerifications reads somebody's own profile and its verifications.
+func (api *directoryAPI) ownWithVerifications(ctx context.Context, userID uuid.UUID) (ownProfileResponse, error) {
+	profile, err := api.directory.Own(ctx, userID)
+	if err != nil {
+		return ownProfileResponse{}, err
+	}
+	verifications, err := api.directory.Verifications(ctx, userID)
+	if err != nil {
+		return ownProfileResponse{}, err
+	}
+	return api.ownResponse(profile, verifications), nil
 }
 
 func (api *directoryAPI) handleOwnProfile(c *echo.Context) error {
 	user, _ := currentUser(c)
-	profile, err := api.directory.Own(c.Request().Context(), user.ID)
+	response, err := api.ownWithVerifications(c.Request().Context(), user.ID)
 	if err != nil {
 		return directoryError(err)
 	}
-	return c.JSON(http.StatusOK, api.ownResponse(profile))
+	return c.JSON(http.StatusOK, response)
 }
 
 /*
@@ -338,12 +417,36 @@ func (api *directoryAPI) handleSaveProfile(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	created, err := api.directory.Save(ctx, user.ID, document.Input())
+	created, cleared, err := api.directory.Save(ctx, user.ID, document.Input())
 	if err != nil {
 		return directoryError(err)
 	}
 
-	profile, err := api.directory.Own(ctx, user.ID)
+	/*
+		A verification the edit cleared is recorded, attributed to the owner
+		whose edit cleared it. Otherwise a moderator reading the log would see
+		a verification granted and never withdrawn, and could not tell why the
+		profile no longer shows it.
+	*/
+	for _, verification := range cleared {
+		if err := api.audit.Record(ctx, audit.Entry{
+			ActorID:    &user.ID,
+			ActorLabel: user.Username,
+			Action:     audit.ActionDirectoryVerificationCleared,
+			TargetKind: "directory_verification",
+			TargetID:   verification.ID.String(),
+			SourceIP:   requestIP(c),
+			UserAgent:  c.Request().UserAgent(),
+			Detail: map[string]any{
+				"claim": string(verification.Kind), "claimId": verification.ClaimID.String(),
+				"reason": "the claim was edited or removed after it was verified",
+			},
+		}); err != nil {
+			return err
+		}
+	}
+
+	response, err := api.ownWithVerifications(ctx, user.ID)
 	if err != nil {
 		return err
 	}
@@ -351,7 +454,7 @@ func (api *directoryAPI) handleSaveProfile(c *echo.Context) error {
 	if created {
 		status = http.StatusCreated
 	}
-	return c.JSON(status, api.ownResponse(profile))
+	return c.JSON(status, response)
 }
 
 // handleDeleteProfile removes somebody's profile. Their account, messages and
@@ -386,11 +489,16 @@ func (api *directoryAPI) handleViewProfile(c *echo.Context) error {
 		return err
 	}
 
-	profile, err := api.directory.View(c.Request().Context(), c.Param("username"), rank)
+	ctx := c.Request().Context()
+	profile, err := api.directory.View(ctx, c.Param("username"), rank)
 	if err != nil {
 		return directoryError(err)
 	}
-	return c.JSON(http.StatusOK, api.viewOf(profile))
+	verifications, err := api.directory.Verifications(ctx, profile.UserID)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, api.viewOf(profile, verifications))
 }
 
 /*
@@ -427,7 +535,11 @@ func (api *directoryAPI) handleModeratorViewProfile(c *echo.Context) error {
 		return err
 	}
 
-	return c.JSON(http.StatusOK, api.ownResponse(profile))
+	verifications, err := api.directory.Verifications(ctx, owner)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, api.ownResponse(profile, verifications))
 }
 
 type moderateProfileRequest struct {
@@ -511,7 +623,11 @@ func (api *directoryAPI) handleModerateProfile(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, api.ownResponse(profile))
+	verifications, err := api.directory.Verifications(ctx, owner)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, api.ownResponse(profile, verifications))
 }
 
 // companyRequest is what a company's administrators send.

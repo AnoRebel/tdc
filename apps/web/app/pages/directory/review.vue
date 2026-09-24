@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { QueuedSkill, Skill } from "@tdc/types";
+import type { Claim, ProfileClaims, QueuedSkill, Skill } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { useForm } from "@tanstack/vue-form";
 import * as v from "valibot";
-import { ArrowLeft, Check, GitMerge, Tags, X } from "lucide-vue-next";
+import { ArrowLeft, BadgeCheck, Check, GitMerge, Tags, X } from "lucide-vue-next";
+import { Field } from "#layers/ui/app/components/ui/field";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
@@ -42,7 +43,9 @@ async function load() {
   }
 }
 
-onMounted(load);
+onMounted(() => {
+  if (can("directory.skills.manage")) void load();
+});
 
 async function act(action: () => Promise<unknown>) {
   error.value = null;
@@ -82,6 +85,55 @@ watchDebounced(
   },
   { debounce: 250 },
 );
+
+/*
+ * Verifying claims on one profile.
+ *
+ * A verifier looks a profile up, reads each claim as it stands, and attests to
+ * one at a time with a note on what they checked — or withdraws an attestation
+ * with a reason. There is no action for the profile as a whole, because there
+ * is no such verification.
+ */
+const profileClaims = ref<ProfileClaims | null>(null);
+const notes = ref<Record<string, string>>({});
+const reasons = ref<Record<string, string>>({});
+
+const lookup = useForm({
+  defaultValues: { username: "" },
+  validators: { onSubmit: v.object({ username: v.pipe(v.string(), v.trim(), v.minLength(1)) }) },
+  async onSubmit({ value }) {
+    await loadClaims(value.username.trim());
+  },
+});
+
+async function loadClaims(username: string) {
+  error.value = null;
+  try {
+    profileClaims.value = await directory.claims(username);
+  } catch (cause) {
+    profileClaims.value = null;
+    error.value = isApiError(cause) ? cause.message : $ts("directory.couldNotReach");
+  }
+}
+
+async function grant(claim: Claim) {
+  const profile = profileClaims.value;
+  if (!profile) return;
+  await act(() =>
+    directory.verifyClaim(profile.username, claim.kind, claim.id, notes.value[claim.id] ?? ""),
+  );
+  notes.value[claim.id] = "";
+  await loadClaims(profile.username);
+}
+
+async function revoke(claim: Claim) {
+  const profile = profileClaims.value;
+  if (!profile || !claim.verification) return;
+  const id = claim.verification.id;
+  await act(() => directory.revokeVerification(id, reasons.value[claim.id] ?? ""));
+  reasons.value[claim.id] = "";
+  await loadClaims(profile.username);
+}
 
 async function mergeInto(skill: Skill) {
   const proposal = merging.value;
@@ -174,6 +226,81 @@ async function mergeInto(skill: Skill) {
                   </Button>
                 </li>
               </ul>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <section v-if="can('directory.verify')" class="space-y-3">
+        <h2 class="flex items-center gap-2 text-sm font-semibold">
+          <BadgeCheck class="size-4 text-muted-foreground" />
+          {{ $t("directory.verification.title") }}
+        </h2>
+        <p class="text-xs text-muted-foreground">{{ $t("directory.verification.reviewHint") }}</p>
+
+        <form class="flex flex-wrap items-end gap-2" @submit.prevent="lookup.handleSubmit()">
+          <lookup.Field name="username">
+            <template #default="{ field }">
+              <Field :label="$ts('auth.username')" class="max-w-xs">
+                <template #default="{ id }">
+                  <Input
+                    :id="id"
+                    :model-value="field.state.value"
+                    autocomplete="off"
+                    @update:model-value="field.handleChange($event)"
+                  />
+                </template>
+              </Field>
+            </template>
+          </lookup.Field>
+          <Button type="submit" class="h-9">{{ $t("directory.verification.open") }}</Button>
+        </form>
+
+        <ul v-if="profileClaims" class="space-y-2">
+          <li
+            v-for="claim in profileClaims.claims"
+            :key="claim.kind + claim.id"
+            class="space-y-2 rounded-lg border p-3"
+          >
+            <p class="flex flex-wrap items-center gap-2 text-sm">
+              <span class="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
+                {{ $t(`directory.verification.kinds.${claim.kind}`) }}
+              </span>
+              <span class="font-medium">{{ claim.label }}</span>
+              <DirectoryVerifiedBadge v-if="claim.verification" :verified="claim.verification" />
+            </p>
+            <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+              <template v-for="(value, key) in claim.content" :key="key">
+                <dt class="text-muted-foreground">{{ key }}</dt>
+                <dd class="break-words">{{ value || "—" }}</dd>
+              </template>
+            </dl>
+
+            <div v-if="!claim.verification" class="flex flex-wrap items-center gap-2">
+              <Input
+                v-model="notes[claim.id]"
+                class="min-w-48 flex-1"
+                :label="$ts('directory.verification.whatYouChecked', { claim: claim.label })"
+                :placeholder="$ts('directory.verification.whatYouCheckedHint')"
+              />
+              <Button variant="outline" :disabled="!notes[claim.id]?.trim()" @click="grant(claim)">
+                {{ $t("directory.verification.verify") }}
+              </Button>
+            </div>
+            <div v-else class="flex flex-wrap items-center gap-2">
+              <Input
+                v-model="reasons[claim.id]"
+                class="min-w-48 flex-1"
+                :label="$ts('directory.verification.whyRevoke', { claim: claim.label })"
+                :placeholder="$ts('directory.verification.whyRevokeHint')"
+              />
+              <Button
+                variant="danger"
+                :disabled="!reasons[claim.id]?.trim()"
+                @click="revoke(claim)"
+              >
+                {{ $t("directory.verification.revoke") }}
+              </Button>
             </div>
           </li>
         </ul>

@@ -107,6 +107,7 @@ type PortfolioItem struct {
 
 // CompanyReference is a company a profile's owner has agreed to be listed by.
 type CompanyReference struct {
+	ID   uuid.UUID
 	Slug string
 	Name string
 	Role string
@@ -166,16 +167,17 @@ kept and updated, new ones are added, and anything not sent back is removed.
 Identifiers survive an edit because a verification names one item, and editing
 an item must be distinguishable from deleting it and adding another.
 
-Returns whether the profile was created by this call.
+Returns whether the profile was created by this call, and any verifications
+the save cleared because the claim they covered changed.
 */
-func (s *Service) Save(ctx context.Context, userID uuid.UUID, input ProfileInput) (bool, error) {
+func (s *Service) Save(ctx context.Context, userID uuid.UUID, input ProfileInput) (bool, []Verification, error) {
 	if err := normalise(&input); err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return false, fmt.Errorf("begin saving a profile: %w", err)
+		return false, nil, fmt.Errorf("begin saving a profile: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := s.queries.WithTx(tx)
@@ -197,25 +199,30 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, input ProfileInput
 		AvailabilityExpiresAt: input.AvailableUntil,
 	})
 	if err != nil {
-		return false, fmt.Errorf("save a profile: %w", err)
+		return false, nil, fmt.Errorf("save a profile: %w", err)
 	}
 
 	if err := savePortfolio(ctx, queries, userID, input.Portfolio); err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	skills, err := s.resolveSkills(ctx, queries, userID, input.Skills)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	if err := saveSkills(ctx, queries, userID, skills); err != nil {
-		return false, err
+		return false, nil, err
+	}
+
+	cleared, err := clearStale(ctx, queries, userID)
+	if err != nil {
+		return false, nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return false, fmt.Errorf("commit a profile: %w", err)
+		return false, nil, fmt.Errorf("commit a profile: %w", err)
 	}
-	return created, nil
+	return created, cleared, nil
 }
 
 // savePortfolio reconciles the stored portfolio with the list sent.
@@ -509,7 +516,7 @@ func portfolioOf(rows []dbgen.PortfolioItem) []PortfolioItem {
 func companiesOf(rows []dbgen.ViewProfileCompaniesRow) []CompanyReference {
 	companies := make([]CompanyReference, 0, len(rows))
 	for _, row := range rows {
-		companies = append(companies, CompanyReference{Slug: row.Slug, Name: row.Name, Role: row.Role})
+		companies = append(companies, CompanyReference{ID: row.ID, Slug: row.Slug, Name: row.Name, Role: row.Role})
 	}
 	return companies
 }

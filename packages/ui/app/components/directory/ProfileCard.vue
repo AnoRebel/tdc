@@ -11,6 +11,7 @@ import {
 } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { onDate } from "#layers/ui/app/lib/dates";
+import VerifiedBadge from "#layers/ui/app/components/directory/VerifiedBadge.vue";
 
 const { $t, $localeRoute: localeRoute } = useI18n();
 
@@ -39,6 +40,13 @@ const hasContact = computed(
           {{ props.profile.displayName || props.profile.username }}
         </h1>
         <p class="text-xs text-muted-foreground">{{ props.profile.address }}</p>
+        <p
+          v-if="props.profile.identityVerified"
+          class="mt-1 flex flex-wrap items-center gap-2 text-xs"
+        >
+          <span class="text-muted-foreground">{{ $t("directory.verification.identity") }}</span>
+          <VerifiedBadge :verified="props.profile.identityVerified" />
+        </p>
         <p v-if="props.profile.headline" class="mt-1 text-sm">{{ props.profile.headline }}</p>
         <p
           v-if="props.profile.location"
@@ -72,7 +80,7 @@ const hasContact = computed(
         <li v-for="skill in props.profile.skills" :key="skill.id" class="rounded-lg border p-3">
           <p class="flex flex-wrap items-center gap-2 text-sm font-medium">
             {{ skill.name }}
-            <slot name="skill-badge" :skill="skill" />
+            <VerifiedBadge v-if="skill.verified" :verified="skill.verified" />
           </p>
           <p v-if="skill.description" class="mt-1 text-xs text-muted-foreground">
             {{ skill.description }}
@@ -116,7 +124,7 @@ const hasContact = computed(
           <p v-if="item.description" class="mt-1 text-xs text-muted-foreground">
             {{ item.description }}
           </p>
-          <slot name="portfolio-item" :item="item" />
+          <VerifiedBadge v-if="item.verified" class="mt-1" :verified="item.verified" />
         </li>
       </ul>
     </section>
@@ -135,6 +143,7 @@ const hasContact = computed(
             {{ company.name }}
             <span v-if="company.role" class="text-muted-foreground">· {{ company.role }}</span>
           </NuxtLink>
+          <VerifiedBadge v-if="company.verified" class="mt-1" :verified="company.verified" />
         </li>
       </ul>
     </section>

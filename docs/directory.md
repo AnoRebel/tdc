@@ -273,6 +273,56 @@ operator grows the vocabulary beyond the starting list.
 The queue is deliberately plain. If it grows faster than people can clear it,
 that is a question of who reviews, not of the tool.
 
+## Verification
+
+A moderator can verify **one specific claim** on a profile: a skill and what its
+owner says about it, a portfolio link, an association with a company, or the
+person's identity — their name and the link they give as who they are
+elsewhere. There is no verification of a profile as a whole. A profile with one
+verified skill and nine others shows exactly that.
+
+**What a verification means**, and the interface says so wherever one is shown,
+in the same words everywhere: somebody with the permission to verify checked the
+evidence for this one claim and judged it credible. It is **not** an
+endorsement of the person, their work, or whether they will deliver — nobody
+checked any of that.
+
+Anybody reading a profile sees which claims are verified, by whom and when.
+**What the moderator wrote about what they checked is shown only to the profile's
+owner**, since it may mention something the owner hides from everybody else —
+the link that was checked, say.
+
+**Editing a verified claim clears its verification.** What is on the profile
+afterwards is not what anybody looked at, so it goes back to being
+self-asserted, and it stays that way even if the claim is edited back — until a
+moderator checks it again. Leaving a company clears a verified association with
+it the same way. Your own profile page lists your verified claims, with what
+was checked, and says as much before you edit.
+
+Nobody verifies their own claims, whatever permissions they hold.
+
+### Verifying and revoking
+
+A moderator holding **`directory.verify`** works under **Directory → Review →
+Verify claims**: open a profile by username, read each claim as it stands, and
+for one at a time either
+
+- **verify** it, with a note on what was checked — required; or
+- **revoke** a standing verification, with the reason — also required. The
+  claim is shown as self-asserted again at once.
+
+A hidden profile cannot be opened for verification: its owner has not asked to
+be found. Every grant, revocation and clearing is written to the audit log:
+
+| Action                           | Actor                           | Detail                                           |
+| -------------------------------- | ------------------------------- | ------------------------------------------------ |
+| `directory.verification.granted` | the moderator                   | whose profile, which claim, and what was checked |
+| `directory.verification.revoked` | the moderator                   | which claim, and why                             |
+| `directory.verification.cleared` | the owner whose edit cleared it | which claim, and that it was edited or removed   |
+
+Each verification keeps a copy of the claim as it was when it was checked, so a
+record reviewed later shows exactly what was attested to.
+
 ## Not shared with other servers
 
 The directory belongs to this server. Federation carries rooms an operator has
@@ -284,30 +334,33 @@ deliberate decision, not something the protocol backs into.
 
 ## Over the API
 
-| Route                                                 | What it does                                                                                     |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `GET /api/directory/me`                               | your own profile, all of it                                                                      |
-| `PUT /api/directory/me`                               | create or replace your profile (the `profile` object above)                                      |
-| `GET /api/directory/search`                           | one page of the directory; filters `q`, `skill`, `available=true`, `location`, `company`, `page` |
-| `GET /api/directory/skills?q=`                        | the vocabulary, and your own proposals                                                           |
-| `POST /api/directory/skills`                          | propose a skill; answers with the existing one where the name already means one                  |
-| `GET /api/directory/moderation/skills`                | the review queue (`directory.skills.manage`)                                                     |
-| `POST /api/directory/moderation/skills/:id/approve`   | approve a proposal (`directory.skills.manage`)                                                   |
-| `POST /api/directory/moderation/skills/:id/reject`    | reject a proposal, with a `reason` (`directory.skills.manage`)                                   |
-| `POST /api/directory/moderation/skills/:id/merge`     | merge a proposal `into` another skill (`directory.skills.manage`)                                |
-| `DELETE /api/directory/me`                            | delete your profile, keeping your account                                                        |
-| `GET /api/directory/me/export`                        | your profile as `tdc.directory.profile/1`                                                        |
-| `GET /api/directory/profiles/:username`               | a profile as you may see it; signing in is optional                                              |
-| `GET /api/directory/me/companies`                     | your companies, and invitations you have not answered                                            |
-| `POST /api/directory/me/companies/:slug/accept`       | accept a company's invitation                                                                    |
-| `DELETE /api/directory/me/companies/:slug`            | leave a company, or decline its invitation                                                       |
-| `POST /api/directory/companies`                       | create a company                                                                                 |
-| `GET /api/directory/companies/:slug`                  | a company; signing in is optional                                                                |
-| `PUT /api/directory/companies/:slug`                  | change a company (its administrators)                                                            |
-| `DELETE /api/directory/companies/:slug`               | delete a company (its administrators)                                                            |
-| `POST /api/directory/companies/:slug/members`         | invite somebody by username (its administrators)                                                 |
-| `DELETE /api/directory/companies/:slug/members/:user` | remove somebody (its administrators)                                                             |
-| `GET /api/directory/moderation/profiles/:username`    | read a profile as its owner sees it (`directory.profile.manage`)                                 |
-| `PUT /api/directory/moderation/profiles/:username`    | change or clear a profile (`directory.profile.manage`)                                           |
+| Route                                                             | What it does                                                                                     |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET /api/directory/me`                                           | your own profile, all of it                                                                      |
+| `PUT /api/directory/me`                                           | create or replace your profile (the `profile` object above)                                      |
+| `GET /api/directory/search`                                       | one page of the directory; filters `q`, `skill`, `available=true`, `location`, `company`, `page` |
+| `GET /api/directory/skills?q=`                                    | the vocabulary, and your own proposals                                                           |
+| `POST /api/directory/skills`                                      | propose a skill; answers with the existing one where the name already means one                  |
+| `GET /api/directory/moderation/skills`                            | the review queue (`directory.skills.manage`)                                                     |
+| `POST /api/directory/moderation/skills/:id/approve`               | approve a proposal (`directory.skills.manage`)                                                   |
+| `POST /api/directory/moderation/skills/:id/reject`                | reject a proposal, with a `reason` (`directory.skills.manage`)                                   |
+| `POST /api/directory/moderation/skills/:id/merge`                 | merge a proposal `into` another skill (`directory.skills.manage`)                                |
+| `GET /api/directory/moderation/profiles/:username/claims`         | the verifiable claims on a profile (`directory.verify`)                                          |
+| `POST /api/directory/moderation/profiles/:username/verifications` | verify one claim: `kind`, `claimId`, `note` (`directory.verify`)                                 |
+| `POST /api/directory/moderation/verifications/:id/revoke`         | revoke a verification, with a `reason` (`directory.verify`)                                      |
+| `DELETE /api/directory/me`                                        | delete your profile, keeping your account                                                        |
+| `GET /api/directory/me/export`                                    | your profile as `tdc.directory.profile/1`                                                        |
+| `GET /api/directory/profiles/:username`                           | a profile as you may see it; signing in is optional                                              |
+| `GET /api/directory/me/companies`                                 | your companies, and invitations you have not answered                                            |
+| `POST /api/directory/me/companies/:slug/accept`                   | accept a company's invitation                                                                    |
+| `DELETE /api/directory/me/companies/:slug`                        | leave a company, or decline its invitation                                                       |
+| `POST /api/directory/companies`                                   | create a company                                                                                 |
+| `GET /api/directory/companies/:slug`                              | a company; signing in is optional                                                                |
+| `PUT /api/directory/companies/:slug`                              | change a company (its administrators)                                                            |
+| `DELETE /api/directory/companies/:slug`                           | delete a company (its administrators)                                                            |
+| `POST /api/directory/companies/:slug/members`                     | invite somebody by username (its administrators)                                                 |
+| `DELETE /api/directory/companies/:slug/members/:user`             | remove somebody (its administrators)                                                             |
+| `GET /api/directory/moderation/profiles/:username`                | read a profile as its owner sees it (`directory.profile.manage`)                                 |
+| `PUT /api/directory/moderation/profiles/:username`                | change or clear a profile (`directory.profile.manage`)                                           |
 
 Every directory route answers `404` while the directory is switched off.

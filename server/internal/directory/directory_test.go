@@ -66,7 +66,7 @@ func TestASectionsRankIsNeverBelowItsProfiles(t *testing.T) {
 	ctx := context.Background()
 	juma := person(t, pool, "juma")
 
-	if _, err := service.Save(ctx, juma, directory.ProfileInput{
+	if _, _, err := service.Save(ctx, juma, directory.ProfileInput{
 		Visibility: directory.Hidden, DetailsVisibility: directory.Public, ContactVisibility: directory.Public,
 	}); err != nil {
 		t.Fatalf("save: %v", err)
@@ -95,7 +95,7 @@ func TestAWithheldFieldIsNotReadFromTheDatabase(t *testing.T) {
 	ctx := context.Background()
 	juma := person(t, pool, "juma")
 
-	if _, err := service.Save(ctx, juma, directory.ProfileInput{
+	if _, _, err := service.Save(ctx, juma, directory.ProfileInput{
 		Visibility: directory.Public, DetailsVisibility: directory.Members,
 		Bio: "for members", ContactEmail: "juma@example.com",
 	}); err != nil {
@@ -119,5 +119,82 @@ func TestAWithheldFieldIsNotReadFromTheDatabase(t *testing.T) {
 	}
 	if member.ContactEmail != "" {
 		t.Error("contact details left at their default reached a member")
+	}
+}
+
+/*
+The database itself refuses a verification that does not name its claim.
+
+The service never tries, but a verification that could exist without saying
+what it covers would be a badge on a person, which is the thing this model
+exists not to have.
+*/
+func TestTheDatabaseRefusesAVerificationWithoutAClaim(t *testing.T) {
+	service, pool := newDirectory(t)
+	ctx := context.Background()
+	juma := person(t, pool, "juma")
+	if _, _, err := service.Save(ctx, juma, directory.ProfileInput{}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	for description, statement := range map[string]string{
+		"no claim at all": `INSERT INTO profile_verifications (id, user_id, claim_digest, claim_snapshot, note)
+			VALUES (gen_random_uuid(), $1, 'x', '{}', 'checked')`,
+		"a kind that is not one": `INSERT INTO profile_verifications (id, user_id, claim_kind, claim_id, claim_digest, claim_snapshot, note)
+			VALUES (gen_random_uuid(), $1, 'profile', $1, 'x', '{}', 'checked')`,
+		"no note on what was checked": `INSERT INTO profile_verifications (id, user_id, claim_kind, claim_id, claim_digest, claim_snapshot, note)
+			VALUES (gen_random_uuid(), $1, 'identity', $1, 'x', '{}', ' ')`,
+	} {
+		if _, err := pool.Exec(ctx, statement, juma); err == nil {
+			t.Errorf("the database accepted a verification with %s", description)
+		}
+	}
+}
+
+/*
+A claim changed by any path is not shown as verified, even one that did not
+clear the verification itself.
+
+Saving a profile clears the verifications its edits invalidate. This is the
+second line: reading verifications compares each with the claim as it stands,
+so a claim changed some other way — a future path, or a hand edit in the
+database — is still not presented as having been checked.
+*/
+func TestAVerificationStopsApplyingWhenItsClaimChangesAnyWay(t *testing.T) {
+	service, pool := newDirectory(t)
+	ctx := context.Background()
+	juma := person(t, pool, "juma")
+	moderator := person(t, pool, "kheri")
+
+	if _, _, err := service.Save(ctx, juma, directory.ProfileInput{
+		Skills: []directory.SkillInput{{Name: "Go", Description: "eight years"}},
+	}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	claims, err := service.Claims(ctx, juma)
+	if err != nil {
+		t.Fatalf("claims: %v", err)
+	}
+	var skill directory.Claim
+	for _, claim := range claims {
+		if claim.Kind == directory.ClaimSkill {
+			skill = claim
+		}
+	}
+	if _, _, err := service.Verify(ctx, moderator, "kheri", juma, skill.Kind, skill.ID, "checked"); err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+
+	if _, err := pool.Exec(ctx,
+		"UPDATE profile_skills SET description = 'twenty years' WHERE user_id = $1", juma); err != nil {
+		t.Fatalf("editing the claim directly: %v", err)
+	}
+
+	standing, err := service.Verifications(ctx, juma)
+	if err != nil {
+		t.Fatalf("verifications: %v", err)
+	}
+	if _, present := standing[skill.Key()]; present {
+		t.Error("a claim changed outside a save is still shown as verified")
 	}
 }

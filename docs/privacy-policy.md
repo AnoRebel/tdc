@@ -200,6 +200,11 @@ If you are listed by a company, the record holds which company, the role it
 gave you, who invited you, and when you accepted. A company's own page holds its
 name, description, location and who created it.
 
+If a moderator verifies a claim on your profile, the record holds which claim,
+a copy of what it said when they checked it, who verified it, when, and their
+note on what they checked; and, if it is later revoked or cleared, when, by whom
+and why. Other people see only that a claim was verified, by whom and when.
+
 A moderator dealing with abuse can read your profile including what you have
 hidden, and can change or clear it; each read and each change is written to the
 audit log with the moderator's name and, for a change, the reason.

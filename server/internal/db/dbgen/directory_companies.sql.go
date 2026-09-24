@@ -430,7 +430,7 @@ func (q *Queries) ViewCompanyProfile(ctx context.Context, arg ViewCompanyProfile
 }
 
 const viewProfileCompanies = `-- name: ViewProfileCompanies :many
-SELECT c.slug, c.name, m.role
+SELECT c.id, c.slug, c.name, m.role
 FROM company_members m
 JOIN company_profiles c ON c.id = m.company_id
 JOIN directory_profiles p ON p.user_id = m.user_id
@@ -446,6 +446,7 @@ type ViewProfileCompaniesParams struct {
 }
 
 type ViewProfileCompaniesRow struct {
+	ID   uuid.UUID
 	Slug string
 	Name string
 	Role string
@@ -463,7 +464,12 @@ func (q *Queries) ViewProfileCompanies(ctx context.Context, arg ViewProfileCompa
 	items := []ViewProfileCompaniesRow{}
 	for rows.Next() {
 		var i ViewProfileCompaniesRow
-		if err := rows.Scan(&i.Slug, &i.Name, &i.Role); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.Role,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

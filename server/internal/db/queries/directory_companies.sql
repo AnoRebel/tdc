@@ -90,7 +90,7 @@ ORDER BY m.status DESC, c.name;
 -- The companies a profile references, as a viewer may see them: accepted
 -- associations only, with companies the viewer may see, on a profile whose
 -- details the viewer may see — the companies are part of what it says.
-SELECT c.slug, c.name, m.role
+SELECT c.id, c.slug, c.name, m.role
 FROM company_members m
 JOIN company_profiles c ON c.id = m.company_id
 JOIN directory_profiles p ON p.user_id = m.user_id

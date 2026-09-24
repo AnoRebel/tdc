@@ -65,6 +65,7 @@ type Querier interface {
 	// later action from the person who set it.
 	ClearExpiredStatuses(ctx context.Context) error
 	ClearExpiredTyping(ctx context.Context) error
+	ClearVerification(ctx context.Context, id uuid.UUID) (int64, error)
 	// Collected once: the row is deleted as it is read, so a handle presented twice
 	// yields nothing the second time.
 	CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error)
@@ -275,6 +276,8 @@ type Querier interface {
 	// means: a channel setting beats the default rather than merging with it.
 	GetNotificationPreference(ctx context.Context, arg GetNotificationPreferenceParams) (GetNotificationPreferenceRow, error)
 	GetOAuthCredential(ctx context.Context, arg GetOAuthCredentialParams) (Credential, error)
+	// The company associations a profile can have verified: accepted ones.
+	GetOwnCompanyClaims(ctx context.Context, userID uuid.UUID) ([]GetOwnCompanyClaimsRow, error)
 	// The owner's own profile, all of it. Only ever called with the signed-in
 	// person's own identifier.
 	GetOwnDirectoryProfile(ctx context.Context, userID uuid.UUID) (GetOwnDirectoryProfileRow, error)
@@ -308,6 +311,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
 	GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []byte) (User, error)
+	GetVerification(ctx context.Context, id uuid.UUID) (ProfileVerification, error)
 	HasBlocked(ctx context.Context, arg HasBlockedParams) (bool, error)
 	HasConfirmedSecondFactor(ctx context.Context, userID uuid.UUID) (bool, error)
 	// The passkeys an account could answer a second-factor challenge with.
@@ -319,6 +323,7 @@ type Querier interface {
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
 	InsertPortfolioItem(ctx context.Context, arg InsertPortfolioItemParams) error
 	InsertSkill(ctx context.Context, arg InsertSkillParams) (Skill, error)
+	InsertVerification(ctx context.Context, arg InsertVerificationParams) (ProfileVerification, error)
 	// Issuing a new one invalidates the old, so somebody who asks twice is not left
 	// holding two working links.
 	InvalidateEmailConfirmations(ctx context.Context, userID uuid.UUID) (int64, error)
@@ -622,6 +627,7 @@ type Querier interface {
 	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (Invitation, error)
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
+	RevokeVerification(ctx context.Context, arg RevokeVerificationParams) (int64, error)
 	// One peer's participation, which is also the check for whether a peer may
 	// read a room at all.
 	RoomPeer(ctx context.Context, arg RoomPeerParams) (RoomPeer, error)
@@ -726,6 +732,10 @@ type Querier interface {
 	SpendEmailedCode(ctx context.Context, arg SpendEmailedCodeParams) (PendingSignIn, error)
 	SpendRecoveryCode(ctx context.Context, arg SpendRecoveryCodeParams) (Credential, error)
 	SpendRecoveryToken(ctx context.Context, tokenHash []byte) (RecoveryToken, error)
+	// Every verification on a profile that has been neither revoked nor cleared.
+	// Whether each still matches its claim is decided by the caller, which holds
+	// the claim as it stands.
+	StandingVerifications(ctx context.Context, userID uuid.UUID) ([]ProfileVerification, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)
 	StartPendingSignIn(ctx context.Context, arg StartPendingSignInParams) (PendingSignIn, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error

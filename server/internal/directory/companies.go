@@ -365,6 +365,15 @@ func (s *Service) LeaveCompany(ctx context.Context, actor uuid.UUID, slug string
 	}); err != nil {
 		return fmt.Errorf("leave a company: %w", err)
 	}
+
+	/*
+		A verified association ends with the association. Cleared rather than
+		left to be hidden by the claim's absence, so that joining again later
+		does not bring back an attestation about an association that ended.
+	*/
+	if _, err := clearStale(ctx, s.queries, member); err != nil && !errors.Is(err, ErrNoProfile) {
+		return err
+	}
 	return nil
 }
 
