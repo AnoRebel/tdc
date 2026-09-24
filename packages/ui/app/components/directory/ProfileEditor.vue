@@ -12,6 +12,10 @@ import { Input } from "#layers/ui/app/components/ui/input";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import VisibilityPicker from "#layers/ui/app/components/directory/VisibilityPicker.vue";
+import SkillPicker from "#layers/ui/app/components/directory/SkillPicker.vue";
+import { Select } from "#layers/ui/app/components/ui/select";
+import { Switch } from "#layers/ui/app/components/ui/switch";
+import { daysFromNow, onDate } from "#layers/ui/app/lib/dates";
 
 const { $t, $ts } = useI18n();
 
@@ -77,8 +81,41 @@ const schema = computed(() =>
       ),
       v.maxLength(20, $ts("directory.form.tooManyLinks", { count: 20 })),
     ),
+    skills: v.array(
+      v.object({
+        id: v.optional(v.string()),
+        name: v.string(),
+        status: v.optional(v.picklist(["active", "proposed"])),
+        description: v.pipe(
+          v.string(),
+          v.maxLength(300, $ts("directory.form.tooLong", { count: 300 })),
+        ),
+      }),
+    ),
+    openToWork: v.boolean(),
+    availabilityNote: v.pipe(
+      v.string(),
+      v.maxLength(200, $ts("directory.form.tooLong", { count: 200 })),
+    ),
+    availableUntil: v.optional(v.string()),
   }),
 );
+
+/*
+ * How long somebody is available for, chosen as a span rather than a date.
+ *
+ * A span is what people think in — "for the next month" — and it cannot be a
+ * date in the past or years away, both of which the server refuses. The
+ * choice becomes an absolute instant the moment it is made.
+ */
+const spans = computed(() => [
+  { value: 7, label: $ts("directory.availability.oneWeek") },
+  { value: 14, label: $ts("directory.availability.twoWeeks") },
+  { value: 30, label: $ts("directory.availability.oneMonth") },
+  { value: 90, label: $ts("directory.availability.threeMonths") },
+  { value: 180, label: $ts("directory.availability.sixMonths") },
+]);
+const span = ref<number | undefined>(props.initial.openToWork ? undefined : 30);
 
 /** The first thing wrong with a field, once somebody has touched it. */
 function firstError(field: AnyFieldApi): string | undefined {
@@ -300,6 +337,87 @@ const form = useForm({
           </fieldset>
         </template>
       </form.Field>
+
+      <form.Field name="skills">
+        <template #default="{ field }">
+          <SkillPicker
+            :model-value="field.state.value"
+            @update:model-value="field.handleChange($event)"
+          />
+        </template>
+      </form.Field>
+
+      <!-- Availability: a statement about work, nothing to do with whether
+           somebody is online, and one that lapses on its own. -->
+      <fieldset class="space-y-3 rounded-lg border p-3">
+        <legend class="px-1 text-sm font-medium">{{ $t("directory.availability.title") }}</legend>
+        <form.Field name="openToWork">
+          <template #default="{ field }">
+            <div class="flex items-center gap-3">
+              <Switch
+                :model-value="field.state.value"
+                :label="$ts('directory.availability.openToWork')"
+                @update:model-value="
+                  (open: boolean) => {
+                    field.handleChange(open);
+                    if (open && !form.state.values.availableUntil) {
+                      form.setFieldValue('availableUntil', daysFromNow(span ?? 30));
+                    }
+                  }
+                "
+              />
+              <span class="text-sm">{{ $t("directory.availability.openToWork") }}</span>
+            </div>
+          </template>
+        </form.Field>
+
+        <form.Subscribe>
+          <template #default="{ values }">
+            <div v-if="values.openToWork" class="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Select
+                  :model-value="span"
+                  :options="spans"
+                  :label="$ts('directory.availability.forHowLong')"
+                  :placeholder="$ts('directory.availability.forHowLong')"
+                  @update:model-value="
+                    (days) => {
+                      span = days;
+                      if (days) form.setFieldValue('availableUntil', daysFromNow(days));
+                    }
+                  "
+                />
+                <p v-if="values.availableUntil" class="mt-1 text-xs text-muted-foreground">
+                  {{ $t("directory.availability.until", { date: onDate(values.availableUntil) }) }}
+                </p>
+              </div>
+              <form.Field name="availabilityNote">
+                <template #default="{ field }">
+                  <Field
+                    :label="$ts('directory.availability.note')"
+                    :hint="$ts('directory.availability.noteHint')"
+                    :error="firstError(field)"
+                  >
+                    <template #default="{ id, invalid, describedBy }">
+                      <Input
+                        :id="id"
+                        :model-value="field.state.value"
+                        :invalid="invalid"
+                        :described-by="describedBy"
+                        @update:model-value="field.handleChange($event)"
+                        @blur="field.handleBlur"
+                      />
+                    </template>
+                  </Field>
+                </template>
+              </form.Field>
+            </div>
+            <p v-else class="text-xs text-muted-foreground">
+              {{ $t("directory.availability.closedHint") }}
+            </p>
+          </template>
+        </form.Subscribe>
+      </fieldset>
 
       <form.Field name="detailsVisibility">
         <template #default="{ field }">

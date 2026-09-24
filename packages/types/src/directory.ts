@@ -36,6 +36,79 @@ export interface ProfileDocument {
   detailsVisibility: DirectoryVisibility;
   contactVisibility: DirectoryVisibility;
   portfolio: PortfolioLink[];
+  skills: ProfileSkill[];
+  /** Whether they are looking for work, true until `availableUntil`. */
+  openToWork: boolean;
+  /** The kind of engagement sought. */
+  availabilityNote: string;
+  /** When the statement lapses, as an RFC 3339 instant. */
+  availableUntil?: string;
+}
+
+/** Whether a skill is in the vocabulary or waiting for review. */
+export type SkillStatus = "active" | "proposed";
+
+/** One entry in the skill vocabulary, or one waiting for it. */
+export interface Skill {
+  id: string;
+  name: string;
+  description?: string;
+  status: SkillStatus;
+}
+
+/**
+ * A skill on somebody's profile, with what they say about it.
+ *
+ * Sent by `id`, or by a `name` the vocabulary knows. `status` is only ever
+ * read, and only its owner sees "proposed".
+ */
+export interface ProfileSkill {
+  id?: string;
+  name: string;
+  status?: SkillStatus;
+  description: string;
+}
+
+/** A proposal in the review queue. */
+export interface QueuedSkill {
+  id: string;
+  name: string;
+  description?: string;
+  proposedBy?: string;
+  /** How many profiles carry it already. */
+  profiles: number;
+  createdAt: string;
+}
+
+/** One profile in a page of search results. */
+export interface DirectoryHit {
+  username: string;
+  displayName: string;
+  address: string;
+  headline?: string;
+  location?: string;
+  available?: boolean;
+  availabilityNote?: string;
+  skills?: string[];
+  updatedAt: string;
+}
+
+/** One page of a directory search. The page size is the server's. */
+export interface DirectoryResults {
+  profiles: DirectoryHit[];
+  page: number;
+  pageSize: number;
+  more: boolean;
+}
+
+/** What a directory search can be narrowed by. Every one is optional. */
+export interface DirectoryFilters {
+  q?: string;
+  skill?: string;
+  available?: boolean;
+  location?: string;
+  company?: string;
+  page?: number;
 }
 
 /** A company a profile's owner has agreed to be listed by. */
@@ -70,6 +143,11 @@ export interface ProfileView {
   contactUrl?: string;
   portfolio?: (PortfolioLink & { id: string })[];
   companies?: CompanyReference[];
+  skills?: { id: string; name: string; description?: string }[];
+  /** Present only while the owner's availability is current. */
+  available?: boolean;
+  availabilityNote?: string;
+  availableUntil?: string;
   updatedAt: string;
 }
 

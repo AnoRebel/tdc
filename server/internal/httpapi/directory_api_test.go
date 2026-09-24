@@ -40,8 +40,15 @@ into the next test and take its address.
 */
 func cleanDirectory(t *testing.T) {
 	t.Helper()
-	if _, err := poolForTest.Exec(context.Background(), "DELETE FROM company_profiles"); err != nil {
-		t.Fatalf("cleaning the directory: %v", err)
+	for _, statement := range []string{
+		"DELETE FROM company_profiles",
+		// The skills a test proposed or approved; the seeded vocabulary was
+		// never reviewed and stays.
+		"DELETE FROM skills WHERE status = 'proposed' OR reviewed_at IS NOT NULL",
+	} {
+		if _, err := poolForTest.Exec(context.Background(), statement); err != nil {
+			t.Fatalf("cleaning the directory: %v", err)
+		}
 	}
 }
 

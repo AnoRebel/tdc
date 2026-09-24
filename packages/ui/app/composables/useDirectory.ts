@@ -1,10 +1,14 @@
 import type {
   Company,
   CompanyAssociation,
+  DirectoryFilters,
+  DirectoryResults,
   DirectoryVisibility,
   OwnProfile,
   ProfileDocument,
   ProfileView,
+  QueuedSkill,
+  Skill,
 } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 
@@ -28,6 +32,9 @@ export function emptyProfile(): ProfileDocument {
     detailsVisibility: "members",
     contactVisibility: "hidden",
     portfolio: [],
+    skills: [],
+    openToWork: false,
+    availabilityNote: "",
   };
 }
 
@@ -125,7 +132,60 @@ export function useDirectory() {
     );
   }
 
+  /**
+   * One page of a directory search.
+   *
+   * There is no page size to ask for: the server decides it, and a client
+   * wanting more asks for the next page.
+   */
+  function search(filters: DirectoryFilters) {
+    const query = new URLSearchParams();
+    if (filters.q?.trim()) query.set("q", filters.q.trim());
+    if (filters.skill?.trim()) query.set("skill", filters.skill.trim());
+    if (filters.available) query.set("available", "true");
+    if (filters.location?.trim()) query.set("location", filters.location.trim());
+    if (filters.company?.trim()) query.set("company", filters.company.trim());
+    if (filters.page) query.set("page", String(filters.page));
+    return api.get<DirectoryResults>(`/api/directory/search?${query.toString()}`);
+  }
+
+  /** The vocabulary matching what somebody typed, with their own proposals. */
+  function skills(query = "") {
+    return api.get<Skill[]>(`/api/directory/skills?q=${encodeURIComponent(query)}`);
+  }
+
+  /**
+   * Proposes a skill. The server answers with the skill the name already
+   * means, where it means one, rather than making a second.
+   */
+  function proposeSkill(name: string, description = "") {
+    return api.post<Skill>("/api/directory/skills", { name, description });
+  }
+
+  function skillQueue() {
+    return api.get<QueuedSkill[]>("/api/directory/moderation/skills");
+  }
+
+  function approveSkill(id: string) {
+    return api.post<Skill>(`/api/directory/moderation/skills/${id}/approve`);
+  }
+
+  function rejectSkill(id: string, reason: string) {
+    return api.post<void>(`/api/directory/moderation/skills/${id}/reject`, { reason });
+  }
+
+  function mergeSkill(id: string, into: string) {
+    return api.post<Skill>(`/api/directory/moderation/skills/${id}/merge`, { into });
+  }
+
   return {
+    search,
+    skills,
+    proposeSkill,
+    skillQueue,
+    approveSkill,
+    rejectSkill,
+    mergeSkill,
     ownProfile,
     saveProfile,
     deleteProfile,

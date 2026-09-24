@@ -73,31 +73,34 @@ mistake in a handler cannot leak what the query did not return. This is the
 discipline the member-list disclosure established, applied to strangers.
 */
 
-SELECT p.user_id, p.headline, p.bio, p.location, p.experience, p.contact_email, p.contact_phone, p.contact_url, p.visibility, p.details_visibility, p.contact_visibility, p.profile_rank, p.details_rank, p.contact_rank, p.created_at, p.updated_at, u.username, u.display_name
+SELECT p.user_id, p.headline, p.bio, p.location, p.experience, p.contact_email, p.contact_phone, p.contact_url, p.visibility, p.details_visibility, p.contact_visibility, p.profile_rank, p.details_rank, p.contact_rank, p.created_at, p.updated_at, p.open_to_work, p.availability_note, p.availability_expires_at, u.username, u.display_name
 FROM directory_profiles p
 JOIN users u ON u.id = p.user_id
 WHERE p.user_id = $1
 `
 
 type GetOwnDirectoryProfileRow struct {
-	UserID            uuid.UUID
-	Headline          string
-	Bio               string
-	Location          string
-	Experience        string
-	ContactEmail      string
-	ContactPhone      string
-	ContactUrl        string
-	Visibility        string
-	DetailsVisibility string
-	ContactVisibility string
-	ProfileRank       *int16
-	DetailsRank       *int16
-	ContactRank       *int16
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	Username          string
-	DisplayName       string
+	UserID                uuid.UUID
+	Headline              string
+	Bio                   string
+	Location              string
+	Experience            string
+	ContactEmail          string
+	ContactPhone          string
+	ContactUrl            string
+	Visibility            string
+	DetailsVisibility     string
+	ContactVisibility     string
+	ProfileRank           *int16
+	DetailsRank           *int16
+	ContactRank           *int16
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	OpenToWork            bool
+	AvailabilityNote      string
+	AvailabilityExpiresAt *time.Time
+	Username              string
+	DisplayName           string
 }
 
 // The owner's own profile, all of it. Only ever called with the signed-in
@@ -122,6 +125,9 @@ func (q *Queries) GetOwnDirectoryProfile(ctx context.Context, userID uuid.UUID) 
 		&i.ContactRank,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.OpenToWork,
+		&i.AvailabilityNote,
+		&i.AvailabilityExpiresAt,
 		&i.Username,
 		&i.DisplayName,
 	)
@@ -227,13 +233,18 @@ const saveDirectoryProfile = `-- name: SaveDirectoryProfile :one
 INSERT INTO directory_profiles (
     user_id, headline, bio, location, experience,
     contact_email, contact_phone, contact_url,
-    visibility, details_visibility, contact_visibility
+    visibility, details_visibility, contact_visibility,
+    open_to_work, availability_note, availability_expires_at
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8,
-    $9, $10, $11
+    $9, $10, $11,
+    $12, $13, $14
 )
 ON CONFLICT (user_id) DO UPDATE SET
+    open_to_work = EXCLUDED.open_to_work,
+    availability_note = EXCLUDED.availability_note,
+    availability_expires_at = EXCLUDED.availability_expires_at,
     headline = EXCLUDED.headline,
     bio = EXCLUDED.bio,
     location = EXCLUDED.location,
@@ -249,17 +260,20 @@ RETURNING (xmax = 0) AS created
 `
 
 type SaveDirectoryProfileParams struct {
-	UserID            uuid.UUID
-	Headline          string
-	Bio               string
-	Location          string
-	Experience        string
-	ContactEmail      string
-	ContactPhone      string
-	ContactUrl        string
-	Visibility        string
-	DetailsVisibility string
-	ContactVisibility string
+	UserID                uuid.UUID
+	Headline              string
+	Bio                   string
+	Location              string
+	Experience            string
+	ContactEmail          string
+	ContactPhone          string
+	ContactUrl            string
+	Visibility            string
+	DetailsVisibility     string
+	ContactVisibility     string
+	OpenToWork            bool
+	AvailabilityNote      string
+	AvailabilityExpiresAt *time.Time
 }
 
 // Creates the profile or replaces what it says. One statement for both, so a
@@ -278,6 +292,9 @@ func (q *Queries) SaveDirectoryProfile(ctx context.Context, arg SaveDirectoryPro
 		arg.Visibility,
 		arg.DetailsVisibility,
 		arg.ContactVisibility,
+		arg.OpenToWork,
+		arg.AvailabilityNote,
+		arg.AvailabilityExpiresAt,
 	)
 	var created bool
 	err := row.Scan(&created)
@@ -355,6 +372,16 @@ SELECT
     (CASE WHEN p.contact_rank <= $1::smallint THEN p.contact_email ELSE '' END)::text AS contact_email,
     (CASE WHEN p.contact_rank <= $1::smallint THEN p.contact_phone ELSE '' END)::text AS contact_phone,
     (CASE WHEN p.contact_rank <= $1::smallint THEN p.contact_url ELSE '' END)::text AS contact_url,
+    -- Available only while the statement is current: past its expiry this is
+    -- false with nothing about the profile changed.
+    COALESCE(p.details_rank <= $1::smallint
+             AND p.open_to_work AND p.availability_expires_at > NOW(), FALSE)::boolean AS available,
+    (CASE WHEN p.details_rank <= $1::smallint
+               AND p.open_to_work AND p.availability_expires_at > NOW()
+          THEN p.availability_note ELSE '' END)::text AS availability_note,
+    (CASE WHEN p.details_rank <= $1::smallint
+               AND p.open_to_work AND p.availability_expires_at > NOW()
+          THEN p.availability_expires_at ELSE 'epoch'::timestamptz END)::timestamptz AS available_until,
     p.updated_at
 FROM users u
 JOIN directory_profiles p ON p.user_id = u.id
@@ -371,20 +398,23 @@ type ViewDirectoryProfileParams struct {
 }
 
 type ViewDirectoryProfileRow struct {
-	UserID       uuid.UUID
-	Username     string
-	DisplayName  string
-	Visibility   string
-	DetailsShown bool
-	ContactShown bool
-	Headline     string
-	Bio          string
-	Location     string
-	Experience   string
-	ContactEmail string
-	ContactPhone string
-	ContactUrl   string
-	UpdatedAt    time.Time
+	UserID           uuid.UUID
+	Username         string
+	DisplayName      string
+	Visibility       string
+	DetailsShown     bool
+	ContactShown     bool
+	Headline         string
+	Bio              string
+	Location         string
+	Experience       string
+	ContactEmail     string
+	ContactPhone     string
+	ContactUrl       string
+	Available        bool
+	AvailabilityNote string
+	AvailableUntil   time.Time
+	UpdatedAt        time.Time
 }
 
 func (q *Queries) ViewDirectoryProfile(ctx context.Context, arg ViewDirectoryProfileParams) (ViewDirectoryProfileRow, error) {
@@ -404,6 +434,9 @@ func (q *Queries) ViewDirectoryProfile(ctx context.Context, arg ViewDirectoryPro
 		&i.ContactEmail,
 		&i.ContactPhone,
 		&i.ContactUrl,
+		&i.Available,
+		&i.AvailabilityNote,
+		&i.AvailableUntil,
 		&i.UpdatedAt,
 	)
 	return i, err

@@ -658,6 +658,63 @@
       "removeTitle": "Umwondoe {name}?",
       "removeDetail": "Wanaacha kuorodheshwa mara moja, kwenye ukurasa wa kampuni na kwenye wasifu wao.",
       "remove": "Ondoa"
+    },
+    "skills": {
+      "title": "Ujuzi",
+      "hint": "Huchaguliwa kutoka orodha ya seva, ili wanaotafuta ujuzi wawapate wote walio nao.",
+      "find": "Tafuta ujuzi",
+      "matches": "Ujuzi {count} unaolingana",
+      "describe": "Ulichofanya nao (hiari)",
+      "describeWhich": "Ulichofanya na {skill}",
+      "remove": "Ondoa {skill}",
+      "waiting": "Inasubiri kukaguliwa",
+      "notInVocabulary": "{skill} bado haiko kwenye orodha.",
+      "propose": "Ipendekeze"
+    },
+    "availability": {
+      "title": "Upatikanaji",
+      "openToWork": "Niko tayari kwa kazi",
+      "closedHint": "Sema unapotafuta kazi. Inaisha yenyewe, ili wasifu usioushughulikia usiendelee kusema uko huru.",
+      "forHowLong": "Kwa muda gani",
+      "oneWeek": "Wiki moja",
+      "twoWeeks": "Wiki mbili",
+      "oneMonth": "Mwezi mmoja",
+      "threeMonths": "Miezi mitatu",
+      "sixMonths": "Miezi sita",
+      "until": "Hadi {date}",
+      "note": "Kazi ya aina gani",
+      "noteHint": "Kwa mfano, mikataba mifupi au muda wa sehemu.",
+      "available": "Anapatikana kwa kazi"
+    },
+    "search": {
+      "label": "Tafuta kwenye saraka",
+      "query": "Jina au maneno",
+      "queryHint": "Jina, au maneno kutoka kwenye kichwa",
+      "skill": "Ujuzi",
+      "company": "Kampuni",
+      "availableOnly": "Wanaopatikana kwa kazi tu",
+      "search": "Tafuta",
+      "results": "Matokeo",
+      "more": "Onyesha zaidi",
+      "empty": "Bado hakuna mtu kwenye saraka",
+      "emptyHint": "Watu wanaonekana hapa wakishaunda wasifu wanaokuruhusu kuuona.",
+      "nobodyMatches": "Hakuna anayelingana",
+      "nobodyMatchesHint": "Kinachoweza kutafutwa ni kile tu watu walichochagua kukuonyesha.",
+      "slowDown": "Umetafuta mara nyingi kwa muda mfupi. Subiri dakika moja kisha ujaribu tena."
+    },
+    "review": {
+      "title": "Ukaguzi",
+      "skills": "Ujuzi uliopendekezwa",
+      "skillsHint": "Idhinisha ujuzi kuuongeza kwenye orodha, uunganishe na ulioko tayari kwa jina jingine, au uukatae. Kila uamuzi unarekodiwa.",
+      "refused": "Huwezi kukagua ujuzi.",
+      "nothingWaiting": "Hakuna kinachosubiri",
+      "proposedBy": "Ulipendekezwa na {who} tarehe {date} · kwenye wasifu {count}",
+      "approve": "Idhinisha",
+      "merge": "Unganisha na mwingine",
+      "mergeInto": "Unganisha {skill} na…",
+      "reject": "Kataa",
+      "rejectTitle": "Ukatae {skill}?",
+      "why": "Kwa nini? Hii inahifadhiwa kwenye kumbukumbu."
     }
   }
 }

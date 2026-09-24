@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import type { ProfileView } from "@tdc/types";
-import { Building2, ExternalLink, Globe, Mail, MapPin, Phone } from "lucide-vue-next";
+import {
+  BriefcaseBusiness,
+  Building2,
+  ExternalLink,
+  Globe,
+  Mail,
+  MapPin,
+  Phone,
+} from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { onDate } from "#layers/ui/app/lib/dates";
 
 const { $t, $localeRoute: localeRoute } = useI18n();
 
@@ -41,7 +50,37 @@ const hasContact = computed(
       </div>
     </header>
 
+    <p
+      v-if="props.profile.available"
+      class="flex flex-wrap items-center gap-2 rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm"
+    >
+      <BriefcaseBusiness class="size-4 shrink-0" />
+      <span class="font-medium">{{ $t("directory.availability.available") }}</span>
+      <span v-if="props.profile.availabilityNote">· {{ props.profile.availabilityNote }}</span>
+      <span v-if="props.profile.availableUntil" class="text-xs text-muted-foreground">
+        {{ $t("directory.availability.until", { date: onDate(props.profile.availableUntil) }) }}
+      </span>
+    </p>
+
     <slot name="actions" />
+
+    <section v-if="props.profile.skills?.length">
+      <h2 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        {{ $t("directory.skills.title") }}
+      </h2>
+      <ul class="mt-2 space-y-2">
+        <li v-for="skill in props.profile.skills" :key="skill.id" class="rounded-lg border p-3">
+          <p class="flex flex-wrap items-center gap-2 text-sm font-medium">
+            {{ skill.name }}
+            <slot name="skill-badge" :skill="skill" />
+          </p>
+          <p v-if="skill.description" class="mt-1 text-xs text-muted-foreground">
+            {{ skill.description }}
+          </p>
+          <slot name="skill" :skill="skill" />
+        </li>
+      </ul>
+    </section>
 
     <section v-if="props.profile.bio">
       <h2 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">

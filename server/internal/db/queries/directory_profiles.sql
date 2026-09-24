@@ -23,13 +23,18 @@ WHERE p.user_id = $1;
 INSERT INTO directory_profiles (
     user_id, headline, bio, location, experience,
     contact_email, contact_phone, contact_url,
-    visibility, details_visibility, contact_visibility
+    visibility, details_visibility, contact_visibility,
+    open_to_work, availability_note, availability_expires_at
 ) VALUES (
     @user_id, @headline, @bio, @location, @experience,
     @contact_email, @contact_phone, @contact_url,
-    @visibility, @details_visibility, @contact_visibility
+    @visibility, @details_visibility, @contact_visibility,
+    @open_to_work, @availability_note, sqlc.narg('availability_expires_at')
 )
 ON CONFLICT (user_id) DO UPDATE SET
+    open_to_work = EXCLUDED.open_to_work,
+    availability_note = EXCLUDED.availability_note,
+    availability_expires_at = EXCLUDED.availability_expires_at,
     headline = EXCLUDED.headline,
     bio = EXCLUDED.bio,
     location = EXCLUDED.location,
@@ -79,6 +84,16 @@ SELECT
     (CASE WHEN p.contact_rank <= @viewer_rank::smallint THEN p.contact_email ELSE '' END)::text AS contact_email,
     (CASE WHEN p.contact_rank <= @viewer_rank::smallint THEN p.contact_phone ELSE '' END)::text AS contact_phone,
     (CASE WHEN p.contact_rank <= @viewer_rank::smallint THEN p.contact_url ELSE '' END)::text AS contact_url,
+    -- Available only while the statement is current: past its expiry this is
+    -- false with nothing about the profile changed.
+    COALESCE(p.details_rank <= @viewer_rank::smallint
+             AND p.open_to_work AND p.availability_expires_at > NOW(), FALSE)::boolean AS available,
+    (CASE WHEN p.details_rank <= @viewer_rank::smallint
+               AND p.open_to_work AND p.availability_expires_at > NOW()
+          THEN p.availability_note ELSE '' END)::text AS availability_note,
+    (CASE WHEN p.details_rank <= @viewer_rank::smallint
+               AND p.open_to_work AND p.availability_expires_at > NOW()
+          THEN p.availability_expires_at ELSE 'epoch'::timestamptz END)::timestamptz AS available_until,
     p.updated_at
 FROM users u
 JOIN directory_profiles p ON p.user_id = u.id

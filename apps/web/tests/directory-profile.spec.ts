@@ -5,6 +5,7 @@ import {
   fitsThePhone,
   founderWithDirectory,
   onlyInDirectoryProjects,
+  people,
   signInAs,
 } from "./directory.helpers";
 
@@ -19,7 +20,9 @@ import {
 
 onlyInDirectoryProjects();
 
-const developer = `amani${Date.now().toString(36)}`;
+const developer = people.developer;
+
+test.describe.configure({ mode: "serial" });
 
 test("a profile is created, edited and restricted on a phone", async ({ page, request }) => {
   const founder = await founderWithDirectory(request);
@@ -95,7 +98,7 @@ test("a profile is created, edited and restricted on a phone", async ({ page, re
 test("a company is created, and lists only people who accepted", async ({ page, request }) => {
   await founderWithDirectory(request);
   await account(request, developer);
-  const owner = await account(request, `owner${Date.now().toString(36)}`);
+  const owner = await account(request, people.client);
   const slug = `kilima-${Date.now().toString(36)}`;
 
   // The owner makes the company and invites the developer, over the API.

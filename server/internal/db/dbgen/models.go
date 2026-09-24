@@ -124,22 +124,25 @@ type Credential struct {
 }
 
 type DirectoryProfile struct {
-	UserID            uuid.UUID
-	Headline          string
-	Bio               string
-	Location          string
-	Experience        string
-	ContactEmail      string
-	ContactPhone      string
-	ContactUrl        string
-	Visibility        string
-	DetailsVisibility string
-	ContactVisibility string
-	ProfileRank       *int16
-	DetailsRank       *int16
-	ContactRank       *int16
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	UserID                uuid.UUID
+	Headline              string
+	Bio                   string
+	Location              string
+	Experience            string
+	ContactEmail          string
+	ContactPhone          string
+	ContactUrl            string
+	Visibility            string
+	DetailsVisibility     string
+	ContactVisibility     string
+	ProfileRank           *int16
+	DetailsRank           *int16
+	ContactRank           *int16
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	OpenToWork            bool
+	AvailabilityNote      string
+	AvailabilityExpiresAt *time.Time
 }
 
 type EmailConfirmation struct {
@@ -320,6 +323,15 @@ type PostingRestriction struct {
 	LiftedBy            *uuid.UUID
 }
 
+type ProfileSkill struct {
+	UserID      uuid.UUID
+	SkillID     uuid.UUID
+	Description string
+	Position    int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type PushSubscription struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -490,6 +502,23 @@ type Session struct {
 	LastSeenAt time.Time
 	ExpiresAt  time.Time
 	RevokedAt  *time.Time
+}
+
+type Skill struct {
+	ID          uuid.UUID
+	Name        string
+	NameFolded  string
+	Description string
+	Status      string
+	ProposedBy  *uuid.UUID
+	ReviewedBy  *uuid.UUID
+	ReviewedAt  *time.Time
+	CreatedAt   time.Time
+}
+
+type SkillAlias struct {
+	AliasFolded string
+	SkillID     uuid.UUID
 }
 
 type TypingIndicator struct {

@@ -47,6 +47,16 @@ const (
 	maxItemTitle    = 120
 	maxItemURL      = 500
 	maxItemText     = 500
+	maxNote         = 200
+
+	/*
+		maxAvailability is how far ahead somebody may say they are available.
+
+		Six months: long enough that nobody has to keep renewing it, short
+		enough that a profile somebody stopped looking after stops advertising
+		them within a season rather than indefinitely.
+	*/
+	maxAvailability = 183 * 24 * time.Hour
 )
 
 // ProfileInput is everything a person may say in their own profile.
@@ -67,6 +77,14 @@ type ProfileInput struct {
 	ContactVisibility Visibility
 
 	Portfolio []PortfolioInput
+	Skills    []SkillInput
+
+	// OpenToWork is whether they are looking, until AvailableUntil. Being open
+	// requires an expiry: a statement about availability that never lapses is
+	// the stale profile the expiry exists to prevent.
+	OpenToWork       bool
+	AvailabilityNote string
+	AvailableUntil   *time.Time
 }
 
 // PortfolioInput is one link. An item with an ID is one already on the
@@ -126,6 +144,15 @@ type Profile struct {
 
 	Portfolio []PortfolioItem
 	Companies []CompanyReference
+	Skills    []SkillClaim
+
+	// OpenToWork and AvailableUntil are what the owner stated, and are read
+	// only for the owner. Available is whether that statement is current —
+	// open, and not yet expired — which is all a viewer is told.
+	OpenToWork       bool
+	AvailableUntil   *time.Time
+	Available        bool
+	AvailabilityNote string
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -154,23 +181,34 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, input ProfileInput
 	queries := s.queries.WithTx(tx)
 
 	created, err := queries.SaveDirectoryProfile(ctx, dbgen.SaveDirectoryProfileParams{
-		UserID:            userID,
-		Headline:          input.Headline,
-		Bio:               input.Bio,
-		Location:          input.Location,
-		Experience:        input.Experience,
-		ContactEmail:      input.ContactEmail,
-		ContactPhone:      input.ContactPhone,
-		ContactUrl:        input.ContactURL,
-		Visibility:        string(input.Visibility),
-		DetailsVisibility: string(input.DetailsVisibility),
-		ContactVisibility: string(input.ContactVisibility),
+		UserID:                userID,
+		Headline:              input.Headline,
+		Bio:                   input.Bio,
+		Location:              input.Location,
+		Experience:            input.Experience,
+		ContactEmail:          input.ContactEmail,
+		ContactPhone:          input.ContactPhone,
+		ContactUrl:            input.ContactURL,
+		Visibility:            string(input.Visibility),
+		DetailsVisibility:     string(input.DetailsVisibility),
+		ContactVisibility:     string(input.ContactVisibility),
+		OpenToWork:            input.OpenToWork,
+		AvailabilityNote:      input.AvailabilityNote,
+		AvailabilityExpiresAt: input.AvailableUntil,
 	})
 	if err != nil {
 		return false, fmt.Errorf("save a profile: %w", err)
 	}
 
 	if err := savePortfolio(ctx, queries, userID, input.Portfolio); err != nil {
+		return false, err
+	}
+
+	skills, err := s.resolveSkills(ctx, queries, userID, input.Skills)
+	if err != nil {
+		return false, err
+	}
+	if err := saveSkills(ctx, queries, userID, skills); err != nil {
 		return false, err
 	}
 
@@ -261,8 +299,24 @@ func (s *Service) Own(ctx context.Context, userID uuid.UUID) (Profile, error) {
 		ContactEmail:      row.ContactEmail,
 		ContactPhone:      row.ContactPhone,
 		ContactURL:        row.ContactUrl,
-		CreatedAt:         row.CreatedAt,
-		UpdatedAt:         row.UpdatedAt,
+		OpenToWork:        row.OpenToWork,
+		AvailableUntil:    row.AvailabilityExpiresAt,
+		AvailabilityNote:  row.AvailabilityNote,
+		Available: row.OpenToWork && row.AvailabilityExpiresAt != nil &&
+			row.AvailabilityExpiresAt.After(time.Now()),
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}
+
+	skills, err := s.queries.ListOwnProfileSkills(ctx, userID)
+	if err != nil {
+		return Profile{}, fmt.Errorf("read a profile's skills: %w", err)
+	}
+	for _, skill := range skills {
+		profile.Skills = append(profile.Skills, SkillClaim{
+			ID: skill.SkillID, Name: skill.Name, Status: SkillStatus(skill.Status),
+			Description: skill.Description, UpdatedAt: skill.UpdatedAt,
+		})
 	}
 
 	items, err := s.queries.ListPortfolioItems(ctx, userID)
@@ -314,7 +368,26 @@ func (s *Service) View(ctx context.Context, username string, rank Rank) (Profile
 		ContactEmail: row.ContactEmail,
 		ContactPhone: row.ContactPhone,
 		ContactURL:   row.ContactUrl,
+		Available:    row.Available,
 		UpdatedAt:    row.UpdatedAt,
+	}
+	if row.Available {
+		profile.AvailabilityNote = row.AvailabilityNote
+		until := row.AvailableUntil
+		profile.AvailableUntil = &until
+	}
+
+	skills, err := s.queries.ViewProfileSkills(ctx, dbgen.ViewProfileSkillsParams{
+		UserID: row.UserID, ViewerRank: int16(rank),
+	})
+	if err != nil {
+		return Profile{}, fmt.Errorf("read a profile's skills: %w", err)
+	}
+	for _, skill := range skills {
+		profile.Skills = append(profile.Skills, SkillClaim{
+			ID: skill.SkillID, Name: skill.Name, Status: SkillActive,
+			Description: skill.Description, UpdatedAt: skill.UpdatedAt,
+		})
 	}
 
 	// The portfolio and companies belong to the details section, and each
@@ -500,6 +573,24 @@ func normalise(input *ProfileInput) error {
 	}
 	if input.ContactURL != "" && !isWebLink(input.ContactURL) {
 		return invalid("contactUrl", "must be an http or https link")
+	}
+
+	input.AvailabilityNote = strings.TrimSpace(input.AvailabilityNote)
+	if utf8.RuneCountInString(input.AvailabilityNote) > maxNote {
+		return invalid("availabilityNote", fmt.Sprintf("at most %d characters", maxNote))
+	}
+	if input.OpenToWork {
+		now := time.Now()
+		switch {
+		case input.AvailableUntil == nil:
+			return invalid("availableUntil", "say until when; availability has to lapse")
+		case !input.AvailableUntil.After(now):
+			return invalid("availableUntil", "must be in the future")
+		case input.AvailableUntil.After(now.Add(maxAvailability)):
+			return invalid("availableUntil", "at most six months ahead")
+		}
+	} else {
+		input.AvailableUntil = nil
 	}
 
 	if len(input.Portfolio) > maxPortfolio {

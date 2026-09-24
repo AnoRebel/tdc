@@ -545,6 +545,24 @@ Moderating the directory takes **`directory.profile.manage`**, a server-scoped
 permission to grant to whichever role your moderators hold. See
 [the directory](directory.md#moderation) for what it allows and what it records.
 
+**The skill vocabulary** starts with about fifty common skills and their usual
+other spellings. It grows through the review queue: grant
+**`directory.skills.manage`** to whoever should decide what counts as a skill,
+and anything they propose goes straight in, while everybody else's proposals
+wait for them. Seeding a longer list is a matter of that person proposing each
+one — `POST /api/directory/skills` with a `name` — which is scriptable.
+
+**How fast the directory may be read** is policy, changed like any other
+setting:
+
+| Setting                                | Default | What it limits                                                |
+| -------------------------------------- | ------- | ------------------------------------------------------------- |
+| `directory.reads_per_minute`           | 30      | searches and profile views per signed-in person per minute    |
+| `directory.anonymous_reads_per_minute` | 10      | the same, per address, for people browsing without signing in |
+
+Both must be at least one; an operator who wants the directory unreadable
+turns it off. A page of results is always twenty at most, whatever these say.
+
 ## TLS
 
 **The server does not terminate TLS.** It speaks plain HTTP on its configured

@@ -12,6 +12,21 @@ import { expect, type APIRequestContext, type Page, test } from "@playwright/tes
 
 export const password = "correct horse battery staple";
 
+/*
+The people every directory check shares, named once per run.
+
+Shared across files rather than made per check, because the server allows five
+registrations an hour from one address and the checks between them need more
+than five people otherwise. Fresh per run, so a second run against the same
+server does not find last run's profiles already written.
+*/
+const run = Date.now().toString(36);
+export const people = {
+  developer: `amani${run}`,
+  client: `baraka${run}`,
+  closed: `zawadi${run}`,
+};
+
 /** Skips a spec unless one of the directory projects is running it. */
 export function onlyInDirectoryProjects() {
   // eslint-disable-next-line no-empty-pattern -- Playwright passes fixtures first
@@ -39,7 +54,7 @@ export async function tokenFor(request: APIRequestContext, username: string) {
  */
 export async function founderWithDirectory(request: APIRequestContext) {
   await request.post("/api/setup", { data: { username: "founder", password } });
-  const founder = await tokenFor(request, "founder");
+  const founder = await account(request, "founder");
   const toggled = await request.put("/api/admin/features/directory", {
     headers: founder,
     data: { enabled: true },
@@ -56,13 +71,31 @@ export async function founderWithDirectory(request: APIRequestContext) {
  * that re-registered everybody per test would spend it in one run.
  */
 export async function account(request: APIRequestContext, username: string) {
+  const known = tokens.get(username);
+  if (known) return known;
+
   const existing = await request.post("/api/auth/signin", { data: { username, password } });
-  if (existing.ok()) return { Authorization: `Bearer ${(await existing.json()).token}` };
+  if (existing.ok()) {
+    const token = { Authorization: `Bearer ${(await existing.json()).token}` };
+    tokens.set(username, token);
+    return token;
+  }
 
   const registered = await request.post("/api/auth/register", { data: { username, password } });
   expect(registered.status(), `registering ${username}: ${await registered.text()}`).toBe(201);
-  return tokenFor(request, username);
+  const token = await tokenFor(request, username);
+  tokens.set(username, token);
+  return token;
 }
+
+/*
+Tokens already issued in this run, by username.
+
+Kept so a second check needing the same person reuses their session: sign-ins
+are limited per account and per address, and a suite that signed in afresh for
+every check would spend the allowance on repetition.
+*/
+const tokens = new Map<string, { Authorization: string }>();
 
 /** Signs somebody in through the form, and dismisses the introduction. */
 export async function signInAs(page: Page, username: string) {

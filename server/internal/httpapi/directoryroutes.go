@@ -12,6 +12,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
+	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/directory"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/settings"
@@ -107,10 +108,45 @@ func (api *directoryAPI) mount() {
 		hid is only possible on a route that requires the permission and
 		records its use.
 	*/
-	moderation := directoryGroup.Group("/moderation",
+	moderation := directoryGroup.Group("/moderation", requireAuthentication)
+	moderation.GET("/profiles/:username", api.handleModeratorViewProfile,
 		requirePermission(authz.PermDirectoryProfileManage))
-	moderation.GET("/profiles/:username", api.handleModeratorViewProfile)
-	moderation.PUT("/profiles/:username", api.handleModerateProfile)
+	moderation.PUT("/profiles/:username", api.handleModerateProfile,
+		requirePermission(authz.PermDirectoryProfileManage))
+
+	// The rest of the directory, from files of their own.
+	api.mountSkills(directoryGroup, moderation)
+	api.mountSearch(directoryGroup)
+}
+
+/*
+withinReadLimit refuses a read of the directory past the operator's rate.
+
+Per person when signed in, per address otherwise. Every read counts the same —
+a search, a profile, a company — because walking profiles one by one is the
+same enumeration as paging through results.
+*/
+func (api *directoryAPI) withinReadLimit(c *echo.Context) error {
+	ctx := c.Request().Context()
+	key := "directory:read:address:" + requestIP(c).String()
+	setting := settings.DirectoryAnonymousReadsPerMinute
+	if user, ok := currentUser(c); ok {
+		key = "directory:read:user:" + user.ID.String()
+		setting = settings.DirectoryReadsPerMinute
+	}
+
+	limit := cache.RateLimit{Attempts: int(api.limitFor(ctx, setting)), Window: time.Minute}
+	if limit.Attempts < 1 {
+		limit.Attempts = 1
+	}
+	decision, err := api.limiter.Allow(ctx, key, limit)
+	if err != nil {
+		return err
+	}
+	if !decision.Allowed {
+		return retryAfter(c, decision.RetryAfter)
+	}
+	return nil
 }
 
 /*
@@ -179,8 +215,21 @@ type profileView struct {
 
 	Portfolio []portfolioView  `json:"portfolio,omitempty"`
 	Companies []companyRefView `json:"companies,omitempty"`
+	Skills    []skillClaimView `json:"skills,omitempty"`
+
+	// Available is present only when true: whether somebody is not looking,
+	// or has hidden whether they are, is not something to announce.
+	Available        bool   `json:"available,omitempty"`
+	AvailabilityNote string `json:"availabilityNote,omitempty"`
+	AvailableUntil   string `json:"availableUntil,omitempty"`
 
 	UpdatedAt string `json:"updatedAt"`
+}
+
+type skillClaimView struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
 }
 
 type portfolioView struct {
@@ -222,6 +271,16 @@ func (api *directoryAPI) viewOf(profile directory.Profile) profileView {
 	}
 	for _, company := range profile.Companies {
 		view.Companies = append(view.Companies, companyRefView(company))
+	}
+	for _, skill := range profile.Skills {
+		view.Skills = append(view.Skills, skillClaimView{
+			ID: skill.ID.String(), Name: skill.Name, Description: skill.Description,
+		})
+	}
+	if profile.Available && profile.AvailableUntil != nil {
+		view.Available = true
+		view.AvailabilityNote = profile.AvailabilityNote
+		view.AvailableUntil = profile.AvailableUntil.UTC().Format(time.RFC3339)
 	}
 	return view
 }
@@ -322,6 +381,9 @@ func (api *directoryAPI) handleViewProfile(c *echo.Context) error {
 	rank, _, allowed := api.viewerRank(c)
 	if !allowed {
 		return noProfile()
+	}
+	if err := api.withinReadLimit(c); err != nil {
+		return err
 	}
 
 	profile, err := api.directory.View(c.Request().Context(), c.Param("username"), rank)
@@ -528,6 +590,9 @@ func (api *directoryAPI) handleViewCompany(c *echo.Context) error {
 	rank, viewer, allowed := api.viewerRank(c)
 	if !allowed {
 		return echo.NewHTTPError(http.StatusNotFound, directory.ErrNoCompany.Error())
+	}
+	if err := api.withinReadLimit(c); err != nil {
+		return err
 	}
 	company, err := api.directory.ViewCompany(c.Request().Context(), c.Param("slug"), rank, viewer)
 	if err != nil {

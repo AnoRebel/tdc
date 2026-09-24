@@ -30,6 +30,7 @@ type Querier interface {
 	// alone rather than reset to zero, which would resend the room's whole history,
 	// but its address is refreshed so an operator can correct one in place.
 	AddRoomPeer(ctx context.Context, arg AddRoomPeerParams) error
+	AddSkillAlias(ctx context.Context, arg AddSkillAliasParams) error
 	AdoptForeignRoom(ctx context.Context, arg AdoptForeignRoomParams) (Room, error)
 	// Records how far a peer has been told.
 	//
@@ -41,6 +42,7 @@ type Querier interface {
 	AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error)
 	// A reply carries the identifier of the message that started the thread.
 	AppendThreadedEvent(ctx context.Context, arg AppendThreadedEventParams) (Event, error)
+	ApproveSkill(ctx context.Context, arg ApproveSkillParams) (int64, error)
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	// Binds an attachment to the message that carries it.
@@ -170,6 +172,10 @@ type Querier interface {
 	DeleteLapsedBans(ctx context.Context) (int64, error)
 	// Everything the owner did not send back, which is how an item is removed.
 	DeletePortfolioItemsExcept(ctx context.Context, arg DeletePortfolioItemsExceptParams) error
+	DeleteProfileSkillsExcept(ctx context.Context, arg DeleteProfileSkillsExceptParams) error
+	// Rejecting, or the last step of merging. The proposal leaves every profile
+	// it was on, by cascade.
+	DeleteProposedSkill(ctx context.Context, id uuid.UUID) (int64, error)
 	// Scoped to the owner, so one person cannot unsubscribe another's device.
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) (int64, error)
 	// Used when the push service reports a subscription gone, where the endpoint
@@ -291,6 +297,7 @@ type Querier interface {
 	GetServerConfigValue(ctx context.Context, key string) (ServerConfig, error)
 	GetServerStatus(ctx context.Context, key string) (ServerStatus, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error)
+	GetSkill(ctx context.Context, id uuid.UUID) (Skill, error)
 	GetTOTPCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	// Which introductions this person has already been given.
 	//
@@ -311,6 +318,7 @@ type Querier interface {
 	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
 	InsertPortfolioItem(ctx context.Context, arg InsertPortfolioItemParams) error
+	InsertSkill(ctx context.Context, arg InsertSkillParams) (Skill, error)
 	// Issuing a new one invalidates the old, so somebody who asks twice is not left
 	// holding two working links.
 	InvalidateEmailConfirmations(ctx context.Context, userID uuid.UUID) (int64, error)
@@ -382,6 +390,8 @@ type Querier interface {
 	ListOpenReports(ctx context.Context, limit int32) ([]Report, error)
 	// Attachments that never became part of a message, oldest first.
 	ListOrphanedAttachments(ctx context.Context, arg ListOrphanedAttachmentsParams) ([]Attachment, error)
+	// Somebody's own skills, proposals included, so they can see what is waiting.
+	ListOwnProfileSkills(ctx context.Context, userID uuid.UUID) ([]ListOwnProfileSkillsRow, error)
 	ListPasskeysForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	// Invitations still unanswered. Only a company's administrators see these,
 	// and they already know: they sent them.
@@ -464,6 +474,11 @@ type Querier interface {
 	ListServerInvitations(ctx context.Context, limit int32) ([]Invitation, error)
 	ListServerStatuses(ctx context.Context) ([]ServerStatus, error)
 	ListSessionsForUser(ctx context.Context, userID uuid.UUID) ([]Session, error)
+	// Proposals waiting for a decision, oldest first, with who asked.
+	ListSkillQueue(ctx context.Context) ([]ListSkillQueueRow, error)
+	// The vocabulary for somebody choosing: every active skill matching what they
+	// typed, and their own proposals, which only they can attach.
+	ListSkills(ctx context.Context, arg ListSkillsParams) ([]Skill, error)
 	ListThreadReplies(ctx context.Context, threadRootID *string) ([]Event, error)
 	// How many replies each of a set of messages has, and when the latest arrived,
 	// so a timeline can show "3 replies" without fetching them.
@@ -516,6 +531,10 @@ type Querier interface {
 	// visibility can be lowered in the same change, so abusive content can be
 	// taken out of the directory while it is dealt with.
 	ModerateDirectoryProfile(ctx context.Context, arg ModerateDirectoryProfileParams) error
+	// Everybody who had the proposal gets the skill it was merged into, keeping
+	// what they wrote about it. Anybody who already had both keeps the one they
+	// already had.
+	MoveProfileSkills(ctx context.Context, arg MoveProfileSkillsParams) error
 	// Allocates the next position in a room's total order.
 	//
 	// The UPDATE takes a row lock, so two concurrent writers serialise here rather
@@ -584,6 +603,8 @@ type Querier interface {
 	// Only an open report can be resolved, so two moderators acting at once do not
 	// both record an outcome.
 	ResolveReport(ctx context.Context, arg ResolveReportParams) (Report, error)
+	// A name, or another spelling of one, to the skill it means.
+	ResolveSkill(ctx context.Context, folded string) (Skill, error)
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RestrictPosting(ctx context.Context, arg RestrictPostingParams) (PostingRestriction, error)
 	// An operator's decision to try an abandoned peer again.
@@ -611,6 +632,9 @@ type Querier interface {
 	// person saving twice from two tabs cannot end up with two profiles or with
 	// one half-written.
 	SaveDirectoryProfile(ctx context.Context, arg SaveDirectoryProfileParams) (bool, error)
+	// updated_at moves only when the description does, so a verification of the
+	// claim can tell an edit from a reordering.
+	SaveProfileSkill(ctx context.Context, arg SaveProfileSkillParams) error
 	// Records where a device can be reached.
 	//
 	// A browser resubscribing returns the same endpoint, so this updates rather
@@ -618,6 +642,7 @@ type Querier interface {
 	// notification twice. The failure count resets, since a resubscription is the
 	// browser saying this endpoint works.
 	SavePushSubscription(ctx context.Context, arg SavePushSubscriptionParams) (PushSubscription, error)
+	SearchDirectoryProfiles(ctx context.Context, arg SearchDirectoryProfilesParams) ([]SearchDirectoryProfilesRow, error)
 	// Full-text search, restricted to rooms the caller is in.
 	//
 	// The membership join is the authorisation, done in the query rather than by
@@ -694,6 +719,9 @@ type Querier interface {
 	// conversation share a room by definition, which would make 'shared' mean
 	// 'anyone who has ever written to me'.
 	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
+	// Whether somebody may put a skill on their own profile: any active skill,
+	// and their own proposals.
+	SkillAttachable(ctx context.Context, arg SkillAttachableParams) (bool, error)
 	SpendEmailConfirmation(ctx context.Context, tokenHash []byte) (EmailConfirmation, error)
 	SpendEmailedCode(ctx context.Context, arg SpendEmailedCodeParams) (PendingSignIn, error)
 	SpendRecoveryCode(ctx context.Context, arg SpendRecoveryCodeParams) (Credential, error)
@@ -758,6 +786,9 @@ type Querier interface {
 	// associations only, with companies the viewer may see, on a profile whose
 	// details the viewer may see — the companies are part of what it says.
 	ViewProfileCompanies(ctx context.Context, arg ViewProfileCompaniesParams) ([]ViewProfileCompaniesRow, error)
+	// A profile's skills as a viewer may see them: active ones only, and only
+	// when the viewer may see what the profile says.
+	ViewProfileSkills(ctx context.Context, arg ViewProfileSkillsParams) ([]ViewProfileSkillsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

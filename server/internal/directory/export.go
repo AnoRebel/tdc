@@ -49,6 +49,26 @@ type ProfileDocument struct {
 	DetailsVisibility Visibility          `json:"detailsVisibility"`
 	ContactVisibility Visibility          `json:"contactVisibility"`
 	Portfolio         []PortfolioDocument `json:"portfolio"`
+	Skills            []SkillDocument     `json:"skills"`
+	// OpenToWork is the stated availability, true until AvailableUntil.
+	OpenToWork       bool       `json:"openToWork"`
+	AvailabilityNote string     `json:"availabilityNote"`
+	AvailableUntil   *time.Time `json:"availableUntil,omitempty"`
+}
+
+/*
+SkillDocument is one skill on a profile over the API.
+
+Sent by identifier or by name — a name the vocabulary knows, including another
+spelling of it — so an export taken to a server whose identifiers differ still
+restores. Status is only ever read: "proposed" marks a skill still waiting for
+review, which only its owner sees.
+*/
+type SkillDocument struct {
+	ID          *uuid.UUID `json:"id,omitempty"`
+	Name        string     `json:"name"`
+	Status      string     `json:"status,omitempty"`
+	Description string     `json:"description"`
 }
 
 // PortfolioDocument is one portfolio link over the API. The identifier is
@@ -74,6 +94,13 @@ func (d ProfileDocument) Input() ProfileInput {
 		ContactEmail: d.ContactEmail, ContactPhone: d.ContactPhone, ContactURL: d.ContactURL,
 		Visibility: d.Visibility, DetailsVisibility: d.DetailsVisibility,
 		ContactVisibility: d.ContactVisibility,
+		OpenToWork:        d.OpenToWork, AvailabilityNote: d.AvailabilityNote,
+		AvailableUntil: d.AvailableUntil,
+	}
+	for _, skill := range d.Skills {
+		input.Skills = append(input.Skills, SkillInput{
+			ID: skill.ID, Name: skill.Name, Description: skill.Description,
+		})
 	}
 	for _, item := range d.Portfolio {
 		input.Portfolio = append(input.Portfolio, PortfolioInput(item))
@@ -89,6 +116,26 @@ func (p Profile) Document() ProfileDocument {
 		Visibility: p.Visibility, DetailsVisibility: p.DetailsVisibility,
 		ContactVisibility: p.ContactVisibility,
 		Portfolio:         []PortfolioDocument{},
+		Skills:            []SkillDocument{},
+		AvailabilityNote:  p.AvailabilityNote,
+	}
+	/*
+		Availability as it stands now rather than as it was stated.
+
+		A statement that has lapsed reads as not open, so the document can
+		always be saved back: sending an expiry already in the past would be
+		refused, and an export that cannot be restored is not portable.
+	*/
+	if p.Available && p.AvailableUntil != nil {
+		until := p.AvailableUntil.UTC()
+		document.OpenToWork = true
+		document.AvailableUntil = &until
+	}
+	for _, skill := range p.Skills {
+		id := skill.ID
+		document.Skills = append(document.Skills, SkillDocument{
+			ID: &id, Name: skill.Name, Status: string(skill.Status), Description: skill.Description,
+		})
 	}
 	for _, item := range p.Portfolio {
 		id := item.ID

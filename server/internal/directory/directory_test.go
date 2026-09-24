@@ -25,7 +25,11 @@ func newDirectory(t *testing.T) (*directory.Service, *db.Pool) {
 		t.Fatalf("open: %v", err)
 	}
 	clean := func() {
-		for _, statement := range []string{"DELETE FROM company_profiles", "DELETE FROM users"} {
+		for _, statement := range []string{
+			"DELETE FROM company_profiles",
+			"DELETE FROM skills WHERE status = 'proposed' OR reviewed_at IS NOT NULL",
+			"DELETE FROM users",
+		} {
 			if _, err := pool.Exec(context.Background(), statement); err != nil {
 				t.Errorf("clean: %v", err)
 			}

@@ -1,5 +1,10 @@
 package settings
 
+import (
+	"fmt"
+	"strconv"
+)
+
 /*
 The directory's switch.
 
@@ -15,9 +20,55 @@ and restores what was there.
 */
 const FeatureDirectory Feature = "directory"
 
+/*
+How fast the directory may be read.
+
+Searching and opening profiles are limited per person, and per address for
+somebody not signed in, because the directory's promise is that it is a place
+to look for somebody rather than a way to copy everybody. The page-size ceiling
+stops the table being taken in one request; these stop it being walked quickly
+in many.
+
+The defaults are generous for a person and tight for a program: thirty a minute
+is more than anybody browsing will reach, and a list of every profile at that
+rate takes long enough to notice.
+*/
+const (
+	DirectoryReadsPerMinute          Key = "directory.reads_per_minute"
+	DirectoryAnonymousReadsPerMinute Key = "directory.anonymous_reads_per_minute"
+)
+
 func init() {
 	defineFeature(FeatureDirectory, false,
 		"The developer and company directory, enquiries and engagements. Nothing is listed while this is off.")
+
+	define(map[Key]definition{
+		DirectoryReadsPerMinute: {
+			fallback:    "30",
+			description: "Directory searches and profile views allowed per person per minute.",
+			validate:    atLeastOne,
+		},
+		DirectoryAnonymousReadsPerMinute: {
+			fallback:    "10",
+			description: "Directory searches and profile views allowed per address per minute, for people not signed in.",
+			validate:    atLeastOne,
+		},
+	})
+}
+
+/*
+atLeastOne accepts a positive whole number.
+
+Not nonNegative: for a limit, zero reads as "no limit" elsewhere in the
+settings, and a directory with no read limit is the enumeration the limit
+exists to stop. An operator who wants the directory unreadable turns it off.
+*/
+func atLeastOne(value string) error {
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 1 {
+		return fmt.Errorf("%w: expected a whole number of at least 1", ErrInvalidValue)
+	}
+	return nil
 }
 
 // defineFeature adds a toggle from a feature's own file.

@@ -658,6 +658,63 @@
       "removeTitle": "Remove {name}?",
       "removeDetail": "They stop being listed at once, on the company's page and on their profile.",
       "remove": "Remove"
+    },
+    "skills": {
+      "title": "Skills",
+      "hint": "Chosen from the server's list, so people searching for a skill find everybody who has it.",
+      "find": "Find a skill",
+      "matches": "{count} matching skills",
+      "describe": "What you have done with it (optional)",
+      "describeWhich": "What you have done with {skill}",
+      "remove": "Remove {skill}",
+      "waiting": "Waiting for review",
+      "notInVocabulary": "{skill} is not on the list yet.",
+      "propose": "Propose it"
+    },
+    "availability": {
+      "title": "Availability",
+      "openToWork": "I am open to work",
+      "closedHint": "Say so when you are looking. It lapses on its own, so a profile you stop looking after does not keep saying you are free.",
+      "forHowLong": "For how long",
+      "oneWeek": "One week",
+      "twoWeeks": "Two weeks",
+      "oneMonth": "One month",
+      "threeMonths": "Three months",
+      "sixMonths": "Six months",
+      "until": "Until {date}",
+      "note": "What kind of work",
+      "noteHint": "For example, short contracts or part time.",
+      "available": "Available for work"
+    },
+    "search": {
+      "label": "Search the directory",
+      "query": "Name or words",
+      "queryHint": "A name, or words from a headline",
+      "skill": "Skill",
+      "company": "Company",
+      "availableOnly": "Available for work only",
+      "search": "Search",
+      "results": "Results",
+      "more": "Show more",
+      "empty": "Nobody is in the directory yet",
+      "emptyHint": "People appear here once they create a profile they let you see.",
+      "nobodyMatches": "Nobody matches",
+      "nobodyMatchesHint": "Only what people chose to show you can be searched.",
+      "slowDown": "That is a lot of searching in a short time. Wait a minute and try again."
+    },
+    "review": {
+      "title": "Review",
+      "skills": "Proposed skills",
+      "skillsHint": "Approve a skill to add it to the list, merge it into one the list already has under another name, or reject it. Each decision is recorded.",
+      "refused": "You cannot review skills.",
+      "nothingWaiting": "Nothing is waiting",
+      "proposedBy": "Proposed by {who} on {date} · on {count} profiles",
+      "approve": "Approve",
+      "merge": "Merge into another",
+      "mergeInto": "Merge {skill} into…",
+      "reject": "Reject",
+      "rejectTitle": "Reject {skill}?",
+      "why": "Why? This is kept with the record."
     }
   }
 }

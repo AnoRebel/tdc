@@ -46,6 +46,8 @@ A profile can say:
   a profile is read on phones over metered data. Only `http` and `https` links
   are accepted;
 - **contact details** — an email address, a phone number and a website;
+- your **skills**, each with what you have done with it (below);
+- whether you are **available for work**, and what kind (below);
 - the **companies** you have agreed to be listed by (below).
 
 Everything is optional. A profile with nothing but a visibility setting is a
@@ -65,8 +67,8 @@ The three settings govern:
 
 1. **The profile as a whole** — whether it appears in the directory at all.
    Defaults to _Members_.
-2. **What you wrote** — headline, location, experience, about, portfolio and
-   companies. Defaults to _Members_.
+2. **What you wrote** — headline, location, experience, about, portfolio,
+   skills, availability and companies. Defaults to _Members_.
 3. **Your contact details.** Separate, because being findable by strangers and
    being reachable by them are different things. Defaults to **_Only you_**, so
    a profile saved without touching this setting publishes no contact details
@@ -90,6 +92,45 @@ who hid theirs look the same from outside.
 person, a person with no profile, a profile set to _Only you_, and a
 members-only profile asked for by somebody not signed in all receive the same
 `404` with the same body.
+
+### Skills
+
+Skills come from a list the server keeps — the vocabulary — rather than being
+typed freely, because free text is how one skill becomes five spellings nobody
+can search for. The vocabulary also knows other spellings: "golang" is Go,
+"postgres" is PostgreSQL, "k8s" is Kubernetes. Typing either finds the one
+entry, and searching for either finds everybody who has it.
+
+A skill that is not on the list can be **proposed**. It goes on your profile
+straight away, marked _Waiting for review_, and:
+
+- only you see it there — other people see your profile without it;
+- nobody can find you by it;
+- nobody else can add it to their profile.
+
+A reviewer then approves it (it joins the list, and becomes searchable for
+everybody who has it), rejects it (it leaves every profile it was on), or
+decides it is a skill the list already has under another name and merges it —
+your profile then carries that skill, keeping what you wrote about it, and your
+spelling becomes another name for it.
+
+Each skill on your profile can carry a line on what you have done with it —
+"six years, mostly payment integrations". That line is your claim about the
+skill, and it is what a moderator checks if they verify it.
+
+A profile holds at most thirty skills.
+
+### Availability
+
+You can say you are **open to work**, what kind of work you want, and for how
+long — a week to six months. It has to lapse: a statement that never expired is
+how a profile somebody abandoned would go on advertising them indefinitely.
+Once the time passes you are simply not shown as available, with nothing else
+about your profile changed, until you say so again.
+
+**Availability has nothing to do with whether you are online.** It is a
+statement about work, not a reading of your presence: you can hide your
+presence and be listed as available, or be online all day and not looking.
 
 ### Deleting it
 
@@ -141,6 +182,36 @@ to this server after deleting, or to another — to recreate the profile. The
 portfolio identifiers are this server's; sent to a server that does not know
 them, each link is simply added as new.
 
+## Finding people
+
+**Directory** in the sidebar lists the profiles you may see, those currently
+available first and then the most recently updated. It can be narrowed by any
+of:
+
+- a **name, or words** — matched against names, and against headlines and
+  about sections you are allowed to read;
+- a **skill** — by its name or any other spelling the vocabulary knows;
+- **available for work only**;
+- a **location**;
+- a **company** — its address or part of its name.
+
+**A filter only matches what a person lets you see.** Somebody whose location is
+hidden from you is not found by searching for their town, because finding them
+that way would tell you where they are. A filter on a hidden detail never
+matches, rather than matching and hiding the result.
+
+Results come **twenty to a page**, and there is no way to ask for more at once.
+Paging stops after twenty-five pages however many profiles match. Searching and
+opening profiles are also **rate limited** — thirty a minute for somebody
+signed in, ten a minute for each address browsing without signing in, both
+adjustable by the operator. Together these are what keeps the directory a place
+to look for somebody rather than a way to copy everybody out of it.
+
+Member search — the search box at the top of the sidebar — is not changed by
+the directory. It finds people by name and address as it always has, returns
+nothing a directory profile says, and describes somebody with a profile exactly
+as it describes somebody without one.
+
 ## Companies
 
 Anybody may create a company profile — a name, a description, a location, and
@@ -177,6 +248,31 @@ A moderator holding **`directory.profile.manage`** can:
 
 Nobody else can change a profile but its owner.
 
+### Reviewing skills
+
+A reviewer holding **`directory.skills.manage`** works through the proposed
+skills under **Directory → Review**. For each one:
+
+- **Approve** — it joins the vocabulary. Anybody may add it, and everybody who
+  has it can be found by it.
+- **Merge into another** — it is a skill the vocabulary already has under
+  another name. Everybody who added the proposal has the existing skill
+  instead, keeping what they wrote about it, and the proposal's spelling
+  becomes another name for it, so the next person to type it lands in the right
+  place.
+- **Reject** — with a reason. It leaves every profile it was on.
+
+Each decision is written to the audit log as `directory.skill.approved`,
+`directory.skill.merged` or `directory.skill.rejected`, naming the reviewer and
+the skill, and — for a merge — what it became, or — for a rejection — why.
+
+A reviewer who proposes a skill adds it to the vocabulary directly
+(`directory.skill.added`); there is nobody for them to ask. That is how an
+operator grows the vocabulary beyond the starting list.
+
+The queue is deliberately plain. If it grows faster than people can clear it,
+that is a question of who reviews, not of the tool.
+
 ## Not shared with other servers
 
 The directory belongs to this server. Federation carries rooms an operator has
@@ -188,23 +284,30 @@ deliberate decision, not something the protocol backs into.
 
 ## Over the API
 
-| Route                                                 | What it does                                                     |
-| ----------------------------------------------------- | ---------------------------------------------------------------- |
-| `GET /api/directory/me`                               | your own profile, all of it                                      |
-| `PUT /api/directory/me`                               | create or replace your profile (the `profile` object above)      |
-| `DELETE /api/directory/me`                            | delete your profile, keeping your account                        |
-| `GET /api/directory/me/export`                        | your profile as `tdc.directory.profile/1`                        |
-| `GET /api/directory/profiles/:username`               | a profile as you may see it; signing in is optional              |
-| `GET /api/directory/me/companies`                     | your companies, and invitations you have not answered            |
-| `POST /api/directory/me/companies/:slug/accept`       | accept a company's invitation                                    |
-| `DELETE /api/directory/me/companies/:slug`            | leave a company, or decline its invitation                       |
-| `POST /api/directory/companies`                       | create a company                                                 |
-| `GET /api/directory/companies/:slug`                  | a company; signing in is optional                                |
-| `PUT /api/directory/companies/:slug`                  | change a company (its administrators)                            |
-| `DELETE /api/directory/companies/:slug`               | delete a company (its administrators)                            |
-| `POST /api/directory/companies/:slug/members`         | invite somebody by username (its administrators)                 |
-| `DELETE /api/directory/companies/:slug/members/:user` | remove somebody (its administrators)                             |
-| `GET /api/directory/moderation/profiles/:username`    | read a profile as its owner sees it (`directory.profile.manage`) |
-| `PUT /api/directory/moderation/profiles/:username`    | change or clear a profile (`directory.profile.manage`)           |
+| Route                                                 | What it does                                                                                     |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET /api/directory/me`                               | your own profile, all of it                                                                      |
+| `PUT /api/directory/me`                               | create or replace your profile (the `profile` object above)                                      |
+| `GET /api/directory/search`                           | one page of the directory; filters `q`, `skill`, `available=true`, `location`, `company`, `page` |
+| `GET /api/directory/skills?q=`                        | the vocabulary, and your own proposals                                                           |
+| `POST /api/directory/skills`                          | propose a skill; answers with the existing one where the name already means one                  |
+| `GET /api/directory/moderation/skills`                | the review queue (`directory.skills.manage`)                                                     |
+| `POST /api/directory/moderation/skills/:id/approve`   | approve a proposal (`directory.skills.manage`)                                                   |
+| `POST /api/directory/moderation/skills/:id/reject`    | reject a proposal, with a `reason` (`directory.skills.manage`)                                   |
+| `POST /api/directory/moderation/skills/:id/merge`     | merge a proposal `into` another skill (`directory.skills.manage`)                                |
+| `DELETE /api/directory/me`                            | delete your profile, keeping your account                                                        |
+| `GET /api/directory/me/export`                        | your profile as `tdc.directory.profile/1`                                                        |
+| `GET /api/directory/profiles/:username`               | a profile as you may see it; signing in is optional                                              |
+| `GET /api/directory/me/companies`                     | your companies, and invitations you have not answered                                            |
+| `POST /api/directory/me/companies/:slug/accept`       | accept a company's invitation                                                                    |
+| `DELETE /api/directory/me/companies/:slug`            | leave a company, or decline its invitation                                                       |
+| `POST /api/directory/companies`                       | create a company                                                                                 |
+| `GET /api/directory/companies/:slug`                  | a company; signing in is optional                                                                |
+| `PUT /api/directory/companies/:slug`                  | change a company (its administrators)                                                            |
+| `DELETE /api/directory/companies/:slug`               | delete a company (its administrators)                                                            |
+| `POST /api/directory/companies/:slug/members`         | invite somebody by username (its administrators)                                                 |
+| `DELETE /api/directory/companies/:slug/members/:user` | remove somebody (its administrators)                                                             |
+| `GET /api/directory/moderation/profiles/:username`    | read a profile as its owner sees it (`directory.profile.manage`)                                 |
+| `PUT /api/directory/moderation/profiles/:username`    | change or clear a profile (`directory.profile.manage`)                                           |
 
 Every directory route answers `404` while the directory is switched off.

@@ -28,4 +28,16 @@ const (
 		on. The same bargain as ActionWithheldDetailsViewed.
 	*/
 	ActionDirectoryProfileViewed Action = "directory.profile.viewed"
+
+	/*
+		Decisions about the skill vocabulary.
+
+		Recorded because the vocabulary is what search is reliable against: a
+		skill that vanished, or two that became one, changes who is found for
+		what, and somebody asking why should find who decided and when.
+	*/
+	ActionDirectorySkillAdded    Action = "directory.skill.added"
+	ActionDirectorySkillApproved Action = "directory.skill.approved"
+	ActionDirectorySkillRejected Action = "directory.skill.rejected"
+	ActionDirectorySkillMerged   Action = "directory.skill.merged"
 )

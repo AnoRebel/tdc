@@ -185,9 +185,12 @@ stored only as a hash. A record of who accepted which invitation is kept.
 
 Only if you create one. A directory profile holds what you choose to write — a
 headline, a location, a description of your experience, an about section,
-portfolio links, and contact details (an email address, a phone number, a
-website) — along with who you have chosen may see each part, and when it was
-created and last changed. None of it is required.
+portfolio links, contact details (an email address, a phone number, a
+website), the skills you list with what you say about each, and whether you are
+available for work, what kind, and until when — along with who you have chosen
+may see each part, and when it was created and last changed. None of it is
+required. If you propose a skill for the server's list, the proposal records
+that it was you.
 
 Contact details are separate from the rest and visible to nobody but you unless
 you choose otherwise. What you have hidden from somebody is left out of what the
