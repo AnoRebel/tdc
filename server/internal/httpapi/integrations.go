@@ -5,8 +5,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/delivery"
+	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/settings"
+	"github.com/AnoRebel/tdc/server/internal/webhooks"
 )
 
 /*
@@ -17,9 +22,10 @@ a webhook at carries none of it, and so adding it did not change how every test
 and the command build a server.
 */
 type integrationsState struct {
-	once   sync.Once
-	signer *delivery.Signer
-	client *delivery.Client
+	once     sync.Once
+	signer   *delivery.Signer
+	client   *delivery.Client
+	webhooks *webhooks.Service
 }
 
 /*
@@ -31,8 +37,8 @@ holding a worker for an hour.
 */
 const maxDeliveryTimeout = 30 * time.Second
 
-// deliveries returns the signer and the outbound client, building them once.
-func (s *Server) deliveries() (*delivery.Signer, *delivery.Client) {
+// buildIntegrations constructs everything once.
+func (s *Server) buildIntegrations() {
 	s.integrations.once.Do(func() {
 		if s.rooms != nil {
 			s.integrations.signer = delivery.NewSigner(s.rooms.Keyring())
@@ -40,8 +46,91 @@ func (s *Server) deliveries() (*delivery.Signer, *delivery.Client) {
 		s.integrations.client = delivery.NewClient(maxDeliveryTimeout, func() bool {
 			return s.privateDeliveriesAllowed(context.Background())
 		})
+
+		// The queue needs the database it lives in and the rooms it reads
+		// access from; a server built without either has no webhooks.
+		if s.db == nil || s.rooms == nil {
+			return
+		}
+		var policy webhooks.Settings
+		if s.settings != nil {
+			policy = s.settings
+		}
+		s.integrations.webhooks = webhooks.New(s.queries, webhooks.Config{
+			Server:       s.serverName(),
+			CanRead:      s.canRead,
+			AllowPrivate: s.privateDeliveriesAllowed,
+			Send: func(ctx context.Context, endpoint, id, kind string, body, secret []byte) delivery.Outcome {
+				outcome, err := s.sendSigned(ctx, endpoint, id, kind, body, secret)
+				if err != nil {
+					return delivery.Outcome{Error: err.Error()}
+				}
+				return outcome
+			},
+			Limiter:  s.limiter,
+			Settings: policy,
+			Disabled: s.tellOwnerWebhookDisabled,
+		}, s.log)
 	})
+}
+
+// deliveries returns the signer and the outbound client.
+func (s *Server) deliveries() (*delivery.Signer, *delivery.Client) {
+	s.buildIntegrations()
 	return s.integrations.signer, s.integrations.client
+}
+
+// webhookService returns the queue, or nil on a server without a database.
+func (s *Server) webhookService() *webhooks.Service {
+	s.buildIntegrations()
+	return s.integrations.webhooks
+}
+
+/*
+RunDeliveries delivers queued webhooks until ctx ends.
+
+Started by Run alongside the listener. Exported so a test can run the same
+workers against a handler it built without a listener, rather than a copy of
+them that could drift.
+*/
+func (s *Server) RunDeliveries(ctx context.Context) {
+	if service := s.webhookService(); service != nil {
+		service.Run(ctx)
+	}
+}
+
+/*
+queueWebhooks hands a stored event to the subscriptions that want it.
+
+Off the request, like search indexing and notifications: a message is posted
+whether or not any webhook could be queued, and the person posting never waits
+on anybody's endpoint.
+*/
+func (s *Server) queueWebhooks(ctx context.Context, event dbgen.Event) {
+	service := s.webhookService()
+	if service == nil {
+		return
+	}
+	s.inBackground(ctx, "queue webhooks", func(ctx context.Context) {
+		service.Enqueue(ctx, event)
+	})
+}
+
+// canRead is whether somebody can read a channel right now, which is what
+// every webhook decision about a channel turns on.
+func (s *Server) canRead(ctx context.Context, roomID, userID uuid.UUID) bool {
+	_, err := s.rooms.Visible(ctx, roomID, userID)
+	return err == nil
+}
+
+// tellOwnerWebhookDisabled raises the notification that a webhook was turned
+// off, attributed to the server rather than to any person.
+func (s *Server) tellOwnerWebhookDisabled(ctx context.Context, subscription dbgen.WebhookSubscription, eventID *string) {
+	if s.notify == nil || eventID == nil {
+		return
+	}
+	s.notify.About(ctx, subscription.OwnerID, uuid.Nil, s.rooms.UserAddress("webhooks"),
+		subscription.RoomID, *eventID, notify.ReasonWebhookDisabled, subscription.Label)
 }
 
 // privateDeliveriesAllowed reads the operator's decision, defaulting to no.

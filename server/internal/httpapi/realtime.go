@@ -144,6 +144,11 @@ func (s *Server) publishEvent(ctx context.Context, event dbgen.Event) {
 	}
 	s.hub.Publish(ctx, event.RoomID, frame)
 
+	// And to any webhook subscribed to it, queued off the request. Here and
+	// not where other nodes' announcements arrive, so each event is queued
+	// once, by the node that stored it.
+	s.queueWebhooks(ctx, event)
+
 	/*
 		And every other node, where there is one.
 

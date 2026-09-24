@@ -376,6 +376,10 @@ func (s *Server) Run(ctx context.Context) error {
 		}()
 	}
 
+	// Webhook deliveries, by a bounded pool of their own. Stopped by the same
+	// context, and what a worker was sending when it stopped is recorded.
+	go s.RunDeliveries(ctx)
+
 	serveErr := make(chan error, 1)
 	go func() {
 		s.log.Info("server listening",

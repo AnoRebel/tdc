@@ -1,0 +1,245 @@
+# Webhooks and applications
+
+How other systems take part in a TDC server without anybody holding a session:
+being told what happens in a channel, posting into one from outside, and acting
+as an application with permissions of its own.
+
+Everything here is HTTP. The [integration guide](integrating.md) covers the API
+these build on — authentication, rooms, messages, the live connection — and
+[signed deliveries](integrating.md#signed-deliveries), which every outgoing
+request described here carries. Examples run against `http://localhost:8080`.
+
+## Outgoing webhooks
+
+An outgoing webhook sends a channel's events to an endpoint you choose, as they
+happen. It belongs to the person who makes it: it can only be made for a channel
+they can read, and it stops delivering the moment they cannot.
+
+### Subscribing
+
+<!-- demo: subscribe -->
+
+```sh
+curl -X POST http://localhost:8080/api/me/webhooks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "roomId": "'"$ROOM"'",
+    "label": "Build notifications",
+    "url": "https://ci.example.test/hooks/tdc",
+    "eventTypes": ["message.sent", "action.pressed"]
+  }'
+```
+
+```json
+{
+  "id": "0199f2a0-…",
+  "label": "Build notifications",
+  "url": "https://ci.example.test/hooks/tdc",
+  "roomId": "5a1c…",
+  "eventTypes": ["message.sent", "action.pressed"],
+  "payloadVersion": 1,
+  "state": "active",
+  "consecutiveFailures": 0,
+  "rateLimited": 0,
+  "created": "2026-09-23T09:00:00Z",
+  "secret": "whsec_…"
+}
+```
+
+**`secret` is shown once.** It keys the HMAC on every delivery; copy it into
+your receiver now. Nobody can retrieve it later, including you — a lost one is
+replaced by making a new webhook.
+
+What can go wrong when subscribing, and what each looks like:
+
+| Answer  | Why                                                                        |
+| ------- | -------------------------------------------------------------------------- |
+| **404** | The channel does not exist, or you cannot read it — the two look the same  |
+| **403** | The endpoint is on a private network, which the server does not deliver to |
+| **400** | An unknown event type, no event types, no label, or not an http(s) address |
+
+`GET /api/webhooks/event-types` lists what can be asked for. Today:
+`message.sent`, `message.edited`, `message.deleted`, `message.updated`,
+`action.pressed`, `member.joined`, `member.left`, `member.removed`,
+`room.renamed`, `room.archived` and `room.restored` — everything somebody
+reading a channel sees happen in it, and nothing they do not.
+
+`GET /api/me/webhooks` lists yours, never with secrets. `DELETE
+/api/me/webhooks/{id}` removes one with its history. The interface for all of
+this is **Settings → Integrations** in the web client.
+
+### What arrives
+
+Each event is a `POST` of JSON, signed as described in
+[signed deliveries](integrating.md#signed-deliveries), with `TDC-Event` naming
+the event type:
+
+```json
+{
+  "version": 1,
+  "id": "0199f2a1-…",
+  "type": "message.sent",
+  "occurredAt": "2026-09-23T09:14:03.21Z",
+  "subscription": "0199f2a0-…",
+  "server": "chat.example.org",
+  "room": { "id": "5a1c…", "address": "builds@chat.example.org" },
+  "event": {
+    "id": "$Yx3K…",
+    "type": "message.sent",
+    "sequence": 412,
+    "sender": "juma@chat.example.org",
+    "content": { "body": "Build 41 passed" },
+    "createdAt": 1790152443210
+  }
+}
+```
+
+| Field            | Meaning                                                                 |
+| ---------------- | ----------------------------------------------------------------------- |
+| `version`        | The payload version this subscription was made against                  |
+| `id`             | This delivery — the same as `TDC-Delivery`, and the same across retries |
+| `occurredAt`     | When the event happened, RFC 3339 in UTC                                |
+| `event`          | The event as the timeline gives it; `createdAt` is epoch milliseconds   |
+| `event.sequence` | The event's position in its room, which is how to recover order         |
+
+**Answer 2xx to accept.** Anything else — including a 3xx, since redirects are
+never followed — is a failure and is retried. Answer quickly: an attempt that
+takes longer than `integrations.delivery_timeout_seconds` (five by default) has
+failed. Do your work after answering, not before.
+
+**Delivery is at least once.** A delivery whose 2xx was lost on the way back is
+sent again, with the same `id`. Remember the identifiers you have handled and
+ignore a repeat.
+
+**Order is not guaranteed across retries.** Deliveries to one subscription are
+sent one at a time, oldest first, so ordinarily they arrive in order. But a
+failing delivery does not hold back the ones behind it — otherwise one bad
+payload would stall everything after it for a day — so after a retry, events
+can arrive out of order. Use `event.sequence` when order matters.
+
+### Versions
+
+A subscription keeps receiving the payload version it was made against. A
+change that would break a receiver — a renamed field, a changed meaning — is
+published as a new version, and existing subscriptions keep receiving the old
+one until their owner makes a new subscription. Adding a field is not a breaking
+change: ignore fields you do not know. The current version is `payloadVersion`
+from `GET /api/webhooks/event-types`.
+
+### When a receiver fails
+
+A failed delivery is retried with a growing delay: one minute, then two, four,
+eight, doubling up to six hours, each shortened by up to a quarter at random so
+receivers that failed together are not retried together. After **twelve
+attempts** — most of a day — it is abandoned.
+
+A subscription is **turned off** when a delivery is abandoned, or sooner when
+**twenty-four attempts in a row** have failed, whatever they were for. Nothing
+more is queued for it and anything waiting is cancelled. Its owner is told
+through their ordinary notifications, and `state`, `disabledAt` and
+`disabledReason` say what happened. Fix the receiver, then turn it back on:
+
+```sh
+curl -X POST http://localhost:8080/api/me/webhooks/$ID/enable -H "Authorization: Bearer $TOKEN"
+```
+
+The limits are the operator's to change: `integrations.webhook_max_attempts`,
+`integrations.webhook_retry_base_seconds`, `integrations.webhook_retry_cap_seconds`
+and `integrations.webhook_disable_after_failures`.
+
+### Seeing what happened
+
+`GET /api/me/webhooks/{id}` answers with the subscription and its recent
+history — the last hundred deliveries and attempts, newest first:
+
+```json
+{
+  "id": "0199f2a0-…",
+  "state": "active",
+  "consecutiveFailures": 2,
+  "rateLimited": 0,
+  "deliveries": [
+    {
+      "id": "0199f2a1-…",
+      "kind": "message.sent",
+      "state": "pending",
+      "attempts": 2,
+      "nextAttemptAt": "2026-09-23T09:18:03Z",
+      "created": "2026-09-23T09:14:03Z"
+    }
+  ],
+  "attempts": [
+    {
+      "delivery": "0199f2a1-…",
+      "attempt": 2,
+      "at": "2026-09-23T09:16:03Z",
+      "outcome": "failed",
+      "status": 503,
+      "response": "maintenance",
+      "durationMs": 41
+    },
+    {
+      "delivery": "0199f2a1-…",
+      "attempt": 1,
+      "at": "2026-09-23T09:14:03Z",
+      "outcome": "failed",
+      "error": "the endpoint refused the connection",
+      "durationMs": 2
+    }
+  ]
+}
+```
+
+A delivery's `state` is `pending`, `delivering`, `delivered`, `abandoned`, or
+`cancelled` — not sent because the subscription was turned off or its owner could
+no longer read the channel. An attempt's `outcome` is `delivered`, `failed`, or
+`rate_limited`; `status` is what the receiver answered, and `error` what stopped
+it answering at all. `response` is the first kilobyte of what it said. History
+is kept for thirty days (`integrations.delivery_history_days`).
+
+### Limits, and what exceeding them looks like
+
+Each subscription is sent at most **120 deliveries a minute**
+(`integrations.webhook_deliveries_per_minute`). A delivery past that is **held
+back, not dropped**: it waits for the limit, the history records a
+`rate_limited` attempt, and the subscription's `rateLimited` count and
+`lastRateLimited` time say that it happened.
+
+Each subscription has **one delivery in flight at a time**, and the whole server
+no more than `integrations.delivery_workers` (four by default). A slow or silent
+receiver therefore occupies one worker for at most the timeout and cannot hold
+up anybody else's deliveries — or the channel itself: queuing happens after a
+message is stored and off the request that stored it, so posting never waits on
+a webhook.
+
+### What it can carry
+
+Measured by `TestDeliveryLoadLeavesChatUnaffected` (run on its own with
+`TDC_LOAD_TESTS=1`, since beside the rest of the suite it would measure the
+machine's load instead) and `TestDeliveryPoolFitsItsMemoryTarget`. CI runs both
+in the job that reports the server's memory, on every pull request to a release
+branch: the first fails if a target is missed, the second is reported with its
+change from the base commit.
+
+| What                                                          | Target              | Measured when this was written                 |
+| ------------------------------------------------------------- | ------------------- | ---------------------------------------------- |
+| Deliveries a second, four workers, receivers on the same host | at least 50         | 157–262                                        |
+| Posting's median beside a receiver that never answers         | within 1.5× or 5 ms | 10.1 → 10.2 ms, 12.6 → 14.0 ms, 15.3 → 15.8 ms |
+| Posting's 95th percentile while the pool is busy              | within 3× + 10 ms   | 18–35 ms, against 11–16 ms quiet               |
+| Memory after 1,000 deliveries beside a stalled receiver       | reported            | +1.8 MiB, with goroutines back to idle         |
+
+Those were measured on a twelve-core machine with Postgres in a container
+shared with other work; a production host differs, and the shape is the point.
+Throughput is bounded by database commits more than by the network — each
+attempt's outcome is recorded in one statement, and deliveries are claimed a
+batch at a time, because doing either row by row made the pool queue for
+commits and deliver a tenth as much.
+
+### When access is lost
+
+Every delivery checks, at the moment it is sent, that the subscription's owner
+can still read the channel. Somebody removed from a private channel stops being
+told about it immediately — including about events that happened before they
+left and were still waiting. The subscription and its history are kept, marked
+with `accessLost`; deliveries resume if they regain access.

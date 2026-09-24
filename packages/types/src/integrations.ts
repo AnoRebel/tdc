@@ -79,3 +79,70 @@ export interface PrivateReply {
   /** Epoch milliseconds, like every other live frame. */
   createdAt: number;
 }
+
+/** An outgoing webhook, as its owner sees it. The secret is never here. */
+export interface WebhookSubscription {
+  id: string;
+  label: string;
+  url: string;
+  roomId: string;
+  eventTypes: string[];
+  payloadVersion: number;
+  state: "active" | "disabled";
+  disabledAt?: string;
+  disabledReason?: string;
+  /** Failed attempts since the last success. */
+  consecutiveFailures: number;
+  /** Deliveries held back by the rate limit, and when last. */
+  rateLimited: number;
+  lastRateLimited?: string;
+  /** When a delivery last found its owner unable to read the channel. */
+  accessLost?: string;
+  created: string;
+}
+
+/** The one response carrying a webhook's secret. */
+export interface CreatedWebhook extends WebhookSubscription {
+  secret: string;
+}
+
+export type WebhookDeliveryState =
+  "pending" | "delivering" | "delivered" | "abandoned" | "cancelled";
+
+/** One thing a webhook was, or will be, sent. */
+export interface WebhookDelivery {
+  id: string;
+  kind: string;
+  event?: string;
+  state: WebhookDeliveryState;
+  attempts: number;
+  nextAttemptAt?: string;
+  created: string;
+  completed?: string;
+}
+
+/** One try at sending a delivery. */
+export interface WebhookAttempt {
+  id: string;
+  delivery: string;
+  kind: string;
+  attempt: number;
+  at: string;
+  outcome: "delivered" | "failed" | "rate_limited";
+  status?: number;
+  error?: string;
+  response?: string;
+  durationMs: number;
+}
+
+/** A webhook with what has recently been tried for it, newest first. */
+export interface WebhookHistory extends WebhookSubscription {
+  deliveries: WebhookDelivery[];
+  attempts: WebhookAttempt[];
+}
+
+/** What a subscription may ask for. */
+export interface WebhookEventTypes {
+  eventTypes: string[];
+  payloadVersion: number;
+}

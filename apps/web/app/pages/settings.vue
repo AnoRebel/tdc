@@ -675,6 +675,15 @@ function deviceName(userAgent: string): string {
         </ul>
       </section>
 
+      <!-- Integrations: webhooks and the programs pointed at this server. -->
+      <section>
+        <h2 class="text-sm font-semibold">{{ $t("integrations.title") }}</h2>
+        <p class="mt-1 text-xs text-muted-foreground">{{ $t("integrations.settingsHint") }}</p>
+        <NuxtLink :to="localeRoute({ name: 'integrations' })" class="btn btn-outline mt-3">
+          {{ $t("integrations.manage") }}
+        </NuxtLink>
+      </section>
+
       <section
         v-if="
           can('server.audit.read') ||

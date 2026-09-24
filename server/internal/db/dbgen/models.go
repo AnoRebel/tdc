@@ -530,3 +530,50 @@ type WebauthnCeremony struct {
 	CreatedAt     time.Time
 	ExpiresAt     time.Time
 }
+
+type WebhookAttempt struct {
+	ID          uuid.UUID
+	DeliveryID  uuid.UUID
+	Attempt     int32
+	AttemptedAt time.Time
+	Outcome     string
+	StatusCode  *int32
+	Error       *string
+	Response    *string
+	DurationMs  int32
+}
+
+type WebhookDelivery struct {
+	ID             uuid.UUID
+	Target         string
+	SubscriptionID *uuid.UUID
+	EventID        *string
+	Kind           string
+	Payload        []byte
+	State          string
+	Attempts       int32
+	NextAttemptAt  time.Time
+	ClaimedAt      *time.Time
+	CreatedAt      time.Time
+	CompletedAt    *time.Time
+}
+
+type WebhookSubscription struct {
+	ID                  uuid.UUID
+	OwnerID             uuid.UUID
+	RoomID              uuid.UUID
+	Label               string
+	Url                 string
+	Secret              string
+	EventTypes          []string
+	PayloadVersion      int32
+	State               string
+	DisabledAt          *time.Time
+	DisabledReason      *string
+	ConsecutiveFailures int32
+	RateLimitedCount    int64
+	LastRateLimitedAt   *time.Time
+	AccessLostAt        *time.Time
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}

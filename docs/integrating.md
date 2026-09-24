@@ -949,6 +949,14 @@ Bun.serve({
 });
 ```
 
+### Outgoing webhooks
+
+A webhook sends a channel's events to your endpoint as they happen, signed as
+above, retried with backoff when your endpoint fails, and turned off — with its
+owner told — when it keeps failing. Subscribing, the payload and its versions,
+retries, limits and the delivery history are all in
+[Webhooks and applications](webhooks-and-apps.md#outgoing-webhooks).
+
 ### Sending yourself a test delivery
 
 Before anything depends on your receiver, ask the server to send it one:

@@ -404,7 +404,16 @@ export interface ThreadSummary {
 
 /** Why somebody was notified. */
 export type NotificationReason =
-  "mention" | "direct" | "thread" | "reaction" | "reply" | "join" | "forward" | "pin";
+  | "mention"
+  | "direct"
+  | "thread"
+  | "reaction"
+  | "reply"
+  | "join"
+  | "forward"
+  | "pin"
+  // An outgoing webhook of yours was turned off after failing repeatedly.
+  | "webhook_disabled";
 
 /** One thing somebody has been told about. */
 export interface Notification {
