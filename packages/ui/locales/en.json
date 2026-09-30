@@ -643,13 +643,36 @@
       "other": "{actor}: {type}"
     },
     "priority": {
-      "none": "no priority"
+      "none": "no priority",
+      "title": "Priority",
+      "noneOption": "No priority",
+      "scale": "Priority scale",
+      "scaleHint": "Most urgent first. Sorting by priority follows this order, whatever the levels are called.",
+      "moreUrgent": "Make {priority} more urgent",
+      "lessUrgent": "Make {priority} less urgent",
+      "remove": "Remove {priority}",
+      "new": "New level",
+      "add": "Add level"
     },
     "relation": {
-      "parent": "a child of",
-      "child": "the parent of",
+      "parent": "the parent of",
+      "child": "a child of",
       "blocks": "blocking",
-      "blocked_by": "blocked by"
+      "blocked_by": "blocked by",
+      "title": "Relationships",
+      "parentTitle": "Part of",
+      "childrenTitle": "Made up of",
+      "blocksTitle": "Blocks",
+      "blockedByTitle": "Blocked by",
+      "childProgress": "{completed} of {total} parts done",
+      "addBlocks": "This blocks",
+      "addBlockedBy": "This is blocked by",
+      "addParentOf": "This is the parent of",
+      "addChildOf": "This is a child of",
+      "kind": "How they relate",
+      "otherIssue": "The other issue",
+      "add": "Relate",
+      "remove": "Remove the relationship with {other}"
     },
     "usernameRequired": "Say whose username to add.",
     "discussion": "Discussion",
@@ -670,6 +693,39 @@
       "removed": "The message in {room} it was made from has been removed.",
       "edited": "edited",
       "open": "Open it in {room}"
+    },
+    "assignees": "Assignees",
+    "nobodyAssigned": "Nobody yet",
+    "assignSomebody": "Assign somebody",
+    "unassign": "Take {who} off this issue",
+    "labels": "Labels",
+    "noLabels": "No labels",
+    "newLabel": "New label",
+    "addLabel": "Add label",
+    "removeLabel": "Remove the label {label}",
+    "labelColour": "Colour",
+    "allLabels": "Any label",
+    "filterByLabel": "Show issues labelled",
+    "sort": {
+      "title": "Order",
+      "newest": "Newest first",
+      "priority": "Most urgent first"
+    },
+    "mine": {
+      "title": "My issues",
+      "project": "Project",
+      "none": "Nothing is assigned to you."
+    },
+    "colour": {
+      "grey": "Grey",
+      "red": "Red",
+      "orange": "Orange",
+      "yellow": "Yellow",
+      "green": "Green",
+      "teal": "Teal",
+      "blue": "Blue",
+      "violet": "Violet",
+      "pink": "Pink"
     }
   }
 }

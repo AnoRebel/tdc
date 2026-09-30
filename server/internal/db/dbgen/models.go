@@ -169,6 +169,27 @@ type Issue struct {
 	UpdatedAt   time.Time
 	DeletedAt   *time.Time
 	DeletedBy   *uuid.UUID
+	PriorityID  *uuid.UUID
+}
+
+type IssueAssignee struct {
+	IssueID    uuid.UUID
+	UserID     uuid.UUID
+	AssignedAt time.Time
+	AssignedBy *uuid.UUID
+}
+
+type IssueLabel struct {
+	IssueID uuid.UUID
+	LabelID uuid.UUID
+}
+
+type IssueRelation struct {
+	FromIssue uuid.UUID
+	ToIssue   uuid.UUID
+	Kind      string
+	CreatedAt time.Time
+	CreatedBy *uuid.UUID
 }
 
 type IssueState struct {
@@ -302,12 +323,30 @@ type Project struct {
 	UpdatedAt       time.Time
 }
 
+type ProjectLabel struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	Name       string
+	NameFolded string
+	Colour     string
+	CreatedAt  time.Time
+}
+
 type ProjectMember struct {
 	ProjectID uuid.UUID
 	UserID    uuid.UUID
 	Role      string
 	JoinedAt  time.Time
 	AddedBy   *uuid.UUID
+}
+
+type ProjectPriority struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	Name       string
+	NameFolded string
+	Rank       int32
+	CreatedAt  time.Time
 }
 
 type PushSubscription struct {

@@ -65,7 +65,7 @@ func (q *Queries) CountProjectAdmins(ctx context.Context, projectID uuid.UUID) (
 const createIssue = `-- name: CreateIssue :one
 INSERT INTO issues (id, project_id, number, title, description, state_id, author_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by
+RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
 `
 
 type CreateIssueParams struct {
@@ -101,6 +101,7 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.PriorityID,
 	)
 	return i, err
 }
@@ -196,7 +197,7 @@ func (q *Queries) DeleteIssueState(ctx context.Context, id uuid.UUID) error {
 }
 
 const getIssueByID = `-- name: GetIssueByID :one
-SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by FROM issues WHERE id = $1
+SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id FROM issues WHERE id = $1
 `
 
 func (q *Queries) GetIssueByID(ctx context.Context, id uuid.UUID) (Issue, error) {
@@ -214,12 +215,13 @@ func (q *Queries) GetIssueByID(ctx context.Context, id uuid.UUID) (Issue, error)
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.PriorityID,
 	)
 	return i, err
 }
 
 const getIssueByNumber = `-- name: GetIssueByNumber :one
-SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by FROM issues WHERE project_id = $1 AND number = $2
+SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id FROM issues WHERE project_id = $1 AND number = $2
 `
 
 type GetIssueByNumberParams struct {
@@ -242,6 +244,7 @@ func (q *Queries) GetIssueByNumber(ctx context.Context, arg GetIssueByNumberPara
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.PriorityID,
 	)
 	return i, err
 }
@@ -437,20 +440,34 @@ func (q *Queries) ListIssueStates(ctx context.Context, projectID uuid.UUID) ([]I
 }
 
 const listProjectIssues = `-- name: ListProjectIssues :many
-SELECT issues.id, issues.project_id, issues.number, issues.title, issues.description, issues.state_id, issues.author_id, issues.created_at, issues.updated_at, issues.deleted_at, issues.deleted_by
+SELECT issues.id, issues.project_id, issues.number, issues.title, issues.description, issues.state_id, issues.author_id, issues.created_at, issues.updated_at, issues.deleted_at, issues.deleted_by, issues.priority_id
 FROM issues
+LEFT JOIN project_priorities p ON p.id = issues.priority_id
 WHERE issues.project_id = $1
   AND issues.deleted_at IS NULL
   AND ($2::uuid IS NULL OR issues.state_id = $2::uuid)
-  AND ($3::bigint = 0 OR issues.number < $3::bigint)
-ORDER BY issues.number DESC
-LIMIT $4
+  AND ($3::uuid IS NULL OR issues.priority_id = $3::uuid)
+  AND ($4::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM issue_labels l
+        WHERE l.issue_id = issues.id AND l.label_id = $4::uuid))
+  AND ($5::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM issue_assignees a
+        WHERE a.issue_id = issues.id AND a.user_id = $5::uuid))
+  AND ($6::bigint = 0 OR issues.number < $6::bigint)
+ORDER BY
+  CASE WHEN $7::boolean THEN COALESCE(p.rank, 2147483647) END,
+  issues.number DESC
+LIMIT $8
 `
 
 type ListProjectIssuesParams struct {
 	ProjectID    uuid.UUID
 	StateID      *uuid.UUID
+	PriorityID   *uuid.UUID
+	LabelID      *uuid.UUID
+	AssigneeID   *uuid.UUID
 	BeforeNumber int64
+	ByPriority   bool
 	PageSize     int32
 }
 
@@ -459,11 +476,19 @@ type ListProjectIssuesParams struct {
 // Callers check the project is visible to the person asking before calling
 // this; the rows themselves carry nothing a person who can see the project
 // could not see.
+//
+// Filters narrow together: an issue must match every one given. Sorting by
+// priority is by the project's own ranks, most urgent first, with issues that
+// have no priority after every issue that has one.
 func (q *Queries) ListProjectIssues(ctx context.Context, arg ListProjectIssuesParams) ([]Issue, error) {
 	rows, err := q.db.Query(ctx, listProjectIssues,
 		arg.ProjectID,
 		arg.StateID,
+		arg.PriorityID,
+		arg.LabelID,
+		arg.AssigneeID,
 		arg.BeforeNumber,
+		arg.ByPriority,
 		arg.PageSize,
 	)
 	if err != nil {
@@ -485,6 +510,7 @@ func (q *Queries) ListProjectIssues(ctx context.Context, arg ListProjectIssuesPa
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.DeletedBy,
+			&i.PriorityID,
 		); err != nil {
 			return nil, err
 		}
@@ -651,7 +677,7 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, userID uuid.UUID) ([]
 }
 
 const lockIssue = `-- name: LockIssue :one
-SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by FROM issues WHERE id = $1 FOR UPDATE
+SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id FROM issues WHERE id = $1 FOR UPDATE
 `
 
 // Reads an issue and holds it until the transaction ends, so a change and the
@@ -671,6 +697,7 @@ func (q *Queries) LockIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.PriorityID,
 	)
 	return i, err
 }
@@ -678,7 +705,7 @@ func (q *Queries) LockIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
 const markIssueDeleted = `-- name: MarkIssueDeleted :one
 UPDATE issues SET deleted_at = NOW(), deleted_by = $2, updated_at = NOW()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by
+RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
 `
 
 type MarkIssueDeletedParams struct {
@@ -701,6 +728,7 @@ func (q *Queries) MarkIssueDeleted(ctx context.Context, arg MarkIssueDeletedPara
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.PriorityID,
 	)
 	return i, err
 }
@@ -731,7 +759,7 @@ func (q *Queries) RemoveProjectMember(ctx context.Context, arg RemoveProjectMemb
 }
 
 const setIssueDescription = `-- name: SetIssueDescription :one
-UPDATE issues SET description = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by
+UPDATE issues SET description = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
 `
 
 type SetIssueDescriptionParams struct {
@@ -754,6 +782,7 @@ func (q *Queries) SetIssueDescription(ctx context.Context, arg SetIssueDescripti
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.PriorityID,
 	)
 	return i, err
 }
@@ -773,7 +802,7 @@ func (q *Queries) SetIssueStatePosition(ctx context.Context, arg SetIssueStatePo
 }
 
 const setIssueTitle = `-- name: SetIssueTitle :one
-UPDATE issues SET title = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by
+UPDATE issues SET title = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
 `
 
 type SetIssueTitleParams struct {
@@ -796,6 +825,7 @@ func (q *Queries) SetIssueTitle(ctx context.Context, arg SetIssueTitleParams) (I
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.PriorityID,
 	)
 	return i, err
 }
@@ -804,7 +834,7 @@ const transitionIssue = `-- name: TransitionIssue :one
 UPDATE issues
 SET state_id = $1, updated_at = NOW()
 WHERE id = $2 AND state_id = $3
-RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by
+RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
 `
 
 type TransitionIssueParams struct {
@@ -832,6 +862,7 @@ func (q *Queries) TransitionIssue(ctx context.Context, arg TransitionIssueParams
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.DeletedBy,
+		&i.PriorityID,
 	)
 	return i, err
 }

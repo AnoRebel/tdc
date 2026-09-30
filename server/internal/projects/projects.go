@@ -290,7 +290,7 @@ func (s *Service) Create(ctx context.Context, actor Actor, input NewProject) (db
 				return err
 			}
 		}
-		return nil
+		return seedPriorities(ctx, q, project.ID)
 	})
 	return project, err
 }

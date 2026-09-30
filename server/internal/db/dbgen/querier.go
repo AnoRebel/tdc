@@ -42,6 +42,8 @@ type Querier interface {
 	// A reply carries the identifier of the message that started the thread.
 	AppendThreadedEvent(ctx context.Context, arg AppendThreadedEventParams) (Event, error)
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
+	// Assignees, labels, priorities and relationships.
+	AssignIssue(ctx context.Context, arg AssignIssueParams) (int64, error)
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	// Binds an attachment to the message that carries it.
 	//
@@ -147,6 +149,8 @@ type Querier interface {
 	CreatePasskeyCredential(ctx context.Context, arg CreatePasskeyCredentialParams) (Credential, error)
 	// Projects, their membership, their states and their issues.
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
+	CreateProjectLabel(ctx context.Context, arg CreateProjectLabelParams) (ProjectLabel, error)
+	CreateProjectPriority(ctx context.Context, arg CreateProjectPriorityParams) (ProjectPriority, error)
 	CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) (Credential, error)
 	CreateRecoveryToken(ctx context.Context, arg CreateRecoveryTokenParams) (RecoveryToken, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
@@ -171,6 +175,8 @@ type Querier interface {
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
 	DeleteLapsedBans(ctx context.Context) (int64, error)
+	DeleteProjectLabel(ctx context.Context, id uuid.UUID) error
+	DeleteProjectPriority(ctx context.Context, id uuid.UUID) error
 	// Scoped to the owner, so one person cannot unsubscribe another's device.
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) (int64, error)
 	// Used when the push service reports a subscription gone, where the endpoint
@@ -278,7 +284,9 @@ type Querier interface {
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	GetProjectByID(ctx context.Context, id uuid.UUID) (Project, error)
 	GetProjectByKey(ctx context.Context, keyFolded string) (Project, error)
+	GetProjectLabel(ctx context.Context, id uuid.UUID) (ProjectLabel, error)
 	GetProjectMemberRole(ctx context.Context, arg GetProjectMemberRoleParams) (string, error)
+	GetProjectPriority(ctx context.Context, id uuid.UUID) (ProjectPriority, error)
 	// Read without spending, so the client can tell somebody their link has expired
 	// before asking them to type a new password into a form that cannot work.
 	GetRecoveryToken(ctx context.Context, tokenHash []byte) (RecoveryToken, error)
@@ -328,6 +336,7 @@ type Querier interface {
 	IsRemoteMember(ctx context.Context, arg IsRemoteMemberParams) (bool, error)
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
 	KnownPeers(ctx context.Context) ([]KnownPeersRow, error)
+	LabelIssue(ctx context.Context, arg LabelIssueParams) (int64, error)
 	// The newest edit of a message, so a message an issue was made from reads as
 	// it reads in its channel now, rather than as it was first written.
 	LatestMessageEdit(ctx context.Context, arg LatestMessageEditParams) (Event, error)
@@ -340,6 +349,8 @@ type Querier interface {
 	ListAPITokensForUser(ctx context.Context, userID uuid.UUID) ([]ListAPITokensForUserRow, error)
 	// Who pressed what on one message, oldest first.
 	ListActionPressesForEvent(ctx context.Context, eventID string) ([]ActionPress, error)
+	// The assignees of a page of issues at once, rather than a query per card.
+	ListAssigneesForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListAssigneesForIssuesRow, error)
 	ListAttachmentsForEvent(ctx context.Context, eventID *string) ([]Attachment, error)
 	// The files carried by a set of messages, so expiring the messages can remove
 	// them too.
@@ -368,12 +379,15 @@ type Querier interface {
 	// Includes revoked and expired ones: somebody auditing what was issued needs
 	// to see what has been withdrawn, not only what still works.
 	ListInvitationsForRoom(ctx context.Context, arg ListInvitationsForRoomParams) ([]Invitation, error)
+	ListIssueAssignees(ctx context.Context, issueID uuid.UUID) ([]ListIssueAssigneesRow, error)
 	// One issue's history: its project's stream, filtered to it. The partial
 	// expression index events_issue_idx serves exactly this.
 	ListIssueEvents(ctx context.Context, arg ListIssueEventsParams) ([]Event, error)
 	// Every issue in a state, deleted ones included: a deleted issue still names
 	// its state, and a state cannot go while anything names it.
 	ListIssueIDsInState(ctx context.Context, stateID uuid.UUID) ([]uuid.UUID, error)
+	ListIssueIDsWithLabel(ctx context.Context, labelID uuid.UUID) ([]uuid.UUID, error)
+	ListIssueIDsWithPriority(ctx context.Context, priorityID *uuid.UUID) ([]uuid.UUID, error)
 	ListIssueStates(ctx context.Context, projectID uuid.UUID) ([]IssueState, error)
 	// The issues made from a room's messages, that this person may see.
 	//
@@ -382,9 +396,15 @@ type Querier interface {
 	// fetched, so the room's members learn nothing about it — not its title, and
 	// not that it exists.
 	ListIssuesFromRoom(ctx context.Context, arg ListIssuesFromRoomParams) ([]ListIssuesFromRoomRow, error)
+	ListLabelsForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListLabelsForIssuesRow, error)
 	// The lifetimes carried by a page of messages, so a timeline can disclose them
 	// without a query per message.
 	ListLifetimesForEvents(ctx context.Context, eventIds []string) ([]MessageLifetime, error)
+	// Everything assigned to somebody, in every project they may still see.
+	//
+	// Visibility is joined, not filtered afterwards: an assignment in a private
+	// project somebody has since left is never fetched, so it cannot be shown.
+	ListMyIssues(ctx context.Context, arg ListMyIssuesParams) ([]ListMyIssuesRow, error)
 	ListNotificationPreferences(ctx context.Context, userID uuid.UUID) ([]ListNotificationPreferencesRow, error)
 	ListOAuthCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	// The moderation queue: oldest first, so nothing waits indefinitely behind
@@ -411,8 +431,18 @@ type Querier interface {
 	// Callers check the project is visible to the person asking before calling
 	// this; the rows themselves carry nothing a person who can see the project
 	// could not see.
+	//
+	// Filters narrow together: an issue must match every one given. Sorting by
+	// priority is by the project's own ranks, most urgent first, with issues that
+	// have no priority after every issue that has one.
 	ListProjectIssues(ctx context.Context, arg ListProjectIssuesParams) ([]Issue, error)
+	ListProjectLabels(ctx context.Context, projectID uuid.UUID) ([]ProjectLabel, error)
 	ListProjectMembers(ctx context.Context, projectID uuid.UUID) ([]ListProjectMembersRow, error)
+	ListProjectPriorities(ctx context.Context, projectID uuid.UUID) ([]ProjectPriority, error)
+	// Every edge of one kind in a project, for walking the graph to refuse a
+	// cycle. A project holds hundreds or a few thousand issues, so reading its
+	// edges is cheap, and a walk in memory is simple enough to be obviously right.
+	ListProjectRelations(ctx context.Context, arg ListProjectRelationsParams) ([]ListProjectRelationsRow, error)
 	// A project's stream in order, for replaying it.
 	ListProjectStream(ctx context.Context, arg ListProjectStreamParams) ([]Event, error)
 	// The projects somebody may see: every public one, and the private ones they
@@ -429,6 +459,9 @@ type Querier interface {
 	// The most recent events, for opening a room.
 	ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEventsParams) ([]Event, error)
 	ListRecoveryCodes(ctx context.Context, userID uuid.UUID) ([]Credential, error)
+	// An issue's relationships in both directions, with the other issue and its
+	// state, for showing them.
+	ListRelationsOfIssue(ctx context.Context, issueID uuid.UUID) ([]ListRelationsOfIssueRow, error)
 	ListReportsForRoom(ctx context.Context, arg ListReportsForRoomParams) ([]Report, error)
 	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]RolePermission, error)
 	ListRoles(ctx context.Context) ([]Role, error)
@@ -516,6 +549,11 @@ type Querier interface {
 	// Reads an issue and holds it until the transaction ends, so a change and the
 	// event recording it are decided against a value nobody else is changing.
 	LockIssue(ctx context.Context, id uuid.UUID) (Issue, error)
+	// Holds a project's stream until the transaction ends, without taking a
+	// position in it: the next write to the project waits here, which is what
+	// lets a check against the project's current state stay true until the change
+	// it justifies is written.
+	LockProjectStream(ctx context.Context, roomID uuid.UUID) error
 	// Marks media so viewers see it obscured until they choose otherwise.
 	//
 	// A moderator's mark overwrites an uploader's; an uploader's does not
@@ -538,6 +576,7 @@ type Querier interface {
 	MarkScheduledMessageFailed(ctx context.Context, arg MarkScheduledMessageFailedParams) error
 	MarkScheduledMessageSent(ctx context.Context, arg MarkScheduledMessageSentParams) error
 	NextIssueStatePosition(ctx context.Context, projectID uuid.UUID) (int32, error)
+	NextProjectPriorityRank(ctx context.Context, projectID uuid.UUID) (int32, error)
 	// Allocates the next position in a room's total order.
 	//
 	// The UPDATE takes a row lock, so two concurrent writers serialise here rather
@@ -584,6 +623,9 @@ type Querier interface {
 	RecordPushFailure(ctx context.Context, endpoint string) error
 	RecordPushSuccess(ctx context.Context, endpoint string) error
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
+	// Naming the conflict: the same relationship twice is nothing new, but a
+	// second parent is a different constraint and must be refused, not swallowed.
+	RelateIssues(ctx context.Context, arg RelateIssuesParams) (int64, error)
 	RemoteMember(ctx context.Context, arg RemoteMemberParams) (RemoteMember, error)
 	RemoteMembers(ctx context.Context, roomID uuid.UUID) ([]RemoteMember, error)
 	// When a project becomes private, everybody taking part in its discussions who
@@ -692,6 +734,7 @@ type Querier interface {
 	SetHidePushContent(ctx context.Context, arg SetHidePushContentParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetIssueDescription(ctx context.Context, arg SetIssueDescriptionParams) (Issue, error)
+	SetIssuePriority(ctx context.Context, arg SetIssuePriorityParams) (Issue, error)
 	SetIssueStatePosition(ctx context.Context, arg SetIssueStatePositionParams) error
 	SetIssueTitle(ctx context.Context, arg SetIssueTitleParams) (Issue, error)
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
@@ -703,6 +746,7 @@ type Querier interface {
 	// Recording an address somebody has asked to prove, which does not touch the
 	// one they already have.
 	SetPendingEmail(ctx context.Context, arg SetPendingEmailParams) error
+	SetProjectPriorityRank(ctx context.Context, arg SetProjectPriorityRankParams) error
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.
@@ -758,8 +802,10 @@ type Querier interface {
 	// first changes the row and the second matches nothing, so it is told what the
 	// state became rather than silently overwriting it.
 	TransitionIssue(ctx context.Context, arg TransitionIssueParams) (Issue, error)
+	UnassignIssue(ctx context.Context, arg UnassignIssueParams) (int64, error)
 	UnblockUser(ctx context.Context, arg UnblockUserParams) error
 	UnindexMessage(ctx context.Context, eventID string) error
+	UnlabelIssue(ctx context.Context, arg UnlabelIssueParams) (int64, error)
 	// Removes a mark.
 	//
 	// Scoped by who may: an uploader may undo their own mark and an automatic one
@@ -769,11 +815,14 @@ type Querier interface {
 	UnmarkAttachmentSensitive(ctx context.Context, arg UnmarkAttachmentSensitiveParams) (int64, error)
 	UnpinMessage(ctx context.Context, arg UnpinMessageParams) error
 	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error
+	UnrelateIssues(ctx context.Context, arg UnrelateIssuesParams) (int64, error)
 	UpdateIssueState(ctx context.Context, arg UpdateIssueStateParams) (IssueState, error)
 	// The provider's claim about the account may change between sign-ins, so it is
 	// refreshed rather than left at whatever it was the first time.
 	UpdateOAuthCredentialEmail(ctx context.Context, arg UpdateOAuthCredentialEmailParams) error
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
+	UpdateProjectLabel(ctx context.Context, arg UpdateProjectLabelParams) (ProjectLabel, error)
+	UpdateProjectPriority(ctx context.Context, arg UpdateProjectPriorityParams) (ProjectPriority, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
 	// Somebody taking part in an issue's discussion hears about everything said

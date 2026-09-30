@@ -112,6 +112,16 @@ async function saveEdits() {
   }
 }
 
+/* A field changed in the panel: show the issue as it now is, and its record. */
+async function changed(updated: Issue) {
+  issue.value = updated;
+  try {
+    history.value = await projectsApi.history(updated.key);
+  } catch {
+    // The change is made; a stale history is corrected on the next load.
+  }
+}
+
 const deleting = ref(false);
 async function confirmDelete() {
   const current = issue.value;
@@ -190,9 +200,9 @@ async function confirmDelete() {
                   </template>
                 </Field>
                 <div class="flex justify-end gap-2">
-                  <Button variant="ghost" @click="editing = false">{{
-                    $t("action.cancel")
-                  }}</Button>
+                  <Button variant="ghost" @click="editing = false">
+                    {{ $t("action.cancel") }}
+                  </Button>
                   <Button :disabled="saving" @click="saveEdits">{{ $t("action.save") }}</Button>
                 </div>
               </section>
@@ -259,6 +269,7 @@ async function confirmDelete() {
                 <p class="text-xs">{{ issue.author }}</p>
                 <p class="text-xs text-muted-foreground">{{ fully(issue.createdAt) }}</p>
               </div>
+              <ProjectsIssueFields :issue="issue" @changed="changed" />
             </aside>
           </div>
         </div>

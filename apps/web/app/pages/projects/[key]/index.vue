@@ -34,16 +34,25 @@ const issues = ref<Issue[]>([]);
 const missing = ref(false);
 const failed = ref<string | null>(null);
 const stateFilter = ref<string>("all");
+const labelFilter = ref<string>("all");
+const sort = ref<"newest" | "priority">("newest");
 const filing = ref(false);
 
 useHead({ title: computed(() => project.value?.name ?? key.value) });
+
+/** "all" means no filter; anything else is an identifier to narrow by. */
+function narrowing(value: string): string | undefined {
+  return value === "all" ? undefined : value;
+}
 
 async function load() {
   failed.value = null;
   try {
     project.value = await projectsApi.get(key.value);
     issues.value = await projectsApi.issues(key.value, {
-      state: stateFilter.value === "all" ? undefined : stateFilter.value,
+      state: narrowing(stateFilter.value),
+      label: narrowing(labelFilter.value),
+      sort: sort.value,
       limit: 200,
     });
   } catch (cause) {
@@ -52,10 +61,13 @@ async function load() {
   }
 }
 onMounted(load);
-watch(stateFilter, load);
+watch([stateFilter, labelFilter, sort], load);
 
 const NuxtLink = resolveComponent("NuxtLink");
 const StateBadge = resolveComponent("ProjectsStateBadge");
+const PriorityBadge = resolveComponent("ProjectsPriorityBadge");
+const LabelChip = resolveComponent("ProjectsLabelChip");
+const Avatar = resolveComponent("UiAvatar");
 
 /*
  * The columns. The identifier and title link to the issue, because a row is
@@ -89,10 +101,45 @@ const columns = [
       ),
   },
   {
+    id: "labels",
+    header: $ts("projects.labels"),
+    cell: ({ row }: { row: { original: Issue } }) =>
+      h(
+        "span",
+        { class: "flex flex-wrap gap-1" },
+        row.original.labels.map((label) => h(LabelChip, { key: label.id, label })),
+      ),
+  },
+  {
     id: "state",
     accessorFn: (issue: Issue) => issue.state.position,
     header: $ts("projects.state"),
     cell: ({ row }: { row: { original: Issue } }) => h(StateBadge, { state: row.original.state }),
+  },
+  {
+    id: "priority",
+    // Unprioritised issues sort after every prioritised one, as the server's
+    // own priority order does.
+    accessorFn: (issue: Issue) => issue.priority?.rank ?? Number.MAX_SAFE_INTEGER,
+    header: $ts("projects.priority.title"),
+    cell: ({ row }: { row: { original: Issue } }) =>
+      h(PriorityBadge, { priority: row.original.priority, compact: false }),
+  },
+  {
+    id: "assignees",
+    header: $ts("projects.assignees"),
+    cell: ({ row }: { row: { original: Issue } }) =>
+      h(
+        "span",
+        { class: "flex -space-x-1" },
+        row.original.assignees.map((person) =>
+          h(Avatar, {
+            key: person.username,
+            name: person.displayName || person.username,
+            size: "sm",
+          }),
+        ),
+      ),
   },
   {
     accessorKey: "updatedAt",
@@ -104,6 +151,14 @@ const columns = [
 const stateOptions = computed(() => [
   { value: "all", label: $ts("projects.allStates") },
   ...(project.value?.states ?? []).map((state) => ({ value: state.id, label: state.name })),
+]);
+const labelOptions = computed(() => [
+  { value: "all", label: $ts("projects.allLabels") },
+  ...(project.value?.labels ?? []).map((label) => ({ value: label.id, label: label.name })),
+]);
+const sortOptions = computed(() => [
+  { value: "newest" as const, label: $ts("projects.sort.newest") },
+  { value: "priority" as const, label: $ts("projects.sort.priority") },
 ]);
 
 const schema = v.object({
@@ -220,16 +275,38 @@ function firstError(field: AnyFieldApi): string | undefined {
           </form>
         </section>
 
-        <Field :label="$ts('projects.filterByState')" class="w-56">
-          <template #default="{ id }">
-            <Select
-              :id="id"
-              v-model="stateFilter"
-              :label="$ts('projects.filterByState')"
-              :options="stateOptions"
-            />
-          </template>
-        </Field>
+        <div class="flex flex-wrap items-end gap-3">
+          <Field :label="$ts('projects.filterByState')" class="w-48">
+            <template #default="{ id }">
+              <Select
+                :id="id"
+                v-model="stateFilter"
+                :label="$ts('projects.filterByState')"
+                :options="stateOptions"
+              />
+            </template>
+          </Field>
+          <Field :label="$ts('projects.filterByLabel')" class="w-48">
+            <template #default="{ id }">
+              <Select
+                :id="id"
+                v-model="labelFilter"
+                :label="$ts('projects.filterByLabel')"
+                :options="labelOptions"
+              />
+            </template>
+          </Field>
+          <Field :label="$ts('projects.sort.title')" class="w-48">
+            <template #default="{ id }">
+              <Select
+                :id="id"
+                v-model="sort"
+                :label="$ts('projects.sort.title')"
+                :options="sortOptions"
+              />
+            </template>
+          </Field>
+        </div>
 
         <p v-if="failed" class="text-sm text-destructive" role="alert">{{ failed }}</p>
 

@@ -133,13 +133,27 @@ RETURNING *;
 -- Callers check the project is visible to the person asking before calling
 -- this; the rows themselves carry nothing a person who can see the project
 -- could not see.
+--
+-- Filters narrow together: an issue must match every one given. Sorting by
+-- priority is by the project's own ranks, most urgent first, with issues that
+-- have no priority after every issue that has one.
 SELECT issues.*
 FROM issues
+LEFT JOIN project_priorities p ON p.id = issues.priority_id
 WHERE issues.project_id = @project_id
   AND issues.deleted_at IS NULL
   AND (sqlc.narg('state_id')::uuid IS NULL OR issues.state_id = sqlc.narg('state_id')::uuid)
+  AND (sqlc.narg('priority_id')::uuid IS NULL OR issues.priority_id = sqlc.narg('priority_id')::uuid)
+  AND (sqlc.narg('label_id')::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM issue_labels l
+        WHERE l.issue_id = issues.id AND l.label_id = sqlc.narg('label_id')::uuid))
+  AND (sqlc.narg('assignee_id')::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM issue_assignees a
+        WHERE a.issue_id = issues.id AND a.user_id = sqlc.narg('assignee_id')::uuid))
   AND (@before_number::bigint = 0 OR issues.number < @before_number::bigint)
-ORDER BY issues.number DESC
+ORDER BY
+  CASE WHEN @by_priority::boolean THEN COALESCE(p.rank, 2147483647) END,
+  issues.number DESC
 LIMIT @page_size;
 
 -- name: ListIssueEvents :many

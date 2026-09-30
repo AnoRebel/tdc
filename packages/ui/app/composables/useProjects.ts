@@ -1,4 +1,14 @@
-import type { Issue, IssueHistoryEntry, IssueState, Project, ProjectMember } from "@tdc/types";
+import type {
+  Issue,
+  IssueHistoryEntry,
+  IssueLabel,
+  IssuePriority,
+  IssueState,
+  MyIssue,
+  Project,
+  ProjectMember,
+  RelationKind,
+} from "@tdc/types";
 
 /**
  * Projects and their issues, through whichever transport this client has.
@@ -43,14 +53,57 @@ export function useProjects() {
         `${at(key)}/states/${id}${moveTo ? `?moveTo=${encodeURIComponent(moveTo)}` : ""}`,
       ),
 
-    issues: (key: string, options: { state?: string; before?: number; limit?: number } = {}) => {
+    /** A page of a project's issues; every filter given must match. */
+    issues: (
+      key: string,
+      options: {
+        state?: string;
+        label?: string;
+        priority?: string;
+        assignee?: string;
+        sort?: "newest" | "priority";
+        before?: number;
+        limit?: number;
+      } = {},
+    ) => {
       const query = new URLSearchParams();
-      if (options.state) query.set("state", options.state);
-      if (options.before) query.set("before", String(options.before));
-      if (options.limit) query.set("limit", String(options.limit));
+      for (const [name, value] of Object.entries(options)) {
+        if (value !== undefined && value !== "") query.set(name, String(value));
+      }
       const suffix = query.size ? `?${query}` : "";
       return api.get<Issue[]>(`${at(key)}/issues${suffix}`);
     },
+    mine: () => api.get<MyIssue[]>("/api/me/issues"),
+
+    labels: (key: string) => api.get<IssueLabel[]>(`${at(key)}/labels`),
+    addLabel: (key: string, label: { name: string; colour?: string }) =>
+      api.post<IssueLabel>(`${at(key)}/labels`, label),
+    updateLabel: (key: string, id: string, changes: { name?: string; colour?: string }) =>
+      api.patch<IssueLabel>(`${at(key)}/labels/${id}`, changes),
+    removeLabel: (key: string, id: string) => api.delete<void>(`${at(key)}/labels/${id}`),
+    addPriority: (key: string, name: string) =>
+      api.post<IssuePriority>(`${at(key)}/priorities`, { name }),
+    renamePriority: (key: string, id: string, name: string) =>
+      api.patch<IssuePriority>(`${at(key)}/priorities/${id}`, { name }),
+    reorderPriorities: (key: string, order: string[]) =>
+      api.put<IssuePriority[]>(`${at(key)}/priorities`, { order }),
+    removePriority: (key: string, id: string) => api.delete<void>(`${at(key)}/priorities/${id}`),
+
+    assign: (ref: string, username: string) =>
+      api.put<Issue>(`${issueAt(ref)}/assignees/${encodeURIComponent(username)}`),
+    unassign: (ref: string, username: string) =>
+      api.delete<Issue>(`${issueAt(ref)}/assignees/${encodeURIComponent(username)}`),
+    label: (ref: string, labelId: string) => api.put<Issue>(`${issueAt(ref)}/labels/${labelId}`),
+    unlabel: (ref: string, labelId: string) =>
+      api.delete<Issue>(`${issueAt(ref)}/labels/${labelId}`),
+    /** Sets an issue's priority; null clears it. */
+    prioritise: (ref: string, priorityId: string | null) =>
+      api.put<Issue>(`${issueAt(ref)}/priority`, { priorityId }),
+    /** Relates this issue to another: kind is what this one is to that one. */
+    relate: (ref: string, kind: RelationKind, other: string) =>
+      api.post<Issue>(`${issueAt(ref)}/relations`, { kind, issue: other }),
+    unrelate: (ref: string, kind: RelationKind, other: string) =>
+      api.delete<Issue>(`${issueAt(ref)}/relations/${kind}/${encodeURIComponent(other)}`),
     file: (
       key: string,
       issue: {

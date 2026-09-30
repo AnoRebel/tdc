@@ -127,6 +127,49 @@ const destinations = computed(() =>
     .map((state) => ({ value: state.id, label: state.name })),
 );
 
+/*
+ * Labels: a name and a colour from a short palette. The palette rather than
+ * any colour, so labels stay distinguishable from each other; the name is
+ * always written beside the dot, so the colour is never the only signal.
+ */
+const palette = [
+  { value: "#6b7280", name: "grey" },
+  { value: "#dc2626", name: "red" },
+  { value: "#ea580c", name: "orange" },
+  { value: "#ca8a04", name: "yellow" },
+  { value: "#16a34a", name: "green" },
+  { value: "#0891b2", name: "teal" },
+  { value: "#2563eb", name: "blue" },
+  { value: "#7c3aed", name: "violet" },
+  { value: "#db2777", name: "pink" },
+] as const;
+const canLabel = computed(() => Boolean(project.value?.can?.label));
+const newLabel = ref("");
+const newLabelColour = ref<string>(palette[1].value);
+async function addLabel() {
+  const name = newLabel.value.trim();
+  if (!name) return;
+  await attempt(() => projectsApi.addLabel(key.value, { name, colour: newLabelColour.value }));
+  if (!error.value) newLabel.value = "";
+}
+
+/* The priority scale, most urgent first, reordered one step at a time. */
+const priorities = computed(() => project.value?.priorities ?? []);
+const newPriority = ref("");
+async function addPriority() {
+  const name = newPriority.value.trim();
+  if (!name) return;
+  await attempt(() => projectsApi.addPriority(key.value, name));
+  if (!error.value) newPriority.value = "";
+}
+async function shiftPriority(index: number, by: -1 | 1) {
+  const order = priorities.value.map((priority) => priority.id);
+  const target = index + by;
+  if (target < 0 || target >= order.length) return;
+  [order[index], order[target]] = [order[target]!, order[index]!];
+  await attempt(() => projectsApi.reorderPriorities(key.value, order));
+}
+
 /* Members: somebody named, and what they may do here. */
 const roles = computed(() => [
   { value: "member" as const, label: $ts("projects.roleMember") },
@@ -275,6 +318,121 @@ async function setVisibility(visibility: "public" | "private" | undefined) {
               </span>
               <Button type="submit" class="self-end" :disabled="!newState.trim()">
                 {{ $t("projects.addState") }}
+              </Button>
+            </form>
+          </section>
+
+          <section :aria-labelledby="'labels-heading'">
+            <h2 id="labels-heading" class="text-sm font-semibold">{{ $t("projects.labels") }}</h2>
+            <ul v-if="project.labels?.length" class="mt-3 flex flex-wrap gap-2">
+              <li
+                v-for="label in project.labels"
+                :key="label.id"
+                class="flex items-center gap-1 rounded-full border bg-card py-0.5 pr-0.5 pl-1"
+              >
+                <ProjectsLabelChip :label="label" class="border-0" />
+                <Button
+                  v-if="canLabel"
+                  variant="ghost"
+                  size="icon"
+                  class="size-5"
+                  :label="$ts('projects.removeLabel', { label: label.name })"
+                  @click="attempt(() => projectsApi.removeLabel(key, label.id))"
+                >
+                  <Icon name="lucide:x" class="size-3" />
+                </Button>
+              </li>
+            </ul>
+            <p v-else class="mt-2 text-xs text-muted-foreground">{{ $t("projects.noLabels") }}</p>
+            <form
+              v-if="canLabel"
+              class="mt-3 flex flex-wrap items-end gap-2"
+              @submit.prevent="addLabel"
+            >
+              <Field :label="$ts('projects.newLabel')" class="min-w-40 flex-1">
+                <template #default="{ id }">
+                  <Input :id="id" v-model="newLabel" />
+                </template>
+              </Field>
+              <fieldset class="flex gap-1 pb-1.5">
+                <legend class="sr-only">{{ $t("projects.labelColour") }}</legend>
+                <label v-for="colour in palette" :key="colour.value" class="cursor-pointer">
+                  <input
+                    v-model="newLabelColour"
+                    type="radio"
+                    name="label-colour"
+                    class="peer sr-only"
+                    :value="colour.value"
+                  />
+                  <span
+                    class="block size-5 rounded-full ring-offset-2 ring-offset-background peer-checked:ring-2 peer-checked:ring-ring peer-focus-visible:ring-2 peer-focus-visible:ring-ring"
+                    :style="{ backgroundColor: colour.value }"
+                  />
+                  <span class="sr-only">{{ $t(`projects.colour.${colour.name}`) }}</span>
+                </label>
+              </fieldset>
+              <Button type="submit" :disabled="!newLabel.trim()">
+                {{ $t("projects.addLabel") }}
+              </Button>
+            </form>
+          </section>
+
+          <section :aria-labelledby="'priorities-heading'">
+            <h2 id="priorities-heading" class="text-sm font-semibold">
+              {{ $t("projects.priority.scale") }}
+            </h2>
+            <p class="mt-0.5 text-xs text-muted-foreground">
+              {{ $t("projects.priority.scaleHint") }}
+            </p>
+            <ol class="mt-3 space-y-1">
+              <li
+                v-for="(priority, index) in priorities"
+                :key="priority.id"
+                class="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5"
+              >
+                <ProjectsPriorityBadge :priority="priority" class="flex-1" />
+                <template v-if="canConfigure">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    :label="$ts('projects.priority.moreUrgent', { priority: priority.name })"
+                    :disabled="index === 0"
+                    @click="shiftPriority(index, -1)"
+                  >
+                    <Icon name="lucide:arrow-up" class="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    :label="$ts('projects.priority.lessUrgent', { priority: priority.name })"
+                    :disabled="index === priorities.length - 1"
+                    @click="shiftPriority(index, 1)"
+                  >
+                    <Icon name="lucide:arrow-down" class="size-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    :label="$ts('projects.priority.remove', { priority: priority.name })"
+                    @click="attempt(() => projectsApi.removePriority(key, priority.id))"
+                  >
+                    <Icon name="lucide:trash-2" class="size-3.5" />
+                  </Button>
+                </template>
+              </li>
+            </ol>
+            <form
+              v-if="canConfigure"
+              class="mt-3 flex flex-wrap items-end gap-2"
+              @submit.prevent="addPriority"
+            >
+              <Field :label="$ts('projects.priority.new')" class="min-w-40 flex-1">
+                <template #default="{ id }">
+                  <Input :id="id" v-model="newPriority" />
+                </template>
+              </Field>
+              <Button type="submit" :disabled="!newPriority.trim()">
+                {{ $t("projects.priority.add") }}
               </Button>
             </form>
           </section>

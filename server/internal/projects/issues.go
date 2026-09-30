@@ -476,16 +476,34 @@ func (s *Service) Delete(ctx context.Context, actor Actor, access Access, issue 
 	})
 }
 
-// ListIssues returns a page of a project's issues, newest first. before is
-// the number to continue below, or zero for the first page.
-func (s *Service) ListIssues(ctx context.Context, access Access, stateID *uuid.UUID, before int64, limit int) ([]dbgen.Issue, error) {
+// IssueFilter narrows a project's issue list. Every field given must match.
+type IssueFilter struct {
+	StateID    *uuid.UUID
+	LabelID    *uuid.UUID
+	PriorityID *uuid.UUID
+	AssigneeID *uuid.UUID
+	// ByPriority sorts most urgent first, by the project's own scale, instead
+	// of newest first.
+	ByPriority bool
+	// Before continues below this issue number; zero is the first page.
+	Before int64
+	Limit  int
+}
+
+// ListIssues returns a page of a project's issues.
+func (s *Service) ListIssues(ctx context.Context, access Access, filter IssueFilter) ([]dbgen.Issue, error) {
+	limit := filter.Limit
 	if limit <= 0 || limit > maxIssuePage {
 		limit = defaultIssuePage
 	}
 	issues, err := s.queries.ListProjectIssues(ctx, dbgen.ListProjectIssuesParams{
 		ProjectID:    access.Project.ID,
-		StateID:      stateID,
-		BeforeNumber: before,
+		StateID:      filter.StateID,
+		LabelID:      filter.LabelID,
+		PriorityID:   filter.PriorityID,
+		AssigneeID:   filter.AssigneeID,
+		ByPriority:   filter.ByPriority,
+		BeforeNumber: filter.Before,
 		PageSize:     int32(limit),
 	})
 	if err != nil {

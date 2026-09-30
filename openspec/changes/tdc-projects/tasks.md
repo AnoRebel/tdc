@@ -37,12 +37,12 @@ Goal: the capability that is the reason this belongs in a chat platform, working
 
 Goal: an issue carries enough structure to actually be tracked, not just filed.
 
-- [ ] 3.1 Implement assignment to one or more users with notification on assignment; verify an assignee is notified per their preferences and unassignment is recorded with actor and time via the event log
-- [ ] 3.2 Implement a cross-project "my issues" view; verify it lists issues assigned to the viewer across every project they can access and none they cannot
-- [ ] 3.3 Implement project-configurable labels and a project-configurable priority scale; verify filtering by label returns only matching issues and sorting by priority respects the configured order
-- [ ] 3.4 Implement issue relationships (parent/child, blocks/blocked-by) with cycle prevention; verify a relationship that would create a cycle is refused with an explanation, and a parent issue's view reflects the completion state of its children
-- [ ] 3.5 Extend the web issue detail view with assignees, labels, priority, and a relationship editor; verify all four are usable end to end from the browser
-- [ ] **MILESTONE 3** — Demonstrate: an issue is assigned to two people who are both notified, carries two labels and a priority, has a child issue whose completion is reflected on the parent, and a blocking relationship that a cyclic attempt correctly refuses. Tag `v1.34.0-dev`.
+- [x] 3.1 Implement assignment to one or more users with notification on assignment; verify an assignee is notified per their preferences and unassignment is recorded with actor and time via the event log
+- [x] 3.2 Implement a cross-project "my issues" view; verify it lists issues assigned to the viewer across every project they can access and none they cannot
+- [x] 3.3 Implement project-configurable labels and a project-configurable priority scale; verify filtering by label returns only matching issues and sorting by priority respects the configured order
+- [x] 3.4 Implement issue relationships (parent/child, blocks/blocked-by) with cycle prevention; verify a relationship that would create a cycle is refused with an explanation, and a parent issue's view reflects the completion state of its children
+- [x] 3.5 Extend the web issue detail view with assignees, labels, priority, and a relationship editor; verify all four are usable end to end from the browser
+- [x] **MILESTONE 3** — Demonstrate: an issue is assigned to two people who are both notified, carries two labels and a priority, has a child issue whose completion is reflected on the parent, and a blocking relationship that a cyclic attempt correctly refuses. Tag `v1.34.0-dev`.
 
 ## 4. Phase 4 — Search and filtering
 

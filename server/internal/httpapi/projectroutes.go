@@ -15,6 +15,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/projects"
 )
 
@@ -211,6 +212,9 @@ type projectResponse struct {
 	Role   string            `json:"role,omitempty"`
 	States []stateResponse   `json:"states,omitempty"`
 	Can    *projectAbilities `json:"can,omitempty"`
+	// Its labels and priority scale, on a single project.
+	Labels     []labelResponse    `json:"labels,omitempty"`
+	Priorities []priorityResponse `json:"priorities,omitempty"`
 }
 
 func projectResponseOf(project dbgen.Project, role string) projectResponse {
@@ -238,6 +242,23 @@ func (s *Server) fullProject(ctx context.Context, access projects.Access) (proje
 	}
 	abilities := abilitiesOf(access)
 	response.Can = &abilities
+
+	labels, err := s.projects.Labels(ctx, access.Project.ID)
+	if err != nil {
+		return projectResponse{}, err
+	}
+	response.Labels = make([]labelResponse, 0, len(labels))
+	for _, label := range labels {
+		response.Labels = append(response.Labels, labelResponseOf(label))
+	}
+	priorities, err := s.projects.Priorities(ctx, access.Project.ID)
+	if err != nil {
+		return projectResponse{}, err
+	}
+	response.Priorities = make([]priorityResponse, 0, len(priorities))
+	for _, priority := range priorities {
+		response.Priorities = append(response.Priorities, priorityResponseOf(priority))
+	}
 	return response, nil
 }
 
@@ -590,6 +611,11 @@ type issueResponse struct {
 	CreatedAt time.Time     `json:"createdAt"`
 	UpdatedAt time.Time     `json:"updatedAt"`
 
+	Assignees []personRef        `json:"assignees"`
+	Labels    []labelResponse    `json:"labels"`
+	Priority  *priorityResponse  `json:"priority,omitempty"`
+	Relations *relationsResponse `json:"relations,omitempty"`
+
 	// Only on the full view of one issue.
 	Description *string          `json:"description,omitempty"`
 	Project     *projectResponse `json:"project,omitempty"`
@@ -642,6 +668,9 @@ func (s *Server) issueSummaries(ctx context.Context, project dbgen.Project, issu
 		}
 		response = append(response, summary)
 	}
+	if err := s.decorate(ctx, project.ID, issues, response); err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 
@@ -652,18 +681,36 @@ func (s *Server) handleListIssues(c *echo.Context) error {
 		return err
 	}
 
-	var stateID *uuid.UUID
-	if raw := c.QueryParam("state"); raw != "" {
-		id, err := uuid.Parse(raw)
-		if err != nil {
-			return projectError(projects.ErrStateNotFound)
+	filter := projects.IssueFilter{ByPriority: c.QueryParam("sort") == "priority"}
+	for _, parameter := range []struct {
+		name    string
+		target  **uuid.UUID
+		missing error
+	}{
+		{"state", &filter.StateID, projects.ErrStateNotFound},
+		{"label", &filter.LabelID, projects.ErrLabelNotFound},
+		{"priority", &filter.PriorityID, projects.ErrPriorityMissing},
+	} {
+		if raw := c.QueryParam(parameter.name); raw != "" {
+			id, err := uuid.Parse(raw)
+			if err != nil {
+				return structureError(parameter.missing)
+			}
+			*parameter.target = &id
 		}
-		stateID = &id
 	}
-	before, _ := strconv.ParseInt(c.QueryParam("before"), 10, 64)
-	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	if username := c.QueryParam("assignee"); username != "" {
+		person, err := s.queries.GetUserByUsername(ctx, identity.NormaliseUsername(username))
+		if err != nil {
+			// Nobody by that name is assigned to anything.
+			return c.JSON(http.StatusOK, []issueResponse{})
+		}
+		filter.AssigneeID = &person.ID
+	}
+	filter.Before, _ = strconv.ParseInt(c.QueryParam("before"), 10, 64)
+	filter.Limit, _ = strconv.Atoi(c.QueryParam("limit"))
 
-	issues, err := s.projects.ListIssues(ctx, access, stateID, before, limit)
+	issues, err := s.projects.ListIssues(ctx, access, filter)
 	if err != nil {
 		return err
 	}
@@ -763,6 +810,10 @@ func (s *Server) fullIssue(ctx context.Context, c *echo.Context, access projects
 		return issueResponse{}, err
 	}
 	response.Origin = origin
+
+	if response.Relations, err = s.relationsOf(ctx, access.Project, issue); err != nil {
+		return issueResponse{}, err
+	}
 	return response, nil
 }
 

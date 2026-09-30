@@ -643,13 +643,36 @@
       "other": "{actor}: {type}"
     },
     "priority": {
-      "none": "bila kipaumbele"
+      "none": "bila kipaumbele",
+      "title": "Kipaumbele",
+      "noneOption": "Bila kipaumbele",
+      "scale": "Ngazi za kipaumbele",
+      "scaleHint": "Ya dharura zaidi kwanza. Kupanga kwa kipaumbele hufuata mpangilio huu, vyovyote viwango vinavyoitwa.",
+      "moreUrgent": "Fanya {priority} kuwa ya dharura zaidi",
+      "lessUrgent": "Fanya {priority} kuwa ya dharura kidogo",
+      "remove": "Ondoa {priority}",
+      "new": "Ngazi mpya",
+      "add": "Ongeza ngazi"
     },
     "relation": {
-      "parent": "mtoto wa",
-      "child": "mzazi wa",
+      "parent": "mzazi wa",
+      "child": "mtoto wa",
       "blocks": "linalozuia",
-      "blocked_by": "linalozuiwa na"
+      "blocked_by": "linalozuiwa na",
+      "title": "Mahusiano",
+      "parentTitle": "Sehemu ya",
+      "childrenTitle": "Linajumuisha",
+      "blocksTitle": "Linazuia",
+      "blockedByTitle": "Linazuiwa na",
+      "childProgress": "Sehemu {completed} kati ya {total} zimekamilika",
+      "addBlocks": "Hili linazuia",
+      "addBlockedBy": "Hili linazuiwa na",
+      "addParentOf": "Hili ni mzazi wa",
+      "addChildOf": "Hili ni mtoto wa",
+      "kind": "Yanavyohusiana",
+      "otherIssue": "Suala lingine",
+      "add": "Husisha",
+      "remove": "Ondoa uhusiano na {other}"
     },
     "usernameRequired": "Taja jina la mtumiaji wa kuongeza.",
     "discussion": "Majadiliano",
@@ -670,6 +693,39 @@
       "removed": "Ujumbe katika {room} ulioanzisha suala hili umeondolewa.",
       "edited": "umehaririwa",
       "open": "Ufungue katika {room}"
+    },
+    "assignees": "Waliokabidhiwa",
+    "nobodyAssigned": "Bado hakuna mtu",
+    "assignSomebody": "Mkabidhi mtu",
+    "unassign": "Mwondoe {who} kwenye suala hili",
+    "labels": "Lebo",
+    "noLabels": "Hakuna lebo",
+    "newLabel": "Lebo mpya",
+    "addLabel": "Ongeza lebo",
+    "removeLabel": "Ondoa lebo {label}",
+    "labelColour": "Rangi",
+    "allLabels": "Lebo yoyote",
+    "filterByLabel": "Onyesha masuala yenye lebo",
+    "sort": {
+      "title": "Mpangilio",
+      "newest": "Mapya kwanza",
+      "priority": "Ya dharura zaidi kwanza"
+    },
+    "mine": {
+      "title": "Masuala yangu",
+      "project": "Mradi",
+      "none": "Hakuna ulichokabidhiwa."
+    },
+    "colour": {
+      "grey": "Kijivu",
+      "red": "Nyekundu",
+      "orange": "Chungwa",
+      "yellow": "Njano",
+      "green": "Kijani",
+      "teal": "Samawati iliyokolea",
+      "blue": "Buluu",
+      "violet": "Zambarau",
+      "pink": "Waridi"
     }
   }
 }

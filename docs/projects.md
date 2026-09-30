@@ -83,6 +83,36 @@ The history shows the names things had at the time. An issue moved into _Doing_
 that was later renamed _In progress_ still reads "moved to Doing", because that
 is what happened.
 
+## Tracking: who, what kind, how urgent, and what depends on what
+
+The panel beside an issue sets everything else about it. Each change is made
+the moment it is chosen and recorded in the issue's history.
+
+- **Assignees.** One or more people responsible for it, chosen from the
+  project's members. Being assigned tells you — according to your own
+  notification settings — and puts you in the issue's discussion, following it.
+  Nobody can be assigned an issue they cannot see, so a private project's issues
+  can only be assigned to its members. **My issues** in the sidebar lists
+  everything assigned to you across every project you can still see.
+- **Labels.** The project's own vocabulary — `bug`, `docs`, `needs-design` —
+  each with a colour from a short palette. The colour is a dot beside the name,
+  never the only thing saying which label it is. A project's labels are managed
+  under **Settings**; removing one takes it off every issue that had it, each
+  removal recorded.
+- **Priority.** A level from the project's own scale, most urgent first. A new
+  project starts with _Urgent_, _High_, _Medium_ and _Low_; its administrators
+  can rename, add, remove and reorder levels. **Most urgent first** on the issue
+  list sorts by that order, whatever the levels are called, with issues that
+  have no priority last.
+- **Relationships.** An issue can be the **parent** of others — a piece of work
+  made up of smaller pieces — and it shows how many of its children are done,
+  from their states as they are now. An issue has at most one parent. And an
+  issue can **block** another. Neither kind may form a loop: making an issue its
+  own ancestor, or a chain of blocks that comes back round, is refused, and the
+  refusal names the issues the loop would run through. Relationships are
+  between issues of the same project, and each side records the change in its
+  own history.
+
 ## Who may do what
 
 | Permission                 | What it allows                                   | Held by default by                 |

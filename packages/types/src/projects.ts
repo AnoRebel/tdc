@@ -34,6 +34,50 @@ export interface ProjectAbilities {
   delete: boolean;
 }
 
+/** One of a project's labels. */
+export interface IssueLabel {
+  id: string;
+  name: string;
+  /** #rrggbb. */
+  colour: string;
+}
+
+/** One level of a project's priority scale. */
+export interface IssuePriority {
+  id: string;
+  name: string;
+  /** Its place on the scale, 1 being the most urgent. */
+  rank: number;
+}
+
+/** Somebody, as an issue names them. */
+export interface PersonRef {
+  username: string;
+  displayName: string;
+  address: string;
+}
+
+/** Another issue, as a relationship shows it. */
+export interface RelatedIssue {
+  key: string;
+  title: string;
+  state: string;
+  completed: boolean;
+}
+
+/** How an issue stands among the others in its project. */
+export interface IssueRelations {
+  parent?: RelatedIssue;
+  children: RelatedIssue[];
+  blocks: RelatedIssue[];
+  blockedBy: RelatedIssue[];
+  /** How many of its children are finished, from their states as they are now. */
+  childProgress: { completed: number; total: number };
+}
+
+/** What one issue is to another, from its own side. */
+export type RelationKind = "parent" | "child" | "blocks" | "blocked_by";
+
 export interface Project {
   id: string;
   /** What every identifier in it starts with: WEB in WEB-12. Never changes. */
@@ -47,6 +91,10 @@ export interface Project {
   /** Present on a single project, in board order. */
   states?: IssueState[];
   can?: ProjectAbilities;
+  /** Present on a single project. */
+  labels?: IssueLabel[];
+  /** Present on a single project, most urgent first. */
+  priorities?: IssuePriority[];
 }
 
 export interface ProjectMember {
@@ -99,7 +147,11 @@ export interface Issue {
   author?: string;
   createdAt: string;
   updatedAt: string;
+  assignees: PersonRef[];
+  labels: IssueLabel[];
+  priority?: IssuePriority;
   /** On the full view of one issue only. */
+  relations?: IssueRelations;
   description?: string;
   project?: Project;
   can?: IssueAbilities;
@@ -135,6 +187,12 @@ export interface IssueFromMessage {
   state: string;
   /** Whether that state means done. */
   completed: boolean;
+}
+
+/** An issue assigned to the requester, with the project it is in. */
+export interface MyIssue extends Issue {
+  projectKey: string;
+  projectName: string;
 }
 
 /** Refused because the issue changed first: here is what it became. */

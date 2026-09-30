@@ -35,6 +35,9 @@ export async function openTab(page: Page, name: string): Promise<void> {
 export async function choose(page: Page, label: string, option: string): Promise<void> {
   await page.getByRole("combobox", { name: label }).click();
   await page.getByRole("option", { name: option, exact: true }).click();
+  // Closed before anything else is touched: while the list is open it holds
+  // the pointer, and a click meant for the page lands on its backdrop.
+  await expect(page.getByRole("listbox")).toHaveCount(0);
 }
 
 /** A bearer token for an account, for fixtures made through the API. */

@@ -120,6 +120,8 @@ export function describeNotification(notification: Notification): string {
       return `${who} forwarded your message`;
     case "pin":
       return `${who} pinned your message`;
+    case "assigned":
+      return `${who} assigned you ${notification.detail ?? ""}`.trim();
     default:
       return `${who} did something`;
   }

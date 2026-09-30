@@ -396,7 +396,16 @@ export interface ThreadSummary {
 
 /** Why somebody was notified. */
 export type NotificationReason =
-  "mention" | "direct" | "thread" | "reaction" | "reply" | "join" | "forward" | "pin";
+  | "mention"
+  | "direct"
+  | "thread"
+  | "reaction"
+  | "reply"
+  | "join"
+  | "forward"
+  | "pin"
+  // Somebody made you responsible for an issue; detail names it.
+  | "assigned";
 
 /** One thing somebody has been told about. */
 export interface Notification {
