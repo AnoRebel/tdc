@@ -563,6 +563,7 @@ setting:
 | -------------------------------------- | ------- | ------------------------------------------------------------- |
 | `directory.reads_per_minute`           | 30      | searches and profile views per signed-in person per minute    |
 | `directory.anonymous_reads_per_minute` | 10      | the same, per address, for people browsing without signing in |
+| `directory.enquiries_per_hour`         | 5       | enquiries one person may send in an hour                      |
 
 Both must be at least one; an operator who wants the directory unreadable
 turns it off. A page of results is always twenty at most, whatever these say.

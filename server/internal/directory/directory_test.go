@@ -102,7 +102,7 @@ func TestAWithheldFieldIsNotReadFromTheDatabase(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	stranger, err := service.View(ctx, "juma", directory.Anonymous)
+	stranger, err := service.View(ctx, "juma", directory.Anonymous, uuid.Nil)
 	if err != nil {
 		t.Fatalf("view: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestAWithheldFieldIsNotReadFromTheDatabase(t *testing.T) {
 		t.Errorf("a stranger was given withheld fields: %+v", stranger)
 	}
 
-	member, err := service.View(ctx, "juma", directory.Member)
+	member, err := service.View(ctx, "juma", directory.Member, uuid.New())
 	if err != nil {
 		t.Fatalf("view: %v", err)
 	}

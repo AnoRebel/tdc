@@ -73,7 +73,7 @@ mistake in a handler cannot leak what the query did not return. This is the
 discipline the member-list disclosure established, applied to strangers.
 */
 
-SELECT p.user_id, p.headline, p.bio, p.location, p.experience, p.contact_email, p.contact_phone, p.contact_url, p.visibility, p.details_visibility, p.contact_visibility, p.profile_rank, p.details_rank, p.contact_rank, p.created_at, p.updated_at, p.open_to_work, p.availability_note, p.availability_expires_at, u.username, u.display_name
+SELECT p.user_id, p.headline, p.bio, p.location, p.experience, p.contact_email, p.contact_phone, p.contact_url, p.visibility, p.details_visibility, p.contact_visibility, p.profile_rank, p.details_rank, p.contact_rank, p.created_at, p.updated_at, p.open_to_work, p.availability_note, p.availability_expires_at, p.accepts_enquiries, u.username, u.display_name
 FROM directory_profiles p
 JOIN users u ON u.id = p.user_id
 WHERE p.user_id = $1
@@ -99,6 +99,7 @@ type GetOwnDirectoryProfileRow struct {
 	OpenToWork            bool
 	AvailabilityNote      string
 	AvailabilityExpiresAt *time.Time
+	AcceptsEnquiries      *bool
 	Username              string
 	DisplayName           string
 }
@@ -128,6 +129,7 @@ func (q *Queries) GetOwnDirectoryProfile(ctx context.Context, userID uuid.UUID) 
 		&i.OpenToWork,
 		&i.AvailabilityNote,
 		&i.AvailabilityExpiresAt,
+		&i.AcceptsEnquiries,
 		&i.Username,
 		&i.DisplayName,
 	)
@@ -234,14 +236,16 @@ INSERT INTO directory_profiles (
     user_id, headline, bio, location, experience,
     contact_email, contact_phone, contact_url,
     visibility, details_visibility, contact_visibility,
-    open_to_work, availability_note, availability_expires_at
+    open_to_work, availability_note, availability_expires_at, accepts_enquiries
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8,
     $9, $10, $11,
-    $12, $13, $14
+    $12, $13, $14,
+    $15
 )
 ON CONFLICT (user_id) DO UPDATE SET
+    accepts_enquiries = EXCLUDED.accepts_enquiries,
     open_to_work = EXCLUDED.open_to_work,
     availability_note = EXCLUDED.availability_note,
     availability_expires_at = EXCLUDED.availability_expires_at,
@@ -274,6 +278,7 @@ type SaveDirectoryProfileParams struct {
 	OpenToWork            bool
 	AvailabilityNote      string
 	AvailabilityExpiresAt *time.Time
+	AcceptsEnquiries      *bool
 }
 
 // Creates the profile or replaces what it says. One statement for both, so a
@@ -295,6 +300,7 @@ func (q *Queries) SaveDirectoryProfile(ctx context.Context, arg SaveDirectoryPro
 		arg.OpenToWork,
 		arg.AvailabilityNote,
 		arg.AvailabilityExpiresAt,
+		arg.AcceptsEnquiries,
 	)
 	var created bool
 	err := row.Scan(&created)
@@ -382,10 +388,17 @@ SELECT
     (CASE WHEN p.details_rank <= $1::smallint
                AND p.open_to_work AND p.availability_expires_at > NOW()
           THEN p.availability_expires_at ELSE 'epoch'::timestamptz END)::timestamptz AS available_until,
+    -- Whether this viewer could send an enquiry: the owner's choice, or the
+    -- default for the profile's visibility — and never to somebody who has
+    -- blocked them, which reads exactly like a profile that takes none, so
+    -- the block is not disclosed.
+    (COALESCE(p.accepts_enquiries, p.visibility = 'public')
+     AND NOT EXISTS (SELECT 1 FROM user_blocks b
+                     WHERE b.blocker_id = u.id AND b.blocked_id = $2::uuid))::boolean AS accepts_enquiries,
     p.updated_at
 FROM users u
 JOIN directory_profiles p ON p.user_id = u.id
-WHERE u.username_folded = lower($2::text)
+WHERE u.username_folded = lower($3::text)
   AND p.profile_rank <= $1::smallint
   -- A suspended account is not somebody a client can engage, and listing one
   -- would advertise a person the server has stopped.
@@ -394,6 +407,7 @@ WHERE u.username_folded = lower($2::text)
 
 type ViewDirectoryProfileParams struct {
 	ViewerRank int16
+	Viewer     uuid.UUID
 	Username   string
 }
 
@@ -414,11 +428,12 @@ type ViewDirectoryProfileRow struct {
 	Available        bool
 	AvailabilityNote string
 	AvailableUntil   time.Time
+	AcceptsEnquiries bool
 	UpdatedAt        time.Time
 }
 
 func (q *Queries) ViewDirectoryProfile(ctx context.Context, arg ViewDirectoryProfileParams) (ViewDirectoryProfileRow, error) {
-	row := q.db.QueryRow(ctx, viewDirectoryProfile, arg.ViewerRank, arg.Username)
+	row := q.db.QueryRow(ctx, viewDirectoryProfile, arg.ViewerRank, arg.Viewer, arg.Username)
 	var i ViewDirectoryProfileRow
 	err := row.Scan(
 		&i.UserID,
@@ -437,6 +452,7 @@ func (q *Queries) ViewDirectoryProfile(ctx context.Context, arg ViewDirectoryPro
 		&i.Available,
 		&i.AvailabilityNote,
 		&i.AvailableUntil,
+		&i.AcceptsEnquiries,
 		&i.UpdatedAt,
 	)
 	return i, err

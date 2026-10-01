@@ -107,6 +107,9 @@ const filtered = computed(() => Object.values(fromQuery()).some(Boolean));
         >
           {{ $t("directory.review.title") }}
         </NuxtLink>
+        <NuxtLink :to="localeRoute({ name: 'directory-enquiries' })" class="btn btn-ghost">
+          {{ $t("directory.enquiry.title") }}
+        </NuxtLink>
         <NuxtLink :to="localeRoute({ name: 'directory-profile' })" class="btn btn-ghost">
           <UserRound class="size-3.5" />
           {{ $t("directory.profile.yours") }}

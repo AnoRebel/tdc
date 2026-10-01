@@ -196,6 +196,11 @@ Contact details are separate from the rest and visible to nobody but you unless
 you choose otherwise. What you have hidden from somebody is left out of what the
 server sends them, not sent and hidden by the application.
 
+If you send or receive an enquiry through the directory, the record holds who
+sent it to whom, its subject and text, when, and whether it was taken up,
+declined or withdrawn. Its text is also the first message of the private
+conversation it opens, which is kept like any other conversation.
+
 If you are listed by a company, the record holds which company, the role it
 gave you, who invited you, and when you accepted. A company's own page holds its
 name, description, location and who created it.

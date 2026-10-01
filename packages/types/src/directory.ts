@@ -43,6 +43,31 @@ export interface ProfileDocument {
   availabilityNote: string;
   /** When the statement lapses, as an RFC 3339 instant. */
   availableUntil?: string;
+  /**
+   * Whether the profile takes enquiries: null until the owner chooses, when
+   * it follows the visibility — a public profile takes them.
+   */
+  acceptsEnquiries: boolean | null;
+}
+
+/** Where an enquiry stands. */
+export type EnquiryStatus = "pending" | "accepted" | "declined" | "withdrawn";
+
+/** One enquiry, from the point of view of one of its two people. */
+export interface Enquiry {
+  id: string;
+  subject: string;
+  body: string;
+  status: EnquiryStatus;
+  /** The private conversation it opened. */
+  roomId?: string;
+  /** Whether the viewer received it, rather than sent it. */
+  received: boolean;
+  /** The other person's username, and their name. */
+  with: string;
+  withName: string;
+  createdAt: string;
+  respondedAt?: string;
 }
 
 /** Whether a skill is in the vocabulary or waiting for review. */
@@ -186,6 +211,8 @@ export interface ProfileView {
   skills?: { id: string; name: string; description?: string; verified?: Verified }[];
   /** Present when a moderator verified the person is who the profile says. */
   identityVerified?: Verified;
+  /** Whether the viewer could send an enquiry now. */
+  acceptsEnquiries: boolean;
   /** Present only while the owner's availability is current. */
   available?: boolean;
   availabilityNote?: string;

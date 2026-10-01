@@ -98,6 +98,7 @@ const schema = computed(() =>
       v.maxLength(200, $ts("directory.form.tooLong", { count: 200 })),
     ),
     availableUntil: v.optional(v.string()),
+    acceptsEnquiries: v.nullable(v.boolean()),
   }),
 );
 
@@ -162,6 +163,29 @@ const form = useForm({
           />
         </template>
       </form.Field>
+
+      <!-- Taking enquiries is its own decision, separate from who may send
+           a direct message. Until chosen it follows the profile: public takes
+           them. -->
+      <form.Subscribe>
+        <template #default="{ values }">
+          <div class="flex items-start gap-3 rounded-lg border p-3">
+            <Switch
+              :model-value="values.acceptsEnquiries ?? values.visibility === 'public'"
+              :label="$ts('directory.enquiry.takeThem')"
+              @update:model-value="
+                (taking: boolean) => form.setFieldValue('acceptsEnquiries', taking)
+              "
+            />
+            <span class="min-w-0">
+              <span class="block text-sm">{{ $t("directory.enquiry.takeThem") }}</span>
+              <span class="block text-xs text-muted-foreground">
+                {{ $t("directory.enquiry.takeThemHint") }}
+              </span>
+            </span>
+          </div>
+        </template>
+      </form.Subscribe>
     </section>
 
     <section class="space-y-4">

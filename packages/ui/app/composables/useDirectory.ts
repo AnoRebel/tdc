@@ -4,6 +4,7 @@ import type {
   DirectoryFilters,
   DirectoryResults,
   DirectoryVisibility,
+  Enquiry,
   OwnProfile,
   ProfileClaims,
   ProfileDocument,
@@ -36,6 +37,7 @@ export function emptyProfile(): ProfileDocument {
     skills: [],
     openToWork: false,
     availabilityNote: "",
+    acceptsEnquiries: null,
   };
 }
 
@@ -197,7 +199,22 @@ export function useDirectory() {
     return api.post<void>(`/api/directory/moderation/verifications/${id}/revoke`, { reason });
   }
 
+  /** Sends an enquiry through somebody's profile. */
+  function sendEnquiry(username: string, subject: string, body: string) {
+    return api.post<Enquiry>(`/api/directory/profiles/${encodeURIComponent(username)}/enquiries`, {
+      subject,
+      body,
+    });
+  }
+
+  /** The enquiries somebody received, or sent. */
+  function enquiries(box: "received" | "sent" = "received") {
+    return api.get<Enquiry[]>(`/api/directory/me/enquiries${box === "sent" ? "?box=sent" : ""}`);
+  }
+
   return {
+    sendEnquiry,
+    enquiries,
     claims,
     verifyClaim,
     revokeVerification,

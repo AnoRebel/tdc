@@ -212,6 +212,48 @@ the directory. It finds people by name and address as it always has, returns
 nothing a directory profile says, and describes somebody with a profile exactly
 as it describes somebody without one.
 
+## Enquiries
+
+An enquiry is the first contact a client makes with somebody through their
+profile: a subject, and a message saying what the work is.
+
+**Whether you take enquiries is your profile's setting, not your direct-message
+setting.** The two are separate decisions and neither changes the other:
+
+- Somebody who takes direct messages from nobody can still take enquiries.
+- Somebody who closes enquiries can still be messaged directly by whoever their
+  direct-message setting allows.
+
+Until you choose, a public profile takes enquiries — a profile advertised to
+strangers that nobody could contact would be a dead end — and any other profile
+does not. Once you choose, your choice stands whatever you later do with the
+profile's visibility. Closing enquiries refuses new ones; the ones you already
+have, and their conversations, are untouched.
+
+An enquiry to somebody not taking them is refused, and the sender is told so in
+those words. **Somebody who has blocked you appears exactly as somebody taking
+no enquiries** — the same refusal, and a profile that says it takes none — so a
+block is never disclosed.
+
+**An enquiry is one message.** Sending one opens a private conversation between
+the two of you, holding the enquiry, which the recipient is notified about
+exactly as for any direct message addressed to them. The sender is not in that
+conversation, and cannot add to it, until the recipient takes the enquiry up;
+the sender's own list shows it as _Waiting for an answer_. Like every direct
+conversation it is never listed, searchable or discoverable by anybody but the
+two people in it.
+
+You may have one unanswered enquiry with any one person at a time. Sending
+enquiries is limited to five an hour for each sender — plenty for somebody
+looking for a developer, very little for somebody sending the same message to
+everybody listed — and the operator can change the figure. Refusals do not count
+against it.
+
+Enquiries you received and sent are under **Directory → Enquiries**. Each
+enquiry's text is kept with the enquiry as well as in its conversation, so the
+list still says what was asked after the conversation's own retention has done
+its work.
+
 ## Companies
 
 Anybody may create a company profile — a name, a description, a location, and
@@ -348,6 +390,8 @@ deliberate decision, not something the protocol backs into.
 | `GET /api/directory/moderation/profiles/:username/claims`         | the verifiable claims on a profile (`directory.verify`)                                          |
 | `POST /api/directory/moderation/profiles/:username/verifications` | verify one claim: `kind`, `claimId`, `note` (`directory.verify`)                                 |
 | `POST /api/directory/moderation/verifications/:id/revoke`         | revoke a verification, with a `reason` (`directory.verify`)                                      |
+| `POST /api/directory/profiles/:username/enquiries`                | send an enquiry: `subject`, `body`                                                               |
+| `GET /api/directory/me/enquiries`                                 | enquiries you received, or with `?box=sent` those you sent                                       |
 | `DELETE /api/directory/me`                                        | delete your profile, keeping your account                                                        |
 | `GET /api/directory/me/export`                                    | your profile as `tdc.directory.profile/1`                                                        |
 | `GET /api/directory/profiles/:username`                           | a profile as you may see it; signing in is optional                                              |

@@ -85,6 +85,11 @@ type ProfileInput struct {
 	OpenToWork       bool
 	AvailabilityNote string
 	AvailableUntil   *time.Time
+
+	// AcceptsEnquiries is the owner's choice about being approached through
+	// the directory, or nil to follow the profile's visibility: a public
+	// profile takes enquiries, anything else does not.
+	AcceptsEnquiries *bool
 }
 
 // PortfolioInput is one link. An item with an ID is one already on the
@@ -155,6 +160,12 @@ type Profile struct {
 	Available        bool
 	AvailabilityNote string
 
+	// AcceptsEnquiriesChoice is the owner's stated choice, read only for the
+	// owner; AcceptsEnquiries is whether an enquiry would be taken now — for a
+	// viewer, from them in particular.
+	AcceptsEnquiriesChoice *bool
+	AcceptsEnquiries       bool
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -197,6 +208,7 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, input ProfileInput
 		OpenToWork:            input.OpenToWork,
 		AvailabilityNote:      input.AvailabilityNote,
 		AvailabilityExpiresAt: input.AvailableUntil,
+		AcceptsEnquiries:      input.AcceptsEnquiries,
 	})
 	if err != nil {
 		return false, nil, fmt.Errorf("save a profile: %w", err)
@@ -291,24 +303,26 @@ func (s *Service) Own(ctx context.Context, userID uuid.UUID) (Profile, error) {
 	}
 
 	profile := Profile{
-		UserID:            row.UserID,
-		Username:          row.Username,
-		DisplayName:       row.DisplayName,
-		Visibility:        Visibility(row.Visibility),
-		DetailsVisibility: Visibility(row.DetailsVisibility),
-		ContactVisibility: Visibility(row.ContactVisibility),
-		DetailsShown:      true,
-		ContactShown:      true,
-		Headline:          row.Headline,
-		Bio:               row.Bio,
-		Location:          row.Location,
-		Experience:        row.Experience,
-		ContactEmail:      row.ContactEmail,
-		ContactPhone:      row.ContactPhone,
-		ContactURL:        row.ContactUrl,
-		OpenToWork:        row.OpenToWork,
-		AvailableUntil:    row.AvailabilityExpiresAt,
-		AvailabilityNote:  row.AvailabilityNote,
+		UserID:                 row.UserID,
+		Username:               row.Username,
+		DisplayName:            row.DisplayName,
+		Visibility:             Visibility(row.Visibility),
+		DetailsVisibility:      Visibility(row.DetailsVisibility),
+		ContactVisibility:      Visibility(row.ContactVisibility),
+		DetailsShown:           true,
+		ContactShown:           true,
+		Headline:               row.Headline,
+		Bio:                    row.Bio,
+		Location:               row.Location,
+		Experience:             row.Experience,
+		ContactEmail:           row.ContactEmail,
+		ContactPhone:           row.ContactPhone,
+		ContactURL:             row.ContactUrl,
+		OpenToWork:             row.OpenToWork,
+		AvailableUntil:         row.AvailabilityExpiresAt,
+		AcceptsEnquiriesChoice: row.AcceptsEnquiries,
+		AcceptsEnquiries:       acceptsByDefault(row.AcceptsEnquiries, Visibility(row.Visibility)),
+		AvailabilityNote:       row.AvailabilityNote,
 		Available: row.OpenToWork && row.AvailabilityExpiresAt != nil &&
 			row.AvailabilityExpiresAt.After(time.Now()),
 		CreatedAt: row.CreatedAt,
@@ -349,10 +363,11 @@ View returns a profile as a viewer of the given rank may see it.
 ErrNoProfile covers everything the viewer may not learn: no such username, no
 profile, and a profile hidden from them all answer the same way.
 */
-func (s *Service) View(ctx context.Context, username string, rank Rank) (Profile, error) {
+func (s *Service) View(ctx context.Context, username string, rank Rank, viewer uuid.UUID) (Profile, error) {
 	row, err := s.queries.ViewDirectoryProfile(ctx, dbgen.ViewDirectoryProfileParams{
 		ViewerRank: int16(rank),
 		Username:   username,
+		Viewer:     viewer,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Profile{}, ErrNoProfile
@@ -376,7 +391,10 @@ func (s *Service) View(ctx context.Context, username string, rank Rank) (Profile
 		ContactPhone: row.ContactPhone,
 		ContactURL:   row.ContactUrl,
 		Available:    row.Available,
-		UpdatedAt:    row.UpdatedAt,
+		// Somebody not signed in cannot send an enquiry, so is not told a
+		// profile takes them.
+		AcceptsEnquiries: row.AcceptsEnquiries && viewer != uuid.Nil,
+		UpdatedAt:        row.UpdatedAt,
 	}
 	if row.Available {
 		profile.AvailabilityNote = row.AvailabilityNote
@@ -418,6 +436,15 @@ func (s *Service) View(ctx context.Context, username string, rank Rank) (Profile
 	profile.Companies = companiesOf(companies)
 
 	return profile, nil
+}
+
+// acceptsByDefault is whether a profile takes enquiries: the owner's choice
+// where there is one, and otherwise whether the profile is public.
+func acceptsByDefault(choice *bool, visibility Visibility) bool {
+	if choice != nil {
+		return *choice
+	}
+	return visibility == Public
 }
 
 // Delete removes somebody's profile, leaving their account as it was.

@@ -133,6 +133,11 @@ type Querier interface {
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
 	CreateEmailConfirmation(ctx context.Context, arg CreateEmailConfirmationParams) (EmailConfirmation, error)
+	// The private conversation an enquiry opens. A direct room, so everything that
+	// keeps direct conversations out of search, discovery and counts keeps this
+	// out too; the participant key names the enquiry, so it never collides with
+	// the ordinary direct conversation between the same two people.
+	CreateEnquiryRoom(ctx context.Context, arg CreateEnquiryRoomParams) (Room, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
 	// Raises a notification, once.
 	//
@@ -160,6 +165,8 @@ type Querier interface {
 	// Removes the profile and, by cascade, its portfolio. The account, its
 	// messages and its sessions are other tables and are not touched.
 	DeleteDirectoryProfile(ctx context.Context, userID uuid.UUID) (int64, error)
+	// Only for undoing an enquiry that failed half way; never anybody's room.
+	DeleteEnquiryRoom(ctx context.Context, id uuid.UUID) error
 	DeleteExpiredEmailConfirmations(ctx context.Context) (int64, error)
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
@@ -191,6 +198,11 @@ type Querier interface {
 	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
 	DeleteTOTPCredential(ctx context.Context, userID uuid.UUID) error
+	// Whom an enquiry to this username would reach, and whether they take one
+	// from this sender: their profile must be one the sender may see, it must take
+	// enquiries, and they must not have blocked the sender. One row either way, so
+	// every refusal takes the same path.
+	EnquiryRecipient(ctx context.Context, arg EnquiryRecipientParams) (EnquiryRecipientRow, error)
 	// Establishing the handle when somebody enrols their first passkey. Only ever
 	// set once: it is what the authenticator remembers, and changing it would
 	// orphan every passkey already enrolled.
@@ -266,6 +278,7 @@ type Querier interface {
 	// written on the first change, and somebody who has never opened these
 	// settings discloses all three.
 	GetDisclosurePreferences(ctx context.Context, userID uuid.UUID) (GetDisclosurePreferencesRow, error)
+	GetEnquiry(ctx context.Context, id uuid.UUID) (Enquiry, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
 	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
@@ -321,6 +334,7 @@ type Querier interface {
 	// request asks from.
 	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
+	InsertEnquiry(ctx context.Context, arg InsertEnquiryParams) (Enquiry, error)
 	InsertPortfolioItem(ctx context.Context, arg InsertPortfolioItemParams) error
 	InsertSkill(ctx context.Context, arg InsertSkillParams) (Skill, error)
 	InsertVerification(ctx context.Context, arg InsertVerificationParams) (ProfileVerification, error)
@@ -423,6 +437,7 @@ type Querier interface {
 	// whether the reader is among them, which is what makes a reaction button
 	// reflect its own state.
 	ListReactionsForEvents(ctx context.Context, eventIds []string) ([]ListReactionsForEventsRow, error)
+	ListReceivedEnquiries(ctx context.Context, recipientID uuid.UUID) ([]ListReceivedEnquiriesRow, error)
 	// The most recent events, for opening a room.
 	ListRecentRoomEvents(ctx context.Context, arg ListRecentRoomEventsParams) ([]Event, error)
 	ListRecoveryCodes(ctx context.Context, userID uuid.UUID) ([]Credential, error)
@@ -475,6 +490,7 @@ type Querier interface {
 	ListRoomsUserIsIn(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	// Somebody's own outstanding messages, soonest first.
 	ListScheduledMessagesForUser(ctx context.Context, senderID uuid.UUID) ([]ScheduledMessage, error)
+	ListSentEnquiries(ctx context.Context, senderID uuid.UUID) ([]ListSentEnquiriesRow, error)
 	ListServerConfig(ctx context.Context) ([]ServerConfig, error)
 	ListServerInvitations(ctx context.Context, limit int32) ([]Invitation, error)
 	ListServerStatuses(ctx context.Context) ([]ServerStatus, error)
@@ -695,6 +711,8 @@ type Querier interface {
 	// Recording a code that has just been mailed. Replaces any outstanding one, so
 	// asking again is how somebody who lost the first message gets a usable code.
 	SetEmailedCode(ctx context.Context, arg SetEmailedCodeParams) error
+	// Answering an enquiry, once: only a pending one moves.
+	SetEnquiryStatus(ctx context.Context, arg SetEnquiryStatusParams) (int64, error)
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetHidePushContent(ctx context.Context, arg SetHidePushContentParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error

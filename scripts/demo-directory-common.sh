@@ -42,7 +42,11 @@ start() {
   docker exec tdc-database-1 psql -U tdc -d postgres \
     -c "DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE);" >/dev/null
   docker exec tdc-database-1 psql -U tdc -d postgres -c "CREATE DATABASE ${DATABASE};" >/dev/null
+  launch
+}
 
+# Starts the server on the database as it stands.
+launch() {
   TDC_DATABASE_URL="postgres://tdc:tdc@127.0.0.1:55433/${DATABASE}?sslmode=disable" \
   TDC_SERVER_ADDRESS="localhost:${DEMO_PORT}" \
   TDC_SERVER_CANONICAL_ADDRESS="http://d.localhost:${DEMO_PORT}" \
@@ -130,7 +134,16 @@ grant_role() {
 }
 
 # Runs the browser half against this server.
+#
+# The server is restarted first, keeping its database. Its rate limits are held
+# in memory, and the half above has already spent this address's five
+# registrations an hour on the people it needed; the browser half needs its
+# own. A restart is what an operator would see after a deployment, so nothing
+# here depends on state a real server would not keep.
 browser() {
+  kill "$SERVER_PID" 2>/dev/null || true
+  wait "$SERVER_PID" 2>/dev/null || true
+  launch
   (cd "$ROOT/apps/web" && TDC_TEST_URL="$BASE" bunx playwright test --project=directory "$@") \
     || fail "the browser checks did not pass"
 }

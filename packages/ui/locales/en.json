@@ -739,6 +739,35 @@
         "identity": "Identity",
         "company": "Company"
       }
+    },
+    "enquiry": {
+      "title": "Enquiries",
+      "takeThem": "Take enquiries through my profile",
+      "takeThemHint": "Separate from who may send you direct messages. Until you choose, a public profile takes enquiries and any other does not.",
+      "sendTo": "Send {name} an enquiry",
+      "oneMessage": "One message about the work. {name} decides whether to take it further; you cannot add to it until they do.",
+      "subject": "Subject",
+      "subjectRequired": "Say what it is about.",
+      "body": "The work",
+      "bodyHint": "What it is, roughly when, and anything they need to decide.",
+      "bodyRequired": "Describe the work.",
+      "send": "Send enquiry",
+      "wasSent": "Your enquiry was sent.",
+      "seeSent": "See your enquiries",
+      "notTaking": "{name} is not taking enquiries through the directory.",
+      "slowDown": "You have sent a lot of enquiries recently. Wait a while and try again.",
+      "received": "Received",
+      "sent": "Sent",
+      "none": "No enquiries here",
+      "from": "From {name}",
+      "to": "To {name}",
+      "open": "Open the conversation",
+      "status": {
+        "pending": "Waiting for an answer",
+        "accepted": "Taken up",
+        "declined": "Declined",
+        "withdrawn": "Withdrawn"
+      }
     }
   }
 }

@@ -739,6 +739,35 @@
         "identity": "Utambulisho",
         "company": "Kampuni"
       }
+    },
+    "enquiry": {
+      "title": "Maulizo",
+      "takeThem": "Pokea maulizo kupitia wasifu wangu",
+      "takeThemHint": "Ni tofauti na nani anaweza kukutumia jumbe za moja kwa moja. Hadi uchague, wasifu wa umma unapokea maulizo na mwingine haupokei.",
+      "sendTo": "Mtumie {name} ulizo",
+      "oneMessage": "Ujumbe mmoja kuhusu kazi. {name} ataamua kama aendelee; huwezi kuongeza kitu hadi afanye hivyo.",
+      "subject": "Mada",
+      "subjectRequired": "Sema inahusu nini.",
+      "body": "Kazi",
+      "bodyHint": "Ni nini, takriban lini, na chochote anachohitaji kuamua.",
+      "bodyRequired": "Eleza kazi.",
+      "send": "Tuma ulizo",
+      "wasSent": "Ulizo lako limetumwa.",
+      "seeSent": "Tazama maulizo yako",
+      "notTaking": "{name} hapokei maulizo kupitia saraka.",
+      "slowDown": "Umetuma maulizo mengi hivi karibuni. Subiri kidogo kisha ujaribu tena.",
+      "received": "Yaliyopokelewa",
+      "sent": "Yaliyotumwa",
+      "none": "Hakuna maulizo hapa",
+      "from": "Kutoka kwa {name}",
+      "to": "Kwa {name}",
+      "open": "Fungua mazungumzo",
+      "status": {
+        "pending": "Linasubiri jibu",
+        "accepted": "Limekubaliwa",
+        "declined": "Limekataliwa",
+        "withdrawn": "Limeondolewa"
+      }
     }
   }
 }

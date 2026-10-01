@@ -47,12 +47,12 @@ Goal: a moderator can attest to a specific claim on a profile, distinguishably f
 
 Goal: a client can reach a developer through their profile without it becoming a way around `user_privacy`'s direct-message settings or a bulk-messaging vector.
 
-- [ ] 4.1 Add the `enquiries` migration with sender, recipient profile, message body, and rate-limit bookkeeping distinct from `user_privacy.direct_messages`; verify an enquiry and a direct message are governed by independently checkable settings
-- [ ] 4.2 Implement the `accepts_enquiries` profile flag, defaulting on only for public profiles, changeable independently of direct-message settings; verify closing enquiries refuses new ones with a clear response while existing conversations (if any) are unaffected
-- [ ] 4.3 Implement enquiry delivery and notification to the recipient, reusing the existing notification pipeline; verify a sent enquiry notifies the recipient exactly as a mention would, with no self-notification path
-- [ ] 4.4 Implement per-sender rate limiting on enquiries, verified against the abusive-rate requirement in the spec; verify a client sending enquiries at an abusive rate is refused further sends while normal use is unaffected
-- [ ] 4.5 Build the web enquiry interface — send from a profile, view received enquiries; verify sending, receiving, and a closed-enquiries refusal all work end to end
-- [ ] **MILESTONE 4** — Demonstrate: a client sends an enquiry to an available developer's profile and the developer is notified and can read it; a second developer with enquiries closed refuses the same attempt with a clear message; a client attempting many enquiries in quick succession is rate-limited. Tag `v1.25.0-dev`.
+- [x] 4.1 Add the `enquiries` migration with sender, recipient profile, message body, and rate-limit bookkeeping distinct from `user_privacy.direct_messages`; verify an enquiry and a direct message are governed by independently checkable settings
+- [x] 4.2 Implement the `accepts_enquiries` profile flag, defaulting on only for public profiles, changeable independently of direct-message settings; verify closing enquiries refuses new ones with a clear response while existing conversations (if any) are unaffected
+- [x] 4.3 Implement enquiry delivery and notification to the recipient, reusing the existing notification pipeline; verify a sent enquiry notifies the recipient exactly as a mention would, with no self-notification path
+- [x] 4.4 Implement per-sender rate limiting on enquiries, verified against the abusive-rate requirement in the spec; verify a client sending enquiries at an abusive rate is refused further sends while normal use is unaffected
+- [x] 4.5 Build the web enquiry interface — send from a profile, view received enquiries; verify sending, receiving, and a closed-enquiries refusal all work end to end
+- [x] **MILESTONE 4** — Demonstrate: a client sends an enquiry to an available developer's profile and the developer is notified and can read it; a second developer with enquiries closed refuses the same attempt with a clear message; a client attempting many enquiries in quick succession is rate-limited. Tag `v1.25.0-dev`.
 
 ## 5. Phase 5 — The engagement lifecycle and private discussion
 

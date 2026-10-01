@@ -143,6 +143,7 @@ type DirectoryProfile struct {
 	OpenToWork            bool
 	AvailabilityNote      string
 	AvailabilityExpiresAt *time.Time
+	AcceptsEnquiries      *bool
 }
 
 type EmailConfirmation struct {
@@ -153,6 +154,18 @@ type EmailConfirmation struct {
 	CreatedAt time.Time
 	ExpiresAt time.Time
 	UsedAt    *time.Time
+}
+
+type Enquiry struct {
+	ID          uuid.UUID
+	SenderID    uuid.UUID
+	RecipientID uuid.UUID
+	Subject     string
+	Body        string
+	RoomID      *uuid.UUID
+	Status      string
+	CreatedAt   time.Time
+	RespondedAt *time.Time
 }
 
 type Event struct {

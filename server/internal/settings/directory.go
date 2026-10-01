@@ -36,6 +36,14 @@ rate takes long enough to notice.
 const (
 	DirectoryReadsPerMinute          Key = "directory.reads_per_minute"
 	DirectoryAnonymousReadsPerMinute Key = "directory.anonymous_reads_per_minute"
+
+	/*
+		DirectoryEnquiriesPerHour is how many enquiries one person may send in
+		an hour. Five is plenty for somebody looking for a developer and very
+		little for somebody sending the same message to everybody listed,
+		which is the thing the limit is for.
+	*/
+	DirectoryEnquiriesPerHour Key = "directory.enquiries_per_hour"
 )
 
 func init() {
@@ -51,6 +59,11 @@ func init() {
 		DirectoryAnonymousReadsPerMinute: {
 			fallback:    "10",
 			description: "Directory searches and profile views allowed per address per minute, for people not signed in.",
+			validate:    atLeastOne,
+		},
+		DirectoryEnquiriesPerHour: {
+			fallback:    "5",
+			description: "Directory enquiries one person may send per hour.",
 			validate:    atLeastOne,
 		},
 	})

@@ -119,6 +119,7 @@ func (api *directoryAPI) mount() {
 	api.mountSkills(directoryGroup, moderation)
 	api.mountSearch(directoryGroup)
 	api.mountVerification(moderation)
+	api.mountEnquiries(directoryGroup, me)
 }
 
 /*
@@ -229,6 +230,10 @@ type profileView struct {
 	AvailabilityNote string `json:"availabilityNote,omitempty"`
 	AvailableUntil   string `json:"availableUntil,omitempty"`
 
+	// AcceptsEnquiries is whether this viewer could send one now. False for
+	// somebody the owner blocked, exactly as for a profile that takes none.
+	AcceptsEnquiries bool `json:"acceptsEnquiries"`
+
 	UpdatedAt string `json:"updatedAt"`
 }
 
@@ -286,6 +291,8 @@ func (api *directoryAPI) viewOf(profile directory.Profile, verifications map[str
 		DisplayName: profile.DisplayName,
 		Address:     api.rooms.UserAddress(profile.Username),
 		UpdatedAt:   profile.UpdatedAt.UTC().Format(time.RFC3339),
+
+		AcceptsEnquiries: profile.AcceptsEnquiries,
 	}
 
 	// Copied as the query returned them. Whatever the viewer may not see
@@ -481,7 +488,7 @@ func (api *directoryAPI) handleExportProfile(c *echo.Context) error {
 }
 
 func (api *directoryAPI) handleViewProfile(c *echo.Context) error {
-	rank, _, allowed := api.viewerRank(c)
+	rank, viewer, allowed := api.viewerRank(c)
 	if !allowed {
 		return noProfile()
 	}
@@ -490,7 +497,7 @@ func (api *directoryAPI) handleViewProfile(c *echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	profile, err := api.directory.View(ctx, c.Param("username"), rank)
+	profile, err := api.directory.View(ctx, c.Param("username"), rank, viewer)
 	if err != nil {
 		return directoryError(err)
 	}

@@ -430,6 +430,9 @@ short version:
   the directory. They are separate decisions.
 - **You can delete your profile** at any time without deleting your account,
   and **export it** as a file you can bring back later or elsewhere.
+- **Whether you take enquiries is a setting on your profile**, separate from
+  who may send you direct messages. An enquiry is one message, which opens a
+  private conversation the sender cannot add to until you take it up.
 - **A company can ask to list you; only you can accept**, from your profile
   page. Leave, and it is gone from both the company's page and your profile at
   once.

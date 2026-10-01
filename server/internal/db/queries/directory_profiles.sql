@@ -24,14 +24,16 @@ INSERT INTO directory_profiles (
     user_id, headline, bio, location, experience,
     contact_email, contact_phone, contact_url,
     visibility, details_visibility, contact_visibility,
-    open_to_work, availability_note, availability_expires_at
+    open_to_work, availability_note, availability_expires_at, accepts_enquiries
 ) VALUES (
     @user_id, @headline, @bio, @location, @experience,
     @contact_email, @contact_phone, @contact_url,
     @visibility, @details_visibility, @contact_visibility,
-    @open_to_work, @availability_note, sqlc.narg('availability_expires_at')
+    @open_to_work, @availability_note, sqlc.narg('availability_expires_at'),
+    sqlc.narg('accepts_enquiries')
 )
 ON CONFLICT (user_id) DO UPDATE SET
+    accepts_enquiries = EXCLUDED.accepts_enquiries,
     open_to_work = EXCLUDED.open_to_work,
     availability_note = EXCLUDED.availability_note,
     availability_expires_at = EXCLUDED.availability_expires_at,
@@ -94,6 +96,13 @@ SELECT
     (CASE WHEN p.details_rank <= @viewer_rank::smallint
                AND p.open_to_work AND p.availability_expires_at > NOW()
           THEN p.availability_expires_at ELSE 'epoch'::timestamptz END)::timestamptz AS available_until,
+    -- Whether this viewer could send an enquiry: the owner's choice, or the
+    -- default for the profile's visibility — and never to somebody who has
+    -- blocked them, which reads exactly like a profile that takes none, so
+    -- the block is not disclosed.
+    (COALESCE(p.accepts_enquiries, p.visibility = 'public')
+     AND NOT EXISTS (SELECT 1 FROM user_blocks b
+                     WHERE b.blocker_id = u.id AND b.blocked_id = @viewer::uuid))::boolean AS accepts_enquiries,
     p.updated_at
 FROM users u
 JOIN directory_profiles p ON p.user_id = u.id

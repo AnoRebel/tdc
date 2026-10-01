@@ -42,6 +42,9 @@ await load();
 watch(username, load);
 
 const isMe = computed(() => user.value?.username === profile.value?.username);
+
+// The enquiry that was just sent, so the page can say it went.
+const sentEnquiry = ref(false);
 </script>
 
 <template>
@@ -87,6 +90,33 @@ const isMe = computed(() => user.value?.username === profile.value?.username);
           </p>
         </template>
       </DirectoryProfileCard>
+
+      <!-- First contact, where the person takes it. Absent for somebody who
+           does not, with a sentence rather than a disabled form, so it is
+           clear this is their choice and not a fault. -->
+      <section v-if="profile && !isMe" class="mt-8 space-y-3 border-t pt-6">
+        <h2 class="text-sm font-semibold">
+          {{ $t("directory.enquiry.sendTo", { name: profile.displayName || profile.username }) }}
+        </h2>
+        <p v-if="sentEnquiry" class="rounded-md bg-primary/10 px-3 py-2 text-sm" role="status">
+          {{ $t("directory.enquiry.wasSent") }}
+          <NuxtLink
+            :to="localeRoute({ name: 'directory-enquiries', query: { box: 'sent' } })"
+            class="font-medium text-primary hover:underline"
+          >
+            {{ $t("directory.enquiry.seeSent") }}
+          </NuxtLink>
+        </p>
+        <DirectoryEnquiryForm
+          v-else-if="profile.acceptsEnquiries"
+          :username="profile.username"
+          :name="profile.displayName || profile.username"
+          @sent="sentEnquiry = true"
+        />
+        <p v-else class="text-sm text-muted-foreground">
+          {{ $t("directory.enquiry.notTaking", { name: profile.displayName || profile.username }) }}
+        </p>
+      </section>
     </div>
   </div>
 </template>
