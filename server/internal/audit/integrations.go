@@ -12,4 +12,7 @@ away, is exactly what somebody investigating unexpected activity needs to find.
 const (
 	ActionWebhookSubscribed   Action = "integration.webhook.subscribed"
 	ActionWebhookUnsubscribed Action = "integration.webhook.unsubscribed"
+
+	ActionIncomingWebhookCreated Action = "integration.incoming_webhook.created"
+	ActionIncomingWebhookRevoked Action = "integration.incoming_webhook.revoked"
 )

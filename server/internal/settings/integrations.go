@@ -114,6 +114,16 @@ const (
 	// DeliveryHistoryDays is how long finished deliveries and their attempts
 	// are kept for owners to inspect.
 	DeliveryHistoryDays Key = "integrations.delivery_history_days"
+
+	/*
+		IncomingWebhookPostsPerMinute bounds how often one incoming webhook
+		may post.
+
+		Sixty a minute is more than any build system or alerting tool sends to
+		a channel people read, and a bound on what whoever finds a leaked
+		address can do with it: one channel, slowly, and its owner told.
+	*/
+	IncomingWebhookPostsPerMinute Key = "integrations.incoming_webhook_posts_per_minute"
 )
 
 // positive accepts a whole number of at least one, for a bound where zero
@@ -182,6 +192,11 @@ func init() {
 			fallback:    "30",
 			description: "How many days of finished deliveries are kept for their owners to inspect.",
 			validate:    positive,
+		},
+		IncomingWebhookPostsPerMinute: {
+			fallback:    "60",
+			description: "How many messages one incoming webhook may post per minute, or 0 for no limit.",
+			validate:    nonNegative,
 		},
 	})
 }

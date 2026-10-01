@@ -47,14 +47,14 @@ Goal: the hard part. A subscription that survives a receiver being down for a da
 
 Goal: an external system can post into exactly one channel with a credential that assumes it will leak.
 
-- [ ] 4.1 Implement the `incoming_webhooks` table — room-bound, prefixed and hashed like an API token, created and revoked with immediate uncached effect; verify a revoked webhook's very next call is refused, with no delay
-- [ ] 4.2 Implement the posting endpoint accepting the webhook's credential and a message body, attributed to the webhook rather than a person, refusing any attempt to name a different channel; verify a call naming a channel other than the one bound at creation is refused, and a successful post displays as from the webhook, not a user
-- [ ] 4.3 Apply the existing message-content sanitisation path to webhook-posted content, unchanged from user-posted content; verify a webhook posting markup or script content is sanitised identically to a user doing the same
-- [ ] 4.4 Implement per-webhook rate limiting on `cache.Rates` with limit-exceeded reported to the caller and visible to the webhook's owner; verify a caller exceeding the configured rate receives a clear refusal naming when to retry, and the owner can see that calls were refused
-- [ ] 4.5 Record creation and revocation in the audit log with the actor, per the existing audit pattern; verify both actions appear in `GET /api/admin/audit` with the correct actor
-- [ ] 4.6 Build the web interface for creating, labelling, and revoking incoming webhooks on a channel, showing the credential once at creation exactly as API tokens already do; verify the credential cannot be retrieved again after the creation response
-- [ ] 4.7 Document creating and using an incoming webhook in `docs/integrating.md`, including the formatting requirements for build/alert-style content; verify the documented `curl` example posts successfully to a live server
-- [ ] **MILESTONE 4** — Demonstrate: create an incoming webhook on a channel, post to it from `curl` and see the message attributed to the webhook, attempt to post to a different channel with the same credential and see it refused, revoke it and see the next call refused immediately, and find both the creation and the revocation in the audit log. Tag `v1.15.0-dev`.
+- [x] 4.1 Implement the `incoming_webhooks` table — room-bound, prefixed and hashed like an API token, created and revoked with immediate uncached effect; verify a revoked webhook's very next call is refused, with no delay
+- [x] 4.2 Implement the posting endpoint accepting the webhook's credential and a message body, attributed to the webhook rather than a person, refusing any attempt to name a different channel; verify a call naming a channel other than the one bound at creation is refused, and a successful post displays as from the webhook, not a user
+- [x] 4.3 Apply the existing message-content sanitisation path to webhook-posted content, unchanged from user-posted content; verify a webhook posting markup or script content is sanitised identically to a user doing the same
+- [x] 4.4 Implement per-webhook rate limiting on `cache.Rates` with limit-exceeded reported to the caller and visible to the webhook's owner; verify a caller exceeding the configured rate receives a clear refusal naming when to retry, and the owner can see that calls were refused
+- [x] 4.5 Record creation and revocation in the audit log with the actor, per the existing audit pattern; verify both actions appear in `GET /api/admin/audit` with the correct actor
+- [x] 4.6 Build the web interface for creating, labelling, and revoking incoming webhooks on a channel, showing the credential once at creation exactly as API tokens already do; verify the credential cannot be retrieved again after the creation response
+- [x] 4.7 Document creating and using an incoming webhook in `docs/integrating.md`, including the formatting requirements for build/alert-style content; verify the documented `curl` example posts successfully to a live server
+- [x] **MILESTONE 4** — Demonstrate: create an incoming webhook on a channel, post to it from `curl` and see the message attributed to the webhook, attempt to post to a different channel with the same credential and see it refused, revoke it and see the next call refused immediately, and find both the creation and the revocation in the audit log. Tag `v1.15.0-dev`.
 
 ## 5. Phase 5 — Applications exist as installable, scoped entities
 

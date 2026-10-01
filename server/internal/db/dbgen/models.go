@@ -137,6 +137,21 @@ type EventIdempotency struct {
 	CreatedAt   time.Time
 }
 
+type IncomingWebhook struct {
+	ID            uuid.UUID
+	RoomID        uuid.UUID
+	Label         string
+	TokenHash     []byte
+	CreatedBy     *uuid.UUID
+	CreatedAt     time.Time
+	RevokedAt     *time.Time
+	RevokedBy     *uuid.UUID
+	LastUsedAt    *time.Time
+	PostedCount   int64
+	RefusedCount  int64
+	LastRefusedAt *time.Time
+}
+
 type IntegrationContext struct {
 	IntegrationID uuid.UUID
 	RoomID        uuid.UUID

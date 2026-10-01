@@ -243,6 +243,15 @@ kept: close the conversation and it is gone, and if you were not connected when
 it was sent you will not see it later. Anything a program needs you to be sure
 to see, it posts as an ordinary message.
 
+### Messages from programs
+
+A message posted by a program rather than a person says so beside its name:
+**Webhook** for an outside system posting into the channel — a build server, an
+alerting tool — and **Bot** for an application taking part in the
+conversation. The marking is the server's, not the program's, so a program
+cannot leave it off and pretend to be somebody. You can reply to, react to,
+report and (if you moderate) remove these messages exactly as anybody else's.
+
 ### Links
 
 Message text is plain text. Links, addresses and phone numbers in it are

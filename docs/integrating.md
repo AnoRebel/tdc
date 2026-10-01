@@ -957,6 +957,14 @@ owner told — when it keeps failing. Subscribing, the payload and its versions,
 retries, limits and the delivery history are all in
 [Webhooks and applications](webhooks-and-apps.md#outgoing-webhooks).
 
+### Incoming webhooks
+
+The other direction: an address another system posts into one channel through,
+with no account or token — a build server, an alerting tool. Its messages are
+marked as the webhook's, it can post nowhere else, and revoking it is final on
+the next call. Making one, posting, formatting and limits are in
+[Webhooks and applications](webhooks-and-apps.md#incoming-webhooks).
+
 ### Sending yourself a test delivery
 
 Before anything depends on your receiver, ask the server to send it one:

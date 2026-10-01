@@ -46,6 +46,18 @@ export const renderableControlKinds: ReadonlySet<string | undefined> = new Set([
   "input",
 ]);
 
+/**
+ * The program a message came from, when it was not a person. Set by the
+ * server, in the message's own content; absent on everybody's messages.
+ */
+export interface MessageVia {
+  kind: "webhook" | "bot";
+  /** The webhook or application. */
+  id: string;
+  /** What to show in place of a person's name. */
+  name: string;
+}
+
 /** The content of a message.updated event. */
 export interface ControlsUpdate {
   /** The message whose text and controls were replaced. */
@@ -139,6 +151,30 @@ export interface WebhookAttempt {
 export interface WebhookHistory extends WebhookSubscription {
   deliveries: WebhookDelivery[];
   attempts: WebhookAttempt[];
+}
+
+/** An incoming webhook, as a channel's managers see it. Never the credential. */
+export interface IncomingWebhook {
+  id: string;
+  label: string;
+  roomId: string;
+  created: string;
+  createdBy?: string;
+  revoked?: string;
+  lastUsed?: string;
+  posted: number;
+  /** Calls refused by the rate limit, and when last. */
+  refused: number;
+  lastRefused?: string;
+  /** The address its messages appear from. */
+  sender: string;
+}
+
+/** The one response carrying an incoming webhook's address. */
+export interface CreatedIncomingWebhook extends IncomingWebhook {
+  /** Where to post. It contains the credential. */
+  url: string;
+  token: string;
 }
 
 /** What a subscription may ask for. */

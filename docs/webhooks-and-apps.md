@@ -243,3 +243,122 @@ can still read the channel. Somebody removed from a private channel stops being
 told about it immediately — including about events that happened before they
 left and were still waiting. The subscription and its history are kept, marked
 with `accessLost`; deliveries resume if they regain access.
+
+## Incoming webhooks
+
+An incoming webhook is an address an outside system posts into one channel
+through — a build server announcing results, an alerting tool reporting a disk
+filling up. It needs nothing but the address: no account, no token, no
+signature. That is what makes it easy to connect anything to, and why it is
+built on the assumption that the address will leak.
+
+### Making one
+
+Somebody holding `channel.webhooks.manage` in the channel — administrators, by
+default — makes one, from **Settings → Integrations** or:
+
+<!-- demo: create-incoming -->
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/incoming-webhooks" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"label": "Build server"}'
+```
+
+```json
+{
+  "id": "0199f3b0-…",
+  "label": "Build server",
+  "roomId": "5a1c…",
+  "posted": 0,
+  "refused": 0,
+  "sender": "webhook-0199f3b0e1a2@chat.example.org",
+  "url": "https://chat.example.org/api/hooks/tdc_hook_…",
+  "token": "tdc_hook_…"
+}
+```
+
+**`url` is shown once.** It contains the credential, which is stored only as a
+hash; nobody can retrieve it afterwards. It starts `tdc_hook_` so a secret
+scanner that finds one in a public repository knows what it has found.
+
+`GET` on the same path lists a channel's webhooks — how many posts each has
+made, when it was last used, how many calls the rate limit refused — and never
+their addresses. `DELETE …/incoming-webhooks/{id}` revokes one.
+
+### Posting
+
+<!-- demo: post-incoming -->
+
+```sh
+curl -X POST "$WEBHOOK_URL" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "**Build 41 failed** on `main` — 3 tests broke in `payments/`.",
+    "actions": [
+      {"name": "log", "label": "See the log", "capability": "open",
+       "url": "https://ci.example.test/builds/41"}
+    ]
+  }'
+```
+
+Answers **201** with the message's `id`. `body` and `text` mean the same thing;
+`text` is accepted because a great many tools already send it.
+
+The message reads as the webhook's, never a person's: it shows the webhook's
+label in place of a name, marked **Webhook**, and its content carries
+`"via": {"kind": "webhook", "id": "…", "name": "Build server"}` — set by the
+server, so nothing a caller sends can add it or take it away. Its sender is an
+address like `webhook-0199f3b0e1a2@chat.example.org`, which belongs to no
+account.
+
+**It posts into one channel and nothing else.** A request naming a different
+channel — `"room"` with another channel's identifier, or `"channel"` with
+another's name — is refused with **403** and nothing is posted. Naming its own
+channel is accepted, for tools that insist on sending one.
+
+### Formatting build results and alerts
+
+The body is Markdown, rendered exactly as somebody's typed message is: **bold**,
+_emphasis_, `code`, fenced code blocks, lists and links. Lead with the outcome
+on the first line, because that is what a notification shows; put detail after
+it. Up to 8,000 characters.
+
+Buttons may be offered, but only buttons that open a link (`"capability":
+"open"` with an `http` or `https` `url`) — "See the log", "Open the dashboard".
+A webhook cannot answer a press, so a button that asked a question is refused
+with **400**. To ask questions and act on the answers, use an
+[application](#applications) instead.
+
+**What it posts is treated as a person's post is.** The operator's word filter
+applies — masking, flagging or blocking exactly as it would for somebody
+typing — and clients render it with the same protection against markup and
+scripts, because it is stored and delivered as an ordinary message.
+
+### When it is called too often
+
+Each webhook may post sixty times a minute
+(`integrations.incoming_webhook_posts_per_minute`). Past that a call is
+refused with **429**, a `Retry-After` header, and the same in the body:
+
+```json
+{
+  "message": "this webhook is posting faster than the channel allows; wait and send again",
+  "retryAfterSeconds": 42
+}
+```
+
+Each refusal is counted on the webhook — `refused` and `lastRefused` in the
+listing — so whoever manages the channel sees that calls were turned away
+rather than finding messages missing.
+
+### When it leaks
+
+Assume it will. What somebody holding a leaked address can do is post into that
+one channel, slowly, marked as the webhook. They cannot read the channel, act
+anywhere else, or turn it into anything more. Revoke it and **the very next
+call is refused** — there is no cache in front of the check — and make a new
+one for the system that should have it. Creating and revoking are both in the
+audit log with who did them, and every message it posted names it, so unexpected
+activity in a channel traces to one webhook rather than to a guess.

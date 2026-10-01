@@ -39,6 +39,24 @@ func (s *Service) append(
 	content json.RawMessage,
 	clientToken string,
 ) (dbgen.Event, error) {
+	return s.appendAs(ctx, room, &sender.ID, s.UserAddress(sender.Username), eventType, content, clientToken)
+}
+
+/*
+appendAs is append for a sender that may have no account behind it — an
+incoming webhook, which posts as itself rather than as anybody. The address is
+still recorded and signed, so the event says who it is from; only the account
+reference is absent.
+*/
+func (s *Service) appendAs(
+	ctx context.Context,
+	room dbgen.Room,
+	senderID *uuid.UUID,
+	senderAddress string,
+	eventType events.Type,
+	content json.RawMessage,
+	clientToken string,
+) (dbgen.Event, error) {
 	sequence, err := s.nextSequence(ctx, room)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("allocate sequence: %w", err)
@@ -51,7 +69,7 @@ func (s *Service) append(
 
 	event := events.Event{
 		Room:      s.RoomAddress(room),
-		Sender:    s.UserAddress(sender.Username),
+		Sender:    senderAddress,
 		Origin:    s.serverName,
 		Type:      eventType,
 		CreatedAt: events.Now(),
@@ -66,7 +84,7 @@ func (s *Service) append(
 		ID:            event.ID,
 		RoomID:        room.ID,
 		Sequence:      sequence,
-		SenderID:      &sender.ID,
+		SenderID:      senderID,
 		SenderAddress: event.Sender,
 		RoomAddress:   event.Room,
 		OriginServer:  event.Origin,
@@ -84,9 +102,10 @@ func (s *Service) append(
 		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
 	}
 
-	if clientToken != "" {
+	// Idempotency is per account, so a sender without one has none.
+	if clientToken != "" && senderID != nil {
 		if err := s.store.RecordIdempotentSubmission(ctx, dbgen.RecordIdempotentSubmissionParams{
-			SenderID:    sender.ID,
+			SenderID:    *senderID,
 			ClientToken: clientToken,
 			EventID:     stored.ID,
 		}); err != nil {

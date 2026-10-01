@@ -32,6 +32,7 @@ useHead({ title: $ts("integrations.title") });
 
     <div class="mx-auto max-w-3xl space-y-10 px-4 py-6">
       <IntegrationsOutgoingWebhooks />
+      <IntegrationsIncomingWebhooks />
     </div>
   </div>
 </template>

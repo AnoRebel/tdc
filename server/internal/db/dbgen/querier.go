@@ -130,6 +130,7 @@ type Querier interface {
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
 	CreateEmailConfirmation(ctx context.Context, arg CreateEmailConfirmationParams) (EmailConfirmation, error)
+	CreateIncomingWebhook(ctx context.Context, arg CreateIncomingWebhookParams) (IncomingWebhook, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
 	// The first update to a message, from version zero to one.
 	//
@@ -252,6 +253,9 @@ type Querier interface {
 	// existed, and doing it in the query means there is no window where a caller
 	// reads the row and forgets to check.
 	GetAPITokenByHash(ctx context.Context, tokenHash []byte) (GetAPITokenByHashRow, error)
+	// The one lookup a post makes. No cache in front of it, so a revocation is
+	// final for the very next call.
+	GetActiveIncomingWebhookByHash(ctx context.Context, tokenHash []byte) (IncomingWebhook, error)
 	// What this person chose the interface to look like.
 	//
 	// Empty in any column means they have chosen nothing there and take the
@@ -370,6 +374,7 @@ type Querier interface {
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	ListIncomingWebhooksForRoom(ctx context.Context, roomID uuid.UUID) ([]IncomingWebhook, error)
 	// Who joined through one invitation, newest first.
 	ListInvitationUsers(ctx context.Context, invitationID uuid.UUID) ([]ListInvitationUsersRow, error)
 	// What a channel has outstanding, for whoever manages it.
@@ -555,6 +560,8 @@ type Querier interface {
 	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
 	RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error)
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
+	RecordIncomingWebhookPost(ctx context.Context, id uuid.UUID) error
+	RecordIncomingWebhookRefused(ctx context.Context, id uuid.UUID) error
 	// Claims one use, atomically.
 	//
 	// The count is incremented in the same statement that checks it, so two people
@@ -611,6 +618,7 @@ type Querier interface {
 	// credential that outlived the account's own access would be the way back in.
 	RevokeAPITokensForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
+	RevokeIncomingWebhook(ctx context.Context, arg RevokeIncomingWebhookParams) (IncomingWebhook, error)
 	// Revoking is idempotent in effect but recorded once: a second revocation
 	// leaves the first one's timestamp, which is when it actually stopped working.
 	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (Invitation, error)

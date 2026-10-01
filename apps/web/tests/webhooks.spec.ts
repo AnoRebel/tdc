@@ -89,11 +89,12 @@ test("a webhook is made, delivers, fails, retries and turns off, all visible", a
 
   // Made through the form.
   await page.goto("/integrations");
-  await page.getByLabel("Label").fill(label);
-  await page.getByRole("combobox", { name: "Channel" }).click();
+  const section = page.getByRole("region", { name: "Outgoing webhooks" });
+  await section.getByLabel("Label").fill(label);
+  await section.getByRole("combobox", { name: "Channel" }).click();
   await page.getByRole("option", { name: `#${slug}` }).click();
-  await page.getByLabel("Endpoint").fill(endpoint);
-  await page.getByRole("button", { name: "Create webhook" }).click();
+  await section.getByLabel("Endpoint").fill(endpoint);
+  await section.getByRole("button", { name: "Create webhook" }).click();
 
   // The secret, once, said to be once.
   const notice = page.getByRole("status").filter({ hasText: "not shown again" });
@@ -159,4 +160,59 @@ test("a webhook is made, delivers, fails, retries and turns off, all visible", a
   await card.getByRole("button", { name: `Remove ${label}` }).click();
   await page.getByRole("button", { name: "Remove", exact: true }).click();
   await expect(card).toHaveCount(0);
+});
+
+/*
+ * An incoming webhook, through the interface: its address shown once and then
+ * never again, a post through it read in the channel as the webhook's and not
+ * a person's, and revoking it final at once.
+ */
+test("an incoming webhook posts as itself, and stops when revoked", async ({ page, request }) => {
+  const auth = { Authorization: `Bearer ${token}` };
+  const slug = `alerts-${Date.now().toString(36)}`;
+  const room = await (
+    await request.post("/api/rooms", { headers: auth, data: { slug, name: slug } })
+  ).json();
+
+  await page.goto("/integrations");
+  const section = page.getByRole("region", { name: "Incoming webhooks" });
+  await section.getByRole("combobox", { name: "Channel" }).click();
+  await page.getByRole("option", { name: `#${slug}` }).click();
+  await section.getByLabel("What posts through it").fill("Grafana");
+  await section.getByRole("button", { name: "Create", exact: true }).click();
+
+  const notice = section.getByRole("status").filter({ hasText: "not shown again" });
+  await expect(notice).toBeVisible();
+  const address = (await notice.locator("code").textContent())?.trim() ?? "";
+  expect(address).toContain("/api/hooks/tdc_hook_");
+  const path = new URL(address, page.url()).pathname;
+
+  await section.getByRole("button", { name: "Done" }).click();
+  await page.reload();
+  await expect(page.getByText(path)).toHaveCount(0);
+
+  const posted = await request.post(path, { data: { text: "Disk at 91% on db-1" } });
+  expect(posted.status()).toBe(201);
+
+  // Read in the channel as the webhook's, named and marked as a program.
+  await page.goto(`/rooms/${room.id}`);
+  const message = page.getByText("Disk at 91% on db-1");
+  await expect(message).toBeVisible();
+  const group = page.locator("[data-sender-kind]");
+  await expect(group).toHaveText(/webhook/i);
+  await expect(page.getByText("Grafana", { exact: true })).toBeVisible();
+
+  // Revoked through the interface, and the next call refused.
+  await page.goto("/integrations");
+  await section.getByRole("combobox", { name: "Channel" }).click();
+  await page.getByRole("option", { name: `#${slug}` }).click();
+  await section
+    .locator('[data-incoming="Grafana"]')
+    .getByRole("button", { name: "Revoke" })
+    .click();
+  await page.getByRole("button", { name: "Revoke", exact: true }).last().click();
+  await expect(section.getByText("Revoked", { exact: true })).toBeVisible();
+
+  const refused = await request.post(path, { data: { text: "after revocation" } });
+  expect(refused.status()).toBe(404);
 });

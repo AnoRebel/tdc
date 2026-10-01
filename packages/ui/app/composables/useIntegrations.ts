@@ -1,5 +1,7 @@
 import type {
+  CreatedIncomingWebhook,
   CreatedWebhook,
+  IncomingWebhook,
   WebhookEventTypes,
   WebhookHistory,
   WebhookSubscription,
@@ -47,5 +49,29 @@ export function useIntegrations() {
     return api.get<WebhookEventTypes>("/api/webhooks/event-types");
   }
 
-  return { webhooks, webhook, subscribe, unsubscribe, enable, eventTypes };
+  /** A channel's incoming webhooks; refused without the permission. */
+  function incoming(roomId: string): Promise<IncomingWebhook[]> {
+    return api.get<IncomingWebhook[]>(`/api/rooms/${roomId}/incoming-webhooks`);
+  }
+
+  /** Answers with the address to post to, which is never shown again. */
+  function createIncoming(roomId: string, label: string): Promise<CreatedIncomingWebhook> {
+    return api.post<CreatedIncomingWebhook>(`/api/rooms/${roomId}/incoming-webhooks`, { label });
+  }
+
+  function revokeIncoming(roomId: string, id: string): Promise<void> {
+    return api.delete<void>(`/api/rooms/${roomId}/incoming-webhooks/${encodeURIComponent(id)}`);
+  }
+
+  return {
+    webhooks,
+    webhook,
+    subscribe,
+    unsubscribe,
+    enable,
+    eventTypes,
+    incoming,
+    createIncoming,
+    revokeIncoming,
+  };
 }

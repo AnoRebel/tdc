@@ -8,6 +8,7 @@ import type {
   Presence,
   PrivateReply,
   ControlsUpdate,
+  MessageVia,
   Room,
   TypingPerson,
 } from "@tdc/types";
@@ -606,6 +607,17 @@ async function pressAction(
           : $ts("room.actionFailed"),
     };
   }
+}
+
+/**
+ * The program a run of messages came from, when it was not a person.
+ *
+ * Read from the message's own content, where the server put it: a webhook's
+ * or a bot's message carries its kind and name there, and nothing a client or
+ * a sender supplies can add or remove it.
+ */
+function viaOf(group: { items: { content: unknown }[] }): MessageVia | undefined {
+  return (group.items[0]?.content as { via?: MessageVia } | undefined)?.via;
 }
 
 /**
@@ -1913,9 +1925,22 @@ watch(roomId, load, { immediate: true });
                 class="flex items-center gap-2 px-0.5"
                 :class="group.mine ? 'flex-row-reverse' : 'flex-row'"
               >
-                <Avatar :name="group.sender" size="sm" />
+                <Avatar :name="viaOf(group)?.name ?? group.sender" size="sm" />
                 <span class="text-xs font-semibold">
-                  {{ group.mine ? "You" : shortName(group.sender) }}
+                  {{ group.mine ? "You" : (viaOf(group)?.name ?? shortName(group.sender)) }}
+                </span>
+                <!-- A program is named as one, in words, so nobody reads a
+                     webhook's or a bot's message as a person's. -->
+                <span
+                  v-if="viaOf(group)"
+                  class="rounded border border-border px-1 text-[0.625rem] font-medium tracking-wide text-muted-foreground uppercase"
+                  data-sender-kind
+                >
+                  {{
+                    viaOf(group)!.kind === "bot"
+                      ? $t("integrations.bot")
+                      : $t("integrations.webhook")
+                  }}
                 </span>
                 <time class="text-[0.6875rem] text-muted-foreground">{{ when(group.at) }}</time>
               </div>
