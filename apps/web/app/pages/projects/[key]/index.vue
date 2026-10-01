@@ -4,7 +4,7 @@ import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 import { h, resolveComponent } from "vue";
 
-import { isApiError, type Issue, type Project } from "@tdc/types";
+import { isApiError, type Issue, type IssueSearch, type Project } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
@@ -62,6 +62,37 @@ async function load() {
 }
 onMounted(load);
 watch([stateFilter, labelFilter, sort], load);
+
+/*
+ * Words narrow the list too. A search goes to the search index rather than the
+ * list, so its results are the search's — ranked by recency, with the matched
+ * words marked — and the state and label chosen above still apply, by name.
+ */
+const words = ref("");
+const found = ref<IssueSearch | null>(null);
+watchDebounced(
+  [words, stateFilter, labelFilter],
+  async () => {
+    const text = words.value.trim();
+    if (!text) {
+      found.value = null;
+      return;
+    }
+    const stateName = project.value?.states?.find((s) => s.id === stateFilter.value)?.name;
+    const labelName = project.value?.labels?.find((l) => l.id === labelFilter.value)?.name;
+    try {
+      found.value = await projectsApi.search({
+        q: text,
+        project: key.value,
+        state: stateName,
+        label: labelName,
+      });
+    } catch (cause) {
+      failed.value = isApiError(cause) ? cause.message : $ts("projects.search.failed");
+    }
+  },
+  { debounce: 250 },
+);
 
 const NuxtLink = resolveComponent("NuxtLink");
 const StateBadge = resolveComponent("ProjectsStateBadge");
@@ -275,7 +306,17 @@ function firstError(field: AnyFieldApi): string | undefined {
           </form>
         </section>
 
-        <div class="flex flex-wrap items-end gap-3">
+        <div class="flex flex-wrap items-end gap-3" role="search">
+          <Field :label="$ts('projects.search.words')" class="min-w-48 flex-1">
+            <template #default="{ id }">
+              <Input
+                :id="id"
+                v-model="words"
+                type="search"
+                :placeholder="$ts('projects.search.inProject')"
+              />
+            </template>
+          </Field>
           <Field :label="$ts('projects.filterByState')" class="w-48">
             <template #default="{ id }">
               <Select
@@ -310,7 +351,9 @@ function firstError(field: AnyFieldApi): string | undefined {
 
         <p v-if="failed" class="text-sm text-destructive" role="alert">{{ failed }}</p>
 
+        <ProjectsIssueSearchResults v-if="found && words.trim()" :results="found" />
         <UiDataTable
+          v-else
           class="bg-surface"
           :columns="columns"
           :data="issues"

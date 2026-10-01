@@ -48,11 +48,11 @@ Goal: an issue carries enough structure to actually be tracked, not just filed.
 
 Goal: issues are findable the same way messages already are.
 
-- [ ] 4.1 Add the `issue_search` table mirroring `message_search` — generated `tsvector`, GIN index, a separate table from `issues` — with index/unindex wired into issue creation and edits; verify reindexing an issue's title or description does not write to the `issues` table
-- [ ] 4.2 Implement `SearchIssues` using `websearch_to_tsquery` with the project-membership join as the authorization boundary, following `SearchMessages`'s pattern exactly; verify hostile input never raises a syntax error and a project the caller cannot access never appears in results
-- [ ] 4.3 Implement combined filtering by text, state, assignee, label, priority, and project through the existing `Searcher` interface; verify several filters applied together return only issues satisfying all of them
-- [ ] 4.4 Build the web search and filter interface for issues, including a combined issue+conversation search that also queries `SearchMessages` for an issue's discussion room; verify both are usable end to end and respect the same access boundaries as browsing
-- [ ] **MILESTONE 4** — Demonstrate: search across all accessible projects returns matching issues ranked by recency, combining a text query with a state and label filter narrows correctly, and a private project's issues are absent from every search performed by a non-member. Tag `v1.35.0-dev`.
+- [x] 4.1 Add the `issue_search` table mirroring `message_search` — generated `tsvector`, GIN index, a separate table from `issues` — with index/unindex wired into issue creation and edits; verify reindexing an issue's title or description does not write to the `issues` table
+- [x] 4.2 Implement `SearchIssues` using `websearch_to_tsquery` with the project-membership join as the authorization boundary, following `SearchMessages`'s pattern exactly; verify hostile input never raises a syntax error and a project the caller cannot access never appears in results
+- [x] 4.3 Implement combined filtering by text, state, assignee, label, priority, and project through the existing `Searcher` interface; verify several filters applied together return only issues satisfying all of them
+- [x] 4.4 Build the web search and filter interface for issues, including a combined issue+conversation search that also queries `SearchMessages` for an issue's discussion room; verify both are usable end to end and respect the same access boundaries as browsing
+- [x] **MILESTONE 4** — Demonstrate: search across all accessible projects returns matching issues ranked by recency, combining a text query with a state and label filter narrows correctly, and a private project's issues are absent from every search performed by a non-member. Tag `v1.35.0-dev`.
 
 ## 5. Phase 5 — Boards
 

@@ -1,6 +1,8 @@
 import type {
+  DiscussionSearchResult,
   Issue,
   IssueHistoryEntry,
+  IssueSearch,
   IssueLabel,
   IssuePriority,
   IssueState,
@@ -74,6 +76,32 @@ export function useProjects() {
       return api.get<Issue[]>(`${at(key)}/issues${suffix}`);
     },
     mine: () => api.get<MyIssue[]>("/api/me/issues"),
+    /**
+     * Searches issues across every project the requester can see. Words and
+     * filters narrow together; filters name states, labels and priorities
+     * rather than identifying them, so they mean the same in every project.
+     */
+    search: (query: {
+      q?: string;
+      project?: string;
+      state?: string;
+      label?: string;
+      priority?: string;
+      assignee?: string;
+      completed?: boolean;
+      prefix?: boolean;
+      discussions?: boolean;
+    }) => {
+      const parameters = new URLSearchParams();
+      for (const [name, value] of Object.entries(query)) {
+        if (value !== undefined && value !== "") parameters.set(name, String(value));
+      }
+      return api.get<IssueSearch>(`/api/issues/search?${parameters}`);
+    },
+    searchDiscussion: (ref: string, q: string) =>
+      api.get<DiscussionSearchResult[]>(
+        `${issueAt(ref)}/discussion/search?${new URLSearchParams({ q })}`,
+      ),
 
     labels: (key: string) => api.get<IssueLabel[]>(`${at(key)}/labels`),
     addLabel: (key: string, label: { name: string; colour?: string }) =>

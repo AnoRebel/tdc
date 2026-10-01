@@ -113,6 +113,44 @@ the moment it is chosen and recorded in the issue's history.
   between issues of the same project, and each side records the change in its
   own history.
 
+## Finding issues
+
+**Search issues** in the sidebar searches every issue in every project you can
+see, and what was said in their discussions. Words and filters combine — every
+one you give must hold:
+
+- **Words** match an issue's title, and less strongly its description. The
+  search ignores word endings the way a search engine does, so "crashes" finds
+  "crash"; and nothing typed into it, however odd, makes it fail.
+- **State** and **label** are names, not choices from one project's lists,
+  because the search spans projects: _Done_ means done wherever it is, and
+  `bug` is `bug` in every project that has one. Case does not matter.
+- **Assigned to** is a username. **Finished or not** uses each project's own
+  idea of which states mean done.
+
+Results come most recently changed first, with the matched words marked, and
+below them anything said in a discussion that matched. A search is part of the
+page's address, so it can be shared as a link — and each person opening it sees
+what they may see, not what its author saw.
+
+A project's own issue list has the same search above it, limited to that
+project, and an issue's discussion has a search of its own beside it, which
+anybody who can see the issue may use without ever having taken part.
+
+**Private projects are never searched on behalf of anybody outside them** — not
+by words, not by filters, not by naming the project, and not through their
+discussions. The search does not find their issues and then hide them; it never
+reads them.
+
+The API: `GET /api/issues/search` takes `q`, `project` (a key), `state`,
+`label`, `priority` (names), `assignee` (a username), `completed` (`true` or
+`false`), `prefix=true` for search-as-you-type over titles, and `limit` (at most
+50), and answers `{"issues": [...], "discussions": [...]}`. Each issue carries
+`key`, `title`, `projectKey`, `projectName`, `state`, `completed`, `updatedAt`
+and, when there were words, `highlighted` — the title and description with the
+matches in `<mark>`. `GET /api/issues/:ref/discussion/search?q=` searches one
+issue's discussion.
+
 ## Who may do what
 
 | Permission                 | What it allows                                   | Held by default by                 |

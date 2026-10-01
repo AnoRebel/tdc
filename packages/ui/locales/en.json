@@ -726,6 +726,27 @@
       "blue": "Blue",
       "violet": "Violet",
       "pink": "Pink"
+    },
+    "search": {
+      "title": "Search issues",
+      "words": "Words",
+      "wordsPlaceholder": "What it is about",
+      "inProject": "Search this project's issues",
+      "inDiscussion": "Search this discussion",
+      "statePlaceholder": "Any state, or one by name",
+      "label": "Label",
+      "assignee": "Assigned to",
+      "finishedOrNot": "Finished or not",
+      "anyState": "Either",
+      "open": "Not finished",
+      "finished": "Finished",
+      "issuesFound": "Issues",
+      "discussionsFound": "Said in discussions",
+      "noIssues": "No issue matches.",
+      "nothingSaid": "Nothing said here matches.",
+      "changed": "changed {when}",
+      "failed": "The search could not be completed. Try again.",
+      "hint": "Search by words, or narrow by state, label and who an issue is assigned to — or both. Only issues in projects you can see are ever found."
     }
   }
 }

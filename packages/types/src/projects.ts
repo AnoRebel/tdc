@@ -189,6 +189,36 @@ export interface IssueFromMessage {
   completed: boolean;
 }
 
+/** An issue that matched a search. */
+export interface IssueSearchResult {
+  id: string;
+  key: string;
+  title: string;
+  projectKey: string;
+  projectName: string;
+  state: string;
+  completed: boolean;
+  updatedAt: string;
+  /** The title and description with the matched words in `<mark>`, when there were words. */
+  highlighted?: string;
+}
+
+/** Something said in an issue's discussion that matched a search. */
+export interface DiscussionSearchResult {
+  eventId: string;
+  sender: string;
+  sentAt: string;
+  issueKey: string;
+  issueTitle: string;
+  highlighted: string;
+}
+
+/** What an issue search found: issues, and what was said about them. */
+export interface IssueSearch {
+  issues: IssueSearchResult[];
+  discussions: DiscussionSearchResult[];
+}
+
 /** An issue assigned to the requester, with the project it is in. */
 export interface MyIssue extends Issue {
   projectKey: string;

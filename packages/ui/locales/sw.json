@@ -726,6 +726,27 @@
       "blue": "Buluu",
       "violet": "Zambarau",
       "pink": "Waridi"
+    },
+    "search": {
+      "title": "Tafuta masuala",
+      "words": "Maneno",
+      "wordsPlaceholder": "Linahusu nini",
+      "inProject": "Tafuta masuala ya mradi huu",
+      "inDiscussion": "Tafuta katika majadiliano haya",
+      "statePlaceholder": "Hali yoyote, au moja kwa jina",
+      "label": "Lebo",
+      "assignee": "Amekabidhiwa",
+      "finishedOrNot": "Imekamilika au la",
+      "anyState": "Vyovyote",
+      "open": "Haijakamilika",
+      "finished": "Imekamilika",
+      "issuesFound": "Masuala",
+      "discussionsFound": "Yaliyosemwa kwenye majadiliano",
+      "noIssues": "Hakuna suala linalolingana.",
+      "nothingSaid": "Hakuna kilichosemwa hapa kinacholingana.",
+      "changed": "lilibadilishwa {when}",
+      "failed": "Utafutaji haukuweza kukamilika. Jaribu tena.",
+      "hint": "Tafuta kwa maneno, au punguza kwa hali, lebo na aliyekabidhiwa suala — au vyote. Masuala yanayopatikana ni yale tu yaliyo katika miradi unayoweza kuiona."
     }
   }
 }

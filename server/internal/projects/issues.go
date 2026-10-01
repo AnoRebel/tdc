@@ -210,8 +210,10 @@ func (s *Service) CreateIssue(ctx context.Context, actor Actor, access Access, i
 		if err != nil {
 			return fmt.Errorf("read project stream: %w", err)
 		}
-		_, err = s.appendTo(ctx, q, stream, author, events.TypeIssueCreated, content)
-		return err
+		if _, err = s.appendTo(ctx, q, stream, author, events.TypeIssueCreated, content); err != nil {
+			return err
+		}
+		return index(ctx, q, issue)
 	})
 	return issue, err
 }
@@ -446,6 +448,9 @@ func (s *Service) Edit(ctx context.Context, actor Actor, access Access, issue db
 				return err
 			}
 		}
+		if edited.Title != locked.Title || edited.Description != locked.Description {
+			return index(ctx, q, edited)
+		}
 		return nil
 	})
 	return edited, err
@@ -471,9 +476,45 @@ func (s *Service) Delete(ctx context.Context, actor Actor, access Access, issue 
 		if err != nil {
 			return fmt.Errorf("delete issue: %w", err)
 		}
+		if err := q.UnindexIssue(ctx, issue.ID); err != nil {
+			return fmt.Errorf("unindex issue: %w", err)
+		}
 		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueDeleted,
 			issueContent(deleted, access.Project.Key, nil))
 	})
+}
+
+/*
+index writes an issue's searchable text, inside the caller's transaction, so an
+issue is findable by the words it has the moment it has them.
+
+Into issue_search and nowhere else: the issue's row is read, never written, so
+rebuilding the index can never change the record it indexes.
+*/
+func index(ctx context.Context, q *dbgen.Queries, issue dbgen.Issue) error {
+	if err := q.IndexIssue(ctx, dbgen.IndexIssueParams{
+		IssueID: issue.ID, ProjectID: issue.ProjectID, Title: issue.Title, Description: issue.Description,
+	}); err != nil {
+		return fmt.Errorf("index issue: %w", err)
+	}
+	return nil
+}
+
+/*
+Reindex rewrites one issue's searchable text from the issue as it is.
+
+For rebuilding an index that has gone wrong. Reads the issue and writes only the
+index: the one thing a rebuild must never do is change what it is rebuilding.
+*/
+func (s *Service) Reindex(ctx context.Context, issueID uuid.UUID) error {
+	issue, err := s.queries.GetIssueByID(ctx, issueID)
+	if err != nil {
+		return fmt.Errorf("read issue: %w", err)
+	}
+	if issue.DeletedAt != nil {
+		return s.queries.UnindexIssue(ctx, issueID)
+	}
+	return index(ctx, s.queries, issue)
 }
 
 // IssueFilter narrows a project's issue list. Every field given must match.

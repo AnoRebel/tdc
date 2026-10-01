@@ -343,6 +343,78 @@ func TestNothingHereRewritesTheLog(t *testing.T) {
 	}
 }
 
+/*
+Rebuilding an issue's place in the search index never writes to the issue.
+
+Checked by the row's own transaction stamp, which any UPDATE changes — even one
+that sets a column to the value it already had — so "the title did not change"
+would not have been enough to prove nothing touched the row.
+*/
+func TestReindexingDoesNotWriteTheIssue(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	amina := f.person(t, "amina")
+	access := f.project(t, amina, "IDX")
+	issue := f.issue(t, amina, access, "Index me")
+
+	stamp := func() string {
+		var xmin string
+		if err := f.pool.QueryRow(ctx, `SELECT xmin::text FROM issues WHERE id = $1`, issue.ID).Scan(&xmin); err != nil {
+			t.Fatalf("read the row's stamp: %v", err)
+		}
+		return xmin
+	}
+	searchable := func() string {
+		var title string
+		if err := f.pool.QueryRow(ctx, `SELECT title FROM issue_search WHERE issue_id = $1`, issue.ID).Scan(&title); err != nil {
+			t.Fatalf("read the index: %v", err)
+		}
+		return title
+	}
+
+	before := stamp()
+	if _, err := f.pool.Exec(ctx, `UPDATE issue_search SET title = 'stale' WHERE issue_id = $1`, issue.ID); err != nil {
+		t.Fatalf("make the index stale: %v", err)
+	}
+	if err := f.projects.Reindex(ctx, issue.ID); err != nil {
+		t.Fatalf("reindex: %v", err)
+	}
+	if got := searchable(); got != "Index me" {
+		t.Errorf("after reindexing, the index holds %q", got)
+	}
+	if after := stamp(); after != before {
+		t.Errorf("reindexing wrote to the issue's row (stamp %s became %s)", before, after)
+	}
+}
+
+// A deleted issue leaves the index, rather than relying on every search to
+// remember to leave it out.
+func TestDeletingAnIssueTakesItOutOfTheIndex(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	amina := f.person(t, "amina")
+	access := f.project(t, amina, "GONE")
+	issue := f.issue(t, amina, access, "Forget me")
+
+	indexed := func() bool {
+		var present bool
+		if err := f.pool.QueryRow(ctx,
+			`SELECT EXISTS (SELECT 1 FROM issue_search WHERE issue_id = $1)`, issue.ID).Scan(&present); err != nil {
+			t.Fatalf("read the index: %v", err)
+		}
+		return present
+	}
+	if !indexed() {
+		t.Fatal("a new issue is not in the index")
+	}
+	if err := f.projects.Delete(ctx, amina, access, issue); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if indexed() {
+		t.Error("a deleted issue is still in the index")
+	}
+}
+
 // A key is upper-cased, and refused when it could not survive being said
 // aloud or pasted into a commit message.
 func TestNormaliseKey(t *testing.T) {

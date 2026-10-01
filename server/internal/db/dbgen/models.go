@@ -192,6 +192,14 @@ type IssueRelation struct {
 	CreatedBy *uuid.UUID
 }
 
+type IssueSearch struct {
+	IssueID      uuid.UUID
+	ProjectID    uuid.UUID
+	Title        string
+	Description  string
+	SearchVector interface{}
+}
+
 type IssueState struct {
 	ID           uuid.UUID
 	ProjectID    uuid.UUID

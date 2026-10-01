@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { isApiError, type Issue, type IssueHistoryEntry } from "@tdc/types";
+import {
+  isApiError,
+  type DiscussionSearchResult,
+  type Issue,
+  type IssueHistoryEntry,
+} from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
@@ -111,6 +116,28 @@ async function saveEdits() {
     saving.value = false;
   }
 }
+
+/* Searching the discussion, as somebody types. */
+const discussionWords = ref("");
+const discussionFound = ref<DiscussionSearchResult[]>([]);
+const discussionSearched = ref(false);
+watchDebounced(
+  discussionWords,
+  async (words) => {
+    discussionSearched.value = false;
+    if (!words.trim() || !issue.value) {
+      discussionFound.value = [];
+      return;
+    }
+    try {
+      discussionFound.value = await projectsApi.searchDiscussion(issue.value.key, words.trim());
+    } catch {
+      discussionFound.value = [];
+    }
+    discussionSearched.value = true;
+  },
+  { debounce: 250 },
+);
 
 /* A field changed in the panel: show the issue as it now is, and its record. */
 async function changed(updated: Issue) {
@@ -281,6 +308,45 @@ async function confirmDelete() {
           class="flex h-[70vh] min-h-0 shrink-0 flex-col border-t lg:h-auto lg:w-[26rem] lg:border-t-0 lg:border-l"
           :aria-label="$ts('projects.discussion')"
         >
+          <!-- Searching what was said here, for anybody who can see the
+               issue — taking part is not needed to look back through it. -->
+          <div class="shrink-0 border-b px-3 py-2" role="search">
+            <label for="discussion-search" class="sr-only">
+              {{ $t("projects.search.inDiscussion") }}
+            </label>
+            <Input
+              id="discussion-search"
+              v-model="discussionWords"
+              type="search"
+              class="h-8"
+              :placeholder="$ts('projects.search.inDiscussion')"
+            />
+            <ul v-if="discussionFound.length" class="mt-1 max-h-40 overflow-y-auto">
+              <li v-for="said in discussionFound" :key="said.eventId">
+                <NuxtLink
+                  :to="
+                    localeRoute({
+                      name: 'issues-ref',
+                      params: { ref: issue.key },
+                      query: { at: said.eventId, jump: String(Date.now()) },
+                    })
+                  "
+                  class="block rounded px-1.5 py-1 hover:bg-accent"
+                >
+                  <span class="block text-[0.6875rem] text-muted-foreground">
+                    {{ said.sender.split("@")[0] }}
+                  </span>
+                  <SearchExcerpt :html="said.highlighted" class="block text-xs" />
+                </NuxtLink>
+              </li>
+            </ul>
+            <p
+              v-else-if="discussionWords.trim() && discussionSearched"
+              class="mt-1 text-xs text-muted-foreground"
+            >
+              {{ $t("projects.search.nothingSaid") }}
+            </p>
+          </div>
           <ChatRoom :room-id="issue.id" />
         </section>
       </div>

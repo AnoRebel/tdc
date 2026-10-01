@@ -318,6 +318,10 @@ type Querier interface {
 	// The furthest this server has stored for a room, which is what a catch-up
 	// request asks from.
 	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
+	// Finding issues, and what was said about them.
+	// Writes an issue's searchable text. The issue's own row is read, never
+	// written: rebuilding the index is never a change to the record.
+	IndexIssue(ctx context.Context, arg IndexIssueParams) error
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
 	// Issuing a new one invalidates the old, so somebody who asks twice is not left
 	// holding two working links.
@@ -684,6 +688,28 @@ type Querier interface {
 	// notification twice. The failure count resets, since a resubscription is the
 	// browser saying this endpoint works.
 	SavePushSubscription(ctx context.Context, arg SavePushSubscriptionParams) (PushSubscription, error)
+	// What was said about issues: messages in the discussions of issues the
+	// searcher may see, optionally one issue's alone.
+	//
+	// Messages are indexed exactly as in any channel; what differs is who may read
+	// them, which for a discussion is whoever may see its issue — so that is what
+	// is joined, rather than the room's membership, which only records who has
+	// taken part.
+	SearchIssueDiscussions(ctx context.Context, arg SearchIssueDiscussionsParams) ([]SearchIssueDiscussionsRow, error)
+	// Search-as-you-type over titles: a prefix or a near miss, which a tsquery
+	// cannot find. The same visibility join as above.
+	SearchIssueTitlesFuzzy(ctx context.Context, arg SearchIssueTitlesFuzzyParams) ([]SearchIssueTitlesFuzzyRow, error)
+	// Issues matching a query and every filter given, among the projects the
+	// searcher may see, most recently changed first.
+	//
+	// The project's visibility is joined, not filtered afterwards: an issue in a
+	// private project the searcher is not in is never fetched, so a mistake in
+	// the filtering cannot leak it — a mistake in a join is an empty result.
+	//
+	// websearch_to_tsquery never raises a syntax error, whatever is typed at it.
+	// An empty query is no text filter at all, which is how a filter-only search
+	// works; the filters narrow together, each one given having to hold.
+	SearchIssues(ctx context.Context, arg SearchIssuesParams) ([]SearchIssuesRow, error)
 	// Full-text search, restricted to rooms the caller is in.
 	//
 	// The membership join is the authorisation, done in the query rather than by
@@ -804,6 +830,7 @@ type Querier interface {
 	TransitionIssue(ctx context.Context, arg TransitionIssueParams) (Issue, error)
 	UnassignIssue(ctx context.Context, arg UnassignIssueParams) (int64, error)
 	UnblockUser(ctx context.Context, arg UnblockUserParams) error
+	UnindexIssue(ctx context.Context, issueID uuid.UUID) error
 	UnindexMessage(ctx context.Context, eventID string) error
 	UnlabelIssue(ctx context.Context, arg UnlabelIssueParams) (int64, error)
 	// Removes a mark.
