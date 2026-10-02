@@ -10,6 +10,7 @@ package main
 import (
 	"context"
 	"embed"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -48,6 +49,16 @@ the only thing that looks right on both, which is what a template icon means.
 */
 //go:embed build/icons/tray-32.png
 var trayIcon []byte
+
+/*
+The tray icon as a hicolor tree, under the name the tray announces.
+
+The same files the deb and rpm install, embedded so a build installed by
+neither — an AppImage, a tarball, a development run — can put them in the
+person's own icon theme for panels that resolve tray icons by name.
+*/
+//go:embed build/linux/icons/hicolor/*/apps/TDC.*
+var trayIconTheme embed.FS
 
 /*
 What a release must be signed by for this build to install it.
@@ -235,9 +246,14 @@ func main() {
 			ApplicationID: "net.anorebel.tdc",
 		},
 		Mac: application.MacOptions{
-			// Closing the last window quits, which is what somebody means by
-			// closing an application — until the tray exists and offers to
-			// keep running, which 9.14 decides.
+			/*
+				Safe to leave on now that there is a tray, because hiding is
+				not closing.
+
+				shell.Closing intercepts the close button and, where somebody
+				chose the tray, hides the window instead of letting it close —
+				so the last window only ever closes when they meant to quit.
+			*/
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
@@ -316,6 +332,13 @@ func main() {
 		Attached to the window so showing and hiding reach the right one, and
 		given the same icon the application uses everywhere else.
 	*/
+	if theme, err := fs.Sub(trayIconTheme, "build/linux/icons/hicolor"); err == nil {
+		// Before the tray exists, so the first lookup by name already finds it.
+		if err := shell.InstallTrayIcon(theme); err != nil {
+			log.Printf("tdc: the tray icon could not be added to the icon theme: %v", err)
+		}
+	}
+
 	tray := shell.NewTray(app, trayIcon)
 	tray.AttachWindow(window)
 	tray.WindowShown(!openHidden)

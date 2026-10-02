@@ -133,3 +133,47 @@ func TestTheFrontendKnowsEveryTrayEvent(t *testing.T) {
 		}
 	}
 }
+
+/*
+On Linux the tray is named, always, including with nothing waiting.
+
+The label there is the StatusNotifierItem's Title, and what panels show on
+hover, because Wails leaves the tooltip unimplemented on Linux. An empty label
+hovered as nothing, and one never set before Run hovered as "Wails" — which is
+what shipped.
+*/
+func TestTheLinuxTrayAlwaysCarriesItsName(t *testing.T) {
+	for _, count := range []int{0, 1, 7, 250} {
+		label, _ := trayText("linux", count)
+		if !strings.HasPrefix(label, TrayName) {
+			t.Errorf("with %d waiting the Linux label is %q, which does not name the application", count, label)
+		}
+	}
+
+	label, _ := trayText("linux", 3)
+	if !strings.Contains(label, "3 messages") {
+		t.Errorf("the Linux label %q does not say how many are waiting", label)
+	}
+}
+
+// On macOS the label sits beside the icon, so it is the bare count or nothing:
+// "TDC" beside the TDC icon says the same thing twice.
+func TestTheMacTrayLabelIsTheCountAlone(t *testing.T) {
+	if label, _ := trayText("darwin", 0); label != "" {
+		t.Errorf("with nothing waiting the menu bar reads %q, want nothing", label)
+	}
+	if label, _ := trayText("darwin", 120); label != "99+" {
+		t.Errorf("the menu bar reads %q, want 99+", label)
+	}
+}
+
+// Every platform's tooltip names the application, whatever the count.
+func TestEveryTooltipNamesTheApplication(t *testing.T) {
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		for _, count := range []int{0, 2} {
+			if _, tooltip := trayText(goos, count); !strings.HasPrefix(tooltip, TrayName) {
+				t.Errorf("%s with %d waiting: tooltip %q does not name the application", goos, count, tooltip)
+			}
+		}
+	}
+}

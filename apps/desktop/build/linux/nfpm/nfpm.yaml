@@ -10,8 +10,8 @@ version: "0.1.0"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
-description: "A tdc application"
-vendor: "My Company"
+description: "Chat, project tracking, and a directory connecting developers with the people who need them."
+vendor: "Tanzania Developers Community"
 homepage: "https://wails.io"
 license: "MIT"
 release: "1"
@@ -47,12 +47,11 @@ overrides:
       - gtk4
       - webkitgtk-6.0
 
-# scripts section to ensure desktop database is updated after install
+# Refresh the desktop, MIME and icon databases after install, and the icon
+# cache again after removal so it stops naming files that are gone.
 scripts:
   postinstall: "./build/linux/nfpm/scripts/postinstall.sh"
-  # You can also add preremove, postremove if needed
-  # preremove: "./build/linux/nfpm/scripts/preremove.sh"
-  # postremove: "./build/linux/nfpm/scripts/postremove.sh"
+  postremove: "./build/linux/nfpm/scripts/postremove.sh"
 
 # If you build your app with -tags gtk3 (legacy WebKit2GTK 4.1 stack — supported through v3.0.x, removed in v3.1),
 # replace the depends/overrides above with these:

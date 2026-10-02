@@ -8,15 +8,15 @@
   IgnorableNamespaces="uap3">
   
   <Identity 
-    Name="com.example.tdc"
-    Publisher="CN=My Company"
+    Name="net.anorebel.tdc"
+    Publisher="CN=Tanzania Developers Community"
     Version="0.1.0.0" 
     ProcessorArchitecture="x64" />
   
   <Properties>
-    <DisplayName>My Product</DisplayName>
-    <PublisherDisplayName>My Company</PublisherDisplayName>
-    <Description>A tdc application</Description>
+    <DisplayName>TDC</DisplayName>
+    <PublisherDisplayName>Tanzania Developers Community</PublisherDisplayName>
+    <Description>Chat, project tracking, and a directory connecting developers with the people who need them.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   
@@ -29,10 +29,10 @@
   </Resources>
   
   <Applications>
-    <Application Id="com.example.tdc" Executable="tdc" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="net.anorebel.tdc" Executable="tdc" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="My Product"
-        Description="A tdc application"
+        DisplayName="TDC"
+        Description="Chat, project tracking, and a directory connecting developers with the people who need them."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

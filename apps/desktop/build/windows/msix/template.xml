@@ -10,24 +10,24 @@
     <Installer
         Path="tdc"
         Arguments=""
-        InstallLocation="C:\Program Files\My Company\My Product">
+        InstallLocation="C:\Program Files\Tanzania Developers Community\TDC">
     </Installer>
     <PackageInformation
-        PackageName="My Product"
-        PackageDisplayName="My Product"
-        PublisherName="CN=My Company"
-        PublisherDisplayName="My Company"
+        PackageName="TDC"
+        PackageDisplayName="TDC"
+        PublisherName="CN=Tanzania Developers Community"
+        PublisherDisplayName="Tanzania Developers Community"
         Version="0.1.0.0"
-        PackageDescription="A tdc application">
+        PackageDescription="Chat, project tracking, and a directory connecting developers with the people who need them.">
         <Capabilities>
             <Capability Name="runFullTrust" />
             
         </Capabilities>
         <Applications>
             <Application
-                Id="com.example.tdc"
-                Description="A tdc application"
-                DisplayName="My Product"
+                Id="net.anorebel.tdc"
+                Description="Chat, project tracking, and a directory connecting developers with the people who need them."
+                DisplayName="TDC"
                 ExecutableName="tdc"
                 EntryPoint="Windows.FullTrustApplication">
                 
@@ -41,9 +41,9 @@
         </Dependencies>
         <Properties>
             <Framework>false</Framework>
-            <DisplayName>My Product</DisplayName>
-            <PublisherDisplayName>My Company</PublisherDisplayName>
-            <Description>A tdc application</Description>
+            <DisplayName>TDC</DisplayName>
+            <PublisherDisplayName>Tanzania Developers Community</PublisherDisplayName>
+            <Description>Chat, project tracking, and a directory connecting developers with the people who need them.</Description>
             <Logo>Assets\AppIcon.png</Logo>
         </Properties>
     </PackageInformation>

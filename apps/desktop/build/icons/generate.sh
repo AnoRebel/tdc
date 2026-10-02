@@ -24,7 +24,9 @@ command -v rsvg-convert >/dev/null || {
 rsvg-convert -w 1024 -h 1024 "$svg" -o build/appicon.png
 
 # Linux: the sizes a desktop environment looks for in an icon theme.
-for size in 16 24 32 48 64 128 256 512; do
+# 22 included: it is the size most panels and launcher menus ask for, and a
+# missing size is filled by scaling a neighbour, which blurs.
+for size in 16 22 24 32 48 64 128 256 512; do
 	mkdir -p "build/linux/icons/hicolor/${size}x${size}/apps"
 	rsvg-convert -w "$size" -h "$size" "$svg" \
 		-o "build/linux/icons/hicolor/${size}x${size}/apps/net.anorebel.tdc.png"
@@ -40,5 +42,19 @@ cp "$symbolic" build/linux/icons/hicolor/symbolic/apps/net.anorebel.tdc-symbolic
 for size in 16 22 24 32; do
 	rsvg-convert -w "$size" -h "$size" "$symbolic" -o "build/icons/tray-${size}.png"
 done
+
+# The tray glyph again, under the name the tray announces (TrayName, "TDC").
+#
+# Some panels — waybar among them — find a tray icon by looking its Id up in
+# the icon theme rather than drawing the picture they are sent, and show a
+# placeholder when nothing has that name. The packages install these; builds
+# that install nothing put them in the person's own theme at startup
+# (shell.InstallTrayIcon), from these same files.
+for size in 16 22 24 32 48 64; do
+	mkdir -p "build/linux/icons/hicolor/${size}x${size}/apps"
+	rsvg-convert -w "$size" -h "$size" "$symbolic" \
+		-o "build/linux/icons/hicolor/${size}x${size}/apps/TDC.png"
+done
+cp "$symbolic" build/linux/icons/hicolor/scalable/apps/TDC.svg
 
 echo "icons rendered"

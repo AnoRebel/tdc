@@ -2,6 +2,7 @@ package shell
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -87,7 +88,20 @@ func NewTray(app *application.App, icon []byte) *Tray {
 		one.
 	*/
 	tray.tray.SetTemplateIcon(icon)
-	tray.tray.SetTooltip("TDC")
+
+	/*
+		Named before Run, on every platform where the label is the name.
+
+		On Linux the label set before Run becomes the StatusNotifierItem's Id,
+		Title and ToolTip all at once, and Wails fills an empty one with the
+		literal "Wails" — so a panel showed "Wails" on hover, and panels that
+		look tray icons up by name searched the icon theme for one called
+		Wails. The Id cannot change after Run, which is why this cannot wait
+		for the first unread count to set it.
+	*/
+	label, tooltip := trayText(runtime.GOOS, 0)
+	tray.tray.SetLabel(label)
+	tray.tray.SetTooltip(tooltip)
 
 	// Clicking the icon shows or hides the window, which is what a tray icon
 	// does everywhere and what somebody will try first.
@@ -116,15 +130,50 @@ func (t *Tray) SetUnread(count int) {
 		return
 	}
 
-	if count > 0 {
-		t.tray.SetLabel(badge(count))
-		t.tray.SetTooltip(fmt.Sprintf("TDC — %s waiting", messages(count)))
-	} else {
-		t.tray.SetLabel("")
-		t.tray.SetTooltip("TDC")
-	}
+	label, tooltip := trayText(runtime.GOOS, count)
+	t.tray.SetLabel(label)
+	t.tray.SetTooltip(tooltip)
 
 	t.rebuild()
+}
+
+// TrayName is what the tray calls itself, and the name its icon is installed
+// under for panels that look tray icons up in the icon theme.
+const TrayName = "TDC"
+
+/*
+trayText decides the tray's label and tooltip for a platform and a count.
+
+The two mean different things on different platforms, which is the whole
+reason this is a function rather than two calls:
+
+  - macOS draws the label beside the icon in the menu bar, so it carries the
+    bare count and nothing when there is none — a menu bar reading "TDC" next
+    to the TDC icon says the same thing twice.
+  - Linux has no separate tooltip: Wails leaves SetTooltip unimplemented there
+    and panels show the label on hover instead. So the label must always carry
+    the name, with the count beside it, and must never be emptied — an empty
+    label is a tray icon that hovers as nothing at all.
+  - Windows has no label to draw and does have a tooltip, so the tooltip
+    carries everything.
+*/
+func trayText(goos string, count int) (label, tooltip string) {
+	tooltip = TrayName
+	if count > 0 {
+		tooltip = fmt.Sprintf("%s — %s waiting", TrayName, messages(count))
+	}
+
+	switch goos {
+	case "darwin":
+		if count > 0 {
+			return badge(count), tooltip
+		}
+		return "", tooltip
+	case "linux":
+		return tooltip, tooltip
+	default:
+		return "", tooltip
+	}
 }
 
 /*

@@ -134,6 +134,40 @@ shipped the first time, confirmed by reading the pixmap off the bus as black at
 The two bubbles are outline-and-solid rather than two solids, because at
 sixteen pixels two solid shapes merge into a blob.
 
+White suits the dark panels that are the common case and nearly vanishes on a
+light one. A single-colour glyph cannot suit both, and on Linux there is no
+second slot to offer — Wails's dark-mode tray icon simply replaces the first.
+
+### The name
+
+The tray is labelled **before** it starts. On Linux the label at that moment
+becomes the StatusNotifierItem's `Id`, `Title` and `ToolTip` together, and
+Wails fills an empty one with the literal `Wails` — which is what panels showed
+on hover until it was set. The `Id` cannot change afterwards.
+
+On Linux the label is also the only hover text: Wails leaves `SetTooltip`
+unimplemented there. So it always carries the name, `TDC`, with the unread count
+beside it, and is never emptied. macOS draws the label beside the icon, so it
+gets the bare count; Windows has no label and uses the tooltip.
+`shell.trayText` holds the rule for all three.
+
+Some panels — waybar among them — do not draw the picture the tray sends but
+look its `Id` up in the icon theme, and show a placeholder when nothing is
+called that. So the glyph is also installed as `TDC` in `hicolor`, at every
+panel size plus a scalable copy. The deb and rpm ship it and refresh the icon
+cache on install and removal; an AppImage, a tarball or a development build
+installs nothing, so the application writes it into the person's own theme
+(`$XDG_DATA_HOME/icons/hicolor`) when it starts — skipping anything a package
+already provides identically, and replacing a copy that has gone out of date.
+
+To see what a panel sees, read the item off the bus while the application runs:
+
+```sh
+busctl --user get-property org.kde.StatusNotifierWatcher /StatusNotifierWatcher \
+  org.kde.StatusNotifierWatcher RegisteredStatusNotifierItems
+busctl --user get-property <service> /StatusNotifierItem org.kde.StatusNotifierItem Id
+```
+
 ## Starting, and where the window goes
 
 Two choices, neither on unless somebody turns it on: open at login, and open to
@@ -292,6 +326,22 @@ thing.
 The value is case-sensitive, and worth reading off a running window rather than
 assuming — `hyprctl clients` on Wayland, `xprop WM_CLASS` on X11. The
 application is named "TDC"; the id is lowercase.
+
+The per-platform metadata — the Windows version resource and installer, the
+macOS `Info.plist`, the Linux package's vendor and description — is generated
+from `build/config.yml` by `wails3 update build-assets`. That command overwrites
+the hand-edited files too, so rather than running it in place, generate into a
+scratch directory and copy across only what changed:
+
+```sh
+wails3 update build-assets -config build/config.yml -dir /tmp/assets -name tdc -binaryname tdc
+diff -r build /tmp/assets
+```
+
+Until that was done the Windows installer said "My Product" by "My Company",
+and the macOS 26 icon was built from the Wails logo the template ships in
+`appicon.icon`. `Assets.car` is rebuilt from `appicon.icon` on macOS during
+the build; where it is absent, macOS falls back to `icons.icns`.
 
 ## Staying signed in
 

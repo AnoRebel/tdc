@@ -4,15 +4,15 @@
         <key>CFBundlePackageType</key>
             <string>APPL</string>
         <key>CFBundleName</key>
-            <string>My Product</string>
+            <string>TDC</string>
         <key>CFBundleExecutable</key>
             <string>tdc</string>
         <key>CFBundleIdentifier</key>
-            <string>com.example.tdc</string>
+            <string>net.anorebel.tdc</string>
         <key>CFBundleVersion</key>
             <string>0.1.0</string>
         <key>CFBundleGetInfoString</key>
-            <string>This is a comment</string>
+            <string>Self-hosted, by the community, for the community.</string>
         <key>CFBundleShortVersionString</key>
             <string>0.1.0</string>
         <key>CFBundleIconFile</key>
@@ -24,6 +24,6 @@
         <key>NSHighResolutionCapable</key>
             <string>true</string>
         <key>NSHumanReadableCopyright</key>
-            <string>© 2026, My Company</string>
+            <string>(c) 2026 Ano Rebel and contributors</string>
     </dict>
 </plist>
