@@ -230,3 +230,30 @@ export interface IssueConflict {
   message: string;
   issue: Issue;
 }
+
+/** An issue as a board card shows it, and nothing more. */
+export interface BoardCard {
+  key: string;
+  title: string;
+  priority?: { name: string; rank: number };
+  labels?: { name: string; colour: string }[];
+  /** Usernames. */
+  assignees?: string[];
+}
+
+/** One state of a board, and a page of the issues in it. */
+export interface BoardColumn {
+  stateId: string;
+  name: string;
+  isCompletion: boolean;
+  /** How many issues the state holds, all of them. */
+  total: number;
+  cards: BoardCard[];
+  /** Continues the column; absent on its last page. */
+  next?: string;
+}
+
+/** A project's issues as columns, one per state, in board order. */
+export interface Board {
+  columns: BoardColumn[];
+}

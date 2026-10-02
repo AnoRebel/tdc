@@ -113,6 +113,39 @@ the moment it is chosen and recorded in the issue's history.
   between issues of the same project, and each side records the change in its
   own history.
 
+## The board
+
+**Board** on a project shows its issues as columns, one per state, left to
+right in the order the project's settings give them — the columns _are_ the
+states, so adding or reordering a state changes the board. Each column shows
+how many issues it holds and the first twenty of them, most urgent first;
+**Show more** at the bottom of a column fetches the next twenty.
+
+To move a card, drag it to another column. From the keyboard, Tab to the card's
+grip button and press Enter or Space to pick it up; the left and right arrow
+keys choose a column, Enter puts it down there, and Escape leaves it where it
+was. A screen reader is told each step. Both ways send exactly the same request
+— the same one choosing a state on the issue's page sends — so there is nothing
+one of them can do that the other cannot.
+
+If somebody else moved the same card a moment before you, your move is refused
+rather than overwriting theirs, and the board reloads to show where the card
+actually is. The server settles two simultaneous moves on one of them, and tells
+the other person what happened.
+
+### What a board costs to load
+
+A board is drawn on phones on metered data, so its first load is held to a
+budget: **48 KB of JSON before compression, whatever the project holds**. Every
+column sends one page of cards — a project of nine hundred issues sends the same
+cards as one of ninety — and a card carries only what it shows: its identifier,
+title, priority, label names and colours, and assignees' usernames. Never the
+description, the history or the discussion. A test files six times as many
+issues into a full project and fails if the board grows, or if it weighs more
+than the budget; it runs with the rest of the server's tests, so a change that
+breaks either fails the build. The budget lives in `projects.BoardBudgetBytes`,
+and raising it should be a decision made on purpose, in a commit that says why.
+
 ## Finding issues
 
 **Search issues** in the sidebar searches every issue in every project you can

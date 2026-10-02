@@ -97,6 +97,9 @@ type Querier interface {
 	// "entries older than a year were removed" is not an account of anything, and
 	// afterwards there is nothing left to count.
 	CountAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (CountAuditEntriesBeforeRow, error)
+	// How many issues each state holds, so a column can say how many it has
+	// without sending them.
+	CountBoardColumns(ctx context.Context, projectID uuid.UUID) ([]CountBoardColumnsRow, error)
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
@@ -364,6 +367,18 @@ type Querier interface {
 	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)
 	// Who somebody has blocked, which only they can see.
 	ListBlocked(ctx context.Context, blockerID uuid.UUID) ([]ListBlockedRow, error)
+	// A project's board: its states as columns, each a page of small cards.
+	// One page of one column, most urgent first and newest first within a level.
+	//
+	// Keyset rather than offset: the cursor is the last card's (rank, number), so
+	// a card moving out of the column while somebody pages through it cannot make
+	// the next page skip or repeat one. Issues with no priority rank after every
+	// level, as they do in the list.
+	//
+	// Only what a card shows. A board is drawn on a phone on metered data, and a
+	// description, a history or a comment count is what turns a page of cards into
+	// a page of issues.
+	ListBoardColumn(ctx context.Context, arg ListBoardColumnParams) ([]ListBoardColumnRow, error)
 	ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]ListChannelBansRow, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)

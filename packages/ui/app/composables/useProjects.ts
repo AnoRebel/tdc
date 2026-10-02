@@ -1,4 +1,6 @@
 import type {
+  Board,
+  BoardColumn,
   DiscussionSearchResult,
   Issue,
   IssueHistoryEntry,
@@ -155,5 +157,11 @@ export function useProjects() {
     move: (ref: string, stateId: string, expectedStateId?: string) =>
       api.post<Issue>(`${issueAt(ref)}/state`, { stateId, expectedStateId }),
     history: (ref: string) => api.get<IssueHistoryEntry[]>(`${issueAt(ref)}/history`),
+
+    /** Every state's first page of cards. */
+    board: (key: string) => api.get<Board>(`${at(key)}/board`),
+    /** More of one column, after the cursor its last page gave. */
+    column: (key: string, stateId: string, after: string) =>
+      api.get<BoardColumn>(`${at(key)}/board/${stateId}?${new URLSearchParams({ after })}`),
   };
 }

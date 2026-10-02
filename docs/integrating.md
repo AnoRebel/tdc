@@ -797,6 +797,8 @@ curl -X POST http://localhost:8080/api/issues/WEB-1/state \
 | `GET`, `POST /api/projects/:key/labels`; `PATCH`, `DELETE …/labels/:id`                | The project's labels: `name`, `colour` (`#rrggbb`)                                                                                                              |
 | `GET`, `POST`, `PUT /api/projects/:key/priorities`; `PATCH`, `DELETE …/priorities/:id` | The priority scale; `PUT` reorders it, most urgent first                                                                                                        |
 | `GET /api/me/issues`                                                                   | Everything assigned to the caller, in every project they can see                                                                                                |
+| `GET /api/projects/:key/board`                                                         | Every state as a column: `stateId`, `name`, `isCompletion`, `total`, the first page of `cards`, and `next` to continue; `limit` up to 50                        |
+| `GET /api/projects/:key/board/:state?after=`                                           | The next page of one column, from the `next` its last page gave                                                                                                 |
 
 An issue made from a message names it on creation, as two identifiers — the
 message is referred to, never copied:

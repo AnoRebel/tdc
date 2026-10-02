@@ -58,11 +58,11 @@ Goal: issues are findable the same way messages already are.
 
 Goal: the column view, built to the payload discipline the audience's data plans require.
 
-- [ ] 5.1 Implement the board query — paginated issue summaries per state column, derived from the project's ordered `issue_states`, never a full-project fetch; verify a project with hundreds of issues returns only the requested page per column and the response size is bounded regardless of project size
-- [ ] 5.2 Implement moving an issue between board columns as a compare-and-set state transition sharing the Phase 1 transition path; verify moving a card changes the issue's state, is recorded like any other transition, and two simultaneous moves on the same issue converge deterministically rather than one silently overwriting the other
-- [ ] 5.3 Build the web board component as a dedicated view rather than a repurposed data table, with drag-and-drop backed by the same transition endpoint a manual move would call; verify keyboard-only column-to-column movement works through the identical request path as drag-and-drop
-- [ ] 5.4 Verify the board's initial-load payload against a documented budget on a project seeded with hundreds of issues, following the foundation change's payload-budget CI precedent; verify exceeding the budget fails the build
-- [ ] **MILESTONE 5** — Demonstrate: open a project's board on a throttled mobile connection, move a card by drag-and-drop and confirm the state change, move a second card by keyboard alone, and confirm the initial board payload stays within the documented budget regardless of how many issues the project holds. Tag `v1.36.0-dev`.
+- [x] 5.1 Implement the board query — paginated issue summaries per state column, derived from the project's ordered `issue_states`, never a full-project fetch; verify a project with hundreds of issues returns only the requested page per column and the response size is bounded regardless of project size
+- [x] 5.2 Implement moving an issue between board columns as a compare-and-set state transition sharing the Phase 1 transition path; verify moving a card changes the issue's state, is recorded like any other transition, and two simultaneous moves on the same issue converge deterministically rather than one silently overwriting the other
+- [x] 5.3 Build the web board component as a dedicated view rather than a repurposed data table, with drag-and-drop backed by the same transition endpoint a manual move would call; verify keyboard-only column-to-column movement works through the identical request path as drag-and-drop
+- [x] 5.4 Verify the board's initial-load payload against a documented budget on a project seeded with hundreds of issues, following the foundation change's payload-budget CI precedent; verify exceeding the budget fails the build
+- [x] **MILESTONE 5** — Demonstrate: open a project's board on a throttled mobile connection, move a card by drag-and-drop and confirm the state change, move a second card by keyboard alone, and confirm the initial board payload stays within the documented budget regardless of how many issues the project holds. Tag `v1.36.0-dev`.
 
 ## 6. Phase 6 — Views and bulk operations
 

@@ -747,6 +747,19 @@
       "changed": "changed {when}",
       "failed": "The search could not be completed. Try again.",
       "hint": "Search by words, or narrow by state, label and who an issue is assigned to — or both. Only issues in projects you can see are ever found."
+    },
+    "board": {
+      "columns": "Board columns",
+      "column": "{state}, {count} issues",
+      "empty": "Nothing here",
+      "more": "Show {count} more",
+      "move": "Move {issue}, now in {state}",
+      "instructions": "Press to pick the issue up, then use the left and right arrow keys to choose a column, Enter to move it there, or Escape to leave it where it is.",
+      "pickedUp": "Picked up {issue} from {state}. Left and right arrows choose a column; Enter puts it there.",
+      "over": "Over {state}",
+      "moved": "{issue} moved to {state}",
+      "cancelled": "{issue} left where it was",
+      "movedMeanwhile": "Somebody else moved {issue} first. The board now shows where it is."
     }
   }
 }

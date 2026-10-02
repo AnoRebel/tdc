@@ -747,6 +747,19 @@
       "changed": "lilibadilishwa {when}",
       "failed": "Utafutaji haukuweza kukamilika. Jaribu tena.",
       "hint": "Tafuta kwa maneno, au punguza kwa hali, lebo na aliyekabidhiwa suala — au vyote. Masuala yanayopatikana ni yale tu yaliyo katika miradi unayoweza kuiona."
+    },
+    "board": {
+      "columns": "Safu za ubao",
+      "column": "{state}, masuala {count}",
+      "empty": "Hakuna kitu hapa",
+      "more": "Onyesha {count} zaidi",
+      "move": "Hamisha {issue}, sasa iko katika {state}",
+      "instructions": "Bonyeza kulichukua suala, kisha tumia vitufe vya mshale wa kushoto na kulia kuchagua safu, Enter kulihamishia huko, au Escape kuliacha lilipo.",
+      "pickedUp": "Umelichukua {issue} kutoka {state}. Mishale ya kushoto na kulia huchagua safu; Enter hukiweka huko.",
+      "over": "Juu ya {state}",
+      "moved": "{issue} limehamishiwa {state}",
+      "cancelled": "{issue} limeachwa lilipokuwa",
+      "movedMeanwhile": "Mtu mwingine alihamisha {issue} kwanza. Ubao sasa unaonyesha lilipo."
     }
   }
 }
