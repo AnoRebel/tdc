@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/directory"
+	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
@@ -127,17 +128,36 @@ is delivered, replayed on reconnection and ordered exactly like the messages
 around it. Failure is logged rather than returned: the change is recorded, and
 somebody who missed the notice sees the new state when they next read it.
 */
-func (api *directoryAPI) announce(ctx context.Context, engagement directory.Engagement, actor uuid.UUID) {
+func (api *directoryAPI) announce(ctx context.Context, engagement directory.Engagement, actor uuid.UUID, summary string) {
 	if engagement.RoomID == nil {
 		return
 	}
 	event, err := api.rooms.RecordNotice(ctx, *engagement.RoomID, actor, rooms.TypeEngagementChanged,
-		map[string]string{"engagementId": engagement.ID.String(), "state": string(engagement.State)})
+		map[string]string{
+			"engagementId": engagement.ID.String(), "state": string(engagement.State), "body": summary,
+		})
 	if err != nil {
 		api.log.Warn("cannot announce an engagement's change", "engagementId", engagement.ID, "error", err)
 		return
 	}
 	api.publishEvent(ctx, event)
+
+	/*
+		And the other party is notified, the way a direct message notifies
+		them: what changed is addressed to them, and they may not have the
+		engagement open. The person who acted is not told about their own
+		step.
+	*/
+	other := engagement.Other(actor)
+	if api.notify == nil || other == nil || summary == "" {
+		return
+	}
+	actorUser, err := api.queries.GetUserByID(ctx, actor)
+	if err != nil {
+		return
+	}
+	api.notify.About(ctx, *other, actor, api.rooms.UserAddress(actorUser.Username),
+		*engagement.RoomID, event.ID, notify.ReasonDirect, "")
 }
 
 func engagementIDParam(c *echo.Context) (uuid.UUID, error) {
@@ -160,7 +180,7 @@ func (api *directoryAPI) handleAcceptEnquiry(c *echo.Context) error {
 	if err != nil {
 		return enquiryError(err)
 	}
-	api.announce(ctx, engagement, user.ID)
+	api.announce(ctx, engagement, user.ID, user.Username+" took up the enquiry")
 	return c.JSON(http.StatusCreated, api.engagementViewOf(engagement, user.ID))
 }
 
@@ -232,7 +252,7 @@ func (api *directoryAPI) handleWithdrawEngagement(c *echo.Context) error {
 	if err != nil {
 		return engagementError(err)
 	}
-	api.announce(ctx, engagement, user.ID)
+	api.announce(ctx, engagement, user.ID, user.Username+" withdrew from the engagement")
 	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
 }
 

@@ -1,0 +1,279 @@
+package httpapi
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v5"
+
+	"github.com/AnoRebel/tdc/server/internal/directory"
+)
+
+/*
+Proposals, the agreement and finishing, over HTTP.
+
+Every response that shows an agreement carries the same disclosure, taken from
+the one constant the export uses too, so the wording a client shows and the
+wording in a file somebody keeps cannot differ. There is no route that changes a
+sent version, a response or an agreement; the database would refuse one anyway.
+*/
+
+func init() {
+	session := "session or token"
+	documentRoutes(map[string]entry{
+		"GET /api/directory/engagements/:id/proposals":                       {Summary: "Proposals, responses and agreement on an engagement", Authentication: session},
+		"POST /api/directory/engagements/:id/proposals":                      {Summary: "Send a proposal, or a new version of it", Authentication: session},
+		"POST /api/directory/engagements/:id/proposals/:versionId/responses": {Summary: "Accept, decline or ask for changes to the latest proposal", Authentication: session},
+		"POST /api/directory/engagements/:id/start":                          {Summary: "Begin the agreed work", Authentication: session},
+		"POST /api/directory/engagements/:id/complete":                       {Summary: "Say the work is complete", Authentication: session},
+		"POST /api/directory/engagements/:id/confirm-completion":             {Summary: "Confirm the other party's completion", Authentication: session},
+		"GET /api/directory/engagements/:id/agreement/export":                {Summary: "Export the agreement", Authentication: session},
+	})
+}
+
+func (api *directoryAPI) mountAgreements(directoryGroup *echo.Group) {
+	engagements := directoryGroup.Group("/engagements", requireAuthentication)
+	engagements.GET("/:id/proposals", api.handleNegotiation)
+	engagements.POST("/:id/proposals", api.handlePropose)
+	engagements.POST("/:id/proposals/:versionId/responses", api.handleRespond)
+	engagements.POST("/:id/start", api.handleStartWork)
+	engagements.POST("/:id/complete", api.handleRequestCompletion)
+	engagements.POST("/:id/confirm-completion", api.handleConfirmCompletion)
+	engagements.GET("/:id/agreement/export", api.handleExportAgreement)
+}
+
+type versionView struct {
+	ID         string               `json:"id"`
+	Version    int32                `json:"version"`
+	SentBy     string               `json:"sentBy"`
+	Scope      string               `json:"scope"`
+	Timeline   string               `json:"timeline"`
+	LineItems  []directory.LineItem `json:"lineItems"`
+	Currency   string               `json:"currency"`
+	TotalMinor int64                `json:"totalMinor"`
+	SentAt     string               `json:"sentAt"`
+}
+
+type responseView struct {
+	Version   int32  `json:"version"`
+	Responder string `json:"responder"`
+	Kind      string `json:"kind"`
+	Part      string `json:"part,omitempty"`
+	Comment   string `json:"comment,omitempty"`
+	At        string `json:"at"`
+}
+
+type agreementView struct {
+	Version             int32       `json:"version"`
+	ClientAcceptedAt    string      `json:"clientAcceptedAt"`
+	DeveloperAcceptedAt string      `json:"developerAcceptedAt"`
+	Terms               versionView `json:"terms"`
+	RecordedAt          string      `json:"recordedAt"`
+}
+
+type negotiationView struct {
+	Versions  []versionView  `json:"versions"`
+	Responses []responseView `json:"responses"`
+	Agreement *agreementView `json:"agreement,omitempty"`
+	// Disclosure is what the server says it is and is not, shown wherever an
+	// agreement is.
+	Disclosure string `json:"disclosure"`
+}
+
+func stamp(at time.Time) string { return at.UTC().Format(time.RFC3339) }
+
+func versionViewOf(version directory.ProposalVersion) versionView {
+	items := version.LineItems
+	if items == nil {
+		items = []directory.LineItem{}
+	}
+	return versionView{
+		ID: version.ID.String(), Version: version.Version, SentBy: version.SentBy,
+		Scope: version.Scope, Timeline: version.Timeline, LineItems: items,
+		Currency: version.Currency, TotalMinor: version.TotalMinor, SentAt: stamp(version.SentAt),
+	}
+}
+
+func negotiationViewOf(negotiation directory.Negotiation) negotiationView {
+	view := negotiationView{Versions: []versionView{}, Responses: []responseView{}, Disclosure: directory.Disclosure}
+	for _, version := range negotiation.Versions {
+		view.Versions = append(view.Versions, versionViewOf(version))
+	}
+	for _, response := range negotiation.Responses {
+		view.Responses = append(view.Responses, responseView{
+			Version: response.Version, Responder: response.Responder, Kind: string(response.Kind),
+			Part: response.Part, Comment: response.Comment, At: stamp(response.At),
+		})
+	}
+	if agreement := negotiation.Agreement; agreement != nil {
+		view.Agreement = &agreementView{
+			Version: agreement.Version, ClientAcceptedAt: stamp(agreement.ClientAcceptedAt),
+			DeveloperAcceptedAt: stamp(agreement.DeveloperAcceptedAt),
+			Terms:               versionViewOf(agreement.Terms), RecordedAt: stamp(agreement.RecordedAt),
+		}
+	}
+	return view
+}
+
+func (api *directoryAPI) handleNegotiation(c *echo.Context) error {
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	negotiation, err := api.directory.Negotiation(c.Request().Context(), id, user.ID)
+	if err != nil {
+		return agreementError(err)
+	}
+	return c.JSON(http.StatusOK, negotiationViewOf(negotiation))
+}
+
+type proposalRequest struct {
+	Scope     string               `json:"scope"`
+	Timeline  string               `json:"timeline"`
+	LineItems []directory.LineItem `json:"lineItems"`
+	Currency  string               `json:"currency"`
+}
+
+func (api *directoryAPI) handlePropose(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	var request proposalRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	version, engagement, err := api.directory.Propose(ctx, id, user.ID, user.Username, directory.ProposalInput{
+		Scope: request.Scope, Timeline: request.Timeline, LineItems: request.LineItems, Currency: request.Currency,
+	})
+	if err != nil {
+		return agreementError(err)
+	}
+	api.announce(ctx, engagement, user.ID, fmt.Sprintf("%s sent version %d of the proposal", user.Username, version.Version))
+	return c.JSON(http.StatusCreated, versionViewOf(version))
+}
+
+type respondRequest struct {
+	Kind    string `json:"kind"`
+	Part    string `json:"part"`
+	Comment string `json:"comment"`
+}
+
+func (api *directoryAPI) handleRespond(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	versionID, err := uuid.Parse(c.Param("versionId"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, directory.ErrNotLatest.Error())
+	}
+	var request respondRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	agreed, engagement, err := api.directory.Respond(ctx, id, user.ID, user.Username, versionID,
+		directory.ResponseKind(request.Kind), request.Part, request.Comment)
+	if err != nil {
+		return agreementError(err)
+	}
+
+	summary := map[directory.ResponseKind]string{
+		directory.Accept:         user.Username + " accepted the proposal",
+		directory.Decline:        user.Username + " declined the proposal",
+		directory.RequestChanges: user.Username + " asked for changes to " + request.Part + ": " + request.Comment,
+	}[directory.ResponseKind(request.Kind)]
+	if agreed {
+		summary = "Both parties accepted the same proposal. The agreement is recorded."
+	}
+	api.announce(ctx, engagement, user.ID, summary)
+	return c.JSON(http.StatusCreated, api.engagementViewOf(engagement, user.ID))
+}
+
+func (api *directoryAPI) handleStartWork(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	engagement, err := api.directory.StartWork(ctx, id, user.ID, user.Username)
+	if err != nil {
+		return agreementError(err)
+	}
+	api.announce(ctx, engagement, user.ID, user.Username+" started the agreed work")
+	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
+}
+
+type completeRequest struct {
+	Note string `json:"note"`
+}
+
+func (api *directoryAPI) handleRequestCompletion(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	var request completeRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	engagement, err := api.directory.RequestCompletion(ctx, id, user.ID, user.Username, request.Note)
+	if err != nil {
+		return agreementError(err)
+	}
+	api.announce(ctx, engagement, user.ID, user.Username+" says the work is complete, and asks you to confirm")
+	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
+}
+
+func (api *directoryAPI) handleConfirmCompletion(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	engagement, err := api.directory.ConfirmCompletion(ctx, id, user.ID, user.Username)
+	if err != nil {
+		return agreementError(err)
+	}
+	api.announce(ctx, engagement, user.ID, user.Username+" confirmed the work is complete")
+	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
+}
+
+func (api *directoryAPI) handleExportAgreement(c *echo.Context) error {
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	export, err := api.directory.ExportAgreement(c.Request().Context(), id, user.ID, api.config.CanonicalAddress)
+	if err != nil {
+		return agreementError(err)
+	}
+	c.Response().Header().Set("Content-Disposition", `attachment; filename="agreement-`+id.String()+`.json"`)
+	return c.JSON(http.StatusOK, export)
+}
+
+func agreementError(err error) error {
+	switch {
+	case errors.Is(err, directory.ErrNoAgreement), errors.Is(err, directory.ErrNoProposal):
+		return echo.NewHTTPError(http.StatusNotFound, err.Error())
+	case errors.Is(err, directory.ErrNotLatest), errors.Is(err, directory.ErrAlreadyAccepted):
+		return echo.NewHTTPError(http.StatusConflict, err.Error())
+	case errors.Is(err, directory.ErrOwnCompletion):
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
+	return engagementError(err)
+}

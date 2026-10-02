@@ -121,6 +121,7 @@ func (api *directoryAPI) mount() {
 	api.mountVerification(moderation)
 	api.mountEnquiries(directoryGroup, me)
 	api.mountEngagements(directoryGroup, me)
+	api.mountAgreements(directoryGroup)
 }
 
 /*

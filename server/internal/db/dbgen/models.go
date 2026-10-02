@@ -172,6 +172,21 @@ type Engagement struct {
 	UpdatedAt             time.Time
 }
 
+type EngagementAgreement struct {
+	ID                  uuid.UUID
+	EngagementID        uuid.UUID
+	VersionID           uuid.UUID
+	Version             int32
+	ClientID            *uuid.UUID
+	DeveloperID         *uuid.UUID
+	ClientLabel         string
+	DeveloperLabel      string
+	ClientAcceptedAt    time.Time
+	DeveloperAcceptedAt time.Time
+	Terms               []byte
+	RecordedAt          time.Time
+}
+
 type EngagementTransition struct {
 	ID           int64
 	EngagementID uuid.UUID
@@ -387,6 +402,32 @@ type ProfileVerification struct {
 	RevokedBy       *uuid.UUID
 	RevokeReason    *string
 	ClearedAt       *time.Time
+}
+
+type ProposalResponse struct {
+	ID             uuid.UUID
+	VersionID      uuid.UUID
+	EngagementID   uuid.UUID
+	ResponderID    *uuid.UUID
+	ResponderLabel string
+	Kind           string
+	Part           *string
+	Comment        string
+	CreatedAt      time.Time
+}
+
+type ProposalVersion struct {
+	ID           uuid.UUID
+	EngagementID uuid.UUID
+	Version      int32
+	SentBy       *uuid.UUID
+	SentByLabel  string
+	Scope        string
+	Timeline     string
+	LineItems    []byte
+	Currency     string
+	TotalMinor   int64
+	SentAt       time.Time
 }
 
 type PushSubscription struct {

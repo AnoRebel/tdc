@@ -13,6 +13,8 @@ import (
 
 type Querier interface {
 	AcceptCompanyMembership(ctx context.Context, arg AcceptCompanyMembershipParams) (int64, error)
+	// Who has accepted one version, and when.
+	AcceptancesOf(ctx context.Context, versionID uuid.UUID) ([]AcceptancesOfRow, error)
 	// Whoever creates a company is its first administrator, accepted from the
 	// start: they are consenting by creating it.
 	AddCompanyFounder(ctx context.Context, arg AddCompanyFounderParams) error
@@ -260,6 +262,7 @@ type Querier interface {
 	// existed, and doing it in the query means there is no window where a caller
 	// reads the row and forgets to check.
 	GetAPITokenByHash(ctx context.Context, tokenHash []byte) (GetAPITokenByHashRow, error)
+	GetAgreement(ctx context.Context, engagementID uuid.UUID) (EngagementAgreement, error)
 	// What this person chose the interface to look like.
 	//
 	// Empty in any column means they have chosen nothing there and take the
@@ -338,9 +341,15 @@ type Querier interface {
 	// request asks from.
 	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
+	InsertAgreement(ctx context.Context, arg InsertAgreementParams) (EngagementAgreement, error)
 	InsertEngagement(ctx context.Context, arg InsertEngagementParams) (Engagement, error)
 	InsertEnquiry(ctx context.Context, arg InsertEnquiryParams) (Enquiry, error)
 	InsertPortfolioItem(ctx context.Context, arg InsertPortfolioItemParams) error
+	InsertProposalResponse(ctx context.Context, arg InsertProposalResponseParams) (ProposalResponse, error)
+	// The next version for the engagement. Numbered here, in the statement that
+	// inserts, so two people sending at once cannot both claim the same number:
+	// the unique key refuses the second.
+	InsertProposalVersion(ctx context.Context, arg InsertProposalVersionParams) (ProposalVersion, error)
 	InsertSkill(ctx context.Context, arg InsertSkillParams) (Skill, error)
 	InsertVerification(ctx context.Context, arg InsertVerificationParams) (ProfileVerification, error)
 	// Issuing a new one invalidates the old, so somebody who asks twice is not left
@@ -363,6 +372,7 @@ type Querier interface {
 	IsRemoteMember(ctx context.Context, arg IsRemoteMemberParams) (bool, error)
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
 	KnownPeers(ctx context.Context) ([]KnownPeersRow, error)
+	LatestProposalVersion(ctx context.Context, engagementID uuid.UUID) (ProposalVersion, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
 	LiftPostingRestriction(ctx context.Context, arg LiftPostingRestrictionParams) (int64, error)
@@ -436,6 +446,8 @@ type Querier interface {
 	ListPortfolioItems(ctx context.Context, userID uuid.UUID) ([]PortfolioItem, error)
 	ListPostingRestrictions(ctx context.Context, limit int32) ([]ListPostingRestrictionsRow, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
+	ListProposalResponses(ctx context.Context, engagementID uuid.UUID) ([]ProposalResponse, error)
+	ListProposalVersions(ctx context.Context, engagementID uuid.UUID) ([]ProposalVersion, error)
 	ListPushSubscriptions(ctx context.Context, userID uuid.UUID) ([]PushSubscription, error)
 	// Every reaction on a set of messages, for drawing a timeline.
 	//
@@ -628,6 +640,7 @@ type Querier interface {
 	RenamePasskey(ctx context.Context, arg RenamePasskeyParams) (Credential, error)
 	RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
+	RequestCompletion(ctx context.Context, arg RequestCompletionParams) (int64, error)
 	// Clears presence for connections that ended without a clean close, which is
 	// what makes an ungraceful disconnect expire rather than persist.
 	ResetStalePresence(ctx context.Context, lastSeenAt time.Time) error
