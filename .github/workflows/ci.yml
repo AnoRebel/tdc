@@ -19,10 +19,13 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Pinned, because a Go release can change vet's rules and turn a green branch
-  # red for reasons that have nothing to do with the change under review.
-  GO_VERSION: "1.27.0"
+# Go's version is read from each module's go.mod rather than written here.
+#
+# Still fixed, deliberately — a Go release can change vet's rules and turn a
+# green branch red for reasons that have nothing to do with the change under
+# review — but fixed in one place. A version written here as well is a second
+# copy that falls behind the first: go.mod moves, CI keeps the old toolchain,
+# and every job fails at the first command with "go.mod requires go >= …".
 
 jobs:
   # Decides which tier this run is. Expressed once here rather than repeated as
@@ -106,7 +109,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
 
       - run: bun install --frozen-lockfile
 
@@ -144,7 +147,7 @@ jobs:
         run: |
           go build -o /tmp/tdc-server ./cmd/tdc-server
           /tmp/tdc-server &
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:8099/api/server >/dev/null && break
             sleep 1
           done
@@ -202,7 +205,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - name: Formatting
@@ -257,7 +260,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: apps/desktop/go.mod
           cache-dependency-path: apps/desktop/go.sum
 
       - name: Install the webview's dependencies
@@ -327,7 +330,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - name: Check Go dependency licences
@@ -353,7 +356,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - name: govulncheck
@@ -387,7 +390,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - name: Apply every migration from empty
@@ -420,7 +423,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - name: Build it twice and compare
@@ -475,7 +478,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: apps/desktop/go.mod
           cache-dependency-path: apps/desktop/go.sum
 
       - name: Install the legacy webview's dependencies
@@ -545,7 +548,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - name: Measure delivery under load
@@ -595,7 +598,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - name: Measure this commit
@@ -698,7 +701,7 @@ jobs:
         run: |
           # "skipped" is fine — that is the fast tier deliberately not running
           # the heavy jobs. "failure" and "cancelled" are not.
-          results='${{ join(needs.*.result, " ") }}'
+          results='${{ join(needs.*.result, ' ') }}'
           echo "Job results: $results"
 
           for result in $results; do

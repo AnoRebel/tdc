@@ -27,9 +27,6 @@ on:
 permissions:
   contents: read
 
-env:
-  GO_VERSION: "1.27.0"
-
 jobs:
   # What is being released, decided once so every job agrees.
   version:
@@ -100,7 +97,10 @@ jobs:
             goos: linux
             goarch: amd64
             variant: gtk3
-          - os: macos-13
+          # The Intel label by name: GitHub retired macos-13, and a job asking
+          # for a runner that no longer exists does not fail — it waits, and the
+          # Intel build simply never appears in the release.
+          - os: macos-15-intel
             goos: darwin
             goarch: amd64
           - os: macos-latest
@@ -128,7 +128,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: apps/desktop/go.mod
           cache-dependency-path: apps/desktop/go.sum
 
       - name: Install the webview's dependencies
@@ -243,7 +243,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
 
       - run: bun install --frozen-lockfile
@@ -473,7 +473,9 @@ jobs:
         # security story.
         working-directory: artifacts
         run: |
-          sha256sum $(ls | grep -v '\.sigstore\.json$' | sort) > SHA256SUMS
+          shopt -s extglob
+          # Every artifact except the signatures, in the glob's sorted order.
+          sha256sum !(*.sigstore.json) > SHA256SUMS
           cat SHA256SUMS
 
       - name: Write the release notes
