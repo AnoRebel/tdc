@@ -54,6 +54,8 @@ type Application struct {
 	AccountID            *uuid.UUID
 	RateLimitedCount     int64
 	LastRateLimitedAt    *time.Time
+	InvocationUrl        string
+	InvocationSecret     string
 }
 
 type ApplicationChannel struct {
@@ -597,6 +599,7 @@ type WebhookDelivery struct {
 	ClaimedAt      *time.Time
 	CreatedAt      time.Time
 	CompletedAt    *time.Time
+	ApplicationID  *uuid.UUID
 }
 
 type WebhookSubscription struct {

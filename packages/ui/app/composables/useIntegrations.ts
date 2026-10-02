@@ -5,6 +5,8 @@ import type {
   GrantablePermission,
   IncomingWebhook,
   InstalledApplication,
+  Invocation,
+  InvocationAddress,
   IssuedApplicationCredential,
   WebhookEventTypes,
   WebhookHistory,
@@ -129,6 +131,19 @@ export function useIntegrations() {
     return api.post(`/api/admin/applications/${encodeURIComponent(id)}/remove`, { content });
   }
 
+  /** Sets where presses on its messages are delivered; empty stops them. */
+  function setInvocation(id: string, url: string): Promise<InvocationAddress> {
+    return api.put<InvocationAddress>(
+      `/api/admin/applications/${encodeURIComponent(id)}/invocation`,
+      { url },
+    );
+  }
+
+  /** Its recent invocations, newest first. */
+  function invocations(id: string): Promise<Invocation[]> {
+    return api.get<Invocation[]>(`/api/admin/applications/${encodeURIComponent(id)}/invocations`);
+  }
+
   /** What is installed, as anybody may see it. */
   function installed(): Promise<InstalledApplication[]> {
     return api.get<InstalledApplication[]>("/api/applications");
@@ -149,6 +164,8 @@ export function useIntegrations() {
     issueCredential,
     revokeCredential,
     remove,
+    setInvocation,
+    invocations,
     installed,
     inRoom,
     webhooks,

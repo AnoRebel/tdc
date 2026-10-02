@@ -38,6 +38,27 @@ type Via struct {
 	Name string `json:"name"`
 }
 
+/*
+markIfProgram puts a "via" on what an application's account posts, so a bot's
+message reads as a bot's in every client, exactly as a webhook's does.
+
+Decided here, from who the sender is, rather than by the route the message came
+in through: every way a message can be written — sent, replied in a thread,
+forwarded — passes through this, so there is no path along which an
+application's message arrives looking like a person's.
+*/
+func (s *Service) markIfProgram(ctx context.Context, sender dbgen.User, payload map[string]any) error {
+	application, err := s.store.GetApplicationByAccount(ctx, &sender.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("check whether the sender is an application: %w", err)
+	}
+	payload["via"] = Via{Kind: "bot", ID: application.ID.String(), Name: application.Name}
+	return nil
+}
+
 // ErrOnlyLinks reports a control that needs a program to answer it, on a
 // message posted by something that cannot.
 var ErrOnlyLinks = errors.New("a message posted through a webhook can only offer links")

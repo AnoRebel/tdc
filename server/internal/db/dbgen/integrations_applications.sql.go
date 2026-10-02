@@ -22,7 +22,7 @@ UPDATE applications
 SET state = 'approved', granted_permissions = requested_permissions,
     approved_by = $2, approved_at = now(), account_id = $3
 WHERE id = $1 AND state = 'registered' AND requested_permissions = $4::text[]
-RETURNING id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at
+RETURNING id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at, invocation_url, invocation_secret
 `
 
 type ApproveApplicationParams struct {
@@ -58,6 +58,8 @@ func (q *Queries) ApproveApplication(ctx context.Context, arg ApproveApplication
 		&i.AccountID,
 		&i.RateLimitedCount,
 		&i.LastRateLimitedAt,
+		&i.InvocationUrl,
+		&i.InvocationSecret,
 	)
 	return i, err
 }
@@ -75,7 +77,7 @@ const createApplication = `-- name: CreateApplication :one
 INSERT INTO applications (id, name, purpose, requested_permissions, sends_data_externally,
                           external_disclosure, registered_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at
+RETURNING id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at, invocation_url, invocation_secret
 `
 
 type CreateApplicationParams struct {
@@ -117,6 +119,8 @@ func (q *Queries) CreateApplication(ctx context.Context, arg CreateApplicationPa
 		&i.AccountID,
 		&i.RateLimitedCount,
 		&i.LastRateLimitedAt,
+		&i.InvocationUrl,
+		&i.InvocationSecret,
 	)
 	return i, err
 }
@@ -157,7 +161,7 @@ func (q *Queries) CreateApplicationToken(ctx context.Context, arg CreateApplicat
 }
 
 const getApplication = `-- name: GetApplication :one
-SELECT id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at FROM applications WHERE id = $1
+SELECT id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at, invocation_url, invocation_secret FROM applications WHERE id = $1
 `
 
 func (q *Queries) GetApplication(ctx context.Context, id uuid.UUID) (Application, error) {
@@ -181,12 +185,14 @@ func (q *Queries) GetApplication(ctx context.Context, id uuid.UUID) (Application
 		&i.AccountID,
 		&i.RateLimitedCount,
 		&i.LastRateLimitedAt,
+		&i.InvocationUrl,
+		&i.InvocationSecret,
 	)
 	return i, err
 }
 
 const getApplicationByAccount = `-- name: GetApplicationByAccount :one
-SELECT id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at FROM applications WHERE account_id = $1
+SELECT id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at, invocation_url, invocation_secret FROM applications WHERE account_id = $1
 `
 
 // The application an account acts for, if it acts for one.
@@ -211,6 +217,8 @@ func (q *Queries) GetApplicationByAccount(ctx context.Context, accountID *uuid.U
 		&i.AccountID,
 		&i.RateLimitedCount,
 		&i.LastRateLimitedAt,
+		&i.InvocationUrl,
+		&i.InvocationSecret,
 	)
 	return i, err
 }
@@ -278,7 +286,7 @@ func (q *Queries) ListApplicationTokens(ctx context.Context, applicationID *uuid
 }
 
 const listApplications = `-- name: ListApplications :many
-SELECT id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at FROM applications WHERE state <> 'removed' ORDER BY registered_at DESC
+SELECT id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at, invocation_url, invocation_secret FROM applications WHERE state <> 'removed' ORDER BY registered_at DESC
 `
 
 func (q *Queries) ListApplications(ctx context.Context) ([]Application, error) {
@@ -308,6 +316,8 @@ func (q *Queries) ListApplications(ctx context.Context) ([]Application, error) {
 			&i.AccountID,
 			&i.RateLimitedCount,
 			&i.LastRateLimitedAt,
+			&i.InvocationUrl,
+			&i.InvocationSecret,
 		); err != nil {
 			return nil, err
 		}
@@ -320,7 +330,7 @@ func (q *Queries) ListApplications(ctx context.Context) ([]Application, error) {
 }
 
 const listApplicationsInRoom = `-- name: ListApplicationsInRoom :many
-SELECT a.id, a.name, a.purpose, a.requested_permissions, a.sends_data_externally, a.external_disclosure, a.state, a.granted_permissions, a.registered_by, a.registered_at, a.approved_by, a.approved_at, a.removed_by, a.removed_at, a.account_id, a.rate_limited_count, a.last_rate_limited_at FROM applications AS a
+SELECT a.id, a.name, a.purpose, a.requested_permissions, a.sends_data_externally, a.external_disclosure, a.state, a.granted_permissions, a.registered_by, a.registered_at, a.approved_by, a.approved_at, a.removed_by, a.removed_at, a.account_id, a.rate_limited_count, a.last_rate_limited_at, a.invocation_url, a.invocation_secret FROM applications AS a
 JOIN application_channels AS c ON c.application_id = a.id
 WHERE c.room_id = $1 AND a.state = 'approved'
 ORDER BY a.name
@@ -355,6 +365,8 @@ func (q *Queries) ListApplicationsInRoom(ctx context.Context, roomID uuid.UUID) 
 			&i.AccountID,
 			&i.RateLimitedCount,
 			&i.LastRateLimitedAt,
+			&i.InvocationUrl,
+			&i.InvocationSecret,
 		); err != nil {
 			return nil, err
 		}
@@ -367,7 +379,7 @@ func (q *Queries) ListApplicationsInRoom(ctx context.Context, roomID uuid.UUID) 
 }
 
 const listApprovedApplications = `-- name: ListApprovedApplications :many
-SELECT id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at FROM applications WHERE state = 'approved' ORDER BY approved_at DESC
+SELECT id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at, invocation_url, invocation_secret FROM applications WHERE state = 'approved' ORDER BY approved_at DESC
 `
 
 func (q *Queries) ListApprovedApplications(ctx context.Context) ([]Application, error) {
@@ -397,6 +409,8 @@ func (q *Queries) ListApprovedApplications(ctx context.Context) ([]Application, 
 			&i.AccountID,
 			&i.RateLimitedCount,
 			&i.LastRateLimitedAt,
+			&i.InvocationUrl,
+			&i.InvocationSecret,
 		); err != nil {
 			return nil, err
 		}
@@ -454,7 +468,7 @@ const removeApplication = `-- name: RemoveApplication :one
 UPDATE applications
 SET state = 'removed', removed_by = $2, removed_at = now()
 WHERE id = $1 AND state <> 'removed'
-RETURNING id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at
+RETURNING id, name, purpose, requested_permissions, sends_data_externally, external_disclosure, state, granted_permissions, registered_by, registered_at, approved_by, approved_at, removed_by, removed_at, account_id, rate_limited_count, last_rate_limited_at, invocation_url, invocation_secret
 `
 
 type RemoveApplicationParams struct {
@@ -483,6 +497,8 @@ func (q *Queries) RemoveApplication(ctx context.Context, arg RemoveApplicationPa
 		&i.AccountID,
 		&i.RateLimitedCount,
 		&i.LastRateLimitedAt,
+		&i.InvocationUrl,
+		&i.InvocationSecret,
 	)
 	return i, err
 }

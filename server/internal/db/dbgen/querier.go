@@ -200,6 +200,7 @@ type Querier interface {
 	DisableWebhookSubscription(ctx context.Context, arg DisableWebhookSubscriptionParams) (WebhookSubscription, error)
 	// Turning it back on starts the count again; what failed before is history.
 	EnableWebhookSubscription(ctx context.Context, arg EnableWebhookSubscriptionParams) (WebhookSubscription, error)
+	EnqueueInvocation(ctx context.Context, arg EnqueueInvocationParams) (WebhookDelivery, error)
 	EnqueueWebhookDelivery(ctx context.Context, arg EnqueueWebhookDeliveryParams) (WebhookDelivery, error)
 	// Establishing the handle when somebody enrols their first passkey. Only ever
 	// set once: it is what the authenticator remembers, and changing it would
@@ -361,6 +362,9 @@ type Querier interface {
 	// What an event in this room might need delivering to.
 	ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roomID uuid.UUID) ([]WebhookSubscription, error)
 	ListApplicationChannels(ctx context.Context, applicationID uuid.UUID) ([]uuid.UUID, error)
+	// An application's recent invocations, newest first, with how the last
+	// attempt at each went.
+	ListApplicationInvocations(ctx context.Context, arg ListApplicationInvocationsParams) ([]ListApplicationInvocationsRow, error)
 	ListApplicationTokens(ctx context.Context, applicationID *uuid.UUID) ([]ListApplicationTokensRow, error)
 	ListApplications(ctx context.Context) ([]Application, error)
 	// The approved applications that may act in a channel, which is what that
@@ -689,6 +693,8 @@ type Querier interface {
 	SearchRooms(ctx context.Context, arg SearchRoomsParams) ([]SearchRoomsRow, error)
 	SetAppearance(ctx context.Context, arg SetAppearanceParams) error
 	SetApplicationChannel(ctx context.Context, arg SetApplicationChannelParams) error
+	// Only an approved application has anywhere to be told about anything.
+	SetApplicationInvocation(ctx context.Context, arg SetApplicationInvocationParams) (Application, error)
 	// Scoped to the uploader and to attachments not yet sent: a caption is written
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)

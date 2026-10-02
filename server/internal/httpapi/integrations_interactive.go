@@ -123,7 +123,8 @@ func (s *Server) pressInteractive(c *echo.Context) error {
 		invisibly, for as long as every client leaves the "$" alone.
 	*/
 	messageID := eventIDParam(c)
-	if message, err := s.rooms.Event(ctx, messageID); err == nil && message.SenderID != nil {
+	message, err := s.rooms.Event(ctx, messageID)
+	if err == nil && message.SenderID != nil {
 		if refusal := s.throttlePress(c, "press:integration:"+message.SenderID.String(),
 			settings.PressesPerIntegrationPerMinute); refusal != nil {
 			return refusal
@@ -147,6 +148,7 @@ func (s *Server) pressInteractive(c *echo.Context) error {
 	}
 
 	s.publishEvent(ctx, event)
+	s.queueInvocation(ctx, message, event)
 	return c.JSON(http.StatusCreated, messageResponseOf(event))
 }
 

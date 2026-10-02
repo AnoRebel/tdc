@@ -441,8 +441,13 @@ existed — the key is absent rather than empty, and nothing extra to parse.
 
 A press becomes an event in the room, which is how it reaches you: over the
 live connection you already hold, through the same delivery every other event
-uses. There is no webhook to register and no second mechanism with its own
-retries.
+uses.
+
+A program that cannot hold a connection open — one that runs only when called —
+can be installed as an [application](webhooks-and-apps.md#applications) with an
+invocation address instead, and each press on its messages is delivered there,
+signed and retried as a webhook's delivery is. The
+[worked example](#the-same-program-with-no-connection-held) does it both ways.
 
 ```json
 {
@@ -1285,6 +1290,133 @@ programs posted.
 Percent-encoding an event identifier if you build a path with one. They begin
 with `$`, and `encodeURIComponent` is what a correct client uses — this
 example never does, because it only ever reads identifiers out of events.
+
+### The same program, with no connection held
+
+A program that runs only when something calls it cannot sit on a live
+connection waiting for a press. Install it as an
+[application](webhooks-and-apps.md#applications) instead, and give it an
+address: the server sends each press on its messages there.
+
+**Before you start**, somebody who manages applications installs it —
+registered asking for `channel.post`, approved in the channel — and keeps the
+credential approval shows once. Then they set where its presses go, keeping
+the `secret` that answers:
+
+```sh
+curl -X PUT "http://localhost:8080/api/admin/applications/$APP/invocation" \
+  -H "Authorization: Bearer $SESSION" \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://deploybot.example.org/presses"}'
+```
+
+An address on a private network, `localhost` included, is refused unless the
+operator has set `integrations.allow_private_addresses`, which is for trying
+this out and nothing else.
+
+The program asks the same question, then answers each invocation — after
+proving it came from the server, with the
+[verification functions](#verifying-a-delivery) above saved beside it as
+`verify-delivery.ts`:
+
+<!-- demo: invoked-bot -->
+
+```ts
+#!/usr/bin/env bun
+import { verifyDelivery, verifyHMAC } from "./verify-delivery";
+
+const SERVER = process.env.TDC_SERVER ?? "http://localhost:8080";
+const TOKEN = process.env.TDC_TOKEN!;
+const CHANNEL = process.env.TDC_CHANNEL!;
+const SECRET = process.env.TDC_INVOCATION_SECRET!;
+
+const authorised = { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" };
+
+async function api(path: string, init?: RequestInit) {
+  const response = await fetch(`${SERVER}${path}`, { ...init, headers: authorised });
+  if (!response.ok) {
+    throw new Error(
+      `${init?.method ?? "GET"} ${path}: ${response.status} ${await response.text()}`,
+    );
+  }
+  return response.status === 204 ? undefined : response.json();
+}
+
+const publishedKeys = async () =>
+  (await (await fetch(`${SERVER}/.well-known/tdc-delivery-keys`)).json()).keys;
+let keys = await publishedKeys();
+
+// Ask the question, as the application.
+const asked = await api(`/api/rooms/${CHANNEL}/messages`, {
+  method: "POST",
+  body: JSON.stringify({
+    body: "Deploy build 41 to production?",
+    clientToken: crypto.randomUUID(),
+    actions: [
+      { name: "deploy", label: "Deploy", once: true },
+      { name: "hold", label: "Not yet" },
+    ],
+  }),
+});
+
+// Be told the answer.
+const server = Bun.serve({
+  port: Number(process.env.PORT ?? 9000),
+  async fetch(request) {
+    const body = await request.text();
+    try {
+      try {
+        verifyDelivery(request.headers, body, keys);
+      } catch {
+        keys = await publishedKeys(); // a key rotated since: fetch once more
+        verifyDelivery(request.headers, body, keys);
+      }
+      verifyHMAC(request.headers, body, SECRET);
+    } catch (error) {
+      // Anything but 2xx is retried, which is right for what could not be proved.
+      return new Response(String(error), { status: 401 });
+    }
+
+    const { event } = JSON.parse(body);
+    if (event.type === "action.pressed" && event.content.pressed === asked.id) {
+      const who = event.sender.split("@")[0];
+      await api(`/api/rooms/${CHANNEL}/messages`, {
+        method: "POST",
+        body: JSON.stringify({
+          body:
+            event.content.action === "deploy"
+              ? `Deploying build 41, at ${who}'s word.`
+              : `Holding, at ${who}'s word.`,
+          clientToken: crypto.randomUUID(),
+        }),
+      });
+      setTimeout(() => server.stop(), 100);
+    }
+    return new Response(null, { status: 204 });
+  },
+});
+```
+
+```sh
+TDC_TOKEN=tdc_… TDC_CHANNEL=22089cc6-… TDC_INVOCATION_SECRET=whsec_… bun run deploybot.ts
+```
+
+Its question is marked as a bot's in every client, and its answer names who
+decided — as before, with nothing held open in between.
+
+**Three differences from the connected version are deliberate.**
+
+Answer 2xx only once a delivery has checked out. An address anybody can reach
+will be sent things the server did not send; the server retries what it is not
+told succeeded, so a refusal costs nothing real.
+
+Answer quickly. Each attempt is given a few seconds
+(`integrations.delivery_timeout_seconds`); slow work belongs after the
+response, not before it.
+
+Expect a press twice, now and then. A delivery the server could not confirm is
+sent again with the same `TDC-Delivery` identifier, so a program that acts on
+a press keeps the identifiers it has seen.
 
 ## Writing an integration that behaves
 

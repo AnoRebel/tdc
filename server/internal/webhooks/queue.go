@@ -136,8 +136,13 @@ func (s *Service) dispatch(ctx context.Context, jobs chan<- dbgen.WebhookDeliver
 }
 
 func (s *Service) attempt(ctx context.Context, claimed dbgen.WebhookDelivery) {
+	if claimed.ApplicationID != nil {
+		s.attemptInvocation(ctx, claimed)
+		return
+	}
 	if claimed.SubscriptionID == nil {
-		// Not a webhook's: nothing here knows where to send it.
+		// Neither a webhook's nor an application's: nothing here knows where
+		// to send it.
 		s.complete(ctx, claimed.ID, "cancelled")
 		return
 	}

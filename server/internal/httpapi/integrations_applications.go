@@ -236,17 +236,21 @@ type applicationView struct {
 	Purpose string `json:"purpose"`
 	State   string `json:"state"`
 	// Requested is what it asks for; Granted what it was approved for.
-	Requested           []string     `json:"requested"`
-	Granted             []string     `json:"granted"`
-	SendsDataExternally bool         `json:"sendsDataExternally"`
-	ExternalDisclosure  string       `json:"externalDisclosure,omitempty"`
-	Registered          time.Time    `json:"registered"`
-	Approved            *time.Time   `json:"approved,omitempty"`
-	Account             string       `json:"account,omitempty"`
-	Channels            []channelRef `json:"channels"`
-	Credentials         []credential `json:"credentials,omitempty"`
-	RateLimited         int64        `json:"rateLimited"`
-	LastRateLimited     *time.Time   `json:"lastRateLimited,omitempty"`
+	Requested           []string   `json:"requested"`
+	Granted             []string   `json:"granted"`
+	SendsDataExternally bool       `json:"sendsDataExternally"`
+	ExternalDisclosure  string     `json:"externalDisclosure,omitempty"`
+	Registered          time.Time  `json:"registered"`
+	Approved            *time.Time `json:"approved,omitempty"`
+	Account             string     `json:"account,omitempty"`
+	// AccountID is the account it acts through, which moderation acts on.
+	AccountID       string       `json:"accountId,omitempty"`
+	Channels        []channelRef `json:"channels"`
+	Credentials     []credential `json:"credentials,omitempty"`
+	RateLimited     int64        `json:"rateLimited"`
+	LastRateLimited *time.Time   `json:"lastRateLimited,omitempty"`
+	// InvocationURL is where presses on its messages are sent, if anywhere.
+	InvocationURL string `json:"invocationUrl,omitempty"`
 }
 
 type credential struct {
@@ -272,8 +276,10 @@ func (s *Server) viewOfApplication(c *echo.Context, application dbgen.Applicatio
 		Channels:            []channelRef{},
 		RateLimited:         application.RateLimitedCount,
 		LastRateLimited:     application.LastRateLimitedAt,
+		InvocationURL:       application.InvocationUrl,
 	}
 	if application.AccountID != nil {
+		view.AccountID = application.AccountID.String()
 		if account, err := s.queries.GetUserByID(ctx, *application.AccountID); err == nil {
 			view.Account = s.rooms.UserAddress(account.Username)
 		}
@@ -592,6 +598,8 @@ type installedView struct {
 	// ChannelCount says how widely it acts without naming channels a reader
 	// may not be able to see.
 	ChannelCount int `json:"channelCount"`
+	// InvocationHost is where presses on its messages are sent, if anywhere.
+	InvocationHost string `json:"invocationHost,omitempty"`
 }
 
 func (s *Server) installedViewOf(c *echo.Context, application dbgen.Application) installedView {
@@ -599,6 +607,7 @@ func (s *Server) installedViewOf(c *echo.Context, application dbgen.Application)
 		ID: application.ID.String(), Name: application.Name, Purpose: application.Purpose,
 		Permissions: application.GrantedPermissions, SendsDataExternally: application.SendsDataExternally,
 		ExternalDisclosure: application.ExternalDisclosure,
+		InvocationHost:     invocationHost(application),
 	}
 	if application.ApprovedAt != nil {
 		view.Approved = *application.ApprovedAt

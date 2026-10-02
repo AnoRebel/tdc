@@ -493,6 +493,97 @@ server-wide default. Then:
   An application approved with an administrative permission can do that one
   thing, and the page marks such a permission before approval.
 
+### A bot in the conversation
+
+An application takes part in its channels as a participant of its own kind: a
+bot. Everything it writes — a message, a reply in a thread, a forward — carries
+`"via": {"kind": "bot", "id": "…", "name": "Deploy bot"}` in its content, set
+by the server from who sent it, never from anything in the request. Clients show
+its name with a **Bot** mark beside it, in words, so nobody reads a program's
+message as a person's; a person's message can neither claim the mark nor shed
+it.
+
+**It is moderated as anybody is.** Its account is an ordinary account —
+`accountId` in `GET /api/admin/applications/{id}` — and every moderation action
+applies to it unchanged. A moderator who suspends it
+(`POST /api/admin/users/{accountId}/suspend`) stops it at once: its next request
+is refused with **401**, as a suspended person's would be, until the suspension
+is lifted. Its messages are removed, it is banned from a channel, and it is
+restricted from posting in one, exactly as anybody is — and a ban stops it
+posting there even though the channel is still on its list.
+
+**It reads and posts only where it was put.** A channel it was not given is
+refused with **403**, even a public one any person on the server could read.
+
+### Being told about presses at an address
+
+An application that holds a live connection hears presses on its messages as
+they happen, like any other event. One that cannot — a function that runs only
+when called, a service behind a proxy that cuts long connections — is given an
+address instead, and every press on one of its messages is delivered there:
+
+<!-- demo: set-invocation -->
+
+```sh
+curl -X PUT "http://localhost:8080/api/admin/applications/$APP/invocation" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{\"url\": \"$INVOCATION_URL\"}"
+```
+
+```json
+{ "url": "https://bot.example.org/presses", "secret": "whsec_…" }
+```
+
+**The secret is shown once.** Each invocation is signed exactly as a
+[webhook's delivery](integrating.md#signed-deliveries) is — verifiable from the
+server's published keys alone, and by the HMAC keyed with this secret — and
+retried the same way when the address does not answer 2xx, with the same growing
+delay and the same limit. An address that cannot be reached holds one delivery
+worker, never the pool.
+
+What arrives is a webhook payload naming the application where a delivery
+names its subscription:
+
+```json
+{
+  "version": 1,
+  "id": "0199f5a0-…",
+  "type": "action.pressed",
+  "occurredAt": "2026-10-02T09:20:11.482Z",
+  "application": "0199f4c2-…",
+  "server": "chat.example.org",
+  "room": { "id": "5a1c…", "address": "#deploys:chat.example.org" },
+  "event": {
+    "id": "$Hk2…",
+    "type": "action.pressed",
+    "sequence": 42,
+    "sender": "juma@chat.example.org",
+    "content": { "action": "deploy", "pressed": "$9Qa…", "version": 1 },
+    "createdAt": 1790932811482
+  }
+}
+```
+
+`event.sender` is the person who pressed. Answer with the application's
+credential, through the same requests a connected application uses — post a
+reply, [replace the controls](integrating.md#answering-a-press), or answer the
+presser privately.
+
+**Who may press is decided before anything is sent.** A control that
+[requires a permission](integrating.md#offering-a-choice) is checked against
+the person pressing, never the application; somebody without it is refused, and
+no invocation is queued at all.
+
+**An invocation still waiting when things change is not sent.** Removing the
+application, taking the channel off its list, or clearing its address with
+`{"url": ""}` cancels whatever is queued at its next attempt.
+`GET /api/admin/applications/{id}/invocations` lists the recent ones — waiting,
+delivered, given up or cancelled — with how many attempts each took and the last
+status the address gave. The address's host is listed with the installed
+application for everybody, because where a press goes is part of what an
+application sends off the server.
+
 ### Credentials, and rotating them
 
 `POST /api/admin/applications/{id}/credentials` issues another, shown once;

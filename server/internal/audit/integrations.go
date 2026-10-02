@@ -22,4 +22,5 @@ const (
 	ActionApplicationRemoved          Action = "integration.application.removed"
 	ActionApplicationCredentialIssued Action = "integration.application.credential_issued"
 	ActionApplicationCredentialRevoke Action = "integration.application.credential_revoked"
+	ActionApplicationInvocationSet    Action = "integration.application.invocation_set"
 )

@@ -79,6 +79,9 @@ watch(roomId, async (id) => {
         <p v-if="application.sendsDataExternally" class="mt-0.5 text-[0.6875rem]">
           {{ $t("integrations.sendsDataElsewhere") }}: {{ application.externalDisclosure }}
         </p>
+        <p v-if="application.invocationHost" class="mt-0.5 text-[0.6875rem]">
+          {{ $t("integrations.invokedAt", { host: application.invocationHost }) }}
+        </p>
       </li>
     </ul>
 

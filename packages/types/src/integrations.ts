@@ -199,10 +199,34 @@ export interface Application {
   approved?: string;
   /** The account it acts through, once approved. */
   account?: string;
+  /** That account's identifier, which moderation acts on. */
+  accountId?: string;
   channels: ApplicationChannel[];
   credentials?: ApplicationCredential[];
   rateLimited: number;
   lastRateLimited?: string;
+  /** Where presses on its messages are delivered, if anywhere. */
+  invocationUrl?: string;
+}
+
+/** The answer to setting an invocation address: the secret, shown once. */
+export interface InvocationAddress {
+  url: string;
+  secret?: string;
+}
+
+/** One press delivered, or being delivered, to an application's address. */
+export interface Invocation {
+  id: string;
+  eventId?: string;
+  type: string;
+  state: "pending" | "delivering" | "delivered" | "abandoned" | "cancelled";
+  attempts: number;
+  created: string;
+  completed?: string;
+  nextAttempt?: string;
+  lastStatus?: number;
+  lastError?: string;
 }
 
 export interface ApplicationCredential {
@@ -230,6 +254,8 @@ export interface InstalledApplication {
   externalDisclosure?: string;
   account?: string;
   channelCount: number;
+  /** The host presses on its messages are sent to, if anywhere. */
+  invocationHost?: string;
 }
 
 /** A permission an application can be granted. */

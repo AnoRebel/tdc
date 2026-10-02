@@ -61,7 +61,7 @@ WHERE d.state = 'pending'
     ORDER BY firsts.next_attempt_at, firsts.created_at
     LIMIT $1
   )
-RETURNING d.id, d.target, d.subscription_id, d.event_id, d.kind, d.payload, d.state, d.attempts, d.next_attempt_at, d.claimed_at, d.created_at, d.completed_at
+RETURNING d.id, d.target, d.subscription_id, d.event_id, d.kind, d.payload, d.state, d.attempts, d.next_attempt_at, d.claimed_at, d.created_at, d.completed_at, d.application_id
 `
 
 func (q *Queries) ClaimWebhookDeliveries(ctx context.Context, capacity int32) ([]WebhookDelivery, error) {
@@ -86,6 +86,7 @@ func (q *Queries) ClaimWebhookDeliveries(ctx context.Context, capacity int32) ([
 			&i.ClaimedAt,
 			&i.CreatedAt,
 			&i.CompletedAt,
+			&i.ApplicationID,
 		); err != nil {
 			return nil, err
 		}
@@ -280,7 +281,7 @@ func (q *Queries) EnableWebhookSubscription(ctx context.Context, arg EnableWebho
 const enqueueWebhookDelivery = `-- name: EnqueueWebhookDelivery :one
 INSERT INTO webhook_deliveries (id, target, subscription_id, event_id, kind, payload)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, target, subscription_id, event_id, kind, payload, state, attempts, next_attempt_at, claimed_at, created_at, completed_at
+RETURNING id, target, subscription_id, event_id, kind, payload, state, attempts, next_attempt_at, claimed_at, created_at, completed_at, application_id
 `
 
 type EnqueueWebhookDeliveryParams struct {
@@ -315,6 +316,7 @@ func (q *Queries) EnqueueWebhookDelivery(ctx context.Context, arg EnqueueWebhook
 		&i.ClaimedAt,
 		&i.CreatedAt,
 		&i.CompletedAt,
+		&i.ApplicationID,
 	)
 	return i, err
 }
@@ -453,7 +455,7 @@ func (q *Queries) ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roo
 }
 
 const listWebhookDeliveries = `-- name: ListWebhookDeliveries :many
-SELECT id, target, subscription_id, event_id, kind, payload, state, attempts, next_attempt_at, claimed_at, created_at, completed_at FROM webhook_deliveries
+SELECT id, target, subscription_id, event_id, kind, payload, state, attempts, next_attempt_at, claimed_at, created_at, completed_at, application_id FROM webhook_deliveries
 WHERE subscription_id = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -487,6 +489,7 @@ func (q *Queries) ListWebhookDeliveries(ctx context.Context, arg ListWebhookDeli
 			&i.ClaimedAt,
 			&i.CreatedAt,
 			&i.CompletedAt,
+			&i.ApplicationID,
 		); err != nil {
 			return nil, err
 		}

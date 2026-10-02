@@ -96,8 +96,22 @@ test("an administrator manages an application from start to finish", async ({ pa
     ).status(),
   ).toBe(403);
 
+  // In the channel, its message reads as a bot's — named, and marked in words —
+  // and a person's beside it carries no mark at all.
+  await request.post(`/api/rooms/${allowed.id}/messages`, {
+    headers: auth,
+    data: { body: "Thanks — checking now." },
+  });
+  await page.goto(`/rooms/${allowed.id}`);
+  await expect(page.getByText("Deployed build 41.")).toBeVisible();
+  await expect(page.getByText("Thanks — checking now.")).toBeVisible();
+  const marked = page.locator("[data-sender-kind]");
+  await expect(marked).toHaveCount(1);
+  await expect(marked).toHaveText(/bot/i);
+  await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
+  await page.goto("/applications");
+
   // A second credential, then the first revoked — through the page.
-  await page.getByRole("button", { name: "Done" }).click();
   await card.getByRole("button", { name: "Channels and credentials" }).click();
   await card.getByRole("button", { name: "Issue another credential" }).click();
   const second = (await notice.locator("code").textContent())?.trim() ?? "";

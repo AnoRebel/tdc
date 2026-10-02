@@ -350,6 +350,12 @@ function toggleChannel(id: string, on: boolean) {
                   {{ $t("integrations.issueCredential") }}
                 </Button>
               </div>
+
+              <IntegrationsInvocationAddress
+                :application-id="application.id"
+                :current="open.invocationUrl"
+                @saved="refresh"
+              />
             </div>
           </li>
         </ul>

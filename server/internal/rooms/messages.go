@@ -182,6 +182,9 @@ func (s *Service) SendMessage(
 	if len(offered) > 0 {
 		payload["actions"] = offered
 	}
+	if err := s.markIfProgram(ctx, sender, payload); err != nil {
+		return dbgen.Event{}, err
+	}
 
 	content, err := json.Marshal(payload)
 	if err != nil {
