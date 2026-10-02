@@ -26,7 +26,7 @@
         "@tanstack/vue-form": "^1.33.5",
         "@tdc/types": "workspace:*",
         "@tdc/ui": "workspace:*",
-        "@wailsio/runtime": "3.0.0-beta.23",
+        "@wailsio/runtime": "3.0.0-beta.27",
         "date-fns": "^4.4.0",
         "lucide-vue-next": "^1.0.0",
         "nuxt": "catalog:vue",
@@ -875,7 +875,7 @@
 
     "@vueuse/shared": ["@vueuse/shared@14.4.0", "", { "peerDependencies": { "vue": "^3.5.0" } }, "sha512-JRgY90Sz8DDtPMsaDflvPMp9xYk69JZAmbuDvAquUVXKr2gEjqtzGNTTthLfckH0BzBqvnu31gb4a8TGLRe79g=="],
 
-    "@wailsio/runtime": ["@wailsio/runtime@3.0.0-beta.23", "", {}, "sha512-Am9N7nvA9WBpVzOkrJ0PzTg/cgEFL72I97ksOfOuryLP4VOdnl7viP59+6Nx5zMoHJo207k85WINJaWfCY1CQQ=="],
+    "@wailsio/runtime": ["@wailsio/runtime@3.0.0-beta.27", "", {}, "sha512-QUXfpr04hXzQa/yGavoJTP1UAwpGzvwysoKGwdMIEmyHgwSHtF+k4MfHbV0olRdw0+nbDQtcBM/SkKqb8tvQsw=="],
 
     "abbrev": ["abbrev@5.0.0", "", {}, "sha512-/XrFJgzQQQHpti1raDJC6m4ws6aNktmjBlhk8Fdlk7LwCEuDoieEJJY9OFHjfiFJFFRM2tK+Ky/IsfbbmlMu1w=="],
 
