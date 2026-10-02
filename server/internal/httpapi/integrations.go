@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/AnoRebel/tdc/server/internal/applications"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/delivery"
 	"github.com/AnoRebel/tdc/server/internal/notify"
@@ -22,10 +23,11 @@ a webhook at carries none of it, and so adding it did not change how every test
 and the command build a server.
 */
 type integrationsState struct {
-	once     sync.Once
-	signer   *delivery.Signer
-	client   *delivery.Client
-	webhooks *webhooks.Service
+	once         sync.Once
+	signer       *delivery.Signer
+	client       *delivery.Client
+	webhooks     *webhooks.Service
+	applications *applications.Service
 }
 
 /*
@@ -71,7 +73,19 @@ func (s *Server) buildIntegrations() {
 			Settings: policy,
 			Disabled: s.tellOwnerWebhookDisabled,
 		}, s.log)
+
+		if s.identity != nil && s.apiTokens != nil {
+			s.integrations.applications = applications.NewService(s.queries, s.identity, s.rooms,
+				s.apiTokens, s.log)
+		}
 	})
+}
+
+// applicationService returns the application registry, or nil on a server
+// without what it needs.
+func (s *Server) applicationService() *applications.Service {
+	s.buildIntegrations()
+	return s.integrations.applications
 }
 
 // deliveries returns the signer and the outbound client.

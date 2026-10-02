@@ -362,3 +362,188 @@ call is refused** — there is no cache in front of the check — and make a new
 one for the system that should have it. Creating and revoking are both in the
 audit log with who did them, and every message it posted names it, so unexpected
 activity in a channel traces to one webhook rather than to a guess.
+
+## Applications
+
+An application is a program installed on the server as itself: a deploy bot, a
+triage assistant, a bridge to a ticket tracker. Unlike a webhook it can read as
+well as post, and unlike an [API token](integrating.md#api-tokens) it is not
+somebody acting through a program — it has an account of its own, permissions
+of its own, and holds none of the authority of whoever installed it.
+
+Installing one takes two steps, and they may be two people: somebody registers
+it, saying what it needs; somebody holding `server.applications.manage` —
+administrators, by default — approves it, having been shown exactly that. Both
+are in **Settings → Applications**, and both are in the audit log.
+
+### Registering
+
+<!-- demo: register-application -->
+
+```sh
+curl -X POST http://localhost:8080/api/admin/applications \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Deploy bot",
+    "purpose": "Posts the result of each deployment.",
+    "permissions": ["channel.post"],
+    "sendsDataExternally": true,
+    "externalDisclosure": "Build numbers, to ci.example.org"
+  }'
+```
+
+```json
+{
+  "id": "0199f4c2-…",
+  "name": "Deploy bot",
+  "purpose": "Posts the result of each deployment.",
+  "state": "registered",
+  "requested": ["channel.post"],
+  "granted": [],
+  "sendsDataExternally": true,
+  "externalDisclosure": "Build numbers, to ci.example.org",
+  "registered": "2026-10-02T09:14:03.120Z",
+  "channels": [],
+  "rateLimited": 0
+}
+```
+
+**Registering grants nothing.** `permissions` are the names
+`GET /api/admin/applications/permissions` lists, each with what it allows,
+whether it is held per channel, and whether it is administrative. A name that is
+not one of them is refused with **400**. If the application sends anything off
+the server, `externalDisclosure` must say what and where: it is shown to whoever
+approves it, before they do, and to everybody on the server afterwards.
+
+### Approving
+
+<!-- demo: approve-application -->
+
+```sh
+curl -X POST "http://localhost:8080/api/admin/applications/$APP/approve" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{\"permissions\": [\"channel.post\"], \"channels\": [\"$CHANNEL\"]}"
+```
+
+**What is approved is what was shown.** `permissions` repeats the list the
+approver saw, and must be exactly what the application asks for — a request
+changed between being read and being approved is refused with **409** rather
+than granted unseen. The page lists each permission with what it allows, marks
+the administrative ones, states what leaves the server before the button rather
+than after it, and names on the button how many permissions it grants. Nobody
+can grant an application a permission they do not hold themselves; trying is
+refused with **403**.
+
+`channels` are where its per-channel permissions hold. An application that asks
+for any must be given at least one channel; it joins them as it is approved, and
+it is in no others.
+
+The answer is the application, now `approved`, with its first credential:
+
+```json
+{
+  "id": "0199f4c2-…",
+  "state": "approved",
+  "granted": ["channel.post"],
+  "account": "app-deploy-bot-0199f4@chat.example.org",
+  "channels": [{ "id": "5a1c…", "name": "deploys" }],
+  "credential": { "id": "0199f4c3-…", "label": "Deploy bot", "token": "tdc_…" }
+}
+```
+
+**The credential is shown once**, stored only as a hash, exactly as an
+[API token](integrating.md#api-tokens) is. Put it in the application's
+configuration then.
+
+### Acting as the application
+
+The credential is a bearer token like any other:
+
+<!-- demo: post-as-application -->
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$CHANNEL/messages" \
+  -H "Authorization: Bearer $APP_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"body": "Deployed build 41 to production."}'
+```
+
+Its messages come from its own account —
+`app-deploy-bot-0199f4@chat.example.org`, named for the application — never from
+whoever approved it. `GET /api/applications/me` tells it who it is, what it was
+granted and where.
+
+**It is held to its grant on every request.** The permissions a request made
+with its credential carries are replaced with the application's, so it holds
+what it was granted and nothing besides — not its approver's role, not a
+server-wide default. Then:
+
+- **In a channel**, the channel must be one of its own, and the request one its
+  grant allows there: reading needs `channel.read`, uploading
+  `attachment.upload`, everything else `channel.post`. Anything else is refused
+  with **403**, and a channel it was not given is refused the same way whether
+  or not it exists.
+- **Joining and leaving** are refused: its channels are what its approver chose.
+- **Outside a channel**, it may use only an allowlist — who it is, the live
+  connection, attachments, and the server's own description. A route added to
+  the server later is closed to applications until somebody decides otherwise.
+- **Administrative routes** each check their own permission, against its grant.
+  An application approved with an administrative permission can do that one
+  thing, and the page marks such a permission before approval.
+
+### Credentials, and rotating them
+
+`POST /api/admin/applications/{id}/credentials` issues another, shown once;
+`DELETE /api/admin/applications/{id}/credentials/{credentialId}` revokes one,
+refused from the very next request. To rotate without a gap, issue the new one,
+put it in place, then revoke the old. `GET /api/admin/applications/{id}` lists
+its credentials with when each was issued and last used — never the credentials
+themselves.
+
+`PUT /api/admin/applications/{id}/channels` with `{"channels": [...]}` changes
+where it acts; it joins and leaves accordingly, and the change holds from its
+next request.
+
+### Who can see what is installed
+
+**Anybody on the server.** An application that can read a conversation is
+something the people in it are entitled to know about, so this needs no
+administrator:
+
+- `GET /api/applications` lists every approved application — its name, purpose,
+  permissions, when it was approved, what it sends off the server, and in how
+  many channels it acts, without naming channels the reader may not see.
+- `GET /api/rooms/{id}/applications` lists the applications that can act in a
+  channel, to anybody who can see the channel.
+
+Both are under **Installed applications** in **Settings → Integrations**.
+
+### When it is called too often
+
+Each application may make 600 requests a minute
+(`integrations.application_requests_per_minute`), counted across all its
+credentials, so issuing itself more does not buy it more. Past that it is
+refused with **429** and a `Retry-After` header, and each refusal is counted on
+the application — `rateLimited` and `lastRateLimited` — so whoever manages it
+sees that it was throttled.
+
+### Removing
+
+<!-- demo: remove-application -->
+
+```sh
+curl -X POST "http://localhost:8080/api/admin/applications/$APP/remove" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"content": "retain"}'
+```
+
+`content` is required, because both answers are legitimate and only the person
+removing it knows which this is: `"retain"` leaves what it posted where it is,
+still marked as its; `"remove"` takes each of its messages down as a moderator's
+removal would, leaving a placeholder. Either way every credential stops working
+at once and it leaves its channels. The answer says how many messages were
+removed, and the audit log records the removal with who did it and which was
+chosen.

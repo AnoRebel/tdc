@@ -15,4 +15,11 @@ const (
 
 	ActionIncomingWebhookCreated Action = "integration.incoming_webhook.created"
 	ActionIncomingWebhookRevoked Action = "integration.incoming_webhook.revoked"
+
+	ActionApplicationRegistered       Action = "integration.application.registered"
+	ActionApplicationApproved         Action = "integration.application.approved"
+	ActionApplicationRestricted       Action = "integration.application.restricted"
+	ActionApplicationRemoved          Action = "integration.application.removed"
+	ActionApplicationCredentialIssued Action = "integration.application.credential_issued"
+	ActionApplicationCredentialRevoke Action = "integration.application.credential_revoked"
 )

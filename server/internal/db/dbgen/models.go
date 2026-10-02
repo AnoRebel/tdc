@@ -24,15 +24,41 @@ type ActionPress struct {
 }
 
 type ApiToken struct {
-	ID         uuid.UUID
-	UserID     uuid.UUID
-	Label      string
-	TokenHash  []byte
-	Scope      []byte
-	ExpiresAt  *time.Time
-	RevokedAt  *time.Time
-	LastUsedAt *time.Time
-	CreatedAt  time.Time
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	Label         string
+	TokenHash     []byte
+	Scope         []byte
+	ExpiresAt     *time.Time
+	RevokedAt     *time.Time
+	LastUsedAt    *time.Time
+	CreatedAt     time.Time
+	ApplicationID *uuid.UUID
+}
+
+type Application struct {
+	ID                   uuid.UUID
+	Name                 string
+	Purpose              string
+	RequestedPermissions []string
+	SendsDataExternally  bool
+	ExternalDisclosure   string
+	State                string
+	GrantedPermissions   []string
+	RegisteredBy         *uuid.UUID
+	RegisteredAt         time.Time
+	ApprovedBy           *uuid.UUID
+	ApprovedAt           *time.Time
+	RemovedBy            *uuid.UUID
+	RemovedAt            *time.Time
+	AccountID            *uuid.UUID
+	RateLimitedCount     int64
+	LastRateLimitedAt    *time.Time
+}
+
+type ApplicationChannel struct {
+	ApplicationID uuid.UUID
+	RoomID        uuid.UUID
 }
 
 type Attachment struct {

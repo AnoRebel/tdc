@@ -124,6 +124,17 @@ const (
 		address can do with it: one channel, slowly, and its owner told.
 	*/
 	IncomingWebhookPostsPerMinute Key = "integrations.incoming_webhook_posts_per_minute"
+
+	/*
+		ApplicationRequestsPerMinute bounds how many requests one application
+		may make in a minute, across all its credentials.
+
+		On top of everything a person's requests are held to, not instead of
+		it: an application is a participant, and a misbehaving one is
+		throttled as itself, without anybody else's allowance being spent on
+		it.
+	*/
+	ApplicationRequestsPerMinute Key = "integrations.application_requests_per_minute"
 )
 
 // positive accepts a whole number of at least one, for a bound where zero
@@ -196,6 +207,11 @@ func init() {
 		IncomingWebhookPostsPerMinute: {
 			fallback:    "60",
 			description: "How many messages one incoming webhook may post per minute, or 0 for no limit.",
+			validate:    nonNegative,
+		},
+		ApplicationRequestsPerMinute: {
+			fallback:    "600",
+			description: "How many requests one application may make per minute, or 0 for no limit.",
 			validate:    nonNegative,
 		},
 	})

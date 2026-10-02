@@ -177,6 +177,70 @@ export interface CreatedIncomingWebhook extends IncomingWebhook {
   token: string;
 }
 
+/** A channel an application may act in. */
+export interface ApplicationChannel {
+  id: string;
+  name: string;
+}
+
+/** An application as an administrator manages it. */
+export interface Application {
+  id: string;
+  name: string;
+  purpose: string;
+  state: "registered" | "approved" | "removed";
+  /** What it asks for, and what it was approved for. */
+  requested: string[];
+  granted: string[];
+  sendsDataExternally: boolean;
+  /** What leaves the server and where it goes, when anything does. */
+  externalDisclosure?: string;
+  registered: string;
+  approved?: string;
+  /** The account it acts through, once approved. */
+  account?: string;
+  channels: ApplicationChannel[];
+  credentials?: ApplicationCredential[];
+  rateLimited: number;
+  lastRateLimited?: string;
+}
+
+export interface ApplicationCredential {
+  id: string;
+  label: string;
+  created: string;
+  lastUsed?: string;
+}
+
+/** The one response carrying an application credential's secret. */
+export interface IssuedApplicationCredential {
+  id: string;
+  label: string;
+  token: string;
+}
+
+/** An application as anybody on the server sees it. */
+export interface InstalledApplication {
+  id: string;
+  name: string;
+  purpose: string;
+  permissions: string[];
+  approved: string;
+  sendsDataExternally: boolean;
+  externalDisclosure?: string;
+  account?: string;
+  channelCount: number;
+}
+
+/** A permission an application can be granted. */
+export interface GrantablePermission {
+  name: string;
+  description: string;
+  /** Whether it is granted per channel, rather than across the server. */
+  perChannel: boolean;
+  administrative: boolean;
+}
+
 /** What a subscription may ask for. */
 export interface WebhookEventTypes {
   eventTypes: string[];

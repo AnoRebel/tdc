@@ -965,6 +965,15 @@ marked as the webhook's, it can post nowhere else, and revoking it is final on
 the next call. Making one, posting, formatting and limits are in
 [Webhooks and applications](webhooks-and-apps.md#incoming-webhooks).
 
+### Applications
+
+A program installed on the server as itself, with an account and permissions of
+its own rather than somebody's borrowed: registered, approved by somebody shown
+exactly what it will hold, restricted to the channels they choose, and visible
+to everybody on the server. Its credential is a bearer token used exactly as
+those above are. Registering, approval, what it may call, rotation and removal
+are in [Webhooks and applications](webhooks-and-apps.md#applications).
+
 ### Sending yourself a test delivery
 
 Before anything depends on your receiver, ask the server to send it one:

@@ -102,6 +102,17 @@ type Token struct {
 	ExpiresAt  *time.Time
 	LastUsedAt *time.Time
 	CreatedAt  time.Time
+
+	/*
+		ApplicationID is set on a token an application holds, rather than a
+		person.
+
+		Such a token's authority is the application's grant, resolved by
+		whoever authenticates the request — never the account's roles and
+		never the permissions of whoever approved it. Nil on every token a
+		person issues, which is every token that existed before applications.
+	*/
+	ApplicationID *uuid.UUID
 }
 
 // Store is the database surface this package needs.
@@ -211,8 +222,65 @@ func (s *Service) Resolve(ctx context.Context, secret string) (dbgen.User, Token
 
 	token := asToken(row.ApiToken.ID, row.ApiToken.Label, row.ApiToken.Scope,
 		row.ApiToken.ExpiresAt, row.ApiToken.LastUsedAt, row.ApiToken.CreatedAt)
+	token.ApplicationID = row.ApiToken.ApplicationID
 
 	return row.User, token, nil
+}
+
+/*
+IssueForApplication creates a credential an application holds, and returns it
+once.
+
+The application is the owning subject: the token is tied to it, revoked with
+it, and resolved against its grant. accountID is the account the application
+acts through, which is what membership, suspension and moderation see.
+
+No held permissions are passed, unlike Issue. A person's token is bounded by
+what that person holds; an application's authority is what it was approved for,
+and bounding it by anybody's permissions — the approver's above all — is
+exactly the inheritance it must not have. Whoever approved it was checked for
+holding each permission at approval; that check belongs there, not here.
+*/
+func (s *Service) IssueForApplication(
+	ctx context.Context,
+	applicationID, accountID uuid.UUID,
+	label string,
+	scope []authz.Permission,
+) (Token, string, error) {
+	label = strings.TrimSpace(label)
+	if label == "" {
+		return Token{}, "", ErrLabelRequired
+	}
+	for _, permission := range scope {
+		if _, known := authz.Lookup(permission); !known {
+			return Token{}, "", fmt.Errorf("%w: %q", ErrUnknownPermission, permission)
+		}
+	}
+
+	secret, err := newToken()
+	if err != nil {
+		return Token{}, "", err
+	}
+	encoded, err := json.Marshal(names(scope))
+	if err != nil {
+		return Token{}, "", fmt.Errorf("encode scope: %w", err)
+	}
+
+	row, err := s.store.CreateApplicationToken(ctx, dbgen.CreateApplicationTokenParams{
+		ID:            uuid.New(),
+		UserID:        accountID,
+		Label:         label,
+		TokenHash:     hash(secret),
+		Scope:         encoded,
+		ApplicationID: &applicationID,
+	})
+	if err != nil {
+		return Token{}, "", fmt.Errorf("create application token: %w", err)
+	}
+
+	token := asToken(row.ID, row.Label, encoded, nil, nil, row.CreatedAt)
+	token.ApplicationID = &applicationID
+	return token, secret, nil
 }
 
 /*

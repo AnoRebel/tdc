@@ -99,3 +99,41 @@ func (s *Service) PostAs(
 
 	return s.appendAs(ctx, room, nil, s.UserAddress(localPart), events.TypeMessageSent, content, "")
 }
+
+/*
+RemoveAsOperator takes down a message on an operator's decision — removing an
+application along with what it posted — without the operator having to be in
+the channel.
+
+A moderator's ordinary removal is a member's act in a channel they are in.
+This is the server's act, recorded as the operator's: the content is gone and a
+deletion event says a moderator removed it, exactly as any other removal reads.
+On a room another server owns the removal is local only, as every removal there
+is.
+*/
+func (s *Service) RemoveAsOperator(ctx context.Context, eventID string, operator dbgen.User) (dbgen.Event, error) {
+	target, err := s.store.GetEventByID(ctx, eventID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return dbgen.Event{}, ErrRoomNotFound
+	}
+	if err != nil {
+		return dbgen.Event{}, fmt.Errorf("read message: %w", err)
+	}
+	room, err := s.store.GetRoomByID(ctx, target.RoomID)
+	if err != nil {
+		return dbgen.Event{}, fmt.Errorf("read room: %w", err)
+	}
+
+	if err := s.store.RedactEvent(ctx, dbgen.RedactEventParams{ID: eventID, RedactedBy: &operator.ID}); err != nil {
+		return dbgen.Event{}, fmt.Errorf("redact message: %w", err)
+	}
+	if room.HomeServer != "" && !strings.EqualFold(room.HomeServer, s.serverName) {
+		return target, ErrRedactedLocally
+	}
+
+	content, err := json.Marshal(map[string]any{"redacts": eventID, "byModerator": true})
+	if err != nil {
+		return dbgen.Event{}, fmt.Errorf("encode deletion: %w", err)
+	}
+	return s.append(ctx, room, operator, events.TypeMessageDeleted, content, "")
+}

@@ -679,9 +679,18 @@ function deviceName(userAgent: string): string {
       <section>
         <h2 class="text-sm font-semibold">{{ $t("integrations.title") }}</h2>
         <p class="mt-1 text-xs text-muted-foreground">{{ $t("integrations.settingsHint") }}</p>
-        <NuxtLink :to="localeRoute({ name: 'integrations' })" class="btn btn-outline mt-3">
-          {{ $t("integrations.manage") }}
-        </NuxtLink>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <NuxtLink :to="localeRoute({ name: 'integrations' })" class="btn btn-outline">
+            {{ $t("integrations.manage") }}
+          </NuxtLink>
+          <NuxtLink
+            v-if="can('server.applications.manage')"
+            :to="localeRoute({ name: 'applications' })"
+            class="btn btn-outline"
+          >
+            {{ $t("integrations.applications") }}
+          </NuxtLink>
+        </div>
       </section>
 
       <section

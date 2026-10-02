@@ -1,11 +1,24 @@
 import type {
+  Application,
   CreatedIncomingWebhook,
   CreatedWebhook,
+  GrantablePermission,
   IncomingWebhook,
+  InstalledApplication,
+  IssuedApplicationCredential,
   WebhookEventTypes,
   WebhookHistory,
   WebhookSubscription,
 } from "@tdc/types";
+
+/** What registering an application asks for. */
+export interface NewApplication {
+  name: string;
+  purpose: string;
+  permissions: string[];
+  sendsDataExternally: boolean;
+  externalDisclosure: string;
+}
 
 /** What subscribing an endpoint asks for. */
 export interface NewWebhook {
@@ -63,7 +76,81 @@ export function useIntegrations() {
     return api.delete<void>(`/api/rooms/${roomId}/incoming-webhooks/${encodeURIComponent(id)}`);
   }
 
+  /** Every application not removed, for whoever manages them. */
+  function applications(): Promise<Application[]> {
+    return api.get<Application[]>("/api/admin/applications");
+  }
+
+  function application(id: string): Promise<Application> {
+    return api.get<Application>(`/api/admin/applications/${encodeURIComponent(id)}`);
+  }
+
+  function grantable(): Promise<GrantablePermission[]> {
+    return api.get<GrantablePermission[]>("/api/admin/applications/permissions");
+  }
+
+  function register(request: NewApplication): Promise<Application> {
+    return api.post<Application>("/api/admin/applications", request);
+  }
+
+  /**
+   * Approves exactly the permissions the approver was shown, in the channels
+   * chosen. Answers with the first credential, shown once.
+   */
+  function approve(
+    id: string,
+    permissions: string[],
+    channels: string[],
+  ): Promise<Application & { credential: IssuedApplicationCredential }> {
+    return api.post(`/api/admin/applications/${encodeURIComponent(id)}/approve`, {
+      permissions,
+      channels,
+    });
+  }
+
+  function restrict(id: string, channels: string[]): Promise<Application> {
+    return api.put<Application>(`/api/admin/applications/${encodeURIComponent(id)}/channels`, {
+      channels,
+    });
+  }
+
+  function issueCredential(id: string): Promise<IssuedApplicationCredential> {
+    return api.post(`/api/admin/applications/${encodeURIComponent(id)}/credentials`);
+  }
+
+  function revokeCredential(id: string, credential: string): Promise<void> {
+    return api.delete(
+      `/api/admin/applications/${encodeURIComponent(id)}/credentials/${encodeURIComponent(credential)}`,
+    );
+  }
+
+  /** Removes it, keeping or taking down what it posted. */
+  function remove(id: string, content: "retain" | "remove"): Promise<void> {
+    return api.post(`/api/admin/applications/${encodeURIComponent(id)}/remove`, { content });
+  }
+
+  /** What is installed, as anybody may see it. */
+  function installed(): Promise<InstalledApplication[]> {
+    return api.get<InstalledApplication[]>("/api/applications");
+  }
+
+  /** The applications that can act in one channel. */
+  function inRoom(roomId: string): Promise<InstalledApplication[]> {
+    return api.get<InstalledApplication[]>(`/api/rooms/${roomId}/applications`);
+  }
+
   return {
+    applications,
+    application,
+    grantable,
+    register,
+    approve,
+    restrict,
+    issueCredential,
+    revokeCredential,
+    remove,
+    installed,
+    inRoom,
     webhooks,
     webhook,
     subscribe,
