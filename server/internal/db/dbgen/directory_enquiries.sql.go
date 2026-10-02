@@ -179,7 +179,10 @@ func (q *Queries) InsertEnquiry(ctx context.Context, arg InsertEnquiryParams) (E
 }
 
 const listReceivedEnquiries = `-- name: ListReceivedEnquiries :many
-SELECT e.id, e.sender_id, e.recipient_id, e.subject, e.body, e.room_id, e.status, e.created_at, e.responded_at, u.username AS other_username, u.display_name AS other_display_name
+SELECT e.id, e.sender_id, e.recipient_id, e.subject, e.body, e.room_id, e.status, e.created_at, e.responded_at, u.username AS other_username, u.display_name AS other_display_name,
+       -- The nil identifier where the enquiry was not taken up.
+       COALESCE((SELECT g.id FROM engagements g WHERE g.enquiry_id = e.id),
+                '00000000-0000-0000-0000-000000000000')::uuid AS engagement_id
 FROM enquiries e
 JOIN users u ON u.id = e.sender_id
 WHERE e.recipient_id = $1
@@ -199,6 +202,7 @@ type ListReceivedEnquiriesRow struct {
 	RespondedAt      *time.Time
 	OtherUsername    string
 	OtherDisplayName string
+	EngagementID     uuid.UUID
 }
 
 func (q *Queries) ListReceivedEnquiries(ctx context.Context, recipientID uuid.UUID) ([]ListReceivedEnquiriesRow, error) {
@@ -222,6 +226,7 @@ func (q *Queries) ListReceivedEnquiries(ctx context.Context, recipientID uuid.UU
 			&i.RespondedAt,
 			&i.OtherUsername,
 			&i.OtherDisplayName,
+			&i.EngagementID,
 		); err != nil {
 			return nil, err
 		}
@@ -234,7 +239,10 @@ func (q *Queries) ListReceivedEnquiries(ctx context.Context, recipientID uuid.UU
 }
 
 const listSentEnquiries = `-- name: ListSentEnquiries :many
-SELECT e.id, e.sender_id, e.recipient_id, e.subject, e.body, e.room_id, e.status, e.created_at, e.responded_at, u.username AS other_username, u.display_name AS other_display_name
+SELECT e.id, e.sender_id, e.recipient_id, e.subject, e.body, e.room_id, e.status, e.created_at, e.responded_at, u.username AS other_username, u.display_name AS other_display_name,
+       -- The nil identifier where the enquiry was not taken up.
+       COALESCE((SELECT g.id FROM engagements g WHERE g.enquiry_id = e.id),
+                '00000000-0000-0000-0000-000000000000')::uuid AS engagement_id
 FROM enquiries e
 JOIN users u ON u.id = e.recipient_id
 WHERE e.sender_id = $1
@@ -254,6 +262,7 @@ type ListSentEnquiriesRow struct {
 	RespondedAt      *time.Time
 	OtherUsername    string
 	OtherDisplayName string
+	EngagementID     uuid.UUID
 }
 
 func (q *Queries) ListSentEnquiries(ctx context.Context, senderID uuid.UUID) ([]ListSentEnquiriesRow, error) {
@@ -277,6 +286,7 @@ func (q *Queries) ListSentEnquiries(ctx context.Context, senderID uuid.UUID) ([]
 			&i.RespondedAt,
 			&i.OtherUsername,
 			&i.OtherDisplayName,
+			&i.EngagementID,
 		); err != nil {
 			return nil, err
 		}

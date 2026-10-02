@@ -39,7 +39,10 @@ VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: ListReceivedEnquiries :many
-SELECT e.*, u.username AS other_username, u.display_name AS other_display_name
+SELECT e.*, u.username AS other_username, u.display_name AS other_display_name,
+       -- The nil identifier where the enquiry was not taken up.
+       COALESCE((SELECT g.id FROM engagements g WHERE g.enquiry_id = e.id),
+                '00000000-0000-0000-0000-000000000000')::uuid AS engagement_id
 FROM enquiries e
 JOIN users u ON u.id = e.sender_id
 WHERE e.recipient_id = $1
@@ -47,7 +50,10 @@ ORDER BY e.created_at DESC
 LIMIT 100;
 
 -- name: ListSentEnquiries :many
-SELECT e.*, u.username AS other_username, u.display_name AS other_display_name
+SELECT e.*, u.username AS other_username, u.display_name AS other_display_name,
+       -- The nil identifier where the enquiry was not taken up.
+       COALESCE((SELECT g.id FROM engagements g WHERE g.enquiry_id = e.id),
+                '00000000-0000-0000-0000-000000000000')::uuid AS engagement_id
 FROM enquiries e
 JOIN users u ON u.id = e.recipient_id
 WHERE e.sender_id = $1

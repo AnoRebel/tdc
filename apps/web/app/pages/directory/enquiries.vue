@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Enquiry } from "@tdc/types";
 import { isApiError } from "@tdc/types";
-import { ArrowLeft, Inbox, MessagesSquare } from "lucide-vue-next";
+import { ArrowLeft, Handshake, Inbox, MessagesSquare } from "lucide-vue-next";
+import { Button } from "#layers/ui/app/components/ui/button";
 import { whenBriefly } from "#layers/ui/app/lib/dates";
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
@@ -42,6 +43,33 @@ async function load() {
 
 await load();
 watch(box, load);
+
+const busy = ref<string | null>(null);
+
+/*
+ * Answering an enquiry. Taking one up makes it an engagement and goes there,
+ * where the conversation it opened now has both people in it.
+ */
+async function answer(enquiry: Enquiry, how: "accept" | "decline" | "withdraw") {
+  busy.value = enquiry.id;
+  error.value = null;
+  try {
+    if (how === "accept") {
+      const engagement = await directory.acceptEnquiry(enquiry.id);
+      await router.push(
+        localeRoute({ name: "directory-engagements-id", params: { id: engagement.id } }),
+      );
+      return;
+    }
+    if (how === "decline") await directory.declineEnquiry(enquiry.id);
+    else await directory.withdrawEnquiry(enquiry.id);
+    await load();
+  } catch (cause) {
+    error.value = isApiError(cause) ? cause.message : $ts("directory.couldNotReach");
+  } finally {
+    busy.value = null;
+  }
+}
 
 function choose(which: "received" | "sent") {
   void router.replace({ query: which === "sent" ? { box: "sent" } : {} });
@@ -114,14 +142,51 @@ function choose(which: "received" | "sent") {
             }}
           </p>
           <p class="mt-2 line-clamp-3 text-sm whitespace-pre-wrap">{{ enquiry.body }}</p>
-          <NuxtLink
-            v-if="enquiry.received && enquiry.roomId"
-            :to="`/rooms/${enquiry.roomId}`"
-            class="btn btn-ghost mt-2"
-          >
-            <MessagesSquare class="size-3.5" />
-            {{ $t("directory.enquiry.open") }}
-          </NuxtLink>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <NuxtLink
+              v-if="enquiry.engagementId"
+              :to="
+                localeRoute({
+                  name: 'directory-engagements-id',
+                  params: { id: enquiry.engagementId },
+                })
+              "
+              class="btn btn-outline"
+            >
+              <Handshake class="size-3.5" />
+              {{ $t("directory.engagement.open") }}
+            </NuxtLink>
+            <template v-else-if="enquiry.status === 'pending'">
+              <template v-if="enquiry.received">
+                <Button :disabled="busy === enquiry.id" @click="answer(enquiry, 'accept')">
+                  {{ $t("directory.enquiry.accept") }}
+                </Button>
+                <Button
+                  variant="ghost"
+                  :disabled="busy === enquiry.id"
+                  @click="answer(enquiry, 'decline')"
+                >
+                  {{ $t("directory.enquiry.decline") }}
+                </Button>
+              </template>
+              <Button
+                v-else
+                variant="ghost"
+                :disabled="busy === enquiry.id"
+                @click="answer(enquiry, 'withdraw')"
+              >
+                {{ $t("directory.enquiry.withdraw") }}
+              </Button>
+            </template>
+            <NuxtLink
+              v-if="enquiry.received && enquiry.roomId && !enquiry.engagementId"
+              :to="`/rooms/${enquiry.roomId}`"
+              class="btn btn-ghost"
+            >
+              <MessagesSquare class="size-3.5" />
+              {{ $t("directory.enquiry.open") }}
+            </NuxtLink>
+          </div>
         </li>
       </ul>
     </div>

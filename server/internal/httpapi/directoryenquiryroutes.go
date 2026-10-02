@@ -58,6 +58,8 @@ type enquiryView struct {
 	WithName    string `json:"withName"`
 	CreatedAt   string `json:"createdAt"`
 	RespondedAt string `json:"respondedAt,omitempty"`
+	// EngagementID is present once the enquiry was taken up.
+	EngagementID string `json:"engagementId,omitempty"`
 }
 
 func (api *directoryAPI) enquiryViewOf(enquiry directory.Enquiry, received bool) enquiryView {
@@ -71,6 +73,9 @@ func (api *directoryAPI) enquiryViewOf(enquiry directory.Enquiry, received bool)
 	}
 	if enquiry.RespondedAt != nil {
 		view.RespondedAt = enquiry.RespondedAt.UTC().Format(time.RFC3339)
+	}
+	if enquiry.EngagementID != nil {
+		view.EngagementID = enquiry.EngagementID.String()
 	}
 	return view
 }

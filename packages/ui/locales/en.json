@@ -767,6 +767,36 @@
         "accepted": "Taken up",
         "declined": "Declined",
         "withdrawn": "Withdrawn"
+      },
+      "accept": "Take it up",
+      "decline": "Decline",
+      "withdraw": "Withdraw"
+    },
+    "engagement": {
+      "title": "Engagements",
+      "none": "No engagements yet",
+      "noneHint": "An enquiry becomes an engagement when the person it was sent to takes it up.",
+      "open": "Open the engagement",
+      "backToList": "Back to engagements",
+      "notFound": "No such engagement, or you are not part of it.",
+      "whereItStands": "Where the engagement stands",
+      "with": "With {name}",
+      "history": "History",
+      "moved": "{who} moved it to {to}",
+      "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw from this engagement?",
+      "withdrawDetail": "It closes for both of you and cannot be reopened. The conversation is kept, and stops taking new messages.",
+      "withdrawWhy": "Why, if you want to say (the other person will see it)",
+      "withdrawnHint": "Withdrawn before any agreement. Nothing was agreed, and the conversation is closed.",
+      "states": {
+        "discussion": "Discussion",
+        "proposal": "Proposal",
+        "negotiation": "Negotiation",
+        "agreement": "Agreement",
+        "active": "Work under way",
+        "completion_pending": "Completion awaiting confirmation",
+        "completed": "Completed",
+        "withdrawn": "Withdrawn"
       }
     }
   }

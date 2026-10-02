@@ -156,6 +156,33 @@ type EmailConfirmation struct {
 	UsedAt    *time.Time
 }
 
+type Engagement struct {
+	ID                    uuid.UUID
+	EnquiryID             *uuid.UUID
+	ClientID              *uuid.UUID
+	DeveloperID           *uuid.UUID
+	ClientLabel           string
+	DeveloperLabel        string
+	Title                 string
+	RoomID                *uuid.UUID
+	State                 string
+	CompletionRequestedBy *uuid.UUID
+	CompletionRequestedAt *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+type EngagementTransition struct {
+	ID           int64
+	EngagementID uuid.UUID
+	FromState    string
+	ToState      string
+	ActorID      *uuid.UUID
+	ActorLabel   string
+	Note         string
+	OccurredAt   time.Time
+}
+
 type Enquiry struct {
 	ID          uuid.UUID
 	SenderID    uuid.UUID

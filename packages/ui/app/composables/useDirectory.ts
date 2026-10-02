@@ -4,6 +4,7 @@ import type {
   DirectoryFilters,
   DirectoryResults,
   DirectoryVisibility,
+  Engagement,
   Enquiry,
   OwnProfile,
   ProfileClaims,
@@ -212,7 +213,37 @@ export function useDirectory() {
     return api.get<Enquiry[]>(`/api/directory/me/enquiries${box === "sent" ? "?box=sent" : ""}`);
   }
 
+  function acceptEnquiry(id: string) {
+    return api.post<Engagement>(`/api/directory/enquiries/${id}/accept`);
+  }
+
+  function declineEnquiry(id: string) {
+    return api.post<Enquiry>(`/api/directory/enquiries/${id}/decline`);
+  }
+
+  function withdrawEnquiry(id: string) {
+    return api.post<Enquiry>(`/api/directory/enquiries/${id}/withdraw`);
+  }
+
+  function engagements() {
+    return api.get<Engagement[]>("/api/directory/me/engagements");
+  }
+
+  function engagement(id: string) {
+    return api.get<Engagement>(`/api/directory/engagements/${id}`);
+  }
+
+  function withdrawEngagement(id: string, reason: string) {
+    return api.post<Engagement>(`/api/directory/engagements/${id}/withdraw`, { reason });
+  }
+
   return {
+    acceptEnquiry,
+    declineEnquiry,
+    withdrawEnquiry,
+    engagements,
+    engagement,
+    withdrawEngagement,
     sendEnquiry,
     enquiries,
     claims,

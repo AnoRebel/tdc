@@ -68,6 +68,48 @@ export interface Enquiry {
   withName: string;
   createdAt: string;
   respondedAt?: string;
+  /** The engagement it became, once taken up. */
+  engagementId?: string;
+}
+
+/** Where an engagement stands. */
+export type EngagementState =
+  | "discussion"
+  | "proposal"
+  | "negotiation"
+  | "agreement"
+  | "active"
+  | "completion_pending"
+  | "completed"
+  | "withdrawn";
+
+/** One recorded change of an engagement's state. */
+export interface EngagementTransition {
+  from: EngagementState | "enquiry";
+  to: EngagementState;
+  actor: string;
+  note?: string;
+  at: string;
+}
+
+/** An engagement, as one of its two parties sees it. */
+export interface Engagement {
+  id: string;
+  title: string;
+  state: EngagementState;
+  client: { username: string; address: string };
+  developer: { username: string; address: string };
+  /** Which party the viewer is. */
+  you: "client" | "developer";
+  roomId?: string;
+  enquiryId?: string;
+  /** Whether either party may still withdraw: there is no agreement yet. */
+  withdrawable: boolean;
+  completionRequestedBy?: string;
+  completionRequestedAt?: string;
+  transitions?: EngagementTransition[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Whether a skill is in the vocabulary or waiting for review. */

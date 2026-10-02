@@ -81,6 +81,8 @@ type Enquiry struct {
 	// recipient for somebody who sent it.
 	OtherUsername    string
 	OtherDisplayName string
+	// EngagementID is the engagement it became, once taken up.
+	EngagementID *uuid.UUID
 }
 
 // EnquiryInput is what somebody sends.
@@ -211,6 +213,10 @@ func (s *Service) Received(ctx context.Context, userID uuid.UUID) ([]Enquiry, er
 			Body: row.Body, RoomID: row.RoomID, Status: row.Status, CreatedAt: row.CreatedAt,
 			RespondedAt: row.RespondedAt,
 		}, row.OtherUsername, row.OtherDisplayName))
+		if row.EngagementID != uuid.Nil {
+			id := row.EngagementID
+			enquiries[len(enquiries)-1].EngagementID = &id
+		}
 	}
 	return enquiries, nil
 }
@@ -228,6 +234,10 @@ func (s *Service) Sent(ctx context.Context, userID uuid.UUID) ([]Enquiry, error)
 			Body: row.Body, RoomID: row.RoomID, Status: row.Status, CreatedAt: row.CreatedAt,
 			RespondedAt: row.RespondedAt,
 		}, row.OtherUsername, row.OtherDisplayName))
+		if row.EngagementID != uuid.Nil {
+			id := row.EngagementID
+			enquiries[len(enquiries)-1].EngagementID = &id
+		}
 	}
 	return enquiries, nil
 }

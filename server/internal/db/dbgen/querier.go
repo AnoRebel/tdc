@@ -43,6 +43,8 @@ type Querier interface {
 	// A reply carries the identifier of the message that started the thread.
 	AppendThreadedEvent(ctx context.Context, arg AppendThreadedEventParams) (Event, error)
 	ApproveSkill(ctx context.Context, arg ApproveSkillParams) (int64, error)
+	// Closing an engagement's conversation to new messages, keeping what was said.
+	ArchiveEngagementRoom(ctx context.Context, arg ArchiveEngagementRoomParams) error
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	// Binds an attachment to the message that carries it.
@@ -278,6 +280,8 @@ type Querier interface {
 	// written on the first change, and somebody who has never opened these
 	// settings discloses all three.
 	GetDisclosurePreferences(ctx context.Context, userID uuid.UUID) (GetDisclosurePreferencesRow, error)
+	// An engagement, if the viewer is one of its two parties.
+	GetEngagementFor(ctx context.Context, arg GetEngagementForParams) (Engagement, error)
 	GetEnquiry(ctx context.Context, id uuid.UUID) (Enquiry, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
@@ -334,6 +338,7 @@ type Querier interface {
 	// request asks from.
 	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
+	InsertEngagement(ctx context.Context, arg InsertEngagementParams) (Engagement, error)
 	InsertEnquiry(ctx context.Context, arg InsertEnquiryParams) (Enquiry, error)
 	InsertPortfolioItem(ctx context.Context, arg InsertPortfolioItemParams) error
 	InsertSkill(ctx context.Context, arg InsertSkillParams) (Skill, error)
@@ -387,6 +392,7 @@ type Querier interface {
 	// without sending the same message twice: whoever locks a row owns it, and the
 	// others move on rather than waiting.
 	ListDueScheduledMessages(ctx context.Context, limit int32) ([]ScheduledMessage, error)
+	ListEngagementsFor(ctx context.Context, viewer uuid.UUID) ([]Engagement, error)
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
@@ -504,6 +510,7 @@ type Querier interface {
 	// How many replies each of a set of messages has, and when the latest arrived,
 	// so a timeline can show "3 replies" without fetching them.
 	ListThreadSummaries(ctx context.Context, dollar_1 []string) ([]ListThreadSummariesRow, error)
+	ListTransitions(ctx context.Context, engagementID uuid.UUID) ([]EngagementTransition, error)
 	ListTyping(ctx context.Context, roomID uuid.UUID) ([]ListTypingRow, error)
 	// Unread counts for every room a person is in, in one query rather than one
 	// per room.
@@ -552,6 +559,10 @@ type Querier interface {
 	// visibility can be lowered in the same change, so abusive content can be
 	// taken out of the directory while it is dealt with.
 	ModerateDirectoryProfile(ctx context.Context, arg ModerateDirectoryProfileParams) error
+	// A change of state, only from the state the caller saw: two people acting at
+	// once cannot both move it, and nothing moves an engagement past a state it
+	// is no longer in.
+	MoveEngagement(ctx context.Context, arg MoveEngagementParams) (int64, error)
 	// Everybody who had the proposal gets the skill it was merged into, keeping
 	// what they wrote about it. Anybody who already had both keeps the one they
 	// already had.
@@ -601,6 +612,7 @@ type Querier interface {
 	RecordMessageView(ctx context.Context, arg RecordMessageViewParams) error
 	RecordPushFailure(ctx context.Context, endpoint string) error
 	RecordPushSuccess(ctx context.Context, endpoint string) error
+	RecordTransition(ctx context.Context, arg RecordTransitionParams) error
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
 	RemoteMember(ctx context.Context, arg RemoteMemberParams) (RemoteMember, error)
 	RemoteMembers(ctx context.Context, roomID uuid.UUID) ([]RemoteMember, error)

@@ -433,6 +433,9 @@ short version:
 - **Whether you take enquiries is a setting on your profile**, separate from
   who may send you direct messages. An enquiry is one message, which opens a
   private conversation the sender cannot add to until you take it up.
+- **Taking up an enquiry makes it an engagement**, with a private conversation
+  and a recorded state you both see. Either of you can withdraw before an
+  agreement.
 - **A company can ask to list you; only you can accept**, from your profile
   page. Leave, and it is gone from both the company's page and your profile at
   once.

@@ -254,6 +254,50 @@ enquiry's text is kept with the enquiry as well as in its conversation, so the
 list still says what was asked after the conversation's own retention has done
 its work.
 
+## Engagements
+
+An enquiry the recipient takes up becomes an **engagement**: a record of the
+work the two of you discuss, propose, agree and finish, and the conversation it
+happens in. Either of you finds it under **Directory → Engagements**; nobody
+else can find it at all.
+
+An engagement moves through these states, one step at a time:
+
+| State                            | What it means                                               |
+| -------------------------------- | ----------------------------------------------------------- |
+| Discussion                       | the enquiry was taken up, and you are talking it through    |
+| Proposal                         | the developer has sent a proposal                           |
+| Negotiation                      | a proposal was declined or changes were asked for           |
+| Agreement                        | you both accepted the same proposal                         |
+| Work under way                   | the agreed work is in progress                              |
+| Completion awaiting confirmation | one of you said the work is complete; the other has not yet |
+| Completed                        | you both said so                                            |
+| Withdrawn                        | one of you withdrew before an agreement                     |
+
+**You both see the same state**, because there is one record and both of you
+read it. **Every step is recorded** with who took it and when, and either of you
+can read the history. A step cannot be skipped: the server refuses it, and the
+database refuses to record it even if something tried.
+
+**Either of you can withdraw at any point before an agreement**, with a reason
+the other will see. The engagement closes for both of you, nothing was agreed,
+and it cannot be reopened. Its conversation is kept, and stops taking new
+messages. After an agreement there is no withdrawing — see below for what
+happens instead.
+
+When the other person changes the engagement, your page follows without being
+reloaded: the change is announced in the engagement's conversation, so it
+arrives the way a message does, including after you were offline.
+
+### The conversation
+
+Every engagement has a private conversation between the two of you — the one the
+enquiry opened. It is an ordinary direct conversation, and so has every rule a
+direct conversation has: files, retention and moderation work exactly as they do
+for any other, nobody else can read it, and it never appears in search or
+browsing for anybody but the two of you — including administrators using the
+ordinary search.
+
 ## Companies
 
 Anybody may create a company profile — a name, a description, a location, and
@@ -392,6 +436,12 @@ deliberate decision, not something the protocol backs into.
 | `POST /api/directory/moderation/verifications/:id/revoke`         | revoke a verification, with a `reason` (`directory.verify`)                                      |
 | `POST /api/directory/profiles/:username/enquiries`                | send an enquiry: `subject`, `body`                                                               |
 | `GET /api/directory/me/enquiries`                                 | enquiries you received, or with `?box=sent` those you sent                                       |
+| `POST /api/directory/enquiries/:id/accept`                        | take up an enquiry you received; it becomes an engagement                                        |
+| `POST /api/directory/enquiries/:id/decline`                       | decline an enquiry you received                                                                  |
+| `POST /api/directory/enquiries/:id/withdraw`                      | withdraw an enquiry you sent                                                                     |
+| `GET /api/directory/me/engagements`                               | your engagements                                                                                 |
+| `GET /api/directory/engagements/:id`                              | an engagement you are party to, with its history                                                 |
+| `POST /api/directory/engagements/:id/withdraw`                    | withdraw before an agreement, with an optional `reason`                                          |
 | `DELETE /api/directory/me`                                        | delete your profile, keeping your account                                                        |
 | `GET /api/directory/me/export`                                    | your profile as `tdc.directory.profile/1`                                                        |
 | `GET /api/directory/profiles/:username`                           | a profile as you may see it; signing in is optional                                              |

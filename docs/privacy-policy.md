@@ -201,6 +201,12 @@ sent it to whom, its subject and text, when, and whether it was taken up,
 declined or withdrawn. Its text is also the first message of the private
 conversation it opens, which is kept like any other conversation.
 
+If an enquiry becomes an engagement, the record holds the two people in it,
+its title, its state, and every change of state with who made it, when, and any
+reason they gave. It is visible to the two people in it and nobody else. If
+either of you deletes your account, the record stays for the other, still
+naming you by username.
+
 If you are listed by a company, the record holds which company, the role it
 gave you, who invited you, and when you accepted. A company's own page holds its
 name, description, location and who created it.

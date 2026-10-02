@@ -767,6 +767,36 @@
         "accepted": "Limekubaliwa",
         "declined": "Limekataliwa",
         "withdrawn": "Limeondolewa"
+      },
+      "accept": "Likubali",
+      "decline": "Kataa",
+      "withdraw": "Liondoe"
+    },
+    "engagement": {
+      "title": "Makubaliano ya kazi",
+      "none": "Bado hakuna makubaliano ya kazi",
+      "noneHint": "Ulizo linakuwa makubaliano ya kazi pale aliyetumiwa anapolikubali.",
+      "open": "Fungua makubaliano",
+      "backToList": "Rudi kwenye makubaliano",
+      "notFound": "Hakuna makubaliano hayo, au wewe si sehemu yake.",
+      "whereItStands": "Hali ya makubaliano",
+      "with": "Pamoja na {name}",
+      "history": "Historia",
+      "moved": "{who} aliyahamishia kwenye {to}",
+      "withdraw": "Jiondoe",
+      "withdrawTitle": "Ujiondoe kwenye makubaliano haya?",
+      "withdrawDetail": "Yanafungwa kwa nyote wawili na hayawezi kufunguliwa tena. Mazungumzo yanahifadhiwa, na hayapokei jumbe mpya.",
+      "withdrawWhy": "Kwa nini, ukipenda kusema (mwenzako ataona)",
+      "withdrawnHint": "Yameondolewa kabla ya makubaliano yoyote. Hakuna kilichokubaliwa, na mazungumzo yamefungwa.",
+      "states": {
+        "discussion": "Majadiliano",
+        "proposal": "Pendekezo",
+        "negotiation": "Mazungumzo ya masharti",
+        "agreement": "Makubaliano",
+        "active": "Kazi inaendelea",
+        "completion_pending": "Kukamilika kunasubiri uthibitisho",
+        "completed": "Imekamilika",
+        "withdrawn": "Imeondolewa"
       }
     }
   }
