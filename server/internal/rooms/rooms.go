@@ -63,6 +63,19 @@ func NewService(store Store, keyring *events.Keyring, serverName string, log *sl
 	return &Service{store: store, keyring: keyring, serverName: serverName, log: log}
 }
 
+/*
+HostedHere reports whether this server owns a room.
+
+Asked of the name rooms are stamped with when they are made, and of nothing
+else. Comparing against the configured address instead treated every room as
+somebody else's on a server with no address configured — the default — because
+rooms are stamped "localhost" there and the address is empty, so the client
+sent every message through federation and every message was refused.
+*/
+func (s *Service) HostedHere(room dbgen.Room) bool {
+	return strings.EqualFold(room.HomeServer, s.serverName)
+}
+
 // Address returns the federated address of a room on this server.
 //
 // A direct conversation has no slug: it is found by its participants rather

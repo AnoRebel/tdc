@@ -802,7 +802,7 @@ func (s *Server) handleCatchUp(c *echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
-	if strings.EqualFold(room.HomeServer, s.federationAuthorityHost()) {
+	if s.rooms.HostedHere(room) {
 		return echo.NewHTTPError(http.StatusConflict, "this server owns that room; there is nothing to catch up on")
 	}
 
@@ -1180,7 +1180,7 @@ func (s *Server) remoteRoomContext(
 	if err != nil {
 		return dbgen.Room{}, nil, "", echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
-	if strings.EqualFold(room.HomeServer, s.federationAuthorityHost()) {
+	if s.rooms.HostedHere(room) {
 		return dbgen.Room{}, nil, "", echo.NewHTTPError(http.StatusConflict,
 			"this server owns that room; use the ordinary path")
 	}

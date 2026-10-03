@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -81,7 +80,7 @@ func (s *Server) roomResponse(room dbgen.Room, member bool) roomResponse {
 	// Only when it is somebody else's: a client that knows nothing about
 	// federation should see exactly the shape it saw before.
 	homeServer := ""
-	if !strings.EqualFold(room.HomeServer, s.federationAuthorityHost()) {
+	if !s.rooms.HostedHere(room) {
 		homeServer = room.HomeServer
 	}
 
