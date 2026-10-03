@@ -175,16 +175,19 @@ func (q *Queries) LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) 
 const liftPostingRestriction = `-- name: LiftPostingRestriction :execrows
 UPDATE posting_restrictions
 SET lifted_at = now(), lifted_by = $2
-WHERE id = $1 AND lifted_at IS NULL
+WHERE id = $1 AND room_id = $3 AND lifted_at IS NULL
 `
 
 type LiftPostingRestrictionParams struct {
 	ID       uuid.UUID
 	LiftedBy *uuid.UUID
+	RoomID   *uuid.UUID
 }
 
+// Within the channel the request names, so lifting by identifier cannot reach a
+// restriction made somewhere else.
 func (q *Queries) LiftPostingRestriction(ctx context.Context, arg LiftPostingRestrictionParams) (int64, error) {
-	result, err := q.db.Exec(ctx, liftPostingRestriction, arg.ID, arg.LiftedBy)
+	result, err := q.db.Exec(ctx, liftPostingRestriction, arg.ID, arg.LiftedBy, arg.RoomID)
 	if err != nil {
 		return 0, err
 	}
@@ -311,6 +314,62 @@ func (q *Queries) ListPostingRestrictions(ctx context.Context, limit int32) ([]L
 	items := []ListPostingRestrictionsRow{}
 	for rows.Next() {
 		var i ListPostingRestrictionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.RoomID,
+			&i.RestrictedBy,
+			&i.RestrictedByAddress,
+			&i.Reason,
+			&i.ExpiresAt,
+			&i.CreatedAt,
+			&i.LiftedAt,
+			&i.LiftedBy,
+			&i.Username,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPostingRestrictionsInRoom = `-- name: ListPostingRestrictionsInRoom :many
+SELECT r.id, r.user_id, r.room_id, r.restricted_by, r.restricted_by_address, r.reason, r.expires_at, r.created_at, r.lifted_at, r.lifted_by, u.username
+FROM posting_restrictions r
+JOIN users u ON u.id = r.user_id
+WHERE r.room_id = $1
+  AND r.lifted_at IS NULL AND (r.expires_at IS NULL OR r.expires_at > now())
+ORDER BY r.created_at DESC
+`
+
+type ListPostingRestrictionsInRoomRow struct {
+	ID                  uuid.UUID
+	UserID              uuid.UUID
+	RoomID              *uuid.UUID
+	RestrictedBy        *uuid.UUID
+	RestrictedByAddress string
+	Reason              string
+	ExpiresAt           *time.Time
+	CreatedAt           time.Time
+	LiftedAt            *time.Time
+	LiftedBy            *uuid.UUID
+	Username            string
+}
+
+// Who is currently silenced in one channel.
+func (q *Queries) ListPostingRestrictionsInRoom(ctx context.Context, roomID *uuid.UUID) ([]ListPostingRestrictionsInRoomRow, error) {
+	rows, err := q.db.Query(ctx, listPostingRestrictionsInRoom, roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPostingRestrictionsInRoomRow{}
+	for rows.Next() {
+		var i ListPostingRestrictionsInRoomRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,

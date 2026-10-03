@@ -12,12 +12,66 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+const claimDueScheduledMessages = `-- name: ClaimDueScheduledMessages :many
+UPDATE scheduled_messages
+SET claimed_until = now() + interval '5 minutes'
+WHERE id IN (
+    SELECT id FROM scheduled_messages
+    WHERE send_at <= now() AND sent_event_id IS NULL AND failed_reason = ''
+      AND (claimed_until IS NULL OR claimed_until < now())
+    ORDER BY send_at
+    LIMIT $1
+    FOR UPDATE SKIP LOCKED
+)
+RETURNING id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason, claimed_until
+`
+
+// What is ready to send, claimed by whoever asked.
+//
+// One statement, so finding a row and claiming it cannot be separated: SKIP
+// LOCKED keeps a concurrent pass off the rows this one is claiming, and the
+// claim keeps every later pass off them until it expires. Five minutes is far
+// longer than sending a batch takes, and short enough that a message held by a
+// server that stopped goes out soon after.
+func (q *Queries) ClaimDueScheduledMessages(ctx context.Context, limit int32) ([]ScheduledMessage, error) {
+	rows, err := q.db.Query(ctx, claimDueScheduledMessages, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ScheduledMessage{}
+	for rows.Next() {
+		var i ScheduledMessage
+		if err := rows.Scan(
+			&i.ID,
+			&i.RoomID,
+			&i.SenderID,
+			&i.SenderAddress,
+			&i.Body,
+			&i.AttachmentIds,
+			&i.ThreadRootID,
+			&i.SendAt,
+			&i.CreatedAt,
+			&i.SentEventID,
+			&i.FailedReason,
+			&i.ClaimedUntil,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createScheduledMessage = `-- name: CreateScheduledMessage :one
 INSERT INTO scheduled_messages (
     id, room_id, sender_id, sender_address, body, attachment_ids,
     thread_root_id, send_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason
+RETURNING id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason, claimed_until
 `
 
 type CreateScheduledMessageParams struct {
@@ -55,6 +109,7 @@ func (q *Queries) CreateScheduledMessage(ctx context.Context, arg CreateSchedule
 		&i.CreatedAt,
 		&i.SentEventID,
 		&i.FailedReason,
+		&i.ClaimedUntil,
 	)
 	return i, err
 }
@@ -80,7 +135,7 @@ func (q *Queries) DeleteScheduledMessage(ctx context.Context, arg DeleteSchedule
 }
 
 const getScheduledMessage = `-- name: GetScheduledMessage :one
-SELECT id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason FROM scheduled_messages WHERE id = $1
+SELECT id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason, claimed_until FROM scheduled_messages WHERE id = $1
 `
 
 func (q *Queries) GetScheduledMessage(ctx context.Context, id uuid.UUID) (ScheduledMessage, error) {
@@ -98,57 +153,13 @@ func (q *Queries) GetScheduledMessage(ctx context.Context, id uuid.UUID) (Schedu
 		&i.CreatedAt,
 		&i.SentEventID,
 		&i.FailedReason,
+		&i.ClaimedUntil,
 	)
 	return i, err
 }
 
-const listDueScheduledMessages = `-- name: ListDueScheduledMessages :many
-SELECT id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason FROM scheduled_messages
-WHERE send_at <= now() AND sent_event_id IS NULL AND failed_reason = ''
-ORDER BY send_at
-LIMIT $1
-FOR UPDATE SKIP LOCKED
-`
-
-// What is ready to send.
-//
-// FOR UPDATE SKIP LOCKED so more than one server can run the delivery pass
-// without sending the same message twice: whoever locks a row owns it, and the
-// others move on rather than waiting.
-func (q *Queries) ListDueScheduledMessages(ctx context.Context, limit int32) ([]ScheduledMessage, error) {
-	rows, err := q.db.Query(ctx, listDueScheduledMessages, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ScheduledMessage{}
-	for rows.Next() {
-		var i ScheduledMessage
-		if err := rows.Scan(
-			&i.ID,
-			&i.RoomID,
-			&i.SenderID,
-			&i.SenderAddress,
-			&i.Body,
-			&i.AttachmentIds,
-			&i.ThreadRootID,
-			&i.SendAt,
-			&i.CreatedAt,
-			&i.SentEventID,
-			&i.FailedReason,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listScheduledMessagesForUser = `-- name: ListScheduledMessagesForUser :many
-SELECT id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason FROM scheduled_messages
+SELECT id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason, claimed_until FROM scheduled_messages
 WHERE sender_id = $1 AND sent_event_id IS NULL AND failed_reason = ''
 ORDER BY send_at
 `
@@ -175,6 +186,7 @@ func (q *Queries) ListScheduledMessagesForUser(ctx context.Context, senderID uui
 			&i.CreatedAt,
 			&i.SentEventID,
 			&i.FailedReason,
+			&i.ClaimedUntil,
 		); err != nil {
 			return nil, err
 		}

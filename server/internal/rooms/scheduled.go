@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -133,35 +134,58 @@ func (s *Service) CancelScheduled(ctx context.Context, id, senderID uuid.UUID) e
 }
 
 /*
+ScheduledDelivery is what sending a due message needs from outside this package.
+
+A scheduled message is an ordinary message sent late, so it passes the checks
+an ordinary one does and is followed by what follows one — delivery to the
+people reading, notifications, search, webhooks. Those live with the HTTP
+server rather than here, so they are handed in.
+*/
+type ScheduledDelivery struct {
+	// Bind ties the message's files to it once it exists.
+	Bind AttachmentBinder
+	// MayPost is asked at send time, as it is when somebody posts directly:
+	// a ban, a restriction or a withdrawn permission made after scheduling
+	// stops the message as it would have stopped them typing it.
+	MayPost func(ctx context.Context, roomID, senderID uuid.UUID) error
+	// Sent is told about each message once it is out.
+	Sent func(ctx context.Context, event dbgen.Event, row dbgen.ScheduledMessage)
+}
+
+/*
 DeliverDue sends whatever is ready, returning how many it sent.
 
-Called on a timer. The query takes a row lock and skips what is already locked,
-so several servers can run this at once without any message being sent twice —
-which is the failure that matters here, since an unsent message can be sent on
-the next pass but a message sent twice cannot be unsent.
+Called on a timer, on every server. Each pass claims the rows it will send in
+the statement that finds them, so several servers can run this at once without
+any message being sent twice — which is the failure that matters here, since an
+unsent message can be sent on the next pass but a message sent twice cannot be
+unsent.
 
-A message whose room or membership has changed since it was scheduled is
-recorded as failed rather than retried: somebody who has left a channel should
-not have a message appear in it a week later.
+A message whose room, membership or permission has changed since it was
+scheduled is recorded as failed rather than retried: somebody who has left a
+channel should not have a message appear in it a week later.
 */
 func (s *Service) DeliverDue(
 	ctx context.Context,
 	limit int32,
-	bind AttachmentBinder,
+	delivery ScheduledDelivery,
 	log *slog.Logger,
 ) (int, error) {
 	if limit <= 0 {
 		limit = 50
 	}
 
-	due, err := s.store.ListDueScheduledMessages(ctx, limit)
+	due, err := s.store.ClaimDueScheduledMessages(ctx, limit)
 	if err != nil {
-		return 0, fmt.Errorf("read due messages: %w", err)
+		return 0, fmt.Errorf("claim due messages: %w", err)
 	}
+	// RETURNING keeps no order, and two messages due in the same pass should
+	// arrive in the order they were meant to.
+	slices.SortFunc(due, func(a, b dbgen.ScheduledMessage) int { return a.SendAt.Compare(b.SendAt) })
 
 	sent := 0
 	for _, row := range due {
-		event, err := s.deliver(ctx, row, bind)
+		event, err := s.deliver(ctx, row, delivery)
 		if err != nil {
 			// Recorded rather than retried forever. The sender can see why.
 			if markErr := s.store.MarkScheduledMessageFailed(ctx,
@@ -181,9 +205,12 @@ func (s *Service) DeliverDue(
 			SentEventID: &event.ID,
 		}); err != nil {
 			// The message is out. Failing to record that is worth logging
-			// loudly, since the next pass would otherwise send it again.
+			// loudly, since a pass after the claim expires would send it again.
 			log.Error("a scheduled message was sent but not recorded as sent",
 				"id", row.ID, "eventId", event.ID, "error", err)
+		}
+		if delivery.Sent != nil {
+			delivery.Sent(ctx, event, row)
 		}
 		sent++
 	}
@@ -210,13 +237,18 @@ type AttachmentBinder func(
 func (s *Service) deliver(
 	ctx context.Context,
 	row dbgen.ScheduledMessage,
-	bind AttachmentBinder,
+	delivery ScheduledDelivery,
 ) (dbgen.Event, error) {
 	// Membership is checked again at send time, not only when scheduling: a
 	// week is long enough to leave a channel, be removed from one, or have the
 	// room archived.
 	if _, err := s.RequireMembership(ctx, row.RoomID, row.SenderID); err != nil {
 		return dbgen.Event{}, err
+	}
+	if delivery.MayPost != nil {
+		if err := delivery.MayPost(ctx, row.RoomID, row.SenderID); err != nil {
+			return dbgen.Event{}, err
+		}
 	}
 
 	threadRootID := ""
@@ -243,8 +275,8 @@ func (s *Service) deliver(
 	// Bound after the event exists, since that is what they attach to. A
 	// failure here leaves the message sent without its files rather than
 	// unsent, which is the better of the two: the words arrived.
-	if bind != nil && len(row.AttachmentIds) > 0 {
-		if _, bindErr := bind(ctx, event.ID, row.RoomID, row.SenderID, row.AttachmentIds); bindErr != nil {
+	if delivery.Bind != nil && len(row.AttachmentIds) > 0 {
+		if _, bindErr := delivery.Bind(ctx, event.ID, row.RoomID, row.SenderID, row.AttachmentIds); bindErr != nil {
 			return event, nil
 		}
 	}

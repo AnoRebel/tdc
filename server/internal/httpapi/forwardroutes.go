@@ -57,6 +57,9 @@ func (s *Server) handleForward(c *echo.Context) error {
 	if decision := currentPermissions(c).AllowsChannel(authz.PermChannelPost, toRoomID); !decision.Allowed {
 		return echo.NewHTTPError(http.StatusForbidden, decision.Error())
 	}
+	if err := s.mayPost(c.Request().Context(), toRoomID, user.ID); err != nil {
+		return err
+	}
 
 	event, err := s.rooms.Forward(
 		c.Request().Context(), fromRoomID, toRoomID, user.ID,

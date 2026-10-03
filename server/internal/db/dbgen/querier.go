@@ -54,6 +54,14 @@ type Querier interface {
 	BlockUser(ctx context.Context, arg BlockUserParams) error
 	// Everything still waiting for a subscription that has been turned off.
 	CancelPendingWebhookDeliveries(ctx context.Context, subscriptionID *uuid.UUID) (int64, error)
+	// What is ready to send, claimed by whoever asked.
+	//
+	// One statement, so finding a row and claiming it cannot be separated: SKIP
+	// LOCKED keeps a concurrent pass off the rows this one is claiming, and the
+	// claim keeps every later pass off them until it expires. Five minutes is far
+	// longer than sending a batch takes, and short enough that a message held by a
+	// server that stopped goes out soon after.
+	ClaimDueScheduledMessages(ctx context.Context, limit int32) ([]ScheduledMessage, error)
 	// Claiming by the state the client already holds, for a client with no browser
 	// to receive the redirect. Consumed as it is read, exactly as the handle is.
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
@@ -352,6 +360,8 @@ type Querier interface {
 	KnownPeers(ctx context.Context) ([]KnownPeersRow, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
+	// Within the channel the request names, so lifting by identifier cannot reach a
+	// restriction made somewhere else.
 	LiftPostingRestriction(ctx context.Context, arg LiftPostingRestrictionParams) (int64, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
 	// Never the hash. What this returns is what a person is shown, and the token
@@ -383,12 +393,6 @@ type Querier interface {
 	ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]ListChannelBansRow, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
-	// What is ready to send.
-	//
-	// FOR UPDATE SKIP LOCKED so more than one server can run the delivery pass
-	// without sending the same message twice: whoever locks a row owns it, and the
-	// others move on rather than waiting.
-	ListDueScheduledMessages(ctx context.Context, limit int32) ([]ScheduledMessage, error)
 	// What an account posted, for removing it with the application it acted for.
 	ListEventIDsBySender(ctx context.Context, senderID *uuid.UUID) ([]ListEventIDsBySenderRow, error)
 	// Every grant a user holds, across all their roles. One query rather than one
@@ -428,6 +432,8 @@ type Querier interface {
 	ListPinnedMessages(ctx context.Context, roomID uuid.UUID) ([]ListPinnedMessagesRow, error)
 	ListPinnedRooms(ctx context.Context, userID uuid.UUID) ([]ListPinnedRoomsRow, error)
 	ListPostingRestrictions(ctx context.Context, limit int32) ([]ListPostingRestrictionsRow, error)
+	// Who is currently silenced in one channel.
+	ListPostingRestrictionsInRoom(ctx context.Context, roomID *uuid.UUID) ([]ListPostingRestrictionsInRoomRow, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
 	ListPushSubscriptions(ctx context.Context, userID uuid.UUID) ([]PushSubscription, error)
 	// Every reaction on a set of messages, for drawing a timeline.

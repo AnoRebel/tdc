@@ -42,6 +42,32 @@ func (s *Server) mayPost(ctx context.Context, roomID, userID uuid.UUID) error {
 }
 
 /*
+requirePosting refuses a request that would put words into the channel the
+route names, from somebody who may not.
+
+channel.post and mayPost together, on every route that does it — sending,
+replying, editing, scheduling — rather than in each handler. The handler that
+forgets is the way round a restriction: a reply in a thread is as audible as a
+message, and an edit can replace a word with a paragraph.
+*/
+func (s *Server) requirePosting() echo.MiddlewareFunc {
+	permission := requireChannelPermission(authz.PermChannelPost)
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return permission(func(c *echo.Context) error {
+			user, _ := currentUser(c)
+			roomID, err := uuid.Parse(c.Param("id"))
+			if err != nil {
+				return next(c)
+			}
+			if err := s.mayPost(c.Request().Context(), roomID, user.ID); err != nil {
+				return err
+			}
+			return next(c)
+		})
+	}
+}
+
+/*
 mayContactAll reports whether somebody may open a conversation with everybody
 in it.
 

@@ -253,11 +253,11 @@ func (s *Server) routes() {
 		decides, and a refusal comes from a server this one does not control.
 	*/
 	rooms.POST("/:id/remote/join", s.handleJoinRemoteRoom)
-	rooms.POST("/:id/remote/messages", s.handleSendToRemoteRoom, requireChannelPermission(authz.PermChannelPost))
+	rooms.POST("/:id/remote/messages", s.handleSendToRemoteRoom, s.requirePosting())
 	rooms.GET("/:id/members", s.handleRoomMembers, requireChannelPermission(authz.PermChannelRead))
 	rooms.GET("/:id/timeline", s.handleRoomTimeline, requireChannelPermission(authz.PermChannelRead))
-	rooms.POST("/:id/messages", s.handleSendMessage, requireChannelPermission(authz.PermChannelPost))
-	rooms.PATCH("/:id/messages/:eventId", s.handleEditMessage, requireChannelPermission(authz.PermChannelPost))
+	rooms.POST("/:id/messages", s.handleSendMessage, s.requirePosting())
+	rooms.PATCH("/:id/messages/:eventId", s.handleEditMessage, s.requirePosting())
 	// When a message expires. Its sender's to set, or a moderator's, and only
 	// ever shorter than it already is.
 	rooms.PUT("/:id/messages/:eventId/lifetime", s.handleSetMessageLifetime)
@@ -272,6 +272,14 @@ func (s *Server) routes() {
 	rooms.POST("/:id/bans", s.handleBanFromChannel,
 		requirePermission(authz.PermModerationRestrict))
 	rooms.DELETE("/:id/bans/:userId", s.handleLiftChannelBan,
+		requirePermission(authz.PermModerationRestrict))
+
+	// Posting restrictions: in the channel and reading it, but silenced.
+	rooms.GET("/:id/restrictions", s.handleListRestrictions,
+		requirePermission(authz.PermModerationRestrict))
+	rooms.POST("/:id/restrictions", s.handleRestrictPosting,
+		requirePermission(authz.PermModerationRestrict))
+	rooms.DELETE("/:id/restrictions/:restrictionId", s.handleLiftRestriction,
 		requirePermission(authz.PermModerationRestrict))
 
 	// Invitations to a channel. Issuing takes the invite permission, since an
@@ -313,9 +321,9 @@ func (s *Server) routes() {
 	// Messages written now and sent later.
 	rooms.POST("/:id/scheduled", s.handleScheduleMessage,
 		s.requireFeature(settings.FeatureScheduledMessages),
-		requireChannelPermission(authz.PermChannelPost))
+		s.requirePosting())
 	rooms.GET("/:id/threads/:eventId", s.handleThread, requireChannelPermission(authz.PermChannelRead))
-	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread, requireChannelPermission(authz.PermChannelPost))
+	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread, s.requirePosting())
 	rooms.POST("/:id/read", s.handleMarkRead)
 	rooms.GET("/:id/presence", s.handleRoomPresence, requireChannelPermission(authz.PermChannelRead))
 	rooms.POST("/:id/typing", s.handleStartTyping)

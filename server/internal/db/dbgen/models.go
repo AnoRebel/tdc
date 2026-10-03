@@ -460,6 +460,7 @@ type ScheduledMessage struct {
 	CreatedAt     time.Time
 	SentEventID   *string
 	FailedReason  string
+	ClaimedUntil  *time.Time
 }
 
 type SchemaVersion struct {

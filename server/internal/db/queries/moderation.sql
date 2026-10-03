@@ -44,9 +44,20 @@ INSERT INTO posting_restrictions (
 RETURNING *;
 
 -- name: LiftPostingRestriction :execrows
+-- Within the channel the request names, so lifting by identifier cannot reach a
+-- restriction made somewhere else.
 UPDATE posting_restrictions
 SET lifted_at = now(), lifted_by = $2
-WHERE id = $1 AND lifted_at IS NULL;
+WHERE id = $1 AND room_id = $3 AND lifted_at IS NULL;
+
+-- name: ListPostingRestrictionsInRoom :many
+-- Who is currently silenced in one channel.
+SELECT r.*, u.username
+FROM posting_restrictions r
+JOIN users u ON u.id = r.user_id
+WHERE r.room_id = $1
+  AND r.lifted_at IS NULL AND (r.expires_at IS NULL OR r.expires_at > now())
+ORDER BY r.created_at DESC;
 
 -- name: IsPostingRestricted :one
 -- A restriction on this channel, or one on the whole server.

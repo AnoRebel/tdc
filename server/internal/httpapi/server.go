@@ -380,6 +380,10 @@ func (s *Server) Run(ctx context.Context) error {
 	// context, and what a worker was sending when it stopped is recorded.
 	go s.RunDeliveries(ctx)
 
+	// Messages written earlier and sent now. Every node runs a pass; each
+	// claims what it sends, so nothing goes out twice.
+	go s.RunScheduled(ctx)
+
 	serveErr := make(chan error, 1)
 	go func() {
 		s.log.Info("server listening",

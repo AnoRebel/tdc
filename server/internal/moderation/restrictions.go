@@ -176,16 +176,57 @@ func (s *Service) RestrictPosting(
 	return row.ID, nil
 }
 
-// LiftRestriction ends a restriction early.
-func (s *Service) LiftRestriction(ctx context.Context, id, by uuid.UUID) error {
-	_, err := s.queries.LiftPostingRestriction(ctx, dbgen.LiftPostingRestrictionParams{
+// ErrNoSuchRestriction is returned for lifting a restriction that is not in
+// force in the channel named.
+var ErrNoSuchRestriction = errors.New("moderation: no such restriction")
+
+// Restriction is somebody silenced in a channel.
+type Restriction struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Username     string
+	RestrictedBy string
+	Reason       string
+	ExpiresAt    *time.Time
+	CreatedAt    time.Time
+}
+
+// LiftRestriction ends a restriction early, within the channel it was made in.
+func (s *Service) LiftRestriction(ctx context.Context, id, roomID, by uuid.UUID) error {
+	lifted, err := s.queries.LiftPostingRestriction(ctx, dbgen.LiftPostingRestrictionParams{
 		ID:       id,
 		LiftedBy: &by,
+		RoomID:   &roomID,
 	})
 	if err != nil {
 		return fmt.Errorf("moderation: lifting a restriction: %w", err)
 	}
+	if lifted == 0 {
+		return ErrNoSuchRestriction
+	}
 	return nil
+}
+
+// RestrictionsIn lists who is currently silenced in a channel.
+func (s *Service) RestrictionsIn(ctx context.Context, roomID uuid.UUID) ([]Restriction, error) {
+	rows, err := s.queries.ListPostingRestrictionsInRoom(ctx, &roomID)
+	if err != nil {
+		return nil, fmt.Errorf("moderation: listing restrictions: %w", err)
+	}
+
+	restrictions := make([]Restriction, 0, len(rows))
+	for _, row := range rows {
+		restrictions = append(restrictions, Restriction{
+			ID:           row.ID,
+			UserID:       row.UserID,
+			Username:     row.Username,
+			RestrictedBy: row.RestrictedByAddress,
+			Reason:       row.Reason,
+			ExpiresAt:    row.ExpiresAt,
+			CreatedAt:    row.CreatedAt,
+		})
+	}
+	return restrictions, nil
 }
 
 /*

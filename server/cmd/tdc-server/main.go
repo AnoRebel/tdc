@@ -360,11 +360,6 @@ func run() error {
 		Recovery:     recoveryService,
 	}
 
-	// Messages written now and sent later. The pass takes a row lock and skips
-	// what is already locked, so running more than one server does not send
-	// anything twice.
-	go deliverScheduledPeriodically(ctx, services.Rooms, services.Attachments, log)
-
 	server := httpapi.New(httpapi.Config{
 		// Described once at startup: the values cannot change without a
 		// restart, so re-resolving them per request would report the same
@@ -512,43 +507,6 @@ func sweepPeriodically(ctx context.Context, service *presence.Service, log *slog
 				// indicator lingers until the next one, not that the server
 				// cannot serve.
 				log.Error("presence sweep failed", slog.String("error", err.Error()))
-			}
-		}
-	}
-}
-
-/*
-scheduleInterval is how often due messages are looked for.
-
-A minute rather than a second: somebody scheduling a message for tomorrow
-morning does not care about the difference, and the query runs against an index
-of exactly what is due, so a pass that finds nothing costs almost nothing.
-*/
-const scheduleInterval = time.Minute
-
-// deliverScheduledPeriodically sends messages that have come due.
-func deliverScheduledPeriodically(
-	ctx context.Context,
-	roomService *rooms.Service,
-	attachmentService *attachments.Service,
-	log *slog.Logger,
-) {
-	ticker := time.NewTicker(scheduleInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			sent, err := roomService.DeliverDue(ctx, 50, attachmentService.Bind, log)
-			if err != nil && ctx.Err() == nil {
-				// Logged rather than fatal: a failed pass means a message goes
-				// out on the next one, not that the server cannot serve.
-				log.Error("scheduled delivery failed", slog.String("error", err.Error()))
-			}
-			if sent > 0 {
-				log.Info("sent scheduled messages", "count", sent)
 			}
 		}
 	}

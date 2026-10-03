@@ -421,12 +421,8 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
-	// A ban or a posting restriction stops a message before it is accepted.
-	// Both are separate from membership: somebody restricted is still in the
-	// channel and still reading it.
-	if err := s.mayPost(ctx, roomID, user.ID); err != nil {
-		return err
-	}
+	// A ban or a posting restriction has already stopped this, in
+	// requirePosting, as it has every other way of posting.
 
 	var request sendMessageRequest
 	if err := c.Bind(&request); err != nil {
@@ -478,16 +474,28 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		}
 	}
 
+	s.afterMessage(ctx, event, request.Body)
+
+	return c.JSON(http.StatusCreated, s.withAttachments(ctx, messageResponseOf(event)))
+}
+
+/*
+afterMessage is what follows a message being stored, however it was sent — by
+somebody now, or by the scheduler on their behalf.
+
+body is what the sender wrote, before any masking, which is what search and
+mentions are worked out from.
+*/
+func (s *Server) afterMessage(ctx context.Context, event dbgen.Event, body string) {
 	// Neither of these blocks the response. The message is already stored,
 	// which is the part that matters; making somebody wait for a search index
 	// and a set of badges before their message appears is a cost paid on every
 	// send for something nobody is watching.
-	body := request.Body
 	s.inBackground(ctx, "index", func(ctx context.Context) {
 		s.indexForSearch(ctx, event, body)
 	})
 	s.inBackground(ctx, "notify", func(ctx context.Context) {
-		s.notifyRecipients(ctx, event, body, roomID)
+		s.notifyRecipients(ctx, event, body, event.RoomID)
 	})
 
 	// Delivered after it is stored, so a client that misses the live frame
@@ -495,8 +503,6 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 	// path: it is an in-memory fan-out, and doing it later would mean the
 	// sender's own client sees its message arrive after the response.
 	s.publishEvent(ctx, event)
-
-	return c.JSON(http.StatusCreated, s.withAttachments(ctx, messageResponseOf(event)))
 }
 
 type editMessageRequest struct {

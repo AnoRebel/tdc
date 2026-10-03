@@ -5,17 +5,25 @@ INSERT INTO scheduled_messages (
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
--- name: ListDueScheduledMessages :many
--- What is ready to send.
+-- name: ClaimDueScheduledMessages :many
+-- What is ready to send, claimed by whoever asked.
 --
--- FOR UPDATE SKIP LOCKED so more than one server can run the delivery pass
--- without sending the same message twice: whoever locks a row owns it, and the
--- others move on rather than waiting.
-SELECT * FROM scheduled_messages
-WHERE send_at <= now() AND sent_event_id IS NULL AND failed_reason = ''
-ORDER BY send_at
-LIMIT $1
-FOR UPDATE SKIP LOCKED;
+-- One statement, so finding a row and claiming it cannot be separated: SKIP
+-- LOCKED keeps a concurrent pass off the rows this one is claiming, and the
+-- claim keeps every later pass off them until it expires. Five minutes is far
+-- longer than sending a batch takes, and short enough that a message held by a
+-- server that stopped goes out soon after.
+UPDATE scheduled_messages
+SET claimed_until = now() + interval '5 minutes'
+WHERE id IN (
+    SELECT id FROM scheduled_messages
+    WHERE send_at <= now() AND sent_event_id IS NULL AND failed_reason = ''
+      AND (claimed_until IS NULL OR claimed_until < now())
+    ORDER BY send_at
+    LIMIT $1
+    FOR UPDATE SKIP LOCKED
+)
+RETURNING *;
 
 -- name: MarkScheduledMessageSent :exec
 UPDATE scheduled_messages SET sent_event_id = $2 WHERE id = $1;

@@ -1,12 +1,14 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 )
 
@@ -83,19 +85,7 @@ func (s *Server) handleReplyInThread(c *echo.Context) error {
 		s.log.Error("cannot withdraw typing indication", "error", err)
 	}
 
-	// Whoever started the thread hears about a reply in it, which is the
-	// notification a threaded conversation lives on: without it a thread is
-	// only found by going back and looking.
-	if s.notify != nil && reply.ThreadRootID != nil {
-		if root, err := s.rooms.EventInRoom(ctx, roomID, *reply.ThreadRootID); err == nil &&
-			root.SenderID != nil {
-			s.notify.About(ctx, *root.SenderID, user.ID,
-				s.rooms.UserAddress(user.Username), roomID, reply.ID,
-				notify.ReasonReply, "")
-		}
-	}
-
-	s.publishEvent(ctx, reply)
+	s.afterReply(ctx, reply, user.ID, s.rooms.UserAddress(user.Username))
 	return c.JSON(http.StatusCreated, messageResponseOf(reply))
 }
 
@@ -422,4 +412,21 @@ func (s *Server) handleThreadSummaries(c *echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, response)
+}
+
+// afterReply is what follows a reply in a thread being stored, however it was
+// sent — by somebody now, or by the scheduler on their behalf.
+func (s *Server) afterReply(ctx context.Context, reply dbgen.Event, senderID uuid.UUID, senderAddress string) {
+	// Whoever started the thread hears about a reply in it, which is the
+	// notification a threaded conversation lives on: without it a thread is
+	// only found by going back and looking.
+	if s.notify != nil && reply.ThreadRootID != nil {
+		if root, err := s.rooms.EventInRoom(ctx, reply.RoomID, *reply.ThreadRootID); err == nil &&
+			root.SenderID != nil {
+			s.notify.About(ctx, *root.SenderID, senderID, senderAddress,
+				reply.RoomID, reply.ID, notify.ReasonReply, "")
+		}
+	}
+
+	s.publishEvent(ctx, reply)
 }

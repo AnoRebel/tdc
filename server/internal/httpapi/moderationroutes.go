@@ -145,6 +145,124 @@ func (s *Server) handleListChannelBans(c *echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
+// restrictionResponse is somebody silenced in a channel.
+type restrictionResponse struct {
+	ID           string `json:"id"`
+	UserID       string `json:"userId"`
+	Username     string `json:"username"`
+	RestrictedBy string `json:"restrictedBy"`
+	Reason       string `json:"reason"`
+	ExpiresAt    string `json:"expiresAt,omitempty"`
+	CreatedAt    string `json:"createdAt"`
+}
+
+/*
+handleRestrictPosting silences somebody in one channel without removing them.
+
+The proportionate response to somebody arguing rather than attacking: they keep
+reading the conversation they are part of and stop adding to it, for as long as
+the moderator says. The request has the same shape as a ban's, because it is
+the same decision made more gently.
+*/
+func (s *Server) handleRestrictPosting(c *echo.Context) error {
+	actor, _ := currentUser(c)
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	var request banRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	target, err := uuid.Parse(request.User)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "that is not a person")
+	}
+
+	var until *time.Time
+	if request.Hours > 0 {
+		expiry := time.Now().Add(time.Duration(request.Hours) * time.Hour)
+		until = &expiry
+	}
+
+	id, err := s.moderation.RestrictPosting(c.Request().Context(), target, &roomID, actor.ID,
+		s.rooms.UserAddress(actor.Username), request.Reason, until)
+	if errors.Is(err, moderation.ErrReasonRequired) {
+		return echo.NewHTTPError(http.StatusBadRequest, "a reason is required")
+	}
+	if err != nil {
+		return err
+	}
+
+	s.recordModeration(c, actor, audit.ActionPostingRestricted, "room", roomID.String(),
+		map[string]any{
+			"user":   target.String(),
+			"reason": request.Reason,
+			"hours":  request.Hours,
+		})
+
+	return c.JSON(http.StatusCreated, map[string]string{"id": id.String()})
+}
+
+func (s *Server) handleLiftRestriction(c *echo.Context) error {
+	actor, _ := currentUser(c)
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+	id, err := uuid.Parse(c.Param("restrictionId"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such restriction")
+	}
+
+	err = s.moderation.LiftRestriction(c.Request().Context(), id, roomID, actor.ID)
+	if errors.Is(err, moderation.ErrNoSuchRestriction) {
+		return echo.NewHTTPError(http.StatusNotFound, "no such restriction")
+	}
+	if err != nil {
+		return err
+	}
+
+	s.recordModeration(c, actor, audit.ActionRestrictionLifted, "room", roomID.String(),
+		map[string]any{"restriction": id.String()})
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// handleListRestrictions shows who is currently silenced in a channel.
+func (s *Server) handleListRestrictions(c *echo.Context) error {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	restrictions, err := s.moderation.RestrictionsIn(c.Request().Context(), roomID)
+	if err != nil {
+		return err
+	}
+
+	response := make([]restrictionResponse, 0, len(restrictions))
+	for _, restriction := range restrictions {
+		item := restrictionResponse{
+			ID:           restriction.ID.String(),
+			UserID:       restriction.UserID.String(),
+			Username:     restriction.Username,
+			RestrictedBy: restriction.RestrictedBy,
+			Reason:       restriction.Reason,
+			CreatedAt:    restriction.CreatedAt.UTC().Format(time.RFC3339),
+		}
+		if restriction.ExpiresAt != nil {
+			item.ExpiresAt = restriction.ExpiresAt.UTC().Format(time.RFC3339)
+		}
+		response = append(response, item)
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
 type blockRequest struct {
 	User string `json:"user"`
 }
