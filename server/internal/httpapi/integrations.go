@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/applications"
+	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/delivery"
 	"github.com/AnoRebel/tdc/server/internal/notify"
@@ -131,10 +132,18 @@ func (s *Server) queueWebhooks(ctx context.Context, event dbgen.Event) {
 }
 
 // canRead is whether somebody can read a channel right now, which is what
-// every webhook decision about a channel turns on.
+// every webhook decision about a channel turns on: they can see it, and
+// channel.read has not been withdrawn from them there. Without the second, a
+// webhook would go on carrying a channel to somebody it had been closed to.
 func (s *Server) canRead(ctx context.Context, roomID, userID uuid.UUID) bool {
-	_, err := s.rooms.Visible(ctx, roomID, userID)
-	return err == nil
+	if _, err := s.rooms.Visible(ctx, roomID, userID); err != nil {
+		return false
+	}
+	if s.authz == nil {
+		return true
+	}
+	permissions, err := s.authz.PermissionsFor(ctx, userID)
+	return err == nil && permissions.AllowsChannel(authz.PermChannelRead, roomID).Allowed
 }
 
 // tellOwnerWebhookDisabled raises the notification that a webhook was turned

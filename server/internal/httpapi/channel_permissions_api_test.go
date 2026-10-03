@@ -248,3 +248,24 @@ func TestALiveSubscriptionNeedsChannelRead(t *testing.T) {
 		}
 	}
 }
+
+// A webhook is a way of reading, so a channel closed to somebody cannot be
+// subscribed to by them either.
+func TestAWebhookNeedsChannelRead(t *testing.T) {
+	handler := newTestAPI(t)
+	admin := completeSetup(t, handler)
+
+	staff := makeRoom(t, handler, admin, "staff", "public")
+	member := registerAndSignIn(t, handler, "amina")
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+staff+"/join", nil, member, http.StatusOK)
+
+	withdraw(t, handler, admin, "channel.read", staff)
+
+	recorder := call(t, handler, http.MethodPost, "/api/me/webhooks", map[string]any{
+		"roomId": staff, "label": "listener", "url": "https://example.org/hook",
+		"eventTypes": []string{"message.sent"},
+	}, member)
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("subscribing to a channel whose channel.read was withdrawn: status %d, want 404", recorder.Code)
+	}
+}
