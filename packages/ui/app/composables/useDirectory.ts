@@ -6,10 +6,14 @@ import type {
   DirectoryVisibility,
   Engagement,
   Enquiry,
+  Negotiation,
   OwnProfile,
   ProfileClaims,
   ProfileDocument,
   ProfileView,
+  ProposalDraft,
+  ProposalResponseKind,
+  ProposalVersion,
   QueuedSkill,
   Skill,
 } from "@tdc/types";
@@ -237,7 +241,55 @@ export function useDirectory() {
     return api.post<Engagement>(`/api/directory/engagements/${id}/withdraw`, { reason });
   }
 
+  /** Everything proposed and answered on an engagement, and the agreement. */
+  function negotiation(id: string) {
+    return api.get<Negotiation>(`/api/directory/engagements/${id}/proposals`);
+  }
+
+  /** Sends a proposal, or a new version of it. */
+  function propose(id: string, draft: ProposalDraft) {
+    return api.post<ProposalVersion>(`/api/directory/engagements/${id}/proposals`, draft);
+  }
+
+  /** Answers the latest version: accept, decline, or ask for a change to one part. */
+  function respond(
+    id: string,
+    versionId: string,
+    kind: ProposalResponseKind,
+    part = "",
+    comment = "",
+  ) {
+    return api.post<Engagement>(
+      `/api/directory/engagements/${id}/proposals/${versionId}/responses`,
+      { kind, part, comment },
+    );
+  }
+
+  function startWork(id: string) {
+    return api.post<Engagement>(`/api/directory/engagements/${id}/start`);
+  }
+
+  function requestCompletion(id: string, note: string) {
+    return api.post<Engagement>(`/api/directory/engagements/${id}/complete`, { note });
+  }
+
+  function confirmCompletion(id: string) {
+    return api.post<Engagement>(`/api/directory/engagements/${id}/confirm-completion`);
+  }
+
+  /** The agreement as a document either party keeps. */
+  function exportAgreement(id: string) {
+    return api.get<Record<string, unknown>>(`/api/directory/engagements/${id}/agreement/export`);
+  }
+
   return {
+    negotiation,
+    propose,
+    respond,
+    startWork,
+    requestCompletion,
+    confirmCompletion,
+    exportAgreement,
     acceptEnquiry,
     declineEnquiry,
     withdrawEnquiry,

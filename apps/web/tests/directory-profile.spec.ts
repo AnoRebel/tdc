@@ -26,7 +26,9 @@ test.describe.configure({ mode: "serial" });
 
 test("a profile is created, edited and restricted on a phone", async ({ page, request }) => {
   const founder = await founderWithDirectory(request);
-  await account(request, developer);
+  const asDeveloper = await account(request, developer);
+  // Other specs give this person a profile too; this one starts without.
+  await request.delete("/api/directory/me", { headers: asDeveloper });
 
   await signInAs(page, developer);
   await page.goto("/directory/profile");

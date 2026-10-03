@@ -436,6 +436,13 @@ short version:
 - **Taking up an enquiry makes it an engagement**, with a private conversation
   and a recorded state you both see. Either of you can withdraw before an
   agreement.
+- **A proposal is versioned and an agreement needs you both.** Asking for a
+  change to one line gets you a new version, with the old one kept as it was;
+  the agreement is recorded only when you both accept the same version, and
+  cannot be changed afterwards. Either of you can export it. The server keeps
+  the record and nothing more: it holds no money and settles no disputes.
+- **Finished work needs both of you too.** One says it is complete; it stays
+  outstanding until the other confirms.
 - **A company can ask to list you; only you can accept**, from your profile
   page. Leave, and it is gone from both the company's page and your profile at
   once.

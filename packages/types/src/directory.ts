@@ -297,3 +297,59 @@ export interface CompanyAssociation {
   invitedAt: string;
   acceptedAt?: string;
 }
+
+/** One deliverable in a proposal, priced in whole minor units of its currency. */
+export interface LineItem {
+  description: string;
+  amountMinor: number;
+}
+
+/** A proposal as somebody writes it. */
+export interface ProposalDraft {
+  scope: string;
+  timeline: string;
+  lineItems: LineItem[];
+  /** An ISO 4217 code, such as TZS. */
+  currency: string;
+}
+
+/** One sent version of a proposal. Never changed once sent. */
+export interface ProposalVersion extends ProposalDraft {
+  id: string;
+  version: number;
+  sentBy: string;
+  totalMinor: number;
+  sentAt: string;
+}
+
+/** How somebody answered a version. */
+export type ProposalResponseKind = "accept" | "decline" | "request_changes";
+
+/** One answer to one version. */
+export interface ProposalResponse {
+  version: number;
+  responder: string;
+  kind: ProposalResponseKind;
+  /** What a change request is about: "scope", "timeline", "currency" or "item:N". */
+  part?: string;
+  comment?: string;
+  at: string;
+}
+
+/** The terms both parties accepted, and when each did. */
+export interface Agreement {
+  version: number;
+  clientAcceptedAt: string;
+  developerAcceptedAt: string;
+  terms: ProposalVersion;
+  recordedAt: string;
+}
+
+/** Everything proposed and answered on one engagement. */
+export interface Negotiation {
+  versions: ProposalVersion[];
+  responses: ProposalResponse[];
+  agreement?: Agreement;
+  /** What the server is and is not, shown wherever an agreement is. */
+  disclosure: string;
+}

@@ -25,8 +25,10 @@ const proposed = `Odoo ${Date.now().toString(36)}`;
 
 test("skills and availability make a developer findable", async ({ page, request, browser }) => {
   await founderWithDirectory(request);
-  await account(request, developer);
+  const asDeveloper = await account(request, developer);
   await account(request, client);
+  // Other specs give this person a profile too; this one writes it from nothing.
+  await request.delete("/api/directory/me", { headers: asDeveloper });
 
   await signInAs(page, developer);
   await page.goto("/directory/profile");
