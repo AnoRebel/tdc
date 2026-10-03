@@ -80,7 +80,14 @@ export function whenBriefly(value: string | number | Date, timeZone?: string): s
   const at = instant(value);
   const now = new Date();
 
-  if (isSameDay(at, now)) return atTime(at, timeZone);
-  if (isSameYear(at, now)) return onDayAtTime(at, timeZone);
+  /*
+   * "Today" in the zone being shown, not the zone the process happens to run
+   * in. They differ whenever a zone is given — two in the morning in Dar es
+   * Salaam is still yesterday in UTC — and comparing in one zone while
+   * formatting in the other printed a bare time for something from yesterday.
+   */
+  const where = zone(timeZone);
+  if (isSameDay(at, now, where)) return atTime(at, timeZone);
+  if (isSameYear(at, now, where)) return onDayAtTime(at, timeZone);
   return fully(at, timeZone);
 }

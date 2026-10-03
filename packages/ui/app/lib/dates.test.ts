@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   atTime,
@@ -156,9 +156,34 @@ describe("how long ago", () => {
 });
 
 describe("the shortest thing that still says when", () => {
+  /*
+   * The clock is fixed: "an hour ago" is yesterday for an hour every night,
+   * and a test that reads the real clock fails only in that hour.
+   */
+  afterEach(() => vi.useRealTimers());
+
   it("gives only the time for something today", () => {
-    const earlier = new Date(Date.now() - 60 * 60 * 1000);
-    expect(whenBriefly(earlier, DAR)).toMatch(/^\d{2}:\d{2}$/);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-08T12:00:00+03:00")); // noon in Dar es Salaam
+
+    const earlier = new Date("2026-09-08T11:00:00+03:00");
+    expect(whenBriefly(earlier, DAR)).toBe("11:00");
+  });
+
+  /*
+   * Whether something was today is decided in the zone being shown.
+   *
+   * 01:30 in Dar es Salaam on the 9th is 22:30 UTC on the 8th. Read at 08:00
+   * Dar es Salaam on the 9th, it is earlier today there — and yesterday in
+   * UTC, where the machine running this may well be.
+   */
+  it("decides today in the zone it shows, not the machine's", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T08:00:00+03:00"));
+
+    const smallHours = new Date("2026-09-09T01:30:00+03:00");
+    expect(whenBriefly(smallHours, DAR)).toBe("01:30");
+    expect(whenBriefly(smallHours, "UTC")).toBe("8 Sep 22:30");
   });
 
   it("adds the year only once it is not this one", () => {
