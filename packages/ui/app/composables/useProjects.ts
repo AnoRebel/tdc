@@ -1,6 +1,12 @@
 import type {
   Board,
   BoardColumn,
+  BoardFilter,
+  BulkChange,
+  BulkResult,
+  OpenedView,
+  SavedView,
+  ViewFilter,
   DiscussionSearchResult,
   Issue,
   IssueHistoryEntry,
@@ -158,10 +164,46 @@ export function useProjects() {
       api.post<Issue>(`${issueAt(ref)}/state`, { stateId, expectedStateId }),
     history: (ref: string) => api.get<IssueHistoryEntry[]>(`${issueAt(ref)}/history`),
 
-    /** Every state's first page of cards. */
-    board: (key: string) => api.get<Board>(`${at(key)}/board`),
+    /** Every state's first page of cards, narrowed by the filter if given. */
+    board: (key: string, filter: BoardFilter = {}) => {
+      const query = boardQuery(filter).toString();
+      return api.get<Board>(`${at(key)}/board${query ? `?${query}` : ""}`);
+    },
     /** More of one column, after the cursor its last page gave. */
-    column: (key: string, stateId: string, after: string) =>
-      api.get<BoardColumn>(`${at(key)}/board/${stateId}?${new URLSearchParams({ after })}`),
+    column: (key: string, stateId: string, after: string, filter: BoardFilter = {}) => {
+      const query = boardQuery(filter);
+      query.set("after", after);
+      return api.get<BoardColumn>(`${at(key)}/board/${stateId}?${query}`);
+    },
+
+    /** Saved views: one project's, or those across projects when key is null. */
+    views: (key: string | null) => api.get<SavedView[]>(key ? `${at(key)}/views` : "/api/views"),
+    saveView: (
+      key: string | null,
+      view: { name: string; layout: "list" | "board"; filter: ViewFilter; shared: boolean },
+    ) => api.post<SavedView>(key ? `${at(key)}/views` : "/api/views", view),
+    updateView: (
+      id: string,
+      view: { name: string; layout: "list" | "board"; filter: ViewFilter; shared: boolean },
+    ) => api.patch<SavedView>(`/api/views/${encodeURIComponent(id)}`, view),
+    deleteView: (id: string) => api.delete<void>(`/api/views/${encodeURIComponent(id)}`),
+    /** Opens a view as the requester: its results are what they may see. */
+    openView: (id: string) => api.get<OpenedView>(`/api/views/${encodeURIComponent(id)}/results`),
+
+    /**
+     * Makes one change to many of a project's issues. Each issue is decided
+     * on its own, and the answer says what became of every one.
+     */
+    bulk: (key: string, issues: string[], change: BulkChange) =>
+      api.post<{ results: BulkResult[] }>(`${at(key)}/issues/bulk`, { issues, change }),
   };
+}
+
+function boardQuery(filter: BoardFilter): URLSearchParams {
+  const query = new URLSearchParams();
+  for (const name of ["label", "priority", "assignee"] as const) {
+    const value = filter[name];
+    if (value) query.set(name, value);
+  }
+  return query;
 }

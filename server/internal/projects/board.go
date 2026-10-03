@@ -96,13 +96,27 @@ func pageSize(limit int) int32 {
 	return int32(limit)
 }
 
+/*
+BoardFilter narrows a board, by names as a saved view keeps them: a label, a
+priority level, somebody assigned. Every one given must hold, and the column
+counts are of what the filtered board shows.
+*/
+type BoardFilter struct {
+	Label    string
+	Priority string
+	Assignee *uuid.UUID
+}
+
 // Board returns a project's board: every state, each with its first page.
-func (s *Service) Board(ctx context.Context, access Access, limit int) (Board, error) {
+func (s *Service) Board(ctx context.Context, access Access, filter BoardFilter, limit int) (Board, error) {
 	states, err := s.queries.ListIssueStates(ctx, access.Project.ID)
 	if err != nil {
 		return Board{}, fmt.Errorf("list states: %w", err)
 	}
-	counts, err := s.queries.CountBoardColumns(ctx, access.Project.ID)
+	counts, err := s.queries.CountBoardColumns(ctx, dbgen.CountBoardColumnsParams{
+		ProjectID: access.Project.ID, LabelName: filter.Label,
+		PriorityName: filter.Priority, AssigneeID: filter.Assignee,
+	})
 	if err != nil {
 		return Board{}, fmt.Errorf("count columns: %w", err)
 	}
@@ -113,7 +127,7 @@ func (s *Service) Board(ctx context.Context, access Access, limit int) (Board, e
 
 	board := Board{Columns: make([]BoardColumn, 0, len(states))}
 	for _, state := range states {
-		column, err := s.column(ctx, access, state, "", limit)
+		column, err := s.column(ctx, access, state, filter, "", limit)
 		if err != nil {
 			return Board{}, err
 		}
@@ -125,15 +139,15 @@ func (s *Service) Board(ctx context.Context, access Access, limit int) (Board, e
 
 // Column returns one more page of one column, after the cursor a previous
 // page gave.
-func (s *Service) Column(ctx context.Context, access Access, stateID uuid.UUID, after string, limit int) (BoardColumn, error) {
+func (s *Service) Column(ctx context.Context, access Access, stateID uuid.UUID, filter BoardFilter, after string, limit int) (BoardColumn, error) {
 	state, err := stateOf(ctx, s.queries, access.Project.ID, stateID)
 	if err != nil {
 		return BoardColumn{}, err
 	}
-	return s.column(ctx, access, state, after, limit)
+	return s.column(ctx, access, state, filter, after, limit)
 }
 
-func (s *Service) column(ctx context.Context, access Access, state dbgen.IssueState, after string, limit int) (BoardColumn, error) {
+func (s *Service) column(ctx context.Context, access Access, state dbgen.IssueState, filter BoardFilter, after string, limit int) (BoardColumn, error) {
 	rank, number, err := parseCursor(after)
 	if err != nil {
 		return BoardColumn{}, err
@@ -141,6 +155,7 @@ func (s *Service) column(ctx context.Context, access Access, state dbgen.IssueSt
 	size := pageSize(limit)
 	rows, err := s.queries.ListBoardColumn(ctx, dbgen.ListBoardColumnParams{
 		ProjectID: access.Project.ID, StateID: state.ID,
+		LabelName: filter.Label, PriorityName: filter.Priority, AssigneeID: filter.Assignee,
 		AfterRank: rank, AfterNumber: number, PageSize: size,
 	})
 	if err != nil {

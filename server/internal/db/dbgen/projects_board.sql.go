@@ -12,11 +12,26 @@ import (
 )
 
 const countBoardColumns = `-- name: CountBoardColumns :many
-SELECT state_id, count(*)::bigint AS total
-FROM issues
-WHERE project_id = $1 AND deleted_at IS NULL
-GROUP BY state_id
+SELECT i.state_id, count(*)::bigint AS total
+FROM issues i
+LEFT JOIN project_priorities p ON p.id = i.priority_id
+WHERE i.project_id = $1 AND i.deleted_at IS NULL
+  AND ($2::text = '' OR EXISTS (
+        SELECT 1 FROM issue_labels il JOIN project_labels l ON l.id = il.label_id
+        WHERE il.issue_id = i.id AND l.name_folded = lower($2::text)))
+  AND ($3::text = '' OR p.name_folded = lower($3::text))
+  AND ($4::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM issue_assignees a
+        WHERE a.issue_id = i.id AND a.user_id = $4::uuid))
+GROUP BY i.state_id
 `
+
+type CountBoardColumnsParams struct {
+	ProjectID    uuid.UUID
+	LabelName    string
+	PriorityName string
+	AssigneeID   *uuid.UUID
+}
 
 type CountBoardColumnsRow struct {
 	StateID uuid.UUID
@@ -25,8 +40,16 @@ type CountBoardColumnsRow struct {
 
 // How many issues each state holds, so a column can say how many it has
 // without sending them.
-func (q *Queries) CountBoardColumns(ctx context.Context, projectID uuid.UUID) ([]CountBoardColumnsRow, error) {
-	rows, err := q.db.Query(ctx, countBoardColumns, projectID)
+//
+// Narrowed by the same filters as the cards, so a filtered board's counts are
+// of what it shows.
+func (q *Queries) CountBoardColumns(ctx context.Context, arg CountBoardColumnsParams) ([]CountBoardColumnsRow, error) {
+	rows, err := q.db.Query(ctx, countBoardColumns,
+		arg.ProjectID,
+		arg.LabelName,
+		arg.PriorityName,
+		arg.AssigneeID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -55,18 +78,28 @@ LEFT JOIN project_priorities p ON p.id = i.priority_id
 WHERE i.project_id = $1
   AND i.state_id = $2
   AND i.deleted_at IS NULL
-  AND (COALESCE(p.rank, 2147483647) > $3::int
-       OR (COALESCE(p.rank, 2147483647) = $3::int AND i.number < $4::bigint))
+  AND ($3::text = '' OR EXISTS (
+        SELECT 1 FROM issue_labels il JOIN project_labels l ON l.id = il.label_id
+        WHERE il.issue_id = i.id AND l.name_folded = lower($3::text)))
+  AND ($4::text = '' OR p.name_folded = lower($4::text))
+  AND ($5::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM issue_assignees a
+        WHERE a.issue_id = i.id AND a.user_id = $5::uuid))
+  AND (COALESCE(p.rank, 2147483647) > $6::int
+       OR (COALESCE(p.rank, 2147483647) = $6::int AND i.number < $7::bigint))
 ORDER BY COALESCE(p.rank, 2147483647), i.number DESC
-LIMIT $5
+LIMIT $8
 `
 
 type ListBoardColumnParams struct {
-	ProjectID   uuid.UUID
-	StateID     uuid.UUID
-	AfterRank   int32
-	AfterNumber int64
-	PageSize    int32
+	ProjectID    uuid.UUID
+	StateID      uuid.UUID
+	LabelName    string
+	PriorityName string
+	AssigneeID   *uuid.UUID
+	AfterRank    int32
+	AfterNumber  int64
+	PageSize     int32
 }
 
 type ListBoardColumnRow struct {
@@ -92,6 +125,9 @@ func (q *Queries) ListBoardColumn(ctx context.Context, arg ListBoardColumnParams
 	rows, err := q.db.Query(ctx, listBoardColumn,
 		arg.ProjectID,
 		arg.StateID,
+		arg.LabelName,
+		arg.PriorityName,
+		arg.AssigneeID,
 		arg.AfterRank,
 		arg.AfterNumber,
 		arg.PageSize,

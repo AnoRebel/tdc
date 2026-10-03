@@ -759,7 +759,71 @@
       "over": "Juu ya {state}",
       "moved": "{issue} limehamishiwa {state}",
       "cancelled": "{issue} limeachwa lilipokuwa",
-      "movedMeanwhile": "Mtu mwingine alihamisha {issue} kwanza. Ubao sasa unaonyesha lilipo."
+      "movedMeanwhile": "Mtu mwingine alihamisha {issue} kwanza. Ubao sasa unaonyesha lilipo.",
+      "filters": "Vichujio vya ubao",
+      "anyLabel": "Lebo yoyote",
+      "anyPriority": "Kipaumbele chochote",
+      "assignee": "Aliyepewa",
+      "assigneePlaceholder": "Yeyote"
+    },
+    "saved": {
+      "title": "Mionekano",
+      "save": "Hifadhi mwonekano",
+      "name": "Jina la mwonekano",
+      "namePlaceholder": "Hitilafu za kupanga",
+      "nameRequired": "Mwonekano unahitaji jina.",
+      "nameTooLong": "Jina la mwonekano lisizidi herufi sitini.",
+      "share": "Shiriki na kila anayeweza kuona hiki",
+      "shareHint": "Wanafungua vichujio vilevile na kuona masuala wanayoruhusiwa kuona tu.",
+      "couldNotSave": "Mwonekano haukuweza kuhifadhiwa.",
+      "couldNotDelete": "Mwonekano haukuweza kufutwa.",
+      "couldNotOpen": "Mwonekano haukuweza kufunguliwa.",
+      "none": "Bado hakuna mionekano iliyohifadhiwa.",
+      "shared": "Umeshirikiwa",
+      "by": "wa {owner}",
+      "delete": "Futa mwonekano {name}",
+      "notFound": "Hakuna mwonekano kama huo, au haujashirikiwa nawe.",
+      "allViews": "Mionekano yote",
+      "acrossProjects": "Mionekano ya miradi yote",
+      "inProjects": "Mionekano ya mradi",
+      "asks": "Inaonyesha",
+      "everything": "kila suala",
+      "openedAs": "Inaonyesha unachoruhusiwa kuona. Mtu mwingine akifungua mwonekano huu ataona anachoruhusiwa kuona.",
+      "filterLabel": "lebo {value}",
+      "filterState": "hali {value}",
+      "filterPriority": "kipaumbele {value}",
+      "filterAssignee": "aliyepewa {value}",
+      "filterWords": "yenye “{value}”"
+    },
+    "bulk": {
+      "title": "Badilisha masuala yaliyochaguliwa",
+      "select": "Chagua {issue}",
+      "selectAll": "Chagua kila suala linaloonyeshwa",
+      "selected": "{count} yamechaguliwa",
+      "change": "Badiliko",
+      "to": "Kuwa",
+      "person": "Mtu",
+      "personPlaceholder": "jina la mtumiaji",
+      "apply": "Tumia kwa yaliyochaguliwa",
+      "clear": "Futa uteuzi",
+      "failed": "Badiliko halikuweza kufanywa.",
+      "report": "Kilichotokea kwa kila suala",
+      "outcome": "{changed} yamebadilishwa, {other} hayakubadilishwa.",
+      "kinds": {
+        "label": "Ongeza lebo",
+        "unlabel": "Ondoa lebo",
+        "state": "Hamishia hali",
+        "priority": "Weka kipaumbele",
+        "assign": "Mpe",
+        "unassign": "Mwondolee"
+      },
+      "codes": {
+        "changed": "Limebadilishwa",
+        "unchanged": "Tayari liko hivyo",
+        "refused": "Limekataliwa",
+        "not_found": "Halipatikani",
+        "failed": "Limeshindikana"
+      }
     }
   }
 }

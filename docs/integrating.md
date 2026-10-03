@@ -799,6 +799,11 @@ curl -X POST http://localhost:8080/api/issues/WEB-1/state \
 | `GET /api/me/issues`                                                                   | Everything assigned to the caller, in every project they can see                                                                                                |
 | `GET /api/projects/:key/board`                                                         | Every state as a column: `stateId`, `name`, `isCompletion`, `total`, the first page of `cards`, and `next` to continue; `limit` up to 50                        |
 | `GET /api/projects/:key/board/:state?after=`                                           | The next page of one column, from the `next` its last page gave                                                                                                 |
+| `GET`, `POST /api/projects/:key/views`                                                 | A project's saved views; save one: `name`, `layout`, `filter`, `shared`                                                                                         |
+| `GET`, `POST /api/views`                                                               | Saved views across projects; save one                                                                                                                           |
+| `GET`, `PATCH`, `DELETE /api/views/:id`                                                | A saved view; only its owner changes or deletes it                                                                                                              |
+| `GET /api/views/:id/results`                                                           | Open a view as the caller: `issues` for a list, `board` for a board                                                                                             |
+| `POST /api/projects/:key/issues/bulk`                                                  | One change to many issues: `issues`, `change` (`kind`, `value`); `results` per issue                                                                            |
 
 An issue made from a message names it on creation, as two identifiers — the
 message is referred to, never copied:

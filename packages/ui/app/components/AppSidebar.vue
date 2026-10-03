@@ -173,6 +173,16 @@ function conversationName(room: Room): string {
             <span class="truncate">{{ $t("projects.search.title") }}</span>
           </NuxtLink>
         </li>
+        <li>
+          <NuxtLink
+            :to="localeRoute({ name: 'views' })"
+            class="nav-item"
+            :data-active="route.path.startsWith('/views')"
+          >
+            <Icon name="lucide:bookmark" class="size-3.5 shrink-0 opacity-60" />
+            <span class="truncate">{{ $t("projects.saved.title") }}</span>
+          </NuxtLink>
+        </li>
       </ul>
 
       <section v-if="joined.length">

@@ -54,6 +54,19 @@ type discussionSearchResult struct {
 	Highlighted string    `json:"highlighted"`
 }
 
+func searchResults(found []search.IssueResult) []issueSearchResult {
+	results := make([]issueSearchResult, 0, len(found))
+	for _, issue := range found {
+		results = append(results, issueSearchResult{
+			ID: issue.ID.String(), Key: issue.Key, Title: issue.Title,
+			ProjectKey: issue.ProjectKey, ProjectName: issue.ProjectName,
+			State: issue.State, Completed: issue.Completed, UpdatedAt: issue.UpdatedAt,
+			Highlighted: issue.Highlighted,
+		})
+	}
+	return results
+}
+
 func discussionResults(found []search.DiscussionResult) []discussionSearchResult {
 	results := make([]discussionSearchResult, 0, len(found))
 	for _, result := range found {
@@ -109,15 +122,7 @@ func (s *Server) handleSearchIssues(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	results := make([]issueSearchResult, 0, len(issues))
-	for _, issue := range issues {
-		results = append(results, issueSearchResult{
-			ID: issue.ID.String(), Key: issue.Key, Title: issue.Title,
-			ProjectKey: issue.ProjectKey, ProjectName: issue.ProjectName,
-			State: issue.State, Completed: issue.Completed, UpdatedAt: issue.UpdatedAt,
-			Highlighted: issue.Highlighted,
-		})
-	}
+	results := searchResults(issues)
 
 	// What was said about issues, alongside the issues themselves — unless
 	// the search was only filters, where there are no words to find.

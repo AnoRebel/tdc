@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/projects"
 )
 
@@ -32,13 +33,34 @@ func init() {
 	})
 }
 
+/*
+boardFilter reads a board's filters from the query: label and priority by
+name, assignee by username.
+*/
+func (s *Server) boardFilter(c *echo.Context) projects.BoardFilter {
+	filter := projects.BoardFilter{Label: c.QueryParam("label"), Priority: c.QueryParam("priority")}
+	if username := c.QueryParam("assignee"); username != "" {
+		person, err := s.queries.GetUserByUsername(c.Request().Context(), identity.NormaliseUsername(username))
+		if err != nil {
+			// Nobody by that name: an identifier nobody holds, so every
+			// column is empty, as it should be.
+			nobody := uuid.Nil
+			filter.Assignee = &nobody
+			return filter
+		}
+		filter.Assignee = &person.ID
+	}
+	return filter
+}
+
 func (s *Server) handleBoard(c *echo.Context) error {
 	access, err := s.projectFrom(c)
 	if err != nil {
 		return err
 	}
+	filter := s.boardFilter(c)
 	limit, _ := strconv.Atoi(c.QueryParam("limit"))
-	board, err := s.projects.Board(c.Request().Context(), access, limit)
+	board, err := s.projects.Board(c.Request().Context(), access, filter, limit)
 	if err != nil {
 		return err
 	}
@@ -54,8 +76,9 @@ func (s *Server) handleBoardColumn(c *echo.Context) error {
 	if err != nil {
 		return projectError(projects.ErrStateNotFound)
 	}
+	filter := s.boardFilter(c)
 	limit, _ := strconv.Atoi(c.QueryParam("limit"))
-	column, err := s.projects.Column(c.Request().Context(), access, stateID, c.QueryParam("after"), limit)
+	column, err := s.projects.Column(c.Request().Context(), access, stateID, filter, c.QueryParam("after"), limit)
 	if errors.Is(err, projects.ErrBadCursor) {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}

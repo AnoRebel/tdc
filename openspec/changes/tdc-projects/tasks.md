@@ -68,12 +68,12 @@ Goal: the column view, built to the payload discipline the audience's data plans
 
 Goal: people can save how they like to look at a project, and act on more than one issue at a time.
 
-- [ ] 6.1 Implement saved views (filter, sort, list-or-board) storing configuration rather than results, re-run under the viewer's own permissions on open; verify a shared view opened by another user shows only issues that user can see, even when it differs from what the view's owner sees
-- [ ] 6.2 Build the web interface for saving, naming, and sharing a view; verify a saved view is reusable later and a shared view is reachable by the people it was shared with
+- [x] 6.1 Implement saved views (filter, sort, list-or-board) storing configuration rather than results, re-run under the viewer's own permissions on open; verify a shared view opened by another user shows only issues that user can see, even when it differs from what the view's owner sees
+- [x] 6.2 Build the web interface for saving, naming, and sharing a view; verify a saved view is reusable later and a shared view is reachable by the people it was shared with
 - [ ] 6.3 Implement bulk state, assignee, label, and cycle changes across selected issues, evaluating each issue's permission independently and reporting per-item outcome; verify a batch with some issues the caller cannot modify applies the successful ones and reports exactly which failed and why
-- [ ] 6.4 Verify each issue in a bulk operation records its own change in its own history; verify a partially-successful batch leaves no affected issue without its own recorded event
-- [ ] 6.5 Build the web bulk-selection and bulk-action interface on the list view; verify a multi-issue selection, action, and outcome report are usable end to end
-- [ ] **MILESTONE 6** — Demonstrate: save a filtered board view and share it with a second account that sees it correctly narrowed to their own permissions, then select a mixed batch of issues — some the acting user may modify and one they may not — apply a bulk label change, and see an itemised report of what succeeded and what was refused. Tag `v1.37.0-dev`.
+- [x] 6.4 Verify each issue in a bulk operation records its own change in its own history; verify a partially-successful batch leaves no affected issue without its own recorded event
+- [x] 6.5 Build the web bulk-selection and bulk-action interface on the list view; verify a multi-issue selection, action, and outcome report are usable end to end
+- [x] **MILESTONE 6** — Demonstrate: save a filtered board view and share it with a second account that sees it correctly narrowed to their own permissions, then select a mixed batch of issues — some the acting user may modify and one they may not — apply a bulk label change, and see an itemised report of what succeeded and what was refused. Tag `v1.37.0-dev`.
 
 ## 7. Phase 7 — Cycles and milestones
 

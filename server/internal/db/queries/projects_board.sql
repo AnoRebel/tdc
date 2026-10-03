@@ -19,6 +19,13 @@ LEFT JOIN project_priorities p ON p.id = i.priority_id
 WHERE i.project_id = @project_id
   AND i.state_id = @state_id
   AND i.deleted_at IS NULL
+  AND (@label_name::text = '' OR EXISTS (
+        SELECT 1 FROM issue_labels il JOIN project_labels l ON l.id = il.label_id
+        WHERE il.issue_id = i.id AND l.name_folded = lower(@label_name::text)))
+  AND (@priority_name::text = '' OR p.name_folded = lower(@priority_name::text))
+  AND (sqlc.narg('assignee_id')::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM issue_assignees a
+        WHERE a.issue_id = i.id AND a.user_id = sqlc.narg('assignee_id')::uuid))
   AND (COALESCE(p.rank, 2147483647) > @after_rank::int
        OR (COALESCE(p.rank, 2147483647) = @after_rank::int AND i.number < @after_number::bigint))
 ORDER BY COALESCE(p.rank, 2147483647), i.number DESC
@@ -27,7 +34,18 @@ LIMIT @page_size;
 -- name: CountBoardColumns :many
 -- How many issues each state holds, so a column can say how many it has
 -- without sending them.
-SELECT state_id, count(*)::bigint AS total
-FROM issues
-WHERE project_id = $1 AND deleted_at IS NULL
-GROUP BY state_id;
+--
+-- Narrowed by the same filters as the cards, so a filtered board's counts are
+-- of what it shows.
+SELECT i.state_id, count(*)::bigint AS total
+FROM issues i
+LEFT JOIN project_priorities p ON p.id = i.priority_id
+WHERE i.project_id = @project_id AND i.deleted_at IS NULL
+  AND (@label_name::text = '' OR EXISTS (
+        SELECT 1 FROM issue_labels il JOIN project_labels l ON l.id = il.label_id
+        WHERE il.issue_id = i.id AND l.name_folded = lower(@label_name::text)))
+  AND (@priority_name::text = '' OR p.name_folded = lower(@priority_name::text))
+  AND (sqlc.narg('assignee_id')::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM issue_assignees a
+        WHERE a.issue_id = i.id AND a.user_id = sqlc.narg('assignee_id')::uuid))
+GROUP BY i.state_id;

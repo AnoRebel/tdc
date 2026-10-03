@@ -2,7 +2,7 @@
 import { useForm } from "@tanstack/vue-form";
 import * as v from "valibot";
 
-import { isApiError, type IssueSearch } from "@tdc/types";
+import { isApiError, type IssueSearch, type SavedView, type ViewFilter } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
@@ -86,6 +86,19 @@ async function run() {
 }
 watch(() => route.query, run, { immediate: true });
 
+/*
+ * A search worth keeping is saved as a view across projects: the same
+ * question, by name, answered afresh for whoever opens it.
+ */
+const saving = ref(false);
+const savedView = ref<SavedView | null>(null);
+const asView = computed<ViewFilter>(() => ({
+  q: fromQuery("q") || undefined,
+  state: fromQuery("state") || undefined,
+  label: fromQuery("label") || undefined,
+  assignee: fromQuery("assignee") || undefined,
+}));
+
 const completions = computed(() => [
   { value: "any" as const, label: $ts("projects.search.anyState") },
   { value: "false" as const, label: $ts("projects.search.open") },
@@ -97,6 +110,12 @@ const completions = computed(() => [
   <div class="flex-1 overflow-y-auto">
     <header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
       <h1 class="text-sm font-semibold">{{ $t("projects.search.title") }}</h1>
+      <NuxtLink
+        :to="localeRoute({ name: 'views' })"
+        class="ml-auto text-xs text-primary hover:underline"
+      >
+        {{ $t("projects.saved.allViews") }}
+      </NuxtLink>
     </header>
 
     <div class="max-w-4xl space-y-6 px-4 py-6">
@@ -189,7 +208,39 @@ const completions = computed(() => [
       <div v-else-if="searching" class="space-y-2" aria-busy="true">
         <UiSkeleton v-for="n in 3" :key="n" class="h-12 w-full rounded-md" />
       </div>
-      <ProjectsIssueSearchResults v-else-if="results" :results="results" show-project />
+      <template v-else-if="results">
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- A view does not keep "finished or not", so it is not offered
+               for a search that relies on it rather than saved without it. -->
+          <Button
+            v-if="!saving && !fromQuery('completed')"
+            variant="outline"
+            @click="((saving = true), (savedView = null))"
+          >
+            <Icon name="lucide:bookmark-plus" class="size-3.5" />
+            {{ $t("projects.saved.save") }}
+          </Button>
+          <span role="status">
+            <NuxtLink
+              v-if="savedView"
+              :to="localeRoute({ name: 'views-id', params: { id: savedView.id } })"
+              class="text-sm text-primary hover:underline"
+            >
+              {{ savedView.name }}
+            </NuxtLink>
+          </span>
+        </div>
+        <ProjectsSaveView
+          v-if="saving"
+          :project-key="null"
+          layout="list"
+          :filter="asView"
+          may-share
+          @saved="(view) => ((savedView = view), (saving = false))"
+          @cancel="saving = false"
+        />
+        <ProjectsIssueSearchResults :results="results" show-project />
+      </template>
       <p v-else class="text-sm text-muted-foreground">{{ $t("projects.search.hint") }}</p>
     </div>
   </div>

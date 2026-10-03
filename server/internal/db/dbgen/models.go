@@ -357,6 +357,18 @@ type ProjectPriority struct {
 	CreatedAt  time.Time
 }
 
+type ProjectView struct {
+	ID        uuid.UUID
+	ProjectID *uuid.UUID
+	OwnerID   uuid.UUID
+	Name      string
+	Layout    string
+	Filter    []byte
+	Shared    bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type PushSubscription struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID

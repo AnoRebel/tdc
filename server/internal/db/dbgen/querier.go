@@ -99,7 +99,10 @@ type Querier interface {
 	CountAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (CountAuditEntriesBeforeRow, error)
 	// How many issues each state holds, so a column can say how many it has
 	// without sending them.
-	CountBoardColumns(ctx context.Context, projectID uuid.UUID) ([]CountBoardColumnsRow, error)
+	//
+	// Narrowed by the same filters as the cards, so a filtered board's counts are
+	// of what it shows.
+	CountBoardColumns(ctx context.Context, arg CountBoardColumnsParams) ([]CountBoardColumnsRow, error)
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
@@ -154,6 +157,8 @@ type Querier interface {
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateProjectLabel(ctx context.Context, arg CreateProjectLabelParams) (ProjectLabel, error)
 	CreateProjectPriority(ctx context.Context, arg CreateProjectPriorityParams) (ProjectPriority, error)
+	// Saved views.
+	CreateProjectView(ctx context.Context, arg CreateProjectViewParams) (ProjectView, error)
 	CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) (Credential, error)
 	CreateRecoveryToken(ctx context.Context, arg CreateRecoveryTokenParams) (RecoveryToken, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
@@ -180,6 +185,7 @@ type Querier interface {
 	DeleteLapsedBans(ctx context.Context) (int64, error)
 	DeleteProjectLabel(ctx context.Context, id uuid.UUID) error
 	DeleteProjectPriority(ctx context.Context, id uuid.UUID) error
+	DeleteProjectView(ctx context.Context, id uuid.UUID) error
 	// Scoped to the owner, so one person cannot unsubscribe another's device.
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) (int64, error)
 	// Used when the push service reports a subscription gone, where the endpoint
@@ -290,6 +296,7 @@ type Querier interface {
 	GetProjectLabel(ctx context.Context, id uuid.UUID) (ProjectLabel, error)
 	GetProjectMemberRole(ctx context.Context, arg GetProjectMemberRoleParams) (string, error)
 	GetProjectPriority(ctx context.Context, id uuid.UUID) (ProjectPriority, error)
+	GetProjectView(ctx context.Context, id uuid.UUID) (ProjectView, error)
 	// Read without spending, so the client can tell somebody their link has expired
 	// before asking them to type a new password into a form that cannot work.
 	GetRecoveryToken(ctx context.Context, tokenHash []byte) (RecoveryToken, error)
@@ -565,6 +572,11 @@ type Querier interface {
 	// stands for: how many, and how many people are involved.
 	ListUnreadNotificationsGrouped(ctx context.Context, userID uuid.UUID) ([]ListUnreadNotificationsGroupedRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	// Views across projects a person may use: their own, and those shared.
+	ListViewsAcrossProjects(ctx context.Context, userID uuid.UUID) ([]ListViewsAcrossProjectsRow, error)
+	// A project's views a person may use: their own, and those shared. The caller
+	// has already established that they may see the project.
+	ListViewsOfProject(ctx context.Context, arg ListViewsOfProjectParams) ([]ListViewsOfProjectRow, error)
 	// Reads an issue and holds it until the transaction ends, so a change and the
 	// event recording it are decided against a value nobody else is changing.
 	LockIssue(ctx context.Context, id uuid.UUID) (Issue, error)
@@ -865,6 +877,7 @@ type Querier interface {
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
 	UpdateProjectLabel(ctx context.Context, arg UpdateProjectLabelParams) (ProjectLabel, error)
 	UpdateProjectPriority(ctx context.Context, arg UpdateProjectPriorityParams) (ProjectPriority, error)
+	UpdateProjectView(ctx context.Context, arg UpdateProjectViewParams) (ProjectView, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
 	// Somebody taking part in an issue's discussion hears about everything said

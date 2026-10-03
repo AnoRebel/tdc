@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { isApiError, type Project } from "@tdc/types";
+import { isApiError, type BoardFilter, type Project } from "@tdc/types";
+import { Field } from "#layers/ui/app/components/ui/field";
+import { Input } from "#layers/ui/app/components/ui/input";
+import { Select } from "#layers/ui/app/components/ui/select";
 
 const { $t, $ts } = useI18n();
 
@@ -25,6 +28,28 @@ useHead({
   title: computed(() => `${project.value?.name ?? key.value} · ${$ts("projects.tabs.board")}`),
 });
 
+/*
+ * What the board shows. By name, as a saved view keeps it, so saving the board
+ * as it is now saves exactly this.
+ */
+const label = ref("any");
+const priority = ref("any");
+const assignee = ref("");
+const assigneeSettled = refDebounced(assignee, 300);
+const filter = computed<BoardFilter>(() => ({
+  label: label.value === "any" ? undefined : label.value,
+  priority: priority.value === "any" ? undefined : priority.value,
+  assignee: assigneeSettled.value.trim() || undefined,
+}));
+const labelOptions = computed(() => [
+  { value: "any", label: $ts("projects.board.anyLabel") },
+  ...(project.value?.labels ?? []).map((entry) => ({ value: entry.name, label: entry.name })),
+]);
+const priorityOptions = computed(() => [
+  { value: "any", label: $ts("projects.board.anyPriority") },
+  ...(project.value?.priorities ?? []).map((entry) => ({ value: entry.name, label: entry.name })),
+]);
+
 onMounted(async () => {
   try {
     project.value = await projectsApi.get(key.value);
@@ -43,7 +68,54 @@ onMounted(async () => {
     <p v-else-if="failed" class="p-4 text-sm text-destructive" role="alert">{{ failed }}</p>
     <template v-else-if="project">
       <ProjectsProjectHeader :project="project" current="board" />
-      <ProjectsIssueBoard :project-key="project.key" :can-move="Boolean(project.can?.transition)" />
+      <div class="space-y-3 border-b px-4 py-3">
+        <div
+          class="flex flex-wrap items-end gap-3"
+          role="search"
+          :aria-label="$ts('projects.board.filters')"
+        >
+          <Field :label="$ts('projects.filterByLabel')" class="w-44">
+            <template #default="{ id }">
+              <Select
+                :id="id"
+                v-model="label"
+                :label="$ts('projects.filterByLabel')"
+                :options="labelOptions"
+              />
+            </template>
+          </Field>
+          <Field :label="$ts('projects.priority.title')" class="w-44">
+            <template #default="{ id }">
+              <Select
+                :id="id"
+                v-model="priority"
+                :label="$ts('projects.priority.title')"
+                :options="priorityOptions"
+              />
+            </template>
+          </Field>
+          <Field :label="$ts('projects.board.assignee')" class="w-44">
+            <template #default="{ id }">
+              <Input
+                :id="id"
+                v-model="assignee"
+                :placeholder="$ts('projects.board.assigneePlaceholder')"
+              />
+            </template>
+          </Field>
+        </div>
+        <ProjectsProjectViews
+          :project-key="project.key"
+          layout="board"
+          :filter="filter"
+          :may-share="Boolean(project.role)"
+        />
+      </div>
+      <ProjectsIssueBoard
+        :project-key="project.key"
+        :can-move="Boolean(project.can?.transition)"
+        :filter="filter"
+      />
     </template>
   </div>
 </template>

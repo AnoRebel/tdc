@@ -87,7 +87,7 @@ func boardProject(t *testing.T, f fixture) (projects.Actor, projects.Access) {
 
 func boardBytes(t *testing.T, f fixture, access projects.Access) int {
 	t.Helper()
-	board, err := f.projects.Board(context.Background(), access, 0)
+	board, err := f.projects.Board(context.Background(), access, projects.BoardFilter{}, 0)
 	if err != nil {
 		t.Fatalf("board: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestTheBoardStaysWithinItsBudgetAtAnySize(t *testing.T) {
 			large-small)
 	}
 
-	board, err := f.projects.Board(context.Background(), access, 0)
+	board, err := f.projects.Board(context.Background(), access, projects.BoardFilter{}, 0)
 	if err != nil {
 		t.Fatalf("board: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestPagingAColumnVisitsEveryCardOnce(t *testing.T) {
 	after := ""
 	previous := ""
 	for page := 0; ; page++ {
-		column, err := f.projects.Column(ctx, access, states[0].ID, after, 5)
+		column, err := f.projects.Column(ctx, access, states[0].ID, projects.BoardFilter{}, after, 5)
 		if err != nil {
 			t.Fatalf("page %d: %v", page, err)
 		}
@@ -221,7 +221,7 @@ func TestPagingAColumnVisitsEveryCardOnce(t *testing.T) {
 		}
 	}
 
-	if _, err := f.projects.Column(ctx, access, states[0].ID, "not-a-cursor", 5); !errors.Is(err, projects.ErrBadCursor) {
+	if _, err := f.projects.Column(ctx, access, states[0].ID, projects.BoardFilter{}, "not-a-cursor", 5); !errors.Is(err, projects.ErrBadCursor) {
 		t.Errorf("a made-up cursor: %v", err)
 	}
 }

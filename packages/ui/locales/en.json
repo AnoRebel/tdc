@@ -759,7 +759,71 @@
       "over": "Over {state}",
       "moved": "{issue} moved to {state}",
       "cancelled": "{issue} left where it was",
-      "movedMeanwhile": "Somebody else moved {issue} first. The board now shows where it is."
+      "movedMeanwhile": "Somebody else moved {issue} first. The board now shows where it is.",
+      "filters": "Board filters",
+      "anyLabel": "Any label",
+      "anyPriority": "Any priority",
+      "assignee": "Assignee",
+      "assigneePlaceholder": "Anybody"
+    },
+    "saved": {
+      "title": "Views",
+      "save": "Save view",
+      "name": "View name",
+      "namePlaceholder": "Bugs to triage",
+      "nameRequired": "A view needs a name.",
+      "nameTooLong": "A view's name is at most sixty characters.",
+      "share": "Share with everybody who can see this",
+      "shareHint": "They open the same filters and see only the issues they may see.",
+      "couldNotSave": "The view could not be saved.",
+      "couldNotDelete": "The view could not be deleted.",
+      "couldNotOpen": "The view could not be opened.",
+      "none": "No saved views yet.",
+      "shared": "Shared",
+      "by": "by {owner}",
+      "delete": "Delete the view {name}",
+      "notFound": "There is no such view, or it is not shared with you.",
+      "allViews": "All views",
+      "acrossProjects": "Views across projects",
+      "inProjects": "Views of a project",
+      "asks": "Shows",
+      "everything": "every issue",
+      "openedAs": "Showing what you may see. Somebody else opening this view sees what they may see.",
+      "filterLabel": "label {value}",
+      "filterState": "state {value}",
+      "filterPriority": "priority {value}",
+      "filterAssignee": "assigned to {value}",
+      "filterWords": "matching “{value}”"
+    },
+    "bulk": {
+      "title": "Change selected issues",
+      "select": "Select {issue}",
+      "selectAll": "Select every issue shown",
+      "selected": "{count} selected",
+      "change": "Change",
+      "to": "To",
+      "person": "Person",
+      "personPlaceholder": "username",
+      "apply": "Apply to selected",
+      "clear": "Clear selection",
+      "failed": "The change could not be made.",
+      "report": "What became of each issue",
+      "outcome": "{changed} changed, {other} not changed.",
+      "kinds": {
+        "label": "Add label",
+        "unlabel": "Remove label",
+        "state": "Move to state",
+        "priority": "Set priority",
+        "assign": "Assign",
+        "unassign": "Unassign"
+      },
+      "codes": {
+        "changed": "Changed",
+        "unchanged": "Already so",
+        "refused": "Refused",
+        "not_found": "Not found",
+        "failed": "Failed"
+      }
     }
   }
 }

@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { isApiError, type Board, type BoardCard, type BoardColumn } from "@tdc/types";
+import {
+  isApiError,
+  type Board,
+  type BoardCard,
+  type BoardColumn,
+  type BoardFilter,
+} from "@tdc/types";
 import { useWindowFocus } from "@vueuse/core";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -23,7 +29,12 @@ const { $t, $ts, $localeRoute: localeRoute } = useI18n();
  * server refuses, and the board reloads to show where it really is rather than
  * where either of them guessed.
  */
-const props = defineProps<{ projectKey: string; canMove: boolean }>();
+const props = defineProps<{
+  projectKey: string;
+  canMove: boolean;
+  /** Narrows every column: by label, priority or assignee. */
+  filter?: BoardFilter;
+}>();
 
 const projectsApi = useProjects();
 const board = ref<Board | null>(null);
@@ -34,13 +45,13 @@ const announcement = ref("");
 async function load() {
   failed.value = null;
   try {
-    board.value = await projectsApi.board(props.projectKey);
+    board.value = await projectsApi.board(props.projectKey, props.filter);
   } catch (cause) {
     failed.value = isApiError(cause) ? cause.message : $ts("projects.couldNotLoad");
   }
 }
 onMounted(load);
-watch(() => props.projectKey, load);
+watch(() => [props.projectKey, props.filter], load, { deep: true });
 
 // Somebody coming back to the tab sees the board as it is now, not as they
 // left it: other people move cards too.
@@ -52,7 +63,12 @@ watch(focused, (now) => {
 async function more(column: BoardColumn) {
   if (!column.next) return;
   try {
-    const page = await projectsApi.column(props.projectKey, column.stateId, column.next);
+    const page = await projectsApi.column(
+      props.projectKey,
+      column.stateId,
+      column.next,
+      props.filter,
+    );
     column.cards.push(...page.cards);
     column.next = page.next;
   } catch (cause) {

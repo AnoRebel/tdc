@@ -4,8 +4,15 @@ import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 import { h, resolveComponent } from "vue";
 
-import { isApiError, type Issue, type IssueSearch, type Project } from "@tdc/types";
+import {
+  isApiError,
+  type Issue,
+  type IssueSearch,
+  type Project,
+  type ViewFilter,
+} from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
+import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Select } from "#layers/ui/app/components/ui/select";
@@ -94,6 +101,33 @@ watchDebounced(
   { debounce: 250 },
 );
 
+/*
+ * Selecting issues for one change to all of them. The selection is of
+ * identifiers, so it survives the list reloading after the change — what was
+ * chosen stays chosen while the report is read.
+ */
+const selected = ref<string[]>([]);
+const allSelected = computed(
+  () =>
+    issues.value.length > 0 && issues.value.every((issue) => selected.value.includes(issue.key)),
+);
+function choose(key: string, chosen: boolean) {
+  selected.value = chosen
+    ? [...new Set([...selected.value, key])]
+    : selected.value.filter((existing) => existing !== key);
+}
+function chooseAll(chosen: boolean) {
+  selected.value = chosen ? issues.value.map((issue) => issue.key) : [];
+}
+
+/** What is on the screen, as a view would ask for it: by name, not by id. */
+const currentFilter = computed<ViewFilter>(() => ({
+  q: words.value.trim() || undefined,
+  state: project.value?.states?.find((s) => s.id === stateFilter.value)?.name,
+  label: project.value?.labels?.find((l) => l.id === labelFilter.value)?.name,
+  sort: sort.value,
+}));
+
 const NuxtLink = resolveComponent("NuxtLink");
 const StateBadge = resolveComponent("ProjectsStateBadge");
 const PriorityBadge = resolveComponent("ProjectsPriorityBadge");
@@ -105,6 +139,21 @@ const Avatar = resolveComponent("UiAvatar");
  * something somebody opens far more often than something they sort.
  */
 const columns = [
+  {
+    id: "select",
+    header: () =>
+      h(Checkbox, {
+        modelValue: allSelected.value,
+        label: $ts("projects.bulk.selectAll"),
+        "onUpdate:modelValue": (chosen: boolean) => chooseAll(chosen),
+      }),
+    cell: ({ row }: { row: { original: Issue } }) =>
+      h(Checkbox, {
+        modelValue: selected.value.includes(row.original.key),
+        label: $ts("projects.bulk.select", { issue: row.original.key }),
+        "onUpdate:modelValue": (chosen: boolean) => choose(row.original.key, chosen),
+      }),
+  },
   {
     accessorKey: "number",
     header: $ts("projects.issue"),
@@ -348,6 +397,21 @@ function firstError(field: AnyFieldApi): string | undefined {
             </template>
           </Field>
         </div>
+
+        <ProjectsProjectViews
+          :project-key="project.key"
+          layout="list"
+          :filter="currentFilter"
+          :may-share="Boolean(project.role)"
+        />
+
+        <ProjectsBulkActions
+          v-if="selected.length && !(found && words.trim())"
+          :project="project"
+          :selected="selected"
+          @applied="load"
+          @clear="selected = []"
+        />
 
         <p v-if="failed" class="text-sm text-destructive" role="alert">{{ failed }}</p>
 

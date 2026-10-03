@@ -121,6 +121,12 @@ states, so adding or reordering a state changes the board. Each column shows
 how many issues it holds and the first twenty of them, most urgent first;
 **Show more** at the bottom of a column fetches the next twenty.
 
+Above the columns, a board can be narrowed to one label, one priority, or one
+person's issues; every column then holds only what matches, and its count says
+how many do. The API takes the same as `label`, `priority` (names) and
+`assignee` (a username) on `GET /api/projects/:key/board` and on each column's
+next page.
+
 To move a card, drag it to another column. From the keyboard, Tab to the card's
 grip button and press Enter or Space to pick it up; the left and right arrow
 keys choose a column, Enter puts it down there, and Escape leaves it where it
@@ -183,6 +189,66 @@ The API: `GET /api/issues/search` takes `q`, `project` (a key), `state`,
 and, when there were words, `highlighted` — the title and description with the
 matches in `<mark>`. `GET /api/issues/:ref/discussion/search?q=` searches one
 issue's discussion.
+
+## Saved views
+
+A view is a way of looking at issues, kept under a name: a project's list
+with its filters, a project's board narrowed to a label, a priority or a
+person, or a search across every project. **Views** on a project's list or
+board shows the views of that project and **Save view** keeps what is on the
+screen; a search across projects is saved from the search page, and **Views**
+in the sidebar lists those.
+
+What a view keeps is the question, never the answer — the filters, by name.
+Opening it asks again, as whoever opened it. So a view can be shared: tick
+**Share with everybody who can see this** and it is listed for them, and each
+of them sees what _they_ may see. Somebody outside a private project who opens
+a shared search for every `bug` sees the bugs in projects they can see and none
+from the private one, even though the same view shows its author more. A view
+of a private project does not exist to anybody who cannot see the project.
+
+Only a project's members may share a view of it — so a project's list of shared
+views is the team's — but anybody who can see a project may keep views of it for
+themselves. Only whoever saved a view may change or delete it.
+
+The API: `GET`, `POST /api/projects/:key/views` for a project's views, and
+`GET`, `POST /api/views` for those across projects; each takes `name` (at most
+sixty characters), `layout` (`list` or `board`, and a board belongs to one
+project), `filter` and `shared`. `filter` holds `q`, `state`, `label`,
+`priority` (names), `assignee` (a username) and `sort` (`newest` or
+`priority`). `GET`, `PATCH`, `DELETE /api/views/:id` read, change and delete one;
+`GET /api/views/:id/results` opens it as the caller and answers
+`{"view": …, "issues": [...]}` for a list, the same issues a search returns, or
+`{"view": …, "board": …}` for a board. A view the caller may not open answers
+404, the same as one that does not exist.
+
+## Changing many issues at once
+
+Tick issues in a project's list and a bar appears above it: choose a change —
+add or remove a label, move to a state, set a priority, assign or unassign
+somebody — and **Apply to selected**.
+
+Each issue is decided on its own, exactly as if it had been changed alone: its
+own permission check, its own entry in its own history. So a batch can come
+back half done, and the answer says so line by line — which issues changed,
+which already were as asked, which were **refused** and the permission that
+would have allowed it, and which are not in this project. Somebody who is not a
+member of a public project, for instance, may label the issues they filed there
+and nobody else's: a batch of both labels theirs and names `issue.label` for the
+rest. Nothing that was refused leaves any trace in the issue's history.
+
+A change that cannot mean anything — a state or label that is not this
+project's, an unknown kind of change, no issues at all — is refused whole before
+any issue is touched, rather than as the same refusal for every issue in it.
+
+The API: `POST /api/projects/:key/issues/bulk` with
+`{"issues": ["WEB-1", …], "change": {"kind": …, "value": …}}`, at most two
+hundred issues. `kind` is `state`, `label`, `unlabel` or `priority` with the
+id of the state, label or priority level as `value` (an empty `value` clears a
+priority), or `assign` or `unassign` with a username. It answers 200 with
+`results`, one per issue in the order given: `issue`, `code` (`changed`,
+`unchanged`, `refused`, `not_found` or `failed`), `changed`, and for anything
+not changed a `reason` — and for a refusal, `permission`.
 
 ## Who may do what
 

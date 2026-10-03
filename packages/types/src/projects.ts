@@ -257,3 +257,61 @@ export interface BoardColumn {
 export interface Board {
   columns: BoardColumn[];
 }
+
+/** What a board shows: label and priority by name, assignee by username. */
+export interface BoardFilter {
+  label?: string;
+  priority?: string;
+  assignee?: string;
+}
+
+/**
+ * How a saved view asks: the same names a search takes. A view keeps the
+ * question, never the answer, so whoever opens it sees what they may see.
+ */
+export interface ViewFilter extends BoardFilter {
+  q?: string;
+  /** A state's name. */
+  state?: string;
+  sort?: "newest" | "priority";
+}
+
+/** A saved way of looking at issues. */
+export interface SavedView {
+  id: string;
+  /** The key of the project it views; absent for a view across projects. */
+  project?: string;
+  name: string;
+  layout: "list" | "board";
+  filter: ViewFilter;
+  shared: boolean;
+  /** The username of whoever saved it. */
+  owner: string;
+  /** Whether the requester saved it, and so may change it. */
+  mine: boolean;
+  updatedAt: string;
+}
+
+/** A view opened by the requester: what it asks, and what it found for them. */
+export interface OpenedView {
+  view: SavedView;
+  issues?: IssueSearchResult[];
+  board?: Board;
+}
+
+/** One change to make to many issues of a project. */
+export interface BulkChange {
+  kind: "state" | "assign" | "unassign" | "label" | "unlabel" | "priority";
+  /** A state, label or priority level by id, or a person by username. */
+  value: string;
+}
+
+/** What became of one issue in a batch. */
+export interface BulkResult {
+  issue: string;
+  code: "changed" | "unchanged" | "refused" | "not_found" | "failed";
+  changed: boolean;
+  reason?: string;
+  /** For a refusal, the permission that would have allowed it. */
+  permission?: string;
+}
