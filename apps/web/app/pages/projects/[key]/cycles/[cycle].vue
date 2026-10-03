@@ -87,7 +87,7 @@ async function remove() {
             {{ onCalendarDay(cycle.startsOn) }} – {{ onCalendarDay(cycle.endsOn) }}
             <span class="text-xs text-muted-foreground">({{ project.timeZone }})</span>
           </p>
-          <ProjectsPlanProgress :completed="cycle.completed" :total="cycle.total" />
+          <ProjectsProgressReport :project-key="project.key" :of="{ cycle: cycle.id }" />
           <p v-if="cycle.closedAt" class="text-xs text-muted-foreground" data-closed>
             {{
               $t("projects.planning.closed", {

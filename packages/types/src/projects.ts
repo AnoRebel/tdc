@@ -377,3 +377,26 @@ export interface Milestone {
   total: number;
   completed: number;
 }
+
+/** How things stood at the end of one day in the project's calendar, or now for today. */
+export interface ProgressPoint {
+  /** A day, "YYYY-MM-DD". */
+  day: string;
+  total: number;
+  completed: number;
+}
+
+/**
+ * How much of a project, cycle or milestone is done.
+ *
+ * `total` and `completed` are counted from the issues as they are; `trend` is
+ * replayed from the project's history, one point a day. Neither is stored, so
+ * today's point and the figures always agree.
+ */
+export interface Progress {
+  total: number;
+  completed: number;
+  from: string;
+  to: string;
+  trend: ProgressPoint[];
+}

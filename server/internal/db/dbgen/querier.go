@@ -119,6 +119,9 @@ type Querier interface {
 	CountOverlappingCycles(ctx context.Context, arg CountOverlappingCyclesParams) (int64, error)
 	CountPendingAttempt(ctx context.Context, id uuid.UUID) (PendingSignIn, error)
 	CountProjectAdmins(ctx context.Context, projectID uuid.UUID) (int64, error)
+	// How many of a project's issues there are, and how many are done: counted
+	// when asked, from the issues' own states, never kept as a number of its own.
+	CountProjectProgress(ctx context.Context, projectID uuid.UUID) (CountProjectProgressRow, error)
 	CountReactionsForEvent(ctx context.Context, eventID string) (int64, error)
 	// How many reports somebody has filed recently, so a person cannot bury the
 	// queue under hundreds of them.

@@ -558,7 +558,8 @@
       "board": "Ubao",
       "cycles": "Mizunguko",
       "milestones": "Hatua muhimu",
-      "settings": "Mipangilio"
+      "settings": "Mipangilio",
+      "progress": "Maendeleo"
     },
     "couldNotLoad": "Haikuweza kupakiwa. Jaribu tena.",
     "couldNotStart": "Mradi haukuweza kuanzishwa.",
@@ -885,6 +886,16 @@
       "target": "Lengo ni {day}",
       "targetDate": "Siku ya kulenga",
       "timeZone": "Saa za eneo"
+    },
+    "progress": {
+      "title": "Maendeleo",
+      "completed": "Yamekamilika",
+      "total": "Masuala yote",
+      "percent": "{percent}% yamekamilika",
+      "describedAs": "Masuala yaliyokamilika kila siku kuanzia {from} hadi {to}; sasa {completed} kati ya {total}.",
+      "table": "Masuala yaliyokamilika mwisho wa kila siku",
+      "day": "Siku",
+      "wholeProject": "Mradi mzima, wiki mbili zilizopita"
     }
   }
 }

@@ -558,7 +558,8 @@
       "board": "Board",
       "cycles": "Cycles",
       "milestones": "Milestones",
-      "settings": "Settings"
+      "settings": "Settings",
+      "progress": "Progress"
     },
     "couldNotLoad": "This could not be loaded. Try again.",
     "couldNotStart": "The project could not be started.",
@@ -885,6 +886,16 @@
       "target": "Aiming for {day}",
       "targetDate": "Day to aim for",
       "timeZone": "Time zone"
+    },
+    "progress": {
+      "title": "Progress",
+      "completed": "Done",
+      "total": "All issues",
+      "percent": "{percent}% done",
+      "describedAs": "Issues done each day from {from} to {to}; now {completed} of {total}.",
+      "table": "Issues done at the end of each day",
+      "day": "Day",
+      "wholeProject": "The whole project, the last two weeks"
     }
   }
 }

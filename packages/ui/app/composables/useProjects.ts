@@ -8,6 +8,7 @@ import type {
   CyclePolicy,
   Milestone,
   OpenedView,
+  Progress,
   SavedView,
   ViewFilter,
   DiscussionSearchResult,
@@ -223,6 +224,18 @@ export function useProjects() {
       milestone: { name: string; description?: string; targetDate?: string },
     ) => api.patch<Milestone>(`${at(key)}/milestones/${id}`, milestone),
     deleteMilestone: (key: string, id: string) => api.delete<void>(`${at(key)}/milestones/${id}`),
+    /**
+     * How much is done, now and day by day: of the whole project, or of one
+     * cycle or milestone. Counted when asked, so a move just made is in it.
+     */
+    progress: (key: string, of?: { cycle?: string; milestone?: string }) =>
+      api.get<Progress>(
+        of?.cycle
+          ? `${at(key)}/cycles/${of.cycle}/progress`
+          : of?.milestone
+            ? `${at(key)}/milestones/${of.milestone}/progress`
+            : `${at(key)}/progress`,
+      ),
     /** Puts an issue into a cycle; null takes it out. */
     setCycle: (ref: string, cycleId: string | null) =>
       api.put<Issue>(`${issueAt(ref)}/cycle`, { cycleId }),

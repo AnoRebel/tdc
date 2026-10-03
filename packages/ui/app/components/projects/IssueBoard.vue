@@ -39,6 +39,8 @@ const props = defineProps<{
   /** Whether cards offer to be put into a cycle or milestone. */
   canPlan?: boolean;
 }>();
+/** A card moved, as the server now has it: anything counting issues is out of date. */
+const emit = defineEmits<{ moved: [key: string] }>();
 
 const projectsApi = useProjects();
 const board = ref<Board | null>(null);
@@ -125,6 +127,7 @@ async function moveCard(card: BoardCard, to: BoardColumn) {
   try {
     await projectsApi.move(card.key, to.stateId, from.stateId);
     announcement.value = $ts("projects.board.moved", { issue: card.key, state: to.name });
+    emit("moved", card.key);
   } catch (cause) {
     if (isApiError(cause) && cause.status === 409) {
       announcement.value = $ts("projects.board.movedMeanwhile", { issue: card.key });

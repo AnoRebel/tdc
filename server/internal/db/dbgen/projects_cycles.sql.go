@@ -150,6 +150,28 @@ func (q *Queries) CountOverlappingCycles(ctx context.Context, arg CountOverlappi
 	return column_1, err
 }
 
+const countProjectProgress = `-- name: CountProjectProgress :one
+SELECT count(*)::bigint AS total,
+       count(*) FILTER (WHERE s.is_completion)::bigint AS completed
+FROM issues i
+JOIN issue_states s ON s.id = i.state_id
+WHERE i.project_id = $1 AND i.deleted_at IS NULL
+`
+
+type CountProjectProgressRow struct {
+	Total     int64
+	Completed int64
+}
+
+// How many of a project's issues there are, and how many are done: counted
+// when asked, from the issues' own states, never kept as a number of its own.
+func (q *Queries) CountProjectProgress(ctx context.Context, projectID uuid.UUID) (CountProjectProgressRow, error) {
+	row := q.db.QueryRow(ctx, countProjectProgress, projectID)
+	var i CountProjectProgressRow
+	err := row.Scan(&i.Total, &i.Completed)
+	return i, err
+}
+
 const createCycle = `-- name: CreateCycle :one
 INSERT INTO cycles (id, project_id, name, starts_on, ends_on, starts_at, ends_at, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

@@ -166,6 +166,15 @@ JOIN cycles c ON c.id = ic.cycle_id
 WHERE im.milestone_id = $1 AND i.deleted_at IS NULL
 ORDER BY c.starts_at;
 
+-- name: CountProjectProgress :one
+-- How many of a project's issues there are, and how many are done: counted
+-- when asked, from the issues' own states, never kept as a number of its own.
+SELECT count(*)::bigint AS total,
+       count(*) FILTER (WHERE s.is_completion)::bigint AS completed
+FROM issues i
+JOIN issue_states s ON s.id = i.state_id
+WHERE i.project_id = $1 AND i.deleted_at IS NULL;
+
 -- name: ListMilestonesForIssues :many
 SELECT im.issue_id, m.id, m.name, m.target_date
 FROM issue_milestone im JOIN milestones m ON m.id = im.milestone_id

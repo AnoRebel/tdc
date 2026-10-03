@@ -333,6 +333,40 @@ names its `cycle` and `milestone` when it has them. The batch endpoint takes
 `"kind": "cycle"` with a cycle's id, or an empty value to take issues out, and
 the board takes `cycle` — an id, or `none`.
 
+## Progress
+
+**Progress** on a project shows how much of it is done — the whole project
+over the last two weeks, each cycle, and each milestone — and the same figures
+sit above the board for the cycle or project it shows, and on each cycle's and
+milestone's own page.
+
+Every figure is **counted when it is shown**, from the issues' states as they
+are; nothing keeps a running total that could drift from them. So a card moved
+on the board changes the figures above it at once, without the page loading
+again. The day-by-day trend beside the figures is worked out a different way:
+by replaying the project's recorded history, counting at the end of each day in
+the project's calendar. Today's point of the trend and the figures are two
+independent answers to one question, and they always agree — the server's tests
+and the projects milestone check that they do, against a recount made from
+nothing but each issue's own history.
+
+Which states count as done is the project's present answer, for the trend as
+for the figures: making a state mean done changes the past days too, which is
+what lets the two be compared exactly.
+
+The trend is drawn as a chart, and the figures are always written out beside
+it. If the chart cannot be drawn — an old browser, a charting library that has
+broken — the same numbers are shown as a table instead, built from the same
+rows the chart would have drawn.
+
+The API: `GET /api/projects/:key/progress`, `GET
+/api/projects/:key/cycles/:cycle/progress` and `GET
+/api/projects/:key/milestones/:milestone/progress` answer `total`, `completed`,
+`from`, `to` and `trend`, one `{day, total, completed}` a day, the last being
+today as it stands. A project's period is the last two weeks, a cycle's its own
+days, a milestone's from the day it was made; `from` and `to` (days) choose
+another, of at most a year, and a period never runs past today.
+
 ## Who may do what
 
 | Permission                 | What it allows                                   | Held by default by                 |

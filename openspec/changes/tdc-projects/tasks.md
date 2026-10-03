@@ -89,10 +89,10 @@ Goal: optional time-boxing and cross-cycle grouping, without ever discarding wor
 
 Goal: the numbers a project or cycle shows are trustworthy because they are derived, not maintained.
 
-- [ ] 8.1 Implement progress computation (complete vs. total, and trend over the period) as a read-time aggregate over current issue state, never an independently maintained counter; verify recomputing progress from the event log's recorded transitions matches the reported figures exactly
-- [ ] 8.2 Wire progress reporting into the existing chart-adapter interface established in the foundation change, with the documented readable-figures fallback when a chart cannot render; verify the fallback shows the same numbers the chart would have, not a placeholder
-- [ ] 8.3 Build the web progress views for a project, a cycle, and a milestone; verify each is usable end to end and updates immediately after a state transition, with no caching lag a user would notice
-- [ ] **MILESTONE 8** — Demonstrate: a project and one of its cycles both show correct, matching progress figures, a state transition performed live updates the figures without a page reload delay, and disabling chart rendering (simulated) still leaves the underlying numbers legible. Tag `v1.39.0-dev`.
+- [x] 8.1 Implement progress computation (complete vs. total, and trend over the period) as a read-time aggregate over current issue state, never an independently maintained counter; verify recomputing progress from the event log's recorded transitions matches the reported figures exactly
+- [x] 8.2 Wire progress reporting into the existing chart-adapter interface established in the foundation change, with the documented readable-figures fallback when a chart cannot render; verify the fallback shows the same numbers the chart would have, not a placeholder
+- [x] 8.3 Build the web progress views for a project, a cycle, and a milestone; verify each is usable end to end and updates immediately after a state transition, with no caching lag a user would notice
+- [x] **MILESTONE 8** — Demonstrate: a project and one of its cycles both show correct, matching progress figures, a state transition performed live updates the figures without a page reload delay, and disabling chart rendering (simulated) still leaves the underlying numbers legible. Tag `v1.39.0-dev`.
 
 ## 9. Documentation and cross-cutting verification
 

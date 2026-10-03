@@ -66,7 +66,7 @@ onMounted(async () => {
           <p v-if="milestone.overdue" class="text-xs text-muted-foreground">
             {{ $t("projects.planning.overdueHint") }}
           </p>
-          <ProjectsPlanProgress :completed="milestone.completed" :total="milestone.total" />
+          <ProjectsProgressReport :project-key="project.key" :of="{ milestone: milestone.id }" />
         </section>
 
         <section class="max-w-3xl" :aria-label="$ts('projects.planning.spans')">

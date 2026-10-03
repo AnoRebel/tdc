@@ -37,6 +37,8 @@ const priority = ref("any");
 const assignee = ref("");
 const cycle = ref("any");
 const cycles = ref<Cycle[]>([]);
+/** Bumped whenever a card moves, so the figures above the board are counted again. */
+const freshness = ref(0);
 const assigneeSettled = refDebounced(assignee, 300);
 const filter = computed<BoardFilter>(() => ({
   label: label.value === "any" ? undefined : label.value,
@@ -132,6 +134,12 @@ onMounted(async () => {
             </template>
           </Field>
         </div>
+        <ProjectsProgressReport
+          :project-key="project.key"
+          :of="filter.cycle && filter.cycle !== 'none' ? { cycle: filter.cycle } : undefined"
+          :freshness="freshness"
+          compact
+        />
         <ProjectsProjectViews
           :project-key="project.key"
           layout="board"
@@ -144,6 +152,7 @@ onMounted(async () => {
         :can-move="Boolean(project.can?.transition)"
         :can-plan="Boolean(project.can?.planIssues)"
         :filter="filter"
+        @moved="freshness++"
       />
     </template>
   </div>
