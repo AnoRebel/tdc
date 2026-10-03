@@ -168,6 +168,32 @@ jobs:
         run: bun run test:e2e
         working-directory: apps/web
 
+      # The directory's journeys, in the same three engines, each against the
+      # server started afresh on the same database. Each engine signs its two
+      # people in about as often as the server allows one account in a quarter
+      # hour, and registration is limited per address; both allowances live in
+      # the server's memory, so a restart is what lets the next engine run —
+      # as an operator's deployment would. The specs switch the directory on
+      # themselves, so nothing above depends on it.
+      - name: Check the directory
+        env:
+          TDC_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          TDC_SERVER_WEB_ROOT: ${{ github.workspace }}/apps/web/.output/public
+          TDC_SERVER_ADDRESS: 127.0.0.1:8099
+          TDC_DIRECTORY_RUN: ci${{ github.run_id }}${{ github.run_attempt }}
+        run: |
+          for project in directory directory-webkit directory-firefox; do
+            pkill -f /tmp/tdc-server || true
+            sleep 1
+            /tmp/tdc-server >/tmp/tdc-server.log 2>&1 &
+            for i in $(seq 1 30); do
+              curl -sf http://127.0.0.1:8099/api/server >/dev/null && break
+              sleep 1
+            done
+            bunx playwright test --project="$project"
+          done
+        working-directory: apps/web
+
       - name: Keep what a failure produced
         if: failure()
         uses: actions/upload-artifact@v7

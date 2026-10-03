@@ -1,5 +1,12 @@
 import { tz } from "@date-fns/tz";
-import { format, formatDistanceToNowStrict, isSameDay, isSameYear, parseISO } from "date-fns";
+import {
+  addDays,
+  format,
+  formatDistanceToNowStrict,
+  isSameDay,
+  isSameYear,
+  parseISO,
+} from "date-fns";
 
 /**
  * When something happened, said the same way everywhere.
@@ -90,4 +97,15 @@ export function whenBriefly(value: string | number | Date, timeZone?: string): s
   if (isSameDay(at, now, where)) return atTime(at, timeZone);
   if (isSameYear(at, now, where)) return onDayAtTime(at, timeZone);
   return fully(at, timeZone);
+}
+
+/**
+ * The instant a number of days from now, as RFC 3339 in UTC.
+ *
+ * For a server that wants an absolute instant — an availability that lapses,
+ * say — rather than a wall-clock date that means something different in each
+ * time zone it is read in.
+ */
+export function daysFromNow(days: number): string {
+  return addDays(new Date(), days).toISOString();
 }

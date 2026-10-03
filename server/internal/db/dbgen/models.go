@@ -109,6 +109,31 @@ type ChannelBan struct {
 	CreatedAt       time.Time
 }
 
+type CompanyMember struct {
+	CompanyID     uuid.UUID
+	UserID        uuid.UUID
+	Role          string
+	Administrator bool
+	Status        string
+	InvitedBy     *uuid.UUID
+	InvitedAt     time.Time
+	AcceptedAt    *time.Time
+}
+
+type CompanyProfile struct {
+	ID          uuid.UUID
+	Slug        string
+	SlugFolded  string
+	Name        string
+	Description string
+	Location    string
+	Visibility  string
+	ProfileRank *int16
+	CreatedBy   *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Credential struct {
 	ID                    uuid.UUID
 	UserID                uuid.UUID
@@ -128,6 +153,29 @@ type Credential struct {
 	ConfirmedAt           *time.Time
 }
 
+type DirectoryProfile struct {
+	UserID                uuid.UUID
+	Headline              string
+	Bio                   string
+	Location              string
+	Experience            string
+	ContactEmail          string
+	ContactPhone          string
+	ContactUrl            string
+	Visibility            string
+	DetailsVisibility     string
+	ContactVisibility     string
+	ProfileRank           *int16
+	DetailsRank           *int16
+	ContactRank           *int16
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	OpenToWork            bool
+	AvailabilityNote      string
+	AvailabilityExpiresAt *time.Time
+	AcceptsEnquiries      *bool
+}
+
 type EmailConfirmation struct {
 	ID        uuid.UUID
 	TokenHash []byte
@@ -136,6 +184,60 @@ type EmailConfirmation struct {
 	CreatedAt time.Time
 	ExpiresAt time.Time
 	UsedAt    *time.Time
+}
+
+type Engagement struct {
+	ID                    uuid.UUID
+	EnquiryID             *uuid.UUID
+	ClientID              *uuid.UUID
+	DeveloperID           *uuid.UUID
+	ClientLabel           string
+	DeveloperLabel        string
+	Title                 string
+	RoomID                *uuid.UUID
+	State                 string
+	CompletionRequestedBy *uuid.UUID
+	CompletionRequestedAt *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+type EngagementAgreement struct {
+	ID                  uuid.UUID
+	EngagementID        uuid.UUID
+	VersionID           uuid.UUID
+	Version             int32
+	ClientID            *uuid.UUID
+	DeveloperID         *uuid.UUID
+	ClientLabel         string
+	DeveloperLabel      string
+	ClientAcceptedAt    time.Time
+	DeveloperAcceptedAt time.Time
+	Terms               []byte
+	RecordedAt          time.Time
+}
+
+type EngagementTransition struct {
+	ID           int64
+	EngagementID uuid.UUID
+	FromState    string
+	ToState      string
+	ActorID      *uuid.UUID
+	ActorLabel   string
+	Note         string
+	OccurredAt   time.Time
+}
+
+type Enquiry struct {
+	ID          uuid.UUID
+	SenderID    uuid.UUID
+	RecipientID uuid.UUID
+	Subject     string
+	Body        string
+	RoomID      *uuid.UUID
+	Status      string
+	CreatedAt   time.Time
+	RespondedAt *time.Time
 }
 
 type Event struct {
@@ -315,6 +417,17 @@ type PinnedRoom struct {
 	PinnedAt time.Time
 }
 
+type PortfolioItem struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	Title       string
+	Url         string
+	Description string
+	Position    int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type PostingRestriction struct {
 	ID                  uuid.UUID
 	UserID              uuid.UUID
@@ -326,6 +439,58 @@ type PostingRestriction struct {
 	CreatedAt           time.Time
 	LiftedAt            *time.Time
 	LiftedBy            *uuid.UUID
+}
+
+type ProfileSkill struct {
+	UserID      uuid.UUID
+	SkillID     uuid.UUID
+	Description string
+	Position    int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+type ProfileVerification struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	ClaimKind       string
+	ClaimID         uuid.UUID
+	ClaimDigest     string
+	ClaimSnapshot   []byte
+	Note            string
+	VerifiedBy      *uuid.UUID
+	VerifiedByLabel string
+	VerifiedAt      time.Time
+	RevokedAt       *time.Time
+	RevokedBy       *uuid.UUID
+	RevokeReason    *string
+	ClearedAt       *time.Time
+}
+
+type ProposalResponse struct {
+	ID             uuid.UUID
+	VersionID      uuid.UUID
+	EngagementID   uuid.UUID
+	ResponderID    *uuid.UUID
+	ResponderLabel string
+	Kind           string
+	Part           *string
+	Comment        string
+	CreatedAt      time.Time
+}
+
+type ProposalVersion struct {
+	ID           uuid.UUID
+	EngagementID uuid.UUID
+	Version      int32
+	SentBy       *uuid.UUID
+	SentByLabel  string
+	Scope        string
+	Timeline     string
+	LineItems    []byte
+	Currency     string
+	TotalMinor   int64
+	SentAt       time.Time
 }
 
 type PushSubscription struct {
@@ -499,6 +664,23 @@ type Session struct {
 	LastSeenAt time.Time
 	ExpiresAt  time.Time
 	RevokedAt  *time.Time
+}
+
+type Skill struct {
+	ID          uuid.UUID
+	Name        string
+	NameFolded  string
+	Description string
+	Status      string
+	ProposedBy  *uuid.UUID
+	ReviewedBy  *uuid.UUID
+	ReviewedAt  *time.Time
+	CreatedAt   time.Time
+}
+
+type SkillAlias struct {
+	AliasFolded string
+	SkillID     uuid.UUID
 }
 
 type TypingIndicator struct {

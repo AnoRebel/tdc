@@ -2359,7 +2359,7 @@ watch(roomId, load, { immediate: true });
             rows="1"
             :disabled="room.archived"
             :placeholder="room.archived ? 'This room is archived' : `Message ${room.name}`"
-            class="max-h-40 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+            class="max-h-40 min-w-0 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
             @input="
               announceTyping();
               fitComposer();

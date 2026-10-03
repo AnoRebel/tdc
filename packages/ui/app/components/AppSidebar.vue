@@ -46,7 +46,7 @@ const peers = computed(() => props.servers);
  * them. Guarded for the server render, where there is no navigator.
  */
 const notifications = useNotifications();
-const { branding } = useServerInfo();
+const { branding, offers } = useServerInfo();
 const showNotifications = ref(false);
 const showAppearance = ref(false);
 const router = useRouter();
@@ -138,6 +138,24 @@ function conversationName(room: Room): string {
     </div>
 
     <nav data-tour="channels" class="flex-1 space-y-4 overflow-y-auto px-2 pb-3">
+      <!-- The directory, where the server offers one. Asked of the server
+           rather than assumed, because it is off unless an operator turned it
+           on, and a link to a directory that answers 404 is worse than none. -->
+      <section v-if="offers('directory')">
+        <ul class="space-y-px">
+          <li>
+            <NuxtLink
+              :to="localeRoute({ name: 'directory' })"
+              class="nav-item"
+              :data-active="String(route.name ?? '').startsWith('directory')"
+            >
+              <Icon name="lucide:contact" class="size-3.5 shrink-0 opacity-60" />
+              <span class="truncate">{{ $t("directory.nav") }}</span>
+            </NuxtLink>
+          </li>
+        </ul>
+      </section>
+
       <section v-if="joined.length">
         <h2
           class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"

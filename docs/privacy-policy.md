@@ -179,6 +179,63 @@ times it may be used, when it expires, and — where an invitation was bound to
 one person — the email address it was bound to. The invitation's secret is
 stored only as a hash. A record of who accepted which invitation is kept.
 
+### Your directory profile
+
+`[DELETE THIS SECTION IF THE DIRECTORY IS SWITCHED OFF ON THIS SERVER.]`
+
+Only if you create one. A directory profile holds what you choose to write — a
+headline, a location, a description of your experience, an about section,
+portfolio links, contact details (an email address, a phone number, a
+website), the skills you list with what you say about each, and whether you are
+available for work, what kind, and until when — along with who you have chosen
+may see each part, and when it was created and last changed. None of it is
+required. If you propose a skill for the server's list, the proposal records
+that it was you.
+
+Contact details are separate from the rest and visible to nobody but you unless
+you choose otherwise. What you have hidden from somebody is left out of what the
+server sends them, not sent and hidden by the application.
+
+If you send or receive an enquiry through the directory, the record holds who
+sent it to whom, its subject and text, when, and whether it was taken up,
+declined or withdrawn. Its text is also the first message of the private
+conversation it opens, which is kept like any other conversation.
+
+If an enquiry becomes an engagement, the record holds the two people in it,
+its title, its state, and every change of state with who made it, when, and any
+reason they gave. It is visible to the two people in it and nobody else. If
+either of you deletes your account, the record stays for the other, still
+naming you by username.
+
+If either of you writes a proposal in an engagement, the record holds each
+version — the work, the timeline, each deliverable and its price, the currency,
+who sent it and when — and each answer to it, with who answered, when, and what
+they asked to change. If you both accept the same version, the agreement holds a
+copy of its terms and when each of you accepted. These records cannot be
+changed — the database refuses it, whoever asks — and nothing in the application
+deletes them, because their purpose is to show what was agreed; deleting your
+account removes the link to your account from them and leaves your username in
+them, for the other person.
+This server does not process payments: no card, bank or mobile-money details are
+asked for or kept.
+
+If you are listed by a company, the record holds which company, the role it
+gave you, who invited you, and when you accepted. A company's own page holds its
+name, description, location and who created it.
+
+If a moderator verifies a claim on your profile, the record holds which claim,
+a copy of what it said when they checked it, who verified it, when, and their
+note on what they checked; and, if it is later revoked or cleared, when, by whom
+and why. Other people see only that a claim was verified, by whom and when.
+
+A moderator dealing with abuse can read your profile including what you have
+hidden, and can change or clear it; each read and each change is written to the
+audit log with the moderator's name and, for a change, the reason.
+
+Deleting your profile removes all of it, and your company associations, at once,
+and leaves your account as it was. Deleting your account removes your profile
+with it. The directory is not shared with other servers.
+
 ## What the software does not collect
 
 **There is no analytics and no telemetry.** TDC contains no analytics library,
@@ -296,6 +353,12 @@ between leaving for a provider and coming back — expire within minutes and are
 deleted the moment they are used.
 
 **Typing indicators** expire on their own within seconds.
+
+**Directory proposals and agreements** `[DELETE IF THE DIRECTORY IS SWITCHED
+OFF]` are kept for as long as the engagement they belong to, and are not
+changed after they are sent. They outlive the account of either person in them,
+naming that person by username only, so the other keeps the record of what they
+agreed.
 
 ## Your rights
 

@@ -34,6 +34,15 @@ export const SESSION = "test-results/.session.json";
  * suite that does it per test reports the application as broken when what
  * broke was the suite.
  */
+
+/*
+ * One name for this run's directory people, whichever browser is checking.
+ * Set here, before any worker starts, so every directory project inherits the
+ * same one and the second and third engines sign in as the people the first
+ * registered: three engines registering their own would need nine of the five
+ * registrations an hour the server allows one address.
+ */
+process.env.TDC_DIRECTORY_RUN ??= Date.now().toString(36);
 export default defineConfig({
   testDir: "./tests",
   // One at a time. These share a server and a signed-in account, and the
@@ -151,6 +160,46 @@ export default defineConfig({
       name: "milestone",
       use: { ...devices["Desktop Chrome"] },
       testMatch: /milestone-8\.spec\.ts/,
+    },
+    /*
+     * The directory, on a phone.
+     *
+     * A phone rather than a desktop, because that is where a developer
+     * answering a client is most likely to be — and a form that works at 1280
+     * pixels and scrolls sideways at 412 is a form that does not work. No
+     * stored session: these sign in the people they need, since a directory
+     * is about two strangers and the founder alone cannot play both.
+     */
+    {
+      name: "directory",
+      use: { ...devices["Pixel 7"] },
+      // Each one is a whole journey between two people, several sign-ins
+      // and page loads long, rather than one check on one screen.
+      timeout: 120_000,
+      testMatch: /directory-.*\.spec\.ts/,
+    },
+    /*
+     * The same journeys in the other two engines a release is gated on.
+     * WebKit as the iPhone it is on every iPhone; Firefox has no mobile mode,
+     * so a desktop Firefox at a phone's width, which is what catches a layout
+     * that only fits because Chromium measured it.
+     *
+     * Each engine is run on its own, against a server started afresh: one
+     * engine's journeys sign each person in about as often as the server
+     * allows an account in a quarter hour, and that allowance is held in the
+     * server's memory. Continuous integration runs them that way.
+     */
+    {
+      name: "directory-webkit",
+      use: { ...devices["iPhone 13"] },
+      timeout: 120_000,
+      testMatch: /directory-.*\.spec\.ts/,
+    },
+    {
+      name: "directory-firefox",
+      use: { ...devices["Desktop Firefox"], viewport: { width: 412, height: 915 } },
+      timeout: 120_000,
+      testMatch: /directory-.*\.spec\.ts/,
     },
   ],
 });

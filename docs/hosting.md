@@ -574,6 +574,94 @@ guide refetch when a delivery names a key they do not hold, so new deliveries
 reach them at once; telling their owners to refetch is what closes the window
 for the old one.
 
+### The directory
+
+The developer and company directory is **off by default**. A server that only
+wants chat never has to think about it: every directory route answers `404`,
+nothing is listed, and the sidebar shows no link to it.
+
+Turning it on is a feature toggle, changed while the server runs:
+
+```sh
+curl -X PUT https://tdc.example/api/admin/features/directory \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled": true}'
+```
+
+or the **What this server offers** list on the server settings page of the web
+client (Settings → Administration). It takes effect
+on the next request, needs no restart and no migration, and turning it off
+again hides everything without deleting any of it — profiles are there as they
+were when it comes back on.
+
+Nobody appears in the directory because it was switched on; each person decides
+for themselves by creating a profile. Whether people who are not signed in can
+read profiles marked _Anyone_ follows the server's own discoverability
+(`server.visibility`): only a public server shows them to strangers.
+
+Moderating the directory takes **`directory.profile.manage`**, a server-scoped
+permission to grant to whichever role your moderators hold. See
+[the directory](directory.md#moderation) for what it allows and what it records.
+
+**The skill vocabulary** starts with about fifty common skills and their usual
+other spellings. It grows through the review queue: grant
+**`directory.skills.manage`** to whoever should decide what counts as a skill,
+and anything they propose goes straight in, while everybody else's proposals
+wait for them. Seeding a longer list is a matter of that person proposing each
+one — `POST /api/directory/skills` with a `name` — which is scriptable. With a
+reviewer's token and one skill per line in `skills.txt`:
+
+```sh
+while IFS= read -r skill; do
+  curl -s -X POST https://tdc.example/api/directory/skills \
+    -H "Authorization: Bearer $REVIEWER_TOKEN" -H 'Content-Type: application/json' \
+    -d "$(jq -n --arg name "$skill" '{name: $name}')"
+done < skills.txt
+```
+
+A name the vocabulary already knows — under that spelling or another — is
+answered with the existing skill rather than added twice, so running it again
+is harmless.
+
+**Verifying claims** takes **`directory.verify`**. It is separate from the other
+two because it is a different judgement — whether evidence for a claim is
+credible — and a community may want it held by different people.
+
+**How fast the directory may be read** is policy, changed like any other
+setting:
+
+| Setting                                | Default | What it limits                                                |
+| -------------------------------------- | ------- | ------------------------------------------------------------- |
+| `directory.reads_per_minute`           | 30      | searches and profile views per signed-in person per minute    |
+| `directory.anonymous_reads_per_minute` | 10      | the same, per address, for people browsing without signing in |
+| `directory.enquiries_per_hour`         | 5       | enquiries one person may send in an hour                      |
+
+Each must be at least one; an operator who wants the directory unreadable
+turns it off. A page of results is always twenty at most, whatever these say.
+They take effect on the next request:
+
+```sh
+curl -X PUT https://tdc.example/api/admin/settings/directory.reads_per_minute \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value": "60"}'
+```
+
+**Upgrading and switching on are separate steps.** The directory's tables are
+created by the ordinary migrations when the server is upgraded, whether or not
+the directory is ever switched on, so switching it on later — or off and on
+again — touches no schema and needs no maintenance window. Existing accounts
+need nothing done to them: none of them has a profile until its owner makes
+one.
+
+**Switching it off** removes it from people's view straight away: every
+directory route answers `404`, the server stops listing `directory` among what
+it offers, the sidebar link goes at the next page load, and a bookmarked
+directory page lands on the start page instead. Nothing is deleted. Profiles,
+companies, verifications, enquiries, engagements, proposals and agreements are
+all kept and reappear as they were when it is switched back on. The private
+conversation each enquiry opened is an ordinary direct conversation and stays
+available to the two people in it, like any other.
+
 ## TLS
 
 **The server does not terminate TLS.** It speaks plain HTTP on its configured
