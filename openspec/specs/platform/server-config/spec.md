@@ -2,7 +2,7 @@
 
 Defines what an operator can configure about their own TDC server — limits, language, branding, registration policy, and which capabilities exist at all — so that independently hosted servers can serve different communities on their own terms.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Server identity
 

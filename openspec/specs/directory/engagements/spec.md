@@ -2,7 +2,7 @@
 
 Defines how a client and a developer move from first contact to agreed work — enquiry, scoping, proposal, negotiation, and a recorded agreement — so that the terms both sides settled on are captured rather than scattered through chat history.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Enquiries
 

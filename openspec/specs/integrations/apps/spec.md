@@ -2,7 +2,7 @@
 
 Defines third-party applications and bots on a TDC server — how they are installed, what they are permitted to do, and how their access is scoped, granted, and revoked — so a server can be extended without every extension holding the keys to everything.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Application registration
 

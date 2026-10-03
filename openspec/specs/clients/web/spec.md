@@ -2,7 +2,7 @@
 
 Defines the TDC web application — an installable, offline-tolerant progressive web app built for mid-range phones on metered mobile data, since that is how most TDC members will reach the platform.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Installable progressive web app
 

@@ -2,7 +2,7 @@
 
 Defines how independently hosted TDC servers identify each other, authenticate their exchanges, and share rooms and messages, so that no single organisation is a chokepoint for the community — while deliberately avoiding the replicated-state problems that make general-purpose federation protocols so costly to implement.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Federation is optional
 

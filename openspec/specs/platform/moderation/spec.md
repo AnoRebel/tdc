@@ -2,7 +2,7 @@
 
 Defines the tools a TDC server operator and their moderators use to keep a community healthy — content filtering, reporting, moderator actions, and retention — configured per server so each community can set its own standards.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Content filters
 

@@ -2,7 +2,7 @@
 
 Defines the TDC desktop application for Linux, macOS, and Windows — what it must do beyond the web application to justify existing as a native client, and how it stays behaviourally consistent with the web while doing so.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Supported platforms
 

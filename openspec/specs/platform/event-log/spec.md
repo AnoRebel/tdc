@@ -2,7 +2,7 @@
 
 Defines the signed, append-only event model that records every message and state change in a TDC server, providing the single ordered history from which timelines, audit records, integrations, and future cross-server federation are all derived.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Events are the system of record
 

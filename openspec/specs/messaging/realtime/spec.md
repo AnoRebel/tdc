@@ -2,7 +2,7 @@
 
 Defines how clients receive messages and state changes as they happen — connection lifecycle, subscriptions, presence and status, delivery and read state, and recovery after disconnection — with the network and battery constraints of mobile users on metered data treated as first-class requirements.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Live delivery
 

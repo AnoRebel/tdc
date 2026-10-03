@@ -2,7 +2,7 @@
 
 Defines programmable messages that carry actions — buttons, menus, and forms — which people can invoke to trigger behaviour in an integration, so that approvals, assignments, deployments, and similar decisions happen in the conversation rather than in another tool.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Messages can carry actions
 

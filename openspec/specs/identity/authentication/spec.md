@@ -2,7 +2,7 @@
 
 Defines how a person proves who they are to a TDC server, covering email and password, OAuth2 providers, and passkeys, together with the session, recovery, and account-security guarantees that protect those identities.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Supported authentication methods
 

@@ -2,7 +2,7 @@
 
 Defines how users are told about activity that concerns them — in-application, on the web, and on the desktop — with controls precise enough that people migrating from always-on chat apps are not driven to disable notifications entirely.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Notification triggers
 

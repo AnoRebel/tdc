@@ -2,7 +2,7 @@
 
 Defines trackable units of work — issues with states, assignees, labels, relationships, and discussion — so that conversation in TDC can become accountable work without moving to a separate tool.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Issues
 

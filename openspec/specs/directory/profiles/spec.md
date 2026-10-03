@@ -2,7 +2,7 @@
 
 Defines the developer and company profiles that make TDC members discoverable — skills, experience, portfolio, and availability — so that a Tanzanian developer can be found by a client, which is the need the community's earlier directory attempt set out to meet.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Developer profiles
 

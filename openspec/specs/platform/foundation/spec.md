@@ -2,7 +2,7 @@
 
 Defines the repository, build, release, packaging, configuration and documentation guarantees that every other TDC capability depends on, so that any person can obtain, verify, run, and contribute to a TDC server without paid tooling or undocumented steps.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Zero-cost self-hosting
 

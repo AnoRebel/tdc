@@ -2,7 +2,7 @@
 
 Defines the tamper-evident record of security- and administration-relevant actions on a TDC server, so operators can answer who did what and when, and so moderation and administrative power can be reviewed rather than merely trusted.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Recorded actions
 

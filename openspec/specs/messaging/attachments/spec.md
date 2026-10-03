@@ -2,7 +2,7 @@
 
 Defines how files are attached to messages — upload, storage, retrieval, preview generation, and link unfurling — together with the safety rules that prevent attachments and previews from becoming a path to server compromise or data leakage.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Attaching files
 

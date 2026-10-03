@@ -2,7 +2,7 @@
 
 Defines the ways a team sees and plans its work — projects, boards, saved views, and time-boxed cycles — so that TDC members and their clients can agree on what is being done now and what comes next.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Projects
 

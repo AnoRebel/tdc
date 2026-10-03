@@ -2,7 +2,7 @@
 
 Defines the spaces in which TDC conversation happens — servers, channels, threads, direct messages, and disposable chats — including how they are created, joined, discovered, archived, and how membership governs who can see what.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Channels
 

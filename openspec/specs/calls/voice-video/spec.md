@@ -2,7 +2,7 @@
 
 Defines optional voice and video calling between TDC users — how calls are started, joined, permissioned, and carried — as a feature an operator may disable entirely without affecting the rest of the platform.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Calling is optional
 

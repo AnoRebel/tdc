@@ -2,7 +2,7 @@
 
 Defines how external systems send events into TDC and receive events from it, so that a community's existing tools — version control, continuous integration, deployment, monitoring — can participate in its conversations without a bespoke integration for each.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Incoming webhooks
 

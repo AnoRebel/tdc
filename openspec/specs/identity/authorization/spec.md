@@ -2,7 +2,7 @@
 
 Defines how TDC decides what an authenticated actor is allowed to do, through roles and granular permissions scoped to a server, a channel, or an individual resource, so operators can delegate moderation and administration without granting unrelated power.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Permissions are granular and named
 
