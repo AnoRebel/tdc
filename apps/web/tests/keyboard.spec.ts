@@ -68,7 +68,7 @@ test.describe("using this without a mouse", () => {
        * an hour of thinking the keyboard was broken when the first two
        * characters of a username silently vanished.
        */
-      await page.getByRole("button", { name: "Sign in" }).waitFor();
+      await page.getByRole("button", { name: "Sign in", exact: true }).waitFor();
 
       /*
        * The username field already has focus — the form autofocuses it, which

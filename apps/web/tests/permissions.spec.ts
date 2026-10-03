@@ -41,10 +41,10 @@ async function anOrdinaryPerson(page: import("@playwright/test").Page) {
     registered = true;
   } else {
     await page.goto("/signin");
-    await page.getByRole("button", { name: "Sign in" }).waitFor();
+    await page.getByRole("button", { name: "Sign in", exact: true }).waitFor();
     await page.getByLabel(/username or email/i).fill(outsider);
     await page.getByLabel(/^password/i).fill(password);
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/signin"));
   }
 

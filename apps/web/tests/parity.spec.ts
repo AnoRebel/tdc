@@ -282,7 +282,7 @@ test.describe("the rest of the list", () => {
       await page.goto("/signin");
       await page.getByLabel("Username or email").fill("founder");
       await page.getByLabel("Password").fill("correct horse battery staple");
-      await page.getByRole("button", { name: "Sign in" }).click();
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await page.waitForURL((url) => !url.pathname.startsWith("/signin"));
       await page.keyboard.press("Escape");
 
