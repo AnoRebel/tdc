@@ -10,6 +10,9 @@
   several at once, and what rolling back involves.
 - **[Integrating](integrating.md)** — the HTTP API and the live connection, for
   anybody writing a bot, a bridge or another client.
+- **[Webhooks and applications](webhooks-and-apps.md)** — telling other systems
+  what happens in a channel, letting them post into one, and applications and
+  bots with permissions of their own.
 - **[Federation protocol](federation-protocol.md)** — the whole wire protocol:
   discovery, request signing, the event format, replication, and remote
   membership, sufficient to implement the other side without reading this

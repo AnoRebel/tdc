@@ -441,8 +441,13 @@ existed — the key is absent rather than empty, and nothing extra to parse.
 
 A press becomes an event in the room, which is how it reaches you: over the
 live connection you already hold, through the same delivery every other event
-uses. There is no webhook to register and no second mechanism with its own
-retries.
+uses.
+
+A program that cannot hold a connection open — one that runs only when called —
+can be installed as an [application](webhooks-and-apps.md#applications) with an
+invocation address instead, and each press on its messages is delivered there,
+signed and retried as a webhook's delivery is. The
+[worked example](#the-same-program-with-no-connection-held) does it both ways.
 
 ```json
 {
@@ -477,6 +482,179 @@ curl -X POST \
 Answers **201** with the `action.pressed` event. Pressing needs membership of
 the channel, not merely the ability to read it — answering a question in a
 channel is taking part in it.
+
+### Menus and fields
+
+Buttons answer yes-or-no questions. A **menu** offers a list to choose one
+from, and a **field** asks for a short line of text. Both sit in `actions`
+beside buttons, marked by `kind`:
+
+<!-- demo: post-menu -->
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/messages" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "body": "Build 41 is ready. Where should it go?",
+    "clientToken": "3f9a2c7e-3",
+    "actions": [
+      {"name": "environment", "label": "Environment", "kind": "select",
+       "options": [{"value": "staging", "label": "Staging"},
+                   {"value": "production", "label": "Production"}]},
+      {"name": "note", "label": "Release note", "kind": "input",
+       "placeholder": "What changed?", "maxLength": 120}
+    ]
+  }'
+```
+
+| Field         | Applies to | Meaning                                                             |
+| ------------- | ---------- | ------------------------------------------------------------------- |
+| `kind`        | all        | Absent for a button; `select` for a menu; `input` for a field       |
+| `options`     | `select`   | One to 25 choices, each `value` (reported back) and `label` (shown) |
+| `placeholder` | `input`    | A hint while the field is empty, at most 80 characters              |
+| `maxLength`   | `input`    | The most that may be typed, at most 200 — also the default          |
+| `requires`    | all        | A permission the person answering must hold in this channel         |
+
+The same rule as buttons applies: **a malformed control is refused when you
+post it**, with a 400 naming what was wrong, and the message is not posted. A
+menu with no options or more than 25, two options sharing a value, a field with
+no `name` to report its value under, a `capability` on anything but a button, or
+a `kind` this server does not know are all refused.
+
+A press of a menu or a field carries a `value`, and the server checks it against
+what you offered before you ever see it: a choice that is not one of your
+`options`, or text longer than your `maxLength`, is refused with **400**. You
+receive only what your control allowed.
+
+```json
+{
+  "type": "action.pressed",
+  "sender": "juma@chat.example.test",
+  "content": { "action": "environment", "pressed": "$abc123…", "value": "staging", "version": 0 }
+}
+```
+
+`requires` is checked against the **person answering**, never against you: a
+control restricted to `moderation.review` refuses anybody who does not hold it
+in that channel with **403**, and the press never reaches you at all.
+
+A client that meets a `kind` it does not understand leaves that control out and
+shows the rest of the message — it never draws an unknown control as a button.
+
+### Answering a press
+
+A program told that somebody pressed has three ways to answer. Posting an
+ordinary message is the first and needs nothing new. The other two follow.
+
+**Replace the message's text and controls**, so everybody sees that the
+question has been answered:
+
+<!-- demo: update-controls -->
+
+```sh
+curl -X PUT "http://localhost:8080/api/rooms/$ROOM/messages/$EVENT/controls" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "version": 0,
+    "body": "Build 41 is going to staging, at Juma'"'"'s word.",
+    "actions": [{"name": "rollback", "label": "Roll back"}]
+  }'
+```
+
+Only the message's author may. The answer is **200** with the new
+`message.updated` event and the `version` now current. Every reader's client
+receives that event over the live connection and redraws the message in place.
+
+`version` is the version you are replacing — zero for a message as posted, then
+one more for each update. **The update is applied only if that is still the
+current version**; otherwise it is refused with **409**. That is a database
+rule, not a check this server makes before writing: two answers to the same
+press, racing, produce one update and one 409, however they interleave. When
+you get a 409, read the message again and decide afresh.
+
+Every press carries the `version` of the controls it answered, and a client
+sends the version it was showing. **A press through a view that has since been
+replaced is refused with 409** rather than counted against the new question —
+the person answered what they were shown. A press naming no version is judged
+against whatever is current, and refused if the control no longer exists.
+
+**Reply to the person who pressed, and nobody else**:
+
+<!-- demo: private-reply -->
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/presses/$PRESS/reply" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"body": "Only you can see this: staging is locked until 17:00."}'
+```
+
+`$PRESS` is the `id` of the `action.pressed` event, not a person. You can only
+answer somebody who pressed one of **your** messages, only within **15 minutes**
+of the press, and only while they are still in the channel — there is no way to
+use this to reach somebody who did not ask.
+
+The reply never enters the room's log. It is sent over the live connection to
+the presser's open connections as a frame of its own:
+
+```json
+{
+  "type": "private",
+  "roomId": "5a1c…",
+  "payload": {
+    "id": "…",
+    "press": "$def456…",
+    "message": "$abc123…",
+    "sender": "deploybot@chat.example.test",
+    "body": "…",
+    "createdAt": 1758099731000
+  }
+}
+```
+
+The answer is **201** with `{"delivered": 1}` — how many of their connections
+received it. **Nothing is kept.** Somebody not connected when you reply does not
+see it later, so post an ordinary message for anything that must not be missed.
+On a server running several nodes, only connections on the node that handled
+your request receive it.
+
+### Remembering an exchange
+
+A program asking a follow-up question needs to know what was said at the last
+step. Keep it here rather than in a database of your own — it is bound to the
+conversation and the person, and it goes when either does:
+
+<!-- demo: context -->
+
+```sh
+# Remember where this exchange got to.
+curl -X PUT "http://localhost:8080/api/rooms/$ROOM/context/$PERSON" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"state": {"build": 41, "step": "chose-environment"}}'
+
+# Read it back at the next step.
+curl "http://localhost:8080/api/rooms/$ROOM/context/$PERSON" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+`$PERSON` is the presser's account identifier. The state is any JSON up to 16
+KiB. `DELETE` on the same path ends the exchange.
+
+**What you store is readable by you and nobody else.** There is no parameter
+naming the program: whoever calls is the program, so another program, the
+person it is about, and an administrator using these endpoints all find nothing
+(**404**). It is discarded when your account is removed, when the conversation
+is, or when you `DELETE` it. Both you and the person must be in the room.
+
+### Throttling
+
+Presses are limited per person (`integrations.presses_per_user_per_minute`,
+default 30) and per program, counting every press of that program's controls
+by everybody together (`integrations.presses_per_integration_per_minute`,
+default 600). Past either, a press is refused with **429** and `Retry-After`.
 
 ### Attachments
 
@@ -592,6 +770,245 @@ dropped together and reconnected in lockstep would arrive as one spike.
 Fanout is scoped by authorisation on every frame, and that is evaluated live. A
 member removed from a channel stops receiving its events immediately, without
 the connection being re-established.
+
+## Signed deliveries
+
+Some things arrive at **your** endpoint rather than over a connection you
+opened: the events an outgoing webhook subscribes to, and presses on a message
+your program posted. Your endpoint has no session with this server, so each
+delivery carries what you need to prove, from the request alone, that this
+server sent it, that nothing in it changed on the way, and that it is not an old
+delivery played back.
+
+Every delivery is a `POST` with a JSON body and these headers:
+
+| Header               | What it is                                                          |
+| -------------------- | ------------------------------------------------------------------- |
+| `TDC-Delivery`       | The delivery's identifier — the same across retries of one delivery |
+| `TDC-Event`          | What kind of delivery it is, e.g. `message.sent` or `delivery.test` |
+| `Content-Digest`     | `sha-256=:<base64>:`, the SHA-256 of the body (RFC 9530)            |
+| `Signature-Input`    | `tdc=("content-digest" "tdc-delivery");created=…;keyid="…";alg=…`   |
+| `Signature`          | `tdc=:<base64>:`, an Ed25519 signature (RFC 9421 shape)             |
+| `TDC-Signature-HMAC` | `t=<unix seconds>,v1=<hex>`, present when you were given a secret   |
+
+There are **two** signatures, for two kinds of receiver. Check whichever suits
+you; both are always valid together.
+
+**The Ed25519 signature proves the delivery came from this server** with nothing
+shared in advance. It is made with the key the server signs its event log with,
+and the keys are published, without any credential, at:
+
+```sh
+curl http://localhost:8080/.well-known/tdc-delivery-keys
+```
+
+```json
+{
+  "algorithm": "ed25519",
+  "replayWindowSeconds": 300,
+  "keys": [{ "id": "…", "publicKey": "<base64url, 32 bytes>" }]
+}
+```
+
+Retired keys stay in that list, marked `"retired": true`, because they still
+verify what they signed. Cache the document; fetch it again when a delivery
+names a `keyid` you do not have, which is what a rotation looks like.
+
+The signature is over exactly these bytes, lines joined by `\n` with none after
+the last:
+
+```text
+"content-digest": sha-256=:…:
+"tdc-delivery": 0199f1f2-…
+"@signature-params": ("content-digest" "tdc-delivery");created=1758099731;keyid="…";alg="ed25519"
+```
+
+The last line repeats `Signature-Input` after its `tdc=`. Not the method, path
+or host: a receiver behind a proxy often sees all three rewritten, and a
+signature that failed there would be one nobody could use. The delivery's
+identifier is covered instead, so a signature cannot be moved onto a different
+delivery.
+
+**The HMAC is the check most webhook receivers already know.** It is
+HMAC-SHA256, keyed with the secret you set, over `<t>.<body>` — the timestamp
+from the header, a full stop, and the raw body.
+
+**Both cover a timestamp, and that is what bounds a replay.** Refuse any
+delivery whose signed time — `created`, or the HMAC's `t` — is more than **five
+minutes** from your own clock, in either direction. Both are Unix seconds, so
+there is no timezone to get wrong. A retry is signed afresh when it is sent, so
+a delivery retried an hour later still arrives inside its own window. To refuse
+a replay _inside_ the window as well, remember the `TDC-Delivery` identifiers
+you have handled for five minutes; you want that anyway, because retries mean
+you may receive one delivery more than once.
+
+### Verifying a delivery
+
+In TypeScript, for Bun or Node, with nothing but the standard library. Hand it
+the request's headers, the body exactly as received — verify before parsing,
+since re-serialised JSON is different bytes — and the published keys:
+
+<!-- demo: verify-delivery -->
+
+```ts
+import { createHash, createHmac, createPublicKey, timingSafeEqual, verify } from "node:crypto";
+
+export const REPLAY_WINDOW_SECONDS = 300;
+
+type PublishedKey = { id: string; publicKey: string };
+
+function withinWindow(created: number, now: number) {
+  if (!Number.isInteger(created) || Math.abs(now / 1000 - created) > REPLAY_WINDOW_SECONDS) {
+    throw new Error("the delivery was signed outside the replay window");
+  }
+}
+
+/** Throws unless the delivery was signed by the server publishing `keys`. */
+export function verifyDelivery(
+  headers: Headers,
+  body: string,
+  keys: PublishedKey[],
+  now = Date.now(),
+): void {
+  const input = headers.get("signature-input") ?? "";
+  const signature = headers.get("signature") ?? "";
+  const digest = headers.get("content-digest") ?? "";
+  const delivery = headers.get("tdc-delivery") ?? "";
+
+  const params = input.replace(/^tdc=/, "");
+  if (params === input || !/\("content-digest" "tdc-delivery"\)/.test(params)) {
+    throw new Error("the signature does not cover what it must");
+  }
+  const created = Number(/;created=(\d+)/.exec(params)?.[1]);
+  const keyId = /;keyid="([^"]+)"/.exec(params)?.[1];
+  withinWindow(created, now);
+
+  const sum = createHash("sha256").update(body).digest("base64");
+  if (digest !== `sha-256=:${sum}:`) throw new Error("the body does not match its digest");
+
+  const key = keys.find((candidate) => candidate.id === keyId);
+  if (!key) throw new Error(`unknown key ${keyId}: fetch the published keys again`);
+
+  const base =
+    `"content-digest": ${digest}\n` +
+    `"tdc-delivery": ${delivery}\n` +
+    `"@signature-params": ${params}`;
+  const publicKey = createPublicKey({
+    key: { kty: "OKP", crv: "Ed25519", x: key.publicKey },
+    format: "jwk",
+  });
+  const bytes = Buffer.from(signature.replace(/^tdc=:/, "").replace(/:$/, ""), "base64");
+  if (!verify(null, Buffer.from(base), publicKey, bytes)) {
+    throw new Error("the signature does not verify");
+  }
+}
+
+/** Throws unless the delivery carries a valid HMAC for `secret`. */
+export function verifyHMAC(headers: Headers, body: string, secret: string, now = Date.now()): void {
+  const header = headers.get("tdc-signature-hmac") ?? "";
+  const created = Number(/(?:^|,)t=(\d+)/.exec(header)?.[1]);
+  const claimed = /(?:^|,)v1=([0-9a-f]+)/.exec(header)?.[1] ?? "";
+  withinWindow(created, now);
+
+  const expected = createHmac("sha256", secret).update(`${created}.${body}`).digest("hex");
+  if (
+    claimed.length !== expected.length ||
+    !timingSafeEqual(Buffer.from(claimed), Buffer.from(expected))
+  ) {
+    throw new Error("the HMAC does not match");
+  }
+}
+```
+
+And a receiver using it, which answers 2xx only once a delivery has checked
+out — anything else is retried by the server, which is what you want for a
+delivery you could not prove:
+
+<!-- demo: delivery-receiver -->
+
+```ts
+import { verifyDelivery } from "./verify-delivery";
+
+const SERVER = process.env.TDC_SERVER ?? "http://localhost:8080";
+let keys = (await (await fetch(`${SERVER}/.well-known/tdc-delivery-keys`)).json()).keys;
+
+Bun.serve({
+  port: 9000,
+  async fetch(request) {
+    const body = await request.text();
+    try {
+      verifyDelivery(request.headers, body, keys);
+    } catch (error) {
+      // A key rotated since the list was fetched: refetch once, then retry.
+      keys = (await (await fetch(`${SERVER}/.well-known/tdc-delivery-keys`)).json()).keys;
+      try {
+        verifyDelivery(request.headers, body, keys);
+      } catch {
+        return new Response(String(error), { status: 401 });
+      }
+    }
+    const delivery = JSON.parse(body);
+    console.log(request.headers.get("tdc-event"), delivery.id);
+    return new Response(null, { status: 204 });
+  },
+});
+```
+
+### Outgoing webhooks
+
+A webhook sends a channel's events to your endpoint as they happen, signed as
+above, retried with backoff when your endpoint fails, and turned off — with its
+owner told — when it keeps failing. Subscribing, the payload and its versions,
+retries, limits and the delivery history are all in
+[Webhooks and applications](webhooks-and-apps.md#outgoing-webhooks).
+
+### Incoming webhooks
+
+The other direction: an address another system posts into one channel through,
+with no account or token — a build server, an alerting tool. Its messages are
+marked as the webhook's, it can post nowhere else, and revoking it is final on
+the next call. Making one, posting, formatting and limits are in
+[Webhooks and applications](webhooks-and-apps.md#incoming-webhooks).
+
+### Applications
+
+A program installed on the server as itself, with an account and permissions of
+its own rather than somebody's borrowed: registered, approved by somebody shown
+exactly what it will hold, restricted to the channels they choose, and visible
+to everybody on the server. Its credential is a bearer token used exactly as
+those above are. Registering, approval, what it may call, rotation and removal
+are in [Webhooks and applications](webhooks-and-apps.md#applications).
+
+### Sending yourself a test delivery
+
+Before anything depends on your receiver, ask the server to send it one:
+
+<!-- demo: test-delivery -->
+
+```sh
+curl -X POST http://localhost:8080/api/integrations/test-delivery \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://hooks.example.test/tdc", "secret": "the secret you will use"}'
+```
+
+```json
+{ "id": "0199f1f2-…", "delivered": true, "status": 204 }
+```
+
+It is signed exactly as every other delivery, with `TDC-Event: delivery.test`,
+and it goes through everything a real one does: the same destination check, the
+same guard at connection time, the same timeout. `delivered` is true only for a
+2xx answer; otherwise `status` or `error` says what happened, and `response`
+carries the start of what your receiver said. Ten a minute per account.
+
+**An endpoint on a private network is refused** — loopback, `10.0.0.0/8`,
+`192.168.0.0/16`, link-local, and the rest of the reserved ranges — with
+**403**, both when you name it and again when a delivery connects, so a name
+that resolves somewhere else a moment later gains nothing. Redirects are never
+followed: a 3xx is your receiver's answer, recorded as a failure. An operator
+whose receivers genuinely live beside the server turns on
+`integrations.allow_private_addresses`; see the hosting guide.
 
 ## Search
 
@@ -873,6 +1290,133 @@ programs posted.
 Percent-encoding an event identifier if you build a path with one. They begin
 with `$`, and `encodeURIComponent` is what a correct client uses — this
 example never does, because it only ever reads identifiers out of events.
+
+### The same program, with no connection held
+
+A program that runs only when something calls it cannot sit on a live
+connection waiting for a press. Install it as an
+[application](webhooks-and-apps.md#applications) instead, and give it an
+address: the server sends each press on its messages there.
+
+**Before you start**, somebody who manages applications installs it —
+registered asking for `channel.post`, approved in the channel — and keeps the
+credential approval shows once. Then they set where its presses go, keeping
+the `secret` that answers:
+
+```sh
+curl -X PUT "http://localhost:8080/api/admin/applications/$APP/invocation" \
+  -H "Authorization: Bearer $SESSION" \
+  -H 'Content-Type: application/json' \
+  -d '{"url": "https://deploybot.example.org/presses"}'
+```
+
+An address on a private network, `localhost` included, is refused unless the
+operator has set `integrations.allow_private_addresses`, which is for trying
+this out and nothing else.
+
+The program asks the same question, then answers each invocation — after
+proving it came from the server, with the
+[verification functions](#verifying-a-delivery) above saved beside it as
+`verify-delivery.ts`:
+
+<!-- demo: invoked-bot -->
+
+```ts
+#!/usr/bin/env bun
+import { verifyDelivery, verifyHMAC } from "./verify-delivery";
+
+const SERVER = process.env.TDC_SERVER ?? "http://localhost:8080";
+const TOKEN = process.env.TDC_TOKEN!;
+const CHANNEL = process.env.TDC_CHANNEL!;
+const SECRET = process.env.TDC_INVOCATION_SECRET!;
+
+const authorised = { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" };
+
+async function api(path: string, init?: RequestInit) {
+  const response = await fetch(`${SERVER}${path}`, { ...init, headers: authorised });
+  if (!response.ok) {
+    throw new Error(
+      `${init?.method ?? "GET"} ${path}: ${response.status} ${await response.text()}`,
+    );
+  }
+  return response.status === 204 ? undefined : response.json();
+}
+
+const publishedKeys = async () =>
+  (await (await fetch(`${SERVER}/.well-known/tdc-delivery-keys`)).json()).keys;
+let keys = await publishedKeys();
+
+// Ask the question, as the application.
+const asked = await api(`/api/rooms/${CHANNEL}/messages`, {
+  method: "POST",
+  body: JSON.stringify({
+    body: "Deploy build 41 to production?",
+    clientToken: crypto.randomUUID(),
+    actions: [
+      { name: "deploy", label: "Deploy", once: true },
+      { name: "hold", label: "Not yet" },
+    ],
+  }),
+});
+
+// Be told the answer.
+const server = Bun.serve({
+  port: Number(process.env.PORT ?? 9000),
+  async fetch(request) {
+    const body = await request.text();
+    try {
+      try {
+        verifyDelivery(request.headers, body, keys);
+      } catch {
+        keys = await publishedKeys(); // a key rotated since: fetch once more
+        verifyDelivery(request.headers, body, keys);
+      }
+      verifyHMAC(request.headers, body, SECRET);
+    } catch (error) {
+      // Anything but 2xx is retried, which is right for what could not be proved.
+      return new Response(String(error), { status: 401 });
+    }
+
+    const { event } = JSON.parse(body);
+    if (event.type === "action.pressed" && event.content.pressed === asked.id) {
+      const who = event.sender.split("@")[0];
+      await api(`/api/rooms/${CHANNEL}/messages`, {
+        method: "POST",
+        body: JSON.stringify({
+          body:
+            event.content.action === "deploy"
+              ? `Deploying build 41, at ${who}'s word.`
+              : `Holding, at ${who}'s word.`,
+          clientToken: crypto.randomUUID(),
+        }),
+      });
+      setTimeout(() => server.stop(), 100);
+    }
+    return new Response(null, { status: 204 });
+  },
+});
+```
+
+```sh
+TDC_TOKEN=tdc_… TDC_CHANNEL=22089cc6-… TDC_INVOCATION_SECRET=whsec_… bun run deploybot.ts
+```
+
+Its question is marked as a bot's in every client, and its answer names who
+decided — as before, with nothing held open in between.
+
+**Three differences from the connected version are deliberate.**
+
+Answer 2xx only once a delivery has checked out. An address anybody can reach
+will be sent things the server did not send; the server retries what it is not
+told succeeded, so a refusal costs nothing real.
+
+Answer quickly. Each attempt is given a few seconds
+(`integrations.delivery_timeout_seconds`); slow work belongs after the
+response, not before it.
+
+Expect a press twice, now and then. A delivery the server could not confirm is
+sent again with the same `TDC-Delivery` identifier, so a program that acts on
+a press keeps the identifiers it has seen.
 
 ## Writing an integration that behaves
 

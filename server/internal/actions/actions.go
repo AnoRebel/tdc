@@ -132,6 +132,36 @@ type Action struct {
 
 	// Expires marks when the button stops working. Absent means it does not.
 	Expires *time.Time `json:"expires,omitempty"`
+
+	/*
+		Kind says what sort of control this is: a button when empty, or a
+		selection menu or a short input field.
+
+		Empty rather than "button" for the ordinary case, so a message posted
+		before menus existed is exactly the message it was — and so is one
+		posted by a program that has never heard of them.
+	*/
+	Kind Kind `json:"kind,omitempty"`
+
+	// Options are what a menu offers. Meaningless for any other kind.
+	Options []Option `json:"options,omitempty"`
+
+	// Placeholder is a hint shown in an empty input field.
+	Placeholder string `json:"placeholder,omitempty"`
+
+	// MaxLength bounds what may be typed into an input field. Zero is the
+	// largest a field allows.
+	MaxLength int `json:"maxLength,omitempty"`
+
+	/*
+		Requires restricts who may activate this control to people holding a
+		permission, in the channel the message is in.
+
+		Checked against the person pressing, never against whoever posted the
+		message: a program's authority is not something a reader borrows by
+		clicking its button.
+	*/
+	Requires string `json:"requires,omitempty"`
 }
 
 /*
@@ -174,6 +204,15 @@ func checkOne(action Action) error {
 	}
 	if utf8.RuneCountInString(label) > MaxLabelLength {
 		return fmt.Errorf("%w: at most %d characters", ErrLabelTooLong, MaxLabelLength)
+	}
+
+	// A menu or a field is checked for what it carries; a capability belongs
+	// to buttons alone, because only a button does something by being pressed.
+	if err := checkElement(action); err != nil {
+		return err
+	}
+	if action.Kind != KindButton {
+		return nil
 	}
 
 	switch action.Capability {

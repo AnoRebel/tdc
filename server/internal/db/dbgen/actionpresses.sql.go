@@ -12,25 +12,26 @@ import (
 )
 
 const countActionPresses = `-- name: CountActionPresses :one
-SELECT COUNT(*) FROM action_presses WHERE event_id = $1 AND action = $2
+SELECT COUNT(*) FROM action_presses WHERE event_id = $1 AND action = $2 AND version = $3
 `
 
 type CountActionPressesParams struct {
 	EventID string
 	Action  string
+	Version int32
 }
 
 // How many times a button has been pressed by anybody, for a single-use
-// action.
+// action, on the version of the controls that offered it.
 func (q *Queries) CountActionPresses(ctx context.Context, arg CountActionPressesParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countActionPresses, arg.EventID, arg.Action)
+	row := q.db.QueryRow(ctx, countActionPresses, arg.EventID, arg.Action, arg.Version)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
 const listActionPressesForEvent = `-- name: ListActionPressesForEvent :many
-SELECT id, event_id, room_id, action, user_id, user_address, created_at FROM action_presses WHERE event_id = $1 ORDER BY created_at
+SELECT id, event_id, room_id, action, user_id, user_address, created_at, version, value FROM action_presses WHERE event_id = $1 ORDER BY created_at
 `
 
 // Who pressed what on one message, oldest first.
@@ -51,6 +52,8 @@ func (q *Queries) ListActionPressesForEvent(ctx context.Context, eventID string)
 			&i.UserID,
 			&i.UserAddress,
 			&i.CreatedAt,
+			&i.Version,
+			&i.Value,
 		); err != nil {
 			return nil, err
 		}
@@ -63,10 +66,10 @@ func (q *Queries) ListActionPressesForEvent(ctx context.Context, eventID string)
 }
 
 const recordActionPress = `-- name: RecordActionPress :one
-INSERT INTO action_presses (id, event_id, room_id, action, user_id, user_address)
-VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (event_id, user_id, action) DO NOTHING
-RETURNING id, event_id, room_id, action, user_id, user_address, created_at
+INSERT INTO action_presses (id, event_id, room_id, action, user_id, user_address, version, value)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (event_id, user_id, action, version) DO NOTHING
+RETURNING id, event_id, room_id, action, user_id, user_address, created_at, version, value
 `
 
 type RecordActionPressParams struct {
@@ -76,6 +79,8 @@ type RecordActionPressParams struct {
 	Action      string
 	UserID      uuid.UUID
 	UserAddress string
+	Version     int32
+	Value       *string
 }
 
 // The press, recorded before it is announced.
@@ -83,6 +88,10 @@ type RecordActionPressParams struct {
 // ON CONFLICT DO NOTHING rather than an upsert: a second press of the same
 // button by the same person is not a change, it is a repeat, and the caller
 // needs to tell the two apart. No row returned means somebody pressed twice.
+//
+// The version is part of what makes it the same button: a program that
+// replaced a message's controls has asked a new question, even under an old
+// name.
 func (q *Queries) RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error) {
 	row := q.db.QueryRow(ctx, recordActionPress,
 		arg.ID,
@@ -91,6 +100,8 @@ func (q *Queries) RecordActionPress(ctx context.Context, arg RecordActionPressPa
 		arg.Action,
 		arg.UserID,
 		arg.UserAddress,
+		arg.Version,
+		arg.Value,
 	)
 	var i ActionPress
 	err := row.Scan(
@@ -101,6 +112,8 @@ func (q *Queries) RecordActionPress(ctx context.Context, arg RecordActionPressPa
 		&i.UserID,
 		&i.UserAddress,
 		&i.CreatedAt,
+		&i.Version,
+		&i.Value,
 	)
 	return i, err
 }

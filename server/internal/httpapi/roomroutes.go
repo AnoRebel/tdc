@@ -821,7 +821,9 @@ func roomError(err error) error {
 		errors.Is(err, actions.ErrDuplicateName),
 		errors.Is(err, actions.ErrUnknownCapability),
 		errors.Is(err, actions.ErrURLRequired),
-		errors.Is(err, actions.ErrURLNotAllowed):
+		errors.Is(err, actions.ErrURLNotAllowed),
+		// Menus and fields, whose refusals all wrap this one.
+		errors.Is(err, actions.ErrInvalidElement):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	default:
 		return err
@@ -952,30 +954,10 @@ func (s *Server) retentionDefault() int32 {
 handlePressAction records somebody pressing a button on a message.
 
 The press becomes an event in the room, which is how it reaches the program
-that posted the message: over the live connection it already holds. Nothing
-here delivers anything itself.
+that posted the message: over the live connection it already holds. Menus,
+fields, versions and restrictions are handled where the rest of interactive
+messages are, in integrations_interactive.go.
 */
 func (s *Server) handlePressAction(c *echo.Context) error {
-	user, _ := currentUser(c)
-	ctx := c.Request().Context()
-
-	roomID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "no such room")
-	}
-
-	/*
-		eventIDParam rather than c.Param: an event identifier begins with "$",
-		which a correct client percent-encodes, and Echo hands back the raw
-		segment. Reading it directly yields "%24abc" and every lookup misses —
-		invisibly, for as long as every client leaves the "$" alone.
-	*/
-	event, err := s.rooms.PressAction(ctx, roomID, user.ID,
-		eventIDParam(c), c.Param("action"))
-	if err != nil {
-		return roomError(err)
-	}
-
-	s.publishEvent(ctx, event)
-	return c.JSON(http.StatusCreated, messageResponseOf(event))
+	return s.pressInteractive(c)
 }

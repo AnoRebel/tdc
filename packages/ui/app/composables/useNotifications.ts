@@ -120,6 +120,9 @@ export function describeNotification(notification: Notification): string {
       return `${who} forwarded your message`;
     case "pin":
       return `${who} pinned your message`;
+    case "webhook_disabled":
+      // Said by the server, not a person, so the sender's name is not used.
+      return `Your webhook “${notification.detail ?? ""}” was turned off after repeated failures`;
     default:
       return `${who} did something`;
   }

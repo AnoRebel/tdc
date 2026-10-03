@@ -15,7 +15,7 @@ import (
 const createAPIToken = `-- name: CreateAPIToken :one
 INSERT INTO api_tokens (id, user_id, label, token_hash, scope, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, user_id, label, token_hash, scope, expires_at, revoked_at, last_used_at, created_at
+RETURNING id, user_id, label, token_hash, scope, expires_at, revoked_at, last_used_at, created_at, application_id
 `
 
 type CreateAPITokenParams struct {
@@ -47,12 +47,13 @@ func (q *Queries) CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) 
 		&i.RevokedAt,
 		&i.LastUsedAt,
 		&i.CreatedAt,
+		&i.ApplicationID,
 	)
 	return i, err
 }
 
 const getAPITokenByHash = `-- name: GetAPITokenByHash :one
-SELECT api_tokens.id, api_tokens.user_id, api_tokens.label, api_tokens.token_hash, api_tokens.scope, api_tokens.expires_at, api_tokens.revoked_at, api_tokens.last_used_at, api_tokens.created_at, users.id, users.username, users.username_folded, users.display_name, users.email, users.email_folded, users.email_verified, users.suspended_at, users.suspended_until, users.suspended_by, users.suspension_note, users.created_at, users.updated_at, users.sends_typing_indication, users.link_previews_enabled, users.hide_push_content, users.appearance_palette, users.appearance_mode, users.appearance_accent, users.tour_progress, users.webauthn_handle, users.pending_email
+SELECT api_tokens.id, api_tokens.user_id, api_tokens.label, api_tokens.token_hash, api_tokens.scope, api_tokens.expires_at, api_tokens.revoked_at, api_tokens.last_used_at, api_tokens.created_at, api_tokens.application_id, users.id, users.username, users.username_folded, users.display_name, users.email, users.email_folded, users.email_verified, users.suspended_at, users.suspended_until, users.suspended_by, users.suspension_note, users.created_at, users.updated_at, users.sends_typing_indication, users.link_previews_enabled, users.hide_push_content, users.appearance_palette, users.appearance_mode, users.appearance_accent, users.tour_progress, users.webauthn_handle, users.pending_email
 FROM api_tokens
 JOIN users ON users.id = api_tokens.user_id
 WHERE api_tokens.token_hash = $1
@@ -85,6 +86,7 @@ func (q *Queries) GetAPITokenByHash(ctx context.Context, tokenHash []byte) (GetA
 		&i.ApiToken.RevokedAt,
 		&i.ApiToken.LastUsedAt,
 		&i.ApiToken.CreatedAt,
+		&i.ApiToken.ApplicationID,
 		&i.User.ID,
 		&i.User.Username,
 		&i.User.UsernameFolded,

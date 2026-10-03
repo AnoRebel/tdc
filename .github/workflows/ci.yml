@@ -609,6 +609,22 @@ jobs:
         run: |
           go test ./internal/loadprofile/ -run TestServerFitsItsMemoryTarget -v 2>&1 | tee measurement.txt
           grep '^MEMORY_BYTES=' measurement.txt >> "$GITHUB_OUTPUT"
+          # The webhook delivery pool under sustained load, beside a receiver
+          # that never answers: the one part of the server that holds work for
+          # somebody else's endpoint.
+          go test ./internal/loadprofile/ -run TestDeliveryPoolFitsItsMemoryTarget -v 2>&1 | tee deliveries.txt
+          grep '^DELIVERY_MEMORY_BYTES=' deliveries.txt >> "$GITHUB_OUTPUT"
+
+      # What webhook delivery can carry, and that a receiver which never answers
+      # costs the people posting nothing. Run here, alone, because beside the
+      # rest of the suite it would measure the runner's load instead; it fails
+      # when a documented target is missed, and prints its figures either way.
+      - name: Measure webhook delivery under load
+        working-directory: server
+        env:
+          TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          TDC_LOAD_TESTS: "1"
+        run: go test ./internal/httpapi/ -run TestDeliveryLoadLeavesChatUnaffected -v -count=1
 
       - name: Compare against the base
         if: github.event_name == 'pull_request'
@@ -631,6 +647,10 @@ jobs:
             echo "The base commit does not measure this; reporting the figure alone."
           fi
 
+          if go test ./internal/loadprofile/ -run TestDeliveryPoolFitsItsMemoryTarget 2>&1 | tee base-deliveries.txt | grep -q '^DELIVERY_MEMORY_BYTES='; then
+            grep '^DELIVERY_MEMORY_BYTES=' base-deliveries.txt | sed 's/DELIVERY_MEMORY_BYTES=/base_delivery_bytes=/' >> "$GITHUB_OUTPUT"
+          fi
+
           git checkout --quiet -
           git stash pop --quiet || true
 
@@ -638,6 +658,8 @@ jobs:
         env:
           BYTES: ${{ steps.measure.outputs.MEMORY_BYTES }}
           BASE_BYTES: ${{ steps.baseline.outputs.base_bytes }}
+          DELIVERY_BYTES: ${{ steps.measure.outputs.DELIVERY_MEMORY_BYTES }}
+          BASE_DELIVERY_BYTES: ${{ steps.baseline.outputs.base_delivery_bytes }}
         run: |
           python3 - >> "$GITHUB_STEP_SUMMARY" <<'PY'
           import os
@@ -674,6 +696,29 @@ jobs:
               print()
               print("> This is over the target. Not blocking, and worth deciding "
                     "about deliberately rather than discovering on somebody's VPS.")
+
+          # The webhook delivery pool, measured the same way: a thousand
+          # deliveries beside a receiver that never answers.
+          delivery = os.environ.get("DELIVERY_BYTES") or ""
+          base_delivery = os.environ.get("BASE_DELIVERY_BYTES") or ""
+          if delivery:
+              print()
+              print("### With webhook deliveries running")
+              print()
+              print(f"**{mib(int(delivery))}** after a thousand deliveries beside a "
+                    f"stalled receiver.")
+              if base_delivery:
+                  delta = int(delivery) - int(base_delivery)
+                  if abs(delta) < 1024 * 1024:
+                      print(f"Unchanged from the base commit ({mib(int(base_delivery))}).")
+                  else:
+                      direction = "more" if delta > 0 else "less"
+                      print(f"That is **{mib(abs(delta))} {direction}** than the base "
+                            f"commit's {mib(int(base_delivery))}.")
+                      if delta > 0:
+                          print()
+                          print("An increase here is worth a sentence in the pull request "
+                                "saying what it buys.")
           PY
 
   # One required check for branch protection, rather than a list that has to be

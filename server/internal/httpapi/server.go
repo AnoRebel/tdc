@@ -155,6 +155,10 @@ type Server struct {
 	federationPeers *federation.Client
 	federationSeen  *federation.ReplayCache
 
+	// What webhooks and applications hold between requests: the signer, the
+	// outbound client and the delivery queue. Built lazily, in integrations.go.
+	integrations integrationsState
+
 	// shell is the built application's index.html, held in memory so social
 	// metadata can be inserted per request.
 	shell []byte
@@ -371,6 +375,10 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 		}()
 	}
+
+	// Webhook deliveries, by a bounded pool of their own. Stopped by the same
+	// context, and what a worker was sending when it stopped is recorded.
+	go s.RunDeliveries(ctx)
 
 	serveErr := make(chan error, 1)
 	go func() {

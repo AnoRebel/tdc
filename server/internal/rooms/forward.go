@@ -84,6 +84,9 @@ func (s *Service) Forward(
 	if comment != "" {
 		forwarded["comment"] = comment
 	}
+	if err := s.markIfProgram(ctx, sender, forwarded); err != nil {
+		return dbgen.Event{}, err
+	}
 
 	encoded, err := json.Marshal(forwarded)
 	if err != nil {

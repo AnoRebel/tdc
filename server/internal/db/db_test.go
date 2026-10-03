@@ -5,12 +5,12 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/dbtest"
 )
 
 // testDatabaseURL returns the database to test against, or skips.
@@ -18,13 +18,15 @@ import (
 // These tests need a real Postgres: the value of testing a data layer against
 // a mock is close to zero, since the mistakes worth catching are the ones the
 // database itself rejects.
+//
+// A database of this package's own, through dbtest like every other package,
+// rather than the configured one itself. These tests move the schema version
+// up and down deliberately, and doing that to the shared database meant two
+// checkouts testing at once — or one on a branch with newer migrations —
+// refused each other with "schema is newer than this binary".
 func testDatabaseURL(t *testing.T) string {
 	t.Helper()
-	url := os.Getenv("TDC_TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("set TDC_TEST_DATABASE_URL to run database tests")
-	}
-	return url
+	return dbtest.URL(t, "db")
 }
 
 func discardLogger() *slog.Logger {

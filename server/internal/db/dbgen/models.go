@@ -19,18 +19,48 @@ type ActionPress struct {
 	UserID      uuid.UUID
 	UserAddress string
 	CreatedAt   time.Time
+	Version     int32
+	Value       *string
 }
 
 type ApiToken struct {
-	ID         uuid.UUID
-	UserID     uuid.UUID
-	Label      string
-	TokenHash  []byte
-	Scope      []byte
-	ExpiresAt  *time.Time
-	RevokedAt  *time.Time
-	LastUsedAt *time.Time
-	CreatedAt  time.Time
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	Label         string
+	TokenHash     []byte
+	Scope         []byte
+	ExpiresAt     *time.Time
+	RevokedAt     *time.Time
+	LastUsedAt    *time.Time
+	CreatedAt     time.Time
+	ApplicationID *uuid.UUID
+}
+
+type Application struct {
+	ID                   uuid.UUID
+	Name                 string
+	Purpose              string
+	RequestedPermissions []string
+	SendsDataExternally  bool
+	ExternalDisclosure   string
+	State                string
+	GrantedPermissions   []string
+	RegisteredBy         *uuid.UUID
+	RegisteredAt         time.Time
+	ApprovedBy           *uuid.UUID
+	ApprovedAt           *time.Time
+	RemovedBy            *uuid.UUID
+	RemovedAt            *time.Time
+	AccountID            *uuid.UUID
+	RateLimitedCount     int64
+	LastRateLimitedAt    *time.Time
+	InvocationUrl        string
+	InvocationSecret     string
+}
+
+type ApplicationChannel struct {
+	ApplicationID uuid.UUID
+	RoomID        uuid.UUID
 }
 
 type Attachment struct {
@@ -135,6 +165,29 @@ type EventIdempotency struct {
 	CreatedAt   time.Time
 }
 
+type IncomingWebhook struct {
+	ID            uuid.UUID
+	RoomID        uuid.UUID
+	Label         string
+	TokenHash     []byte
+	CreatedBy     *uuid.UUID
+	CreatedAt     time.Time
+	RevokedAt     *time.Time
+	RevokedBy     *uuid.UUID
+	LastUsedAt    *time.Time
+	PostedCount   int64
+	RefusedCount  int64
+	LastRefusedAt *time.Time
+}
+
+type IntegrationContext struct {
+	IntegrationID uuid.UUID
+	RoomID        uuid.UUID
+	UserID        uuid.UUID
+	State         []byte
+	UpdatedAt     time.Time
+}
+
 type Invitation struct {
 	ID               uuid.UUID
 	TokenHash        []byte
@@ -155,6 +208,16 @@ type InvitationUse struct {
 	InvitationID uuid.UUID
 	UserID       uuid.UUID
 	UsedAt       time.Time
+}
+
+type MessageInteraction struct {
+	EventID   string
+	RoomID    uuid.UUID
+	Version   int32
+	Body      string
+	Actions   []byte
+	UpdatedBy *uuid.UUID
+	UpdatedAt time.Time
 }
 
 type MessageLifetime struct {
@@ -509,4 +572,52 @@ type WebauthnCeremony struct {
 	UserID        *uuid.UUID
 	CreatedAt     time.Time
 	ExpiresAt     time.Time
+}
+
+type WebhookAttempt struct {
+	ID          uuid.UUID
+	DeliveryID  uuid.UUID
+	Attempt     int32
+	AttemptedAt time.Time
+	Outcome     string
+	StatusCode  *int32
+	Error       *string
+	Response    *string
+	DurationMs  int32
+}
+
+type WebhookDelivery struct {
+	ID             uuid.UUID
+	Target         string
+	SubscriptionID *uuid.UUID
+	EventID        *string
+	Kind           string
+	Payload        []byte
+	State          string
+	Attempts       int32
+	NextAttemptAt  time.Time
+	ClaimedAt      *time.Time
+	CreatedAt      time.Time
+	CompletedAt    *time.Time
+	ApplicationID  *uuid.UUID
+}
+
+type WebhookSubscription struct {
+	ID                  uuid.UUID
+	OwnerID             uuid.UUID
+	RoomID              uuid.UUID
+	Label               string
+	Url                 string
+	Secret              string
+	EventTypes          []string
+	PayloadVersion      int32
+	State               string
+	DisabledAt          *time.Time
+	DisabledReason      *string
+	ConsecutiveFailures int32
+	RateLimitedCount    int64
+	LastRateLimitedAt   *time.Time
+	AccessLostAt        *time.Time
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }

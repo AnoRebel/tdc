@@ -27,6 +27,8 @@ type Querier interface {
 	// but its address is refreshed so an operator can correct one in place.
 	AddRoomPeer(ctx context.Context, arg AddRoomPeerParams) error
 	AdoptForeignRoom(ctx context.Context, arg AdoptForeignRoomParams) (Room, error)
+	// Every later update, which succeeds only against the version it names.
+	AdvanceMessageInteraction(ctx context.Context, arg AdvanceMessageInteractionParams) (MessageInteraction, error)
 	// Records how far a peer has been told.
 	//
 	// Never moves backwards: a late acknowledgement of an earlier batch must not
@@ -37,6 +39,7 @@ type Querier interface {
 	AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error)
 	// A reply carries the identifier of the message that started the thread.
 	AppendThreadedEvent(ctx context.Context, arg AppendThreadedEventParams) (Event, error)
+	ApproveApplication(ctx context.Context, arg ApproveApplicationParams) (Application, error)
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	// Binds an attachment to the message that carries it.
@@ -49,9 +52,13 @@ type Querier interface {
 	// a moderator extending a ban means the new terms, not an error.
 	BanFromChannel(ctx context.Context, arg BanFromChannelParams) error
 	BlockUser(ctx context.Context, arg BlockUserParams) error
+	// Everything still waiting for a subscription that has been turned off.
+	CancelPendingWebhookDeliveries(ctx context.Context, subscriptionID *uuid.UUID) (int64, error)
 	// Claiming by the state the client already holds, for a client with no browser
 	// to receive the redirect. Consumed as it is read, exactly as the handle is.
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
+	ClaimWebhookDeliveries(ctx context.Context, capacity int32) ([]WebhookDelivery, error)
+	ClearApplicationChannels(ctx context.Context, applicationID uuid.UUID) error
 	// A success resets everything: consecutive failures are what matter, and a
 	// peer that answers has none.
 	ClearDeliveryFailures(ctx context.Context, arg ClearDeliveryFailuresParams) error
@@ -62,6 +69,7 @@ type Querier interface {
 	// Collected once: the row is deleted as it is read, so a handle presented twice
 	// yields nothing the second time.
 	CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error)
+	CompleteWebhookDelivery(ctx context.Context, arg CompleteWebhookDeliveryParams) error
 	ConfirmEmail(ctx context.Context, arg ConfirmEmailParams) (User, error)
 	// Confirming enrolment: the person proved their app holds the secret. The
 	// period is recorded at the same moment, so the code that confirmed it cannot
@@ -77,7 +85,7 @@ type Querier interface {
 	// offline when they close one.
 	ConnectionOpened(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	// How many times a button has been pressed by anybody, for a single-use
-	// action.
+	// action, on the version of the controls that offered it.
 	CountActionPresses(ctx context.Context, arg CountActionPressesParams) (int64, error)
 	// Counts what still points at a stored preview, so its bytes are only removed
 	// once nothing references them.
@@ -120,11 +128,20 @@ type Querier interface {
 	// leave nobody able to administer the server.
 	CountUsersWithPermission(ctx context.Context, permission string) (int64, error)
 	CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) (ApiToken, error)
+	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
+	CreateApplicationToken(ctx context.Context, arg CreateApplicationTokenParams) (CreateApplicationTokenRow, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
 	CreateEmailConfirmation(ctx context.Context, arg CreateEmailConfirmationParams) (EmailConfirmation, error)
+	CreateIncomingWebhook(ctx context.Context, arg CreateIncomingWebhookParams) (IncomingWebhook, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
+	// The first update to a message, from version zero to one.
+	//
+	// ON CONFLICT DO NOTHING is the compare-and-swap for the first step: two
+	// updates both expecting version zero both try to insert, and exactly one
+	// row is written. The loser gets no row back and is told it was stale.
+	CreateMessageInteraction(ctx context.Context, arg CreateMessageInteractionParams) (MessageInteraction, error)
 	// Raises a notification, once.
 	//
 	// The conflict clause is what stops a redelivered or edited message notifying
@@ -144,6 +161,7 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateTOTPCredential(ctx context.Context, arg CreateTOTPCredentialParams) (Credential, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateWebhookSubscription(ctx context.Context, arg CreateWebhookSubscriptionParams) (WebhookSubscription, error)
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
@@ -155,6 +173,9 @@ type Querier interface {
 	DeleteExpiredRecoveryTokens(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteExpiredWebauthnCeremonies(ctx context.Context) (int64, error)
+	DeleteIntegrationContext(ctx context.Context, arg DeleteIntegrationContextParams) (int64, error)
+	// Everything a program remembered, for when it is removed.
+	DeleteIntegrationContextForIntegration(ctx context.Context, integrationID uuid.UUID) (int64, error)
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
 	DeleteLapsedBans(ctx context.Context) (int64, error)
@@ -172,6 +193,15 @@ type Querier interface {
 	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
 	DeleteTOTPCredential(ctx context.Context, userID uuid.UUID) error
+	// Scoped to its owner, so a subscription cannot be removed by guessing.
+	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) (WebhookSubscription, error)
+	// Only an active one, so the owner is told once rather than at every failure
+	// that follows.
+	DisableWebhookSubscription(ctx context.Context, arg DisableWebhookSubscriptionParams) (WebhookSubscription, error)
+	// Turning it back on starts the count again; what failed before is history.
+	EnableWebhookSubscription(ctx context.Context, arg EnableWebhookSubscriptionParams) (WebhookSubscription, error)
+	EnqueueInvocation(ctx context.Context, arg EnqueueInvocationParams) (WebhookDelivery, error)
+	EnqueueWebhookDelivery(ctx context.Context, arg EnqueueWebhookDeliveryParams) (WebhookDelivery, error)
 	// Establishing the handle when somebody enrols their first passkey. Only ever
 	// set once: it is what the authenticator remembers, and changing it would
 	// orphan every passkey already enrolled.
@@ -219,6 +249,7 @@ type Querier interface {
 	FindInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
 	// Consumed when the second factor is accepted, so a ticket buys one session.
 	FinishPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
+	FinishWebhookAttempt(ctx context.Context, arg FinishWebhookAttemptParams) error
 	// The per-request lookup, joined to the account so one query answers both
 	// "is this token good" and "who is it".
 	//
@@ -227,12 +258,18 @@ type Querier interface {
 	// existed, and doing it in the query means there is no window where a caller
 	// reads the row and forgets to check.
 	GetAPITokenByHash(ctx context.Context, tokenHash []byte) (GetAPITokenByHashRow, error)
+	// The one lookup a post makes. No cache in front of it, so a revocation is
+	// final for the very next call.
+	GetActiveIncomingWebhookByHash(ctx context.Context, tokenHash []byte) (IncomingWebhook, error)
 	// What this person chose the interface to look like.
 	//
 	// Empty in any column means they have chosen nothing there and take the
 	// operator's default, which is resolved by the client rather than here: the
 	// server reports what was chosen, and choosing nothing is an answer.
 	GetAppearance(ctx context.Context, id uuid.UUID) (GetAppearanceRow, error)
+	GetApplication(ctx context.Context, id uuid.UUID) (Application, error)
+	// The application an account acts for, if it acts for one.
+	GetApplicationByAccount(ctx context.Context, accountID *uuid.UUID) (Application, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetDirectMessagePolicy(ctx context.Context, userID uuid.UUID) (string, error)
@@ -243,7 +280,12 @@ type Querier interface {
 	// settings discloses all three.
 	GetDisclosurePreferences(ctx context.Context, userID uuid.UUID) (GetDisclosurePreferencesRow, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
+	// What one program remembers about one person in one conversation.
+	GetIntegrationContext(ctx context.Context, arg GetIntegrationContextParams) (IntegrationContext, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
+	// A message's controls as its program last left them. No row means the
+	// message is as it was posted.
+	GetMessageInteraction(ctx context.Context, eventID string) (MessageInteraction, error)
 	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
 	// The preference that applies to one conversation.
 	//
@@ -281,6 +323,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
 	GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []byte) (User, error)
+	GetWebhookSubscription(ctx context.Context, id uuid.UUID) (WebhookSubscription, error)
 	HasBlocked(ctx context.Context, arg HasBlockedParams) (bool, error)
 	HasConfirmedSecondFactor(ctx context.Context, userID uuid.UUID) (bool, error)
 	// The passkeys an account could answer a second-factor challenge with.
@@ -316,6 +359,18 @@ type Querier interface {
 	ListAPITokensForUser(ctx context.Context, userID uuid.UUID) ([]ListAPITokensForUserRow, error)
 	// Who pressed what on one message, oldest first.
 	ListActionPressesForEvent(ctx context.Context, eventID string) ([]ActionPress, error)
+	// What an event in this room might need delivering to.
+	ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roomID uuid.UUID) ([]WebhookSubscription, error)
+	ListApplicationChannels(ctx context.Context, applicationID uuid.UUID) ([]uuid.UUID, error)
+	// An application's recent invocations, newest first, with how the last
+	// attempt at each went.
+	ListApplicationInvocations(ctx context.Context, arg ListApplicationInvocationsParams) ([]ListApplicationInvocationsRow, error)
+	ListApplicationTokens(ctx context.Context, applicationID *uuid.UUID) ([]ListApplicationTokensRow, error)
+	ListApplications(ctx context.Context) ([]Application, error)
+	// The approved applications that may act in a channel, which is what that
+	// channel's members are entitled to know.
+	ListApplicationsInRoom(ctx context.Context, roomID uuid.UUID) ([]Application, error)
+	ListApprovedApplications(ctx context.Context) ([]Application, error)
 	ListAttachmentsForEvent(ctx context.Context, eventID *string) ([]Attachment, error)
 	// The files carried by a set of messages, so expiring the messages can remove
 	// them too.
@@ -334,9 +389,12 @@ type Querier interface {
 	// without sending the same message twice: whoever locks a row owns it, and the
 	// others move on rather than waiting.
 	ListDueScheduledMessages(ctx context.Context, limit int32) ([]ScheduledMessage, error)
+	// What an account posted, for removing it with the application it acted for.
+	ListEventIDsBySender(ctx context.Context, senderID *uuid.UUID) ([]ListEventIDsBySenderRow, error)
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	ListIncomingWebhooksForRoom(ctx context.Context, roomID uuid.UUID) ([]IncomingWebhook, error)
 	// Who joined through one invitation, newest first.
 	ListInvitationUsers(ctx context.Context, invitationID uuid.UUID) ([]ListInvitationUsersRow, error)
 	// What a channel has outstanding, for whoever manages it.
@@ -459,6 +517,11 @@ type Querier interface {
 	// stands for: how many, and how many people are involved.
 	ListUnreadNotificationsGrouped(ctx context.Context, userID uuid.UUID) ([]ListUnreadNotificationsGroupedRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	// A subscription's recent deliveries, including ones not yet attempted.
+	ListWebhookDeliveries(ctx context.Context, arg ListWebhookDeliveriesParams) ([]WebhookDelivery, error)
+	// A subscription's recent attempts, newest first, with what each was for.
+	ListWebhookHistory(ctx context.Context, arg ListWebhookHistoryParams) ([]ListWebhookHistoryRow, error)
+	ListWebhookSubscriptionsForOwner(ctx context.Context, ownerID uuid.UUID) ([]WebhookSubscription, error)
 	// Marks media so viewers see it obscured until they choose otherwise.
 	//
 	// A moderator's mark overwrites an uploader's; an uploader's does not
@@ -491,6 +554,8 @@ type Querier interface {
 	PinMessage(ctx context.Context, arg PinMessageParams) error
 	// A person's own pinned conversation, which says nothing to anybody else.
 	PinRoom(ctx context.Context, arg PinRoomParams) error
+	// Held back by a rate limit: not an attempt, so the count is given back.
+	PostponeWebhookDelivery(ctx context.Context, arg PostponeWebhookDeliveryParams) error
 	// Removes subscriptions that have failed repeatedly without the service ever
 	// saying they are gone.
 	//
@@ -498,15 +563,26 @@ type Querier interface {
 	// a long run of them means nothing is listening, and continuing to try costs
 	// a request per notification forever.
 	PrunePushSubscriptions(ctx context.Context, failures int32) (int64, error)
+	// History older than the retention period. Only finished deliveries: one still
+	// waiting is not history yet, however old.
+	PruneWebhookDeliveries(ctx context.Context, createdAt time.Time) (int64, error)
 	PublishedRooms(ctx context.Context, limit int32) ([]PublishedRoomsRow, error)
+	PutIntegrationContext(ctx context.Context, arg PutIntegrationContextParams) (IntegrationContext, error)
 	// The press, recorded before it is announced.
 	//
 	// ON CONFLICT DO NOTHING rather than an upsert: a second press of the same
 	// button by the same person is not a change, it is a repeat, and the caller
 	// needs to tell the two apart. No row returned means somebody pressed twice.
+	//
+	// The version is part of what makes it the same button: a program that
+	// replaced a message's controls has asked a new question, even under an old
+	// name.
 	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
+	RecordApplicationRateLimited(ctx context.Context, id uuid.UUID) error
 	RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error)
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
+	RecordIncomingWebhookPost(ctx context.Context, id uuid.UUID) error
+	RecordIncomingWebhookRefused(ctx context.Context, id uuid.UUID) error
 	// Claims one use, atomically.
 	//
 	// The count is incremented in the same statement that checks it, so two people
@@ -524,9 +600,17 @@ type Querier interface {
 	RecordMessageView(ctx context.Context, arg RecordMessageViewParams) error
 	RecordPushFailure(ctx context.Context, endpoint string) error
 	RecordPushSuccess(ctx context.Context, endpoint string) error
+	RecordWebhookAccessLost(ctx context.Context, id uuid.UUID) error
+	RecordWebhookAttempt(ctx context.Context, arg RecordWebhookAttemptParams) error
+	RecordWebhookRateLimited(ctx context.Context, id uuid.UUID) error
 	RedactEvent(ctx context.Context, arg RedactEventParams) error
+	// Deliveries a worker claimed and never finished, because the process ended
+	// mid-attempt. Put back rather than lost; the receiver may see one twice,
+	// which the delivery identifier lets it notice.
+	ReleaseStaleWebhookDeliveries(ctx context.Context, claimedAt *time.Time) (int64, error)
 	RemoteMember(ctx context.Context, arg RemoteMemberParams) (RemoteMember, error)
 	RemoteMembers(ctx context.Context, roomID uuid.UUID) ([]RemoteMember, error)
+	RemoveApplication(ctx context.Context, arg RemoveApplicationParams) (Application, error)
 	RemoveReaction(ctx context.Context, arg RemoveReactionParams) error
 	RemoveRemoteMember(ctx context.Context, arg RemoveRemoteMemberParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
@@ -556,6 +640,9 @@ type Querier interface {
 	// credential that outlived the account's own access would be the way back in.
 	RevokeAPITokensForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
+	RevokeApplicationToken(ctx context.Context, arg RevokeApplicationTokenParams) (RevokeApplicationTokenRow, error)
+	RevokeApplicationTokens(ctx context.Context, applicationID *uuid.UUID) error
+	RevokeIncomingWebhook(ctx context.Context, arg RevokeIncomingWebhookParams) (IncomingWebhook, error)
 	// Revoking is idempotent in effect but recorded once: a second revocation
 	// leaves the first one's timestamp, which is when it actually stopped working.
 	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (Invitation, error)
@@ -605,6 +692,9 @@ type Querier interface {
 	// already in it, so searching cannot be used to discover that one exists.
 	SearchRooms(ctx context.Context, arg SearchRoomsParams) ([]SearchRoomsRow, error)
 	SetAppearance(ctx context.Context, arg SetAppearanceParams) error
+	SetApplicationChannel(ctx context.Context, arg SetApplicationChannelParams) error
+	// Only an approved application has anywhere to be told about anything.
+	SetApplicationInvocation(ctx context.Context, arg SetApplicationInvocationParams) (Application, error)
 	// Scoped to the uploader and to attachments not yet sent: a caption is written
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)

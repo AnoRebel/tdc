@@ -84,10 +84,14 @@ func (s *Service) ReplyInThread(
 		return dbgen.Event{}, fmt.Errorf("read sender: %w", err)
 	}
 
-	content, err := json.Marshal(map[string]any{
+	reply := map[string]any{
 		"body":       trimmed,
 		"threadRoot": rootID,
-	})
+	}
+	if err := s.markIfProgram(ctx, sender, reply); err != nil {
+		return dbgen.Event{}, err
+	}
+	content, err := json.Marshal(reply)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("encode reply: %w", err)
 	}
