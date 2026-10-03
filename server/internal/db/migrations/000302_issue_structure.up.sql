@@ -118,6 +118,8 @@ ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_reason_check;
 ALTER TABLE notifications ADD CONSTRAINT notifications_reason_check
     CHECK (reason IN (
         'mention', 'direct', 'thread', 'reaction', 'reply', 'join', 'forward', 'pin',
+        -- Belongs to outgoing webhooks: one of yours was turned off. Not unknown; keep it.
+        'webhook_disabled',
         -- Somebody made you responsible for an issue.
         'assigned'
     ));
