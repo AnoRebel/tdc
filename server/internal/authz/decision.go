@@ -16,6 +16,10 @@ type Grant struct {
 	// implied by absence, because it has to be able to override a grant made
 	// at a broader scope.
 	Granted bool
+	// Baseline is true for what the role every account holds confers. Any
+	// other role's entry at the same scope overrides it, whichever way either
+	// points.
+	Baseline bool
 }
 
 // Decision is the outcome of an authorization check, carrying enough detail
@@ -51,14 +55,24 @@ type Permissions struct {
 	channelScope map[uuid.UUID]map[Permission]bool
 }
 
-// Resolve combines a set of grants into effective permissions.
-//
-// The rules, in order:
-//   - Grants from every role a person holds are unioned.
-//   - Within one scope, an explicit denial beats a grant, so removing access
-//     does not depend on finding and editing every role that conferred it.
-//   - A channel-scope entry overrides the server scope for that channel,
-//     whichever way it points.
+/*
+Resolve combines a set of grants into effective permissions.
+
+The rules, in order:
+  - Grants from every role a person holds are unioned.
+  - Within one scope, an explicit denial beats a grant, so removing access
+    does not depend on finding and editing every role that conferred it.
+  - Except that the role every account holds is a baseline beneath the others:
+    any other role's entry at the same scope replaces its entry there. That is
+    what makes an announcement channel possible. Withdrawing channel.post from
+    Member in one channel silences everybody, because everybody holds Member;
+    a role that grants channel.post there is how the few who announce are let
+    back in. Were the denial to win, as it would between two ordinary roles,
+    nobody holding Member could ever be given the channel back. And somebody
+    another role makes an administrator is not held to the baseline at all.
+  - A channel-scope entry overrides the server scope for that channel,
+    whichever way it points.
+*/
 func Resolve(grants []Grant) Permissions {
 	resolved := Permissions{
 		serverScope:  make(map[Permission]bool),
@@ -79,18 +93,52 @@ func Resolve(grants []Grant) Permissions {
 		scope[permission] = true
 	}
 
-	for _, grant := range grants {
+	scopeOf := func(into Permissions, grant Grant) map[Permission]bool {
 		if grant.ChannelID == nil {
-			apply(resolved.serverScope, grant.Permission, grant.Granted)
-			continue
+			return into.serverScope
 		}
-
-		scope, ok := resolved.channelScope[*grant.ChannelID]
+		scope, ok := into.channelScope[*grant.ChannelID]
 		if !ok {
 			scope = make(map[Permission]bool)
-			resolved.channelScope[*grant.ChannelID] = scope
+			into.channelScope[*grant.ChannelID] = scope
 		}
-		apply(scope, grant.Permission, grant.Granted)
+		return scope
+	}
+
+	// The baseline first, then every other role resolved among themselves and
+	// laid over it entry by entry.
+	others := Permissions{
+		serverScope:  make(map[Permission]bool),
+		channelScope: make(map[uuid.UUID]map[Permission]bool),
+	}
+	for _, grant := range grants {
+		if grant.Baseline {
+			apply(scopeOf(resolved, grant), grant.Permission, grant.Granted)
+		} else {
+			apply(scopeOf(others, grant), grant.Permission, grant.Granted)
+		}
+	}
+
+	/*
+		An administrator is not an ordinary member, and the baseline describes
+		ordinary members. Without this, of two administrators the one promoted
+		from the membership would be silenced by an announcement channel and the
+		one who set the server up would not — and withdrawing channel.create from
+		Member, to leave making channels to administrators, would take it from
+		half of them.
+	*/
+	if others.serverScope[PermServerAdminister] {
+		return others
+	}
+
+	for permission, granted := range others.serverScope {
+		resolved.serverScope[permission] = granted
+	}
+	for channelID, entries := range others.channelScope {
+		scope := scopeOf(resolved, Grant{ChannelID: &channelID})
+		for permission, granted := range entries {
+			scope[permission] = granted
+		}
 	}
 
 	return resolved

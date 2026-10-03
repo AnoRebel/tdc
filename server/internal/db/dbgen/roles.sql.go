@@ -133,22 +133,33 @@ func (q *Queries) GetRoleByName(ctx context.Context, name string) (Role, error) 
 }
 
 const listGrantsForUser = `-- name: ListGrantsForUser :many
-SELECT role_permissions.permission, role_permissions.scope_id, role_permissions.granted
+SELECT role_permissions.permission, role_permissions.scope_id, role_permissions.granted,
+       (roles.built_in AND roles.name = $1::text)::boolean AS baseline
 FROM role_permissions
 JOIN user_roles ON user_roles.role_id = role_permissions.role_id
-WHERE user_roles.user_id = $1
+JOIN roles ON roles.id = role_permissions.role_id
+WHERE user_roles.user_id = $2
 `
+
+type ListGrantsForUserParams struct {
+	BaselineRole string
+	UserID       uuid.UUID
+}
 
 type ListGrantsForUserRow struct {
 	Permission string
 	ScopeID    *uuid.UUID
 	Granted    bool
+	Baseline   bool
 }
 
 // Every grant a user holds, across all their roles. One query rather than one
 // per role: a request resolves permissions once and consults them many times.
-func (q *Queries) ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error) {
-	rows, err := q.db.Query(ctx, listGrantsForUser, userID)
+//
+// baseline marks what comes from the role every account holds, which any
+// other role's entry at the same scope overrides.
+func (q *Queries) ListGrantsForUser(ctx context.Context, arg ListGrantsForUserParams) ([]ListGrantsForUserRow, error) {
+	rows, err := q.db.Query(ctx, listGrantsForUser, arg.BaselineRole, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +167,12 @@ func (q *Queries) ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]Li
 	items := []ListGrantsForUserRow{}
 	for rows.Next() {
 		var i ListGrantsForUserRow
-		if err := rows.Scan(&i.Permission, &i.ScopeID, &i.Granted); err != nil {
+		if err := rows.Scan(
+			&i.Permission,
+			&i.ScopeID,
+			&i.Granted,
+			&i.Baseline,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

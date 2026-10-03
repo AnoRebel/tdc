@@ -75,11 +75,10 @@ assignment — which is worth setting up before the move, so that the people who
 moderated your Telegram group are moderating here on the first day rather than
 asking you to do it for them.
 
-Note what a role does **not** cover. Thirteen of the twenty-three catalogued
+Note what a role does **not** cover. Eighteen of the twenty-five catalogued
 permissions are enforced anywhere; the rest are names waiting for the features
-they belong to. `channel.post` is one of the unenforced ones, so posting is
-governed by membership, bans and posting restrictions rather than by a role — a
-read-only announcement channel is still the awkward case described below.
+they belong to. Reading and posting are among the enforced ones, per channel —
+which is how the announcement channel described below is made.
 
 Decide who holds what before the move rather than during it. An organiser who
 was an admin in Telegram is not automatically anything here.
@@ -211,35 +210,32 @@ in the first month.
 
 ### Announcement channels are moderation, not a channel type
 
+TDC has three kinds of room### Announcement channels are a permission, not a channel type
+
 TDC has three kinds of room — a channel, a direct conversation, and a disposable
-chat. There is no read-only or broadcast channel type.
+chat. There is no read-only or broadcast channel type, and none is needed:
+posting in a channel takes `channel.post`, and a permission can be withdrawn for
+one channel.
 
-Nor is posting permission-controlled. There is a `channel.post` permission in
-the catalogue, but the endpoint that accepts a message does not consult it: what
-actually stops somebody posting is not being a member, being banned from that
-channel, being restricted from posting, having the account suspended, or the
-channel being archived.
+Everybody holds the Member role, so withdrawing `channel.post` from Member in the
+announcement channel stops everybody posting there, and granting it in that
+channel on a role of your own — an `Announcer` — lets the few back in. Member is
+a baseline the other roles override; it is the one place a grant beats a denial.
+Administrators post there regardless. The two calls are in
+[hosting](hosting.md#roles).
 
-So an announcement channel is built out of moderation instead: everybody is a
-member and reads it, and the people who should not post are restricted from
-posting in it. Restrictions are per-person and per-channel, they can be temporary
-or permanent, and they expire by themselves.
+Two things to know before relying on it:
 
-**Be clear-eyed about what this costs.** For a community of two hundred people
-where three should be able to post, that is a restriction applied to a hundred
-and ninety-seven people, and to each new member as they arrive. There is no
-single switch that makes a channel read-only. If a broadcast channel is central
-to how your community works today, this is the largest piece of friction in the
-move, and it is worth knowing before you promise anybody an announcements
-channel.
+- The grant has to name the channel. A role granting `channel.post` everywhere
+  does not reopen a channel where Member has been refused it.
+- Everybody still reads it, because reading is a separate permission
+  (`channel.read`). Withdraw that too and the channel is closed to Member
+  altogether — the way to make a channel only the organisers can see.
 
-A workable alternative for many communities: keep the announcement channel small
-and private with only the organisers in it, and let the rest of the community
-read announcements pinned in the main channel.
+Restricting a person from posting is still there for what it was always for —
+one person, one channel, for a while — and it applies on top of all this.
 
-### Pinned messages
-
-Pinning works, and pinned messages belong to the channel rather than to the
+to the
 person who pinned them — they are listed together, and pinning takes a permission
 where reading what is pinned does not.
 

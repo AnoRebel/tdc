@@ -8,6 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/authz"
+
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
@@ -45,6 +47,15 @@ func (s *Server) handleForward(c *echo.Context) error {
 	toRoomID, err := uuid.Parse(request.To)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "that is not a room to forward to")
+	}
+
+	/*
+		Posting into the destination, checked here because the route's own
+		channel is the source. Forwarding would otherwise be a way to post in a
+		channel somebody may only read: copy a message from anywhere into it.
+	*/
+	if decision := currentPermissions(c).AllowsChannel(authz.PermChannelPost, toRoomID); !decision.Allowed {
+		return echo.NewHTTPError(http.StatusForbidden, decision.Error())
 	}
 
 	event, err := s.rooms.Forward(

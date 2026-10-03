@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/apitokens"
@@ -167,6 +168,42 @@ func requirePermission(permission authz.Permission) echo.MiddlewareFunc {
 				return echo.NewHTTPError(http.StatusForbidden, decision.Error())
 			}
 
+			return next(c)
+		}
+	}
+}
+
+/*
+requireChannelPermission refuses a request whose author lacks a permission in
+the channel the route names.
+
+The channel-scoped counterpart of requirePermission, for routes under
+/api/rooms/:id: a grant or denial made for that one channel is what decides,
+which is how an operator makes a single channel read-only without touching any
+other.
+
+The decision depends only on the person's roles and the identifier in the path,
+never on whether the room exists. So a refusal says nothing about which rooms
+there are — somebody without channel.read is refused the same way for a real
+private room and for an identifier nobody ever used. A path that is not a room
+identifier at all passes through, for the handler to report as missing like any
+other.
+*/
+func requireChannelPermission(permission authz.Permission) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			if _, ok := currentUser(c); !ok {
+				return echo.NewHTTPError(http.StatusUnauthorized, "authentication is required")
+			}
+
+			roomID, err := uuid.Parse(c.Param("id"))
+			if err != nil {
+				return next(c)
+			}
+
+			if decision := currentPermissions(c).AllowsChannel(permission, roomID); !decision.Allowed {
+				return echo.NewHTTPError(http.StatusForbidden, decision.Error())
+			}
 			return next(c)
 		}
 	}

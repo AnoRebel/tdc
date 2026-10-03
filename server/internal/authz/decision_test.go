@@ -200,3 +200,81 @@ func TestAdministrativePermissionsAreMarked(t *testing.T) {
 		t.Error("posting a message is marked administrative")
 	}
 }
+
+/*
+An announcement channel: everybody holds Member, Member may not post in this
+channel, and the role that announces may.
+
+Between two ordinary roles the denial would win, and nobody holding Member
+could ever be let back into the channel. The role every account holds is a
+baseline instead, which another role's entry at the same scope replaces.
+*/
+func TestAnotherRoleOverridesTheBaselineInTheSameScope(t *testing.T) {
+	announcements := channel()
+
+	member := authz.Grant{Permission: authz.PermChannelPost, ChannelID: announcements, Granted: false, Baseline: true}
+	announcer := authz.Grant{Permission: authz.PermChannelPost, ChannelID: announcements, Granted: true}
+
+	if authz.Resolve([]authz.Grant{member}).AllowsChannel(authz.PermChannelPost, *announcements).Allowed {
+		t.Error("a member who only holds Member posted where Member may not")
+	}
+	// In either order: the baseline is not decided by which row arrives first.
+	for _, grants := range [][]authz.Grant{{member, announcer}, {announcer, member}} {
+		if !authz.Resolve(grants).AllowsChannel(authz.PermChannelPost, *announcements).Allowed {
+			t.Error("the announcing role could not post over the Member baseline")
+		}
+	}
+}
+
+// Only at the same scope: a grant everywhere does not reopen a channel the
+// baseline closed, or one channel's restriction would vanish the moment
+// somebody held any role granting the permission at server scope.
+func TestTheBaselineHoldsAgainstABroaderGrant(t *testing.T) {
+	announcements := channel()
+	permissions := authz.Resolve([]authz.Grant{
+		{Permission: authz.PermChannelPost, Granted: true, Baseline: true},
+		{Permission: authz.PermChannelPost, ChannelID: announcements, Granted: false, Baseline: true},
+		{Permission: authz.PermChannelPost, Granted: true},
+	})
+
+	if permissions.AllowsChannel(authz.PermChannelPost, *announcements).Allowed {
+		t.Error("a server-scope grant reopened a channel the baseline closed")
+	}
+}
+
+// A denial on a role other than the baseline still beats a grant.
+func TestOrdinaryRolesStillDenyFirst(t *testing.T) {
+	announcements := channel()
+	permissions := authz.Resolve([]authz.Grant{
+		{Permission: authz.PermChannelPost, ChannelID: announcements, Granted: true, Baseline: true},
+		{Permission: authz.PermChannelPost, ChannelID: announcements, Granted: true},
+		{Permission: authz.PermChannelPost, ChannelID: announcements, Granted: false},
+	})
+
+	if permissions.AllowsChannel(authz.PermChannelPost, *announcements).Allowed {
+		t.Error("a denial on an ordinary role lost to a grant")
+	}
+}
+
+/*
+An administrator who also holds Member is not held to it.
+
+Otherwise, of two administrators, the one promoted from the membership would be
+silenced by an announcement channel and the one who set the server up — who
+never held Member — would not.
+*/
+func TestTheBaselineDoesNotBindAnAdministrator(t *testing.T) {
+	announcements := channel()
+	permissions := authz.Resolve([]authz.Grant{
+		{Permission: authz.PermChannelPost, ChannelID: announcements, Granted: false, Baseline: true},
+		{Permission: authz.PermChannelCreate, Granted: false, Baseline: true},
+		{Permission: authz.PermServerAdminister, Granted: true},
+	})
+
+	if !permissions.AllowsChannel(authz.PermChannelPost, *announcements).Allowed {
+		t.Error("an administrator holding Member was silenced in an announcement channel")
+	}
+	if !permissions.AllowsServer(authz.PermChannelCreate).Allowed {
+		t.Error("withdrawing channel.create from Member took it from an administrator")
+	}
+}

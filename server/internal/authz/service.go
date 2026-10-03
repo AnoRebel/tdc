@@ -66,7 +66,10 @@ func NewService(store Store) *Service {
 // request typically tests several permissions and per-check queries would each
 // be a round trip.
 func (s *Service) PermissionsFor(ctx context.Context, userID uuid.UUID) (Permissions, error) {
-	rows, err := s.store.ListGrantsForUser(ctx, userID)
+	rows, err := s.store.ListGrantsForUser(ctx, dbgen.ListGrantsForUserParams{
+		BaselineRole: DefaultRoleName,
+		UserID:       userID,
+	})
 	if err != nil {
 		return Permissions{}, fmt.Errorf("list grants: %w", err)
 	}
@@ -77,6 +80,7 @@ func (s *Service) PermissionsFor(ctx context.Context, userID uuid.UUID) (Permiss
 			Permission: Permission(row.Permission),
 			ChannelID:  row.ScopeID,
 			Granted:    row.Granted,
+			Baseline:   row.Baseline,
 		})
 	}
 
@@ -374,10 +378,14 @@ channel. For a community of hundreds moving from somewhere else, that is not a
 detail — it is one person doing setup by hand for everybody.
 
 So there is a role, and registration puts people in it. What it grants is
-deliberately small: making a channel, and inviting somebody to one. Neither is
-destructive, both are what an ordinary member of a developer community does
-without asking, and an operator who disagrees can take either away — it is an
-ordinary role, and taking a permission from it is one call.
+deliberately small: reading and posting in the channels somebody belongs to,
+making a channel, and inviting somebody to one. None is destructive, all are
+what an ordinary member of a developer community does without asking, and an
+operator who disagrees can take any of them away — it is an ordinary role, and
+taking a permission from it is one call. Withdrawing channel.post for one
+channel is how an announcement channel is made, and granting it there on
+another role is how the people who announce keep it: what this role confers is
+a baseline every other role overrides.
 */
 const DefaultRoleName = "Member"
 
@@ -391,7 +399,7 @@ administrators make channels withdraws channel.create and nothing else breaks.
 func (s *Service) EnsureDefaultRole(ctx context.Context) (dbgen.Role, error) {
 	return s.EnsureRole(ctx, DefaultRoleName,
 		"What every member can do",
-		PermChannelCreate, PermChannelInvite)
+		PermChannelRead, PermChannelPost, PermChannelCreate, PermChannelInvite)
 }
 
 func (s *Service) EnsureRole(

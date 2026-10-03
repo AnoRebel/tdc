@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/attachments"
+	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
@@ -30,6 +31,10 @@ const maxReplayEvents = 500
 type roomReplayer struct {
 	rooms       *rooms.Service
 	attachments *attachments.Service
+	// authz decides channel.read, which the live connection must honour as
+	// the timeline does — otherwise a role refused the timeline could read
+	// the same messages by subscribing.
+	authz *authz.Service
 }
 
 // CanSubscribe reports whether a user may receive a room's events.
@@ -40,6 +45,22 @@ func (r roomReplayer) CanSubscribe(ctx context.Context, roomID, userID uuid.UUID
 		// A refusal is not an error here; the caller only needs to know the
 		// answer is no, and must not learn whether the room exists.
 		return false, nil
+	}
+
+	/*
+		And allowed to read it, which membership alone does not settle: an
+		operator can withdraw channel.read for one channel. Checked when the
+		subscription is made, so a permission withdrawn later takes effect on
+		the next connection rather than mid-stream.
+	*/
+	if r.authz != nil {
+		permissions, err := r.authz.PermissionsFor(ctx, userID)
+		if err != nil {
+			return false, err
+		}
+		if !permissions.AllowsChannel(authz.PermChannelRead, roomID).Allowed {
+			return false, nil
+		}
 	}
 	return true, nil
 }

@@ -253,18 +253,18 @@ func (s *Server) routes() {
 		decides, and a refusal comes from a server this one does not control.
 	*/
 	rooms.POST("/:id/remote/join", s.handleJoinRemoteRoom)
-	rooms.POST("/:id/remote/messages", s.handleSendToRemoteRoom)
-	rooms.GET("/:id/members", s.handleRoomMembers)
-	rooms.GET("/:id/timeline", s.handleRoomTimeline)
-	rooms.POST("/:id/messages", s.handleSendMessage)
-	rooms.PATCH("/:id/messages/:eventId", s.handleEditMessage)
+	rooms.POST("/:id/remote/messages", s.handleSendToRemoteRoom, requireChannelPermission(authz.PermChannelPost))
+	rooms.GET("/:id/members", s.handleRoomMembers, requireChannelPermission(authz.PermChannelRead))
+	rooms.GET("/:id/timeline", s.handleRoomTimeline, requireChannelPermission(authz.PermChannelRead))
+	rooms.POST("/:id/messages", s.handleSendMessage, requireChannelPermission(authz.PermChannelPost))
+	rooms.PATCH("/:id/messages/:eventId", s.handleEditMessage, requireChannelPermission(authz.PermChannelPost))
 	// When a message expires. Its sender's to set, or a moderator's, and only
 	// ever shorter than it already is.
 	rooms.PUT("/:id/messages/:eventId/lifetime", s.handleSetMessageLifetime)
 	rooms.DELETE("/:id/messages/:eventId", s.handleDeleteMessage)
 	// Counts for the whole timeline at once. Without this a client asks per
 	// message, which is one request per message drawn.
-	rooms.GET("/:id/threads", s.handleThreadSummaries)
+	rooms.GET("/:id/threads", s.handleThreadSummaries, requireChannelPermission(authz.PermChannelRead))
 
 	// Channel bans, confined to the channel they name.
 	rooms.GET("/:id/bans", s.handleListChannelBans,
@@ -284,7 +284,7 @@ func (s *Server) routes() {
 
 	// Reactions. Read for the whole timeline at once, for the same reason
 	// thread counts are: a request per message is a request per message drawn.
-	rooms.GET("/:id/reactions", s.handleRoomReactions)
+	rooms.GET("/:id/reactions", s.handleRoomReactions, requireChannelPermission(authz.PermChannelRead))
 	rooms.PUT("/:id/messages/:eventId/reactions", s.handleReact)
 	rooms.DELETE("/:id/messages/:eventId/reactions", s.handleUnreact)
 
@@ -301,24 +301,25 @@ func (s *Server) routes() {
 
 	// Pinned messages. Pinning speaks for the room, so it takes a permission;
 	// reading what is pinned is part of reading the room.
-	rooms.GET("/:id/pins", s.handleListPinned)
+	rooms.GET("/:id/pins", s.handleListPinned, requireChannelPermission(authz.PermChannelRead))
 	rooms.PUT("/:id/messages/:eventId/pin", s.handlePinMessage,
 		requirePermission(authz.PermMessagePin))
 	rooms.DELETE("/:id/messages/:eventId/pin", s.handleUnpinMessage,
 		requirePermission(authz.PermMessagePin))
 
 	// Forwarding a message to another conversation.
-	rooms.POST("/:id/messages/:eventId/forward", s.handleForward)
+	rooms.POST("/:id/messages/:eventId/forward", s.handleForward, requireChannelPermission(authz.PermChannelRead))
 
 	// Messages written now and sent later.
 	rooms.POST("/:id/scheduled", s.handleScheduleMessage,
-		s.requireFeature(settings.FeatureScheduledMessages))
-	rooms.GET("/:id/threads/:eventId", s.handleThread)
-	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread)
+		s.requireFeature(settings.FeatureScheduledMessages),
+		requireChannelPermission(authz.PermChannelPost))
+	rooms.GET("/:id/threads/:eventId", s.handleThread, requireChannelPermission(authz.PermChannelRead))
+	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread, requireChannelPermission(authz.PermChannelPost))
 	rooms.POST("/:id/read", s.handleMarkRead)
-	rooms.GET("/:id/presence", s.handleRoomPresence)
+	rooms.GET("/:id/presence", s.handleRoomPresence, requireChannelPermission(authz.PermChannelRead))
 	rooms.POST("/:id/typing", s.handleStartTyping)
-	rooms.GET("/:id/typing", s.handleListTyping)
+	rooms.GET("/:id/typing", s.handleListTyping, requireChannelPermission(authz.PermChannelRead))
 
 	// Attachments. Uploaded to a room before the message that carries them, so
 	// a refusal costs only the upload and a failed send does not lose the file.

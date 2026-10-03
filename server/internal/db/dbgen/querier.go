@@ -393,7 +393,10 @@ type Querier interface {
 	ListEventIDsBySender(ctx context.Context, senderID *uuid.UUID) ([]ListEventIDsBySenderRow, error)
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
-	ListGrantsForUser(ctx context.Context, userID uuid.UUID) ([]ListGrantsForUserRow, error)
+	//
+	// baseline marks what comes from the role every account holds, which any
+	// other role's entry at the same scope overrides.
+	ListGrantsForUser(ctx context.Context, arg ListGrantsForUserParams) ([]ListGrantsForUserRow, error)
 	ListIncomingWebhooksForRoom(ctx context.Context, roomID uuid.UUID) ([]IncomingWebhook, error)
 	// Who joined through one invitation, newest first.
 	ListInvitationUsers(ctx context.Context, invitationID uuid.UUID) ([]ListInvitationUsersRow, error)

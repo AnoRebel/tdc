@@ -226,9 +226,31 @@ it with no administrator at all, and one that would remove the authority of the
 person making it. The second can be overridden — somebody stepping down
 deliberately is a real thing — by repeating the request with `confirmed`.
 
-Thirteen of the twenty-three catalogued permissions are enforced; the rest are
-names waiting for features. Notably `channel.post` is not enforced: who may
-speak in a channel is governed by membership, bans and posting restrictions.
+Eighteen of the twenty-five catalogued permissions are enforced; the rest are
+names waiting for features. `channel.read` and `channel.post` are checked per
+channel, on top of membership, bans and posting restrictions, and Member holds
+both everywhere until you say otherwise.
+
+Member is a baseline beneath every other role: whatever another role says about
+a permission in the same place replaces what Member says there. That is what
+makes an announcement channel two calls rather than a restriction per person —
+withdraw `channel.post` from Member in that channel, and grant it there on a
+role held by whoever announces:
+
+```sh
+curl -X PUT "$TDC/api/admin/roles/$MEMBER/permissions" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"permission\": \"channel.post\", \"channel\": \"$CHANNEL\", \"granted\": false}"
+curl -X PUT "$TDC/api/admin/roles/$ANNOUNCER/permissions" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"permission\": \"channel.post\", \"channel\": \"$CHANNEL\", \"granted\": true}"
+```
+
+The grant has to be for that channel: a role granting `channel.post` everywhere
+does not reopen a channel where Member is denied it. Administrators are not held
+to Member at all, so somebody promoted from the membership posts there as the
+person who set the server up does. Between any other two roles a denial still
+wins.
 
 ### Mail, and the account recovery that depends on it
 

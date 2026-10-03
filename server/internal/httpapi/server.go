@@ -268,7 +268,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		if services.Presence != nil {
 			lifecycle = services.Presence
 		}
-		s.realtime = realtime.NewServer(s.hub, roomReplayer{rooms: services.Rooms, attachments: services.Attachments},
+		s.realtime = realtime.NewServer(s.hub, roomReplayer{rooms: services.Rooms, attachments: services.Attachments, authz: services.Authz},
 			lifecycle, cfg.Keepalive, log)
 
 		// Wired here rather than at construction because the hub is built

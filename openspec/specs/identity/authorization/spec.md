@@ -56,6 +56,28 @@ Where scopes conflict, the more specific scope governs, and an explicit denial M
 - **WHEN** a user holds a server-scope grant and an explicit channel-scope denial for the same permission
 - **THEN** the action is denied in that channel and allowed elsewhere
 
+### Requirement: The role every account holds is a baseline
+
+The role every account is given on registration SHALL be a baseline beneath every other role: an entry another role makes at the same scope, granting or denying, MUST replace the baseline's entry there. Between any two other roles an explicit denial still overrides a grant. A person another role makes an administrator MUST NOT be bound by the baseline.
+
+Without this, withdrawing a permission from the baseline in one channel could never be undone for anybody, because everybody holds the baseline.
+
+#### Scenario: An announcement channel
+
+- **WHEN** the baseline role is denied `channel.post` in one channel, and another role is granted `channel.post` in that channel
+- **THEN** people holding only the baseline cannot post there
+- **AND** people also holding the other role can
+
+#### Scenario: A broader grant does not reopen the channel
+
+- **WHEN** the baseline role is denied a permission in one channel, and another role grants it at server scope
+- **THEN** the permission is still denied in that channel
+
+#### Scenario: Administrators are not ordinary members
+
+- **WHEN** a person holding the baseline role is made an administrator
+- **THEN** the baseline's denials no longer apply to them
+
 ### Requirement: Enforcement is server-side
 
 Authorization SHALL be enforced by the server on every request. Client behaviour, including hiding interface elements, MUST NOT be relied upon for enforcement.

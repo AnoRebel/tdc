@@ -47,10 +47,15 @@ ORDER BY roles.name;
 -- name: ListGrantsForUser :many
 -- Every grant a user holds, across all their roles. One query rather than one
 -- per role: a request resolves permissions once and consults them many times.
-SELECT role_permissions.permission, role_permissions.scope_id, role_permissions.granted
+--
+-- baseline marks what comes from the role every account holds, which any
+-- other role's entry at the same scope overrides.
+SELECT role_permissions.permission, role_permissions.scope_id, role_permissions.granted,
+       (roles.built_in AND roles.name = sqlc.arg(baseline_role)::text)::boolean AS baseline
 FROM role_permissions
 JOIN user_roles ON user_roles.role_id = role_permissions.role_id
-WHERE user_roles.user_id = $1;
+JOIN roles ON roles.id = role_permissions.role_id
+WHERE user_roles.user_id = sqlc.arg(user_id);
 
 -- name: CountUsersWithPermission :one
 -- How many people hold a permission at server scope without an explicit
