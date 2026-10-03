@@ -860,16 +860,6 @@ func (s *Server) handleCatchUp(c *echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{"fetched": len(batch), "stored": stored})
 }
 
-// federationAuthorityHost is this server's identity as the trust lists and
-// room home servers record it: a host, without the port.
-func (s *Server) federationAuthorityHost() string {
-	host, err := federation.Host(s.config.CanonicalAddress)
-	if err != nil {
-		return ""
-	}
-	return host
-}
-
 /*
 handleFederatedJoin admits somebody from a peer into a room this server owns.
 
