@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/apitokens"
@@ -365,10 +366,22 @@ func (s *Server) Run(ctx context.Context) error {
 	*/
 	if s.broker != nil {
 		go func() {
-			if err := s.broker.Listen(ctx, func(announcement realtime.Announcement) {
-				s.inBackground(ctx, "announced event", func(ctx context.Context) {
-					s.deliverAnnounced(ctx, announcement)
-				})
+			if err := s.broker.Listen(ctx, realtime.Receivers{
+				Announcement: func(announcement realtime.Announcement) {
+					s.inBackground(ctx, "announced event", func(ctx context.Context) {
+						s.deliverAnnounced(ctx, announcement)
+					})
+				},
+				// Another node's private answer, for whoever is connected here.
+				Private: func(userID uuid.UUID, frame realtime.Frame) int {
+					if s.hub == nil {
+						return 0
+					}
+					return s.hub.SendToUser(userID, frame)
+				},
+				Holds: func(userID uuid.UUID) bool {
+					return s.hub != nil && s.hub.Holds(userID)
+				},
 			}); err != nil && ctx.Err() == nil {
 				s.log.Error("stopped listening for events from other nodes",
 					slog.String("error", err.Error()))

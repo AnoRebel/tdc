@@ -181,12 +181,13 @@ install: you are already running Postgres. The notification carries the event's
 identity, and each node reads the event from the database — so nothing is lost
 to the eight-kilobyte limit on a notification, however long the message.
 
-**One thing stays on its node: an application's private answer to a press.** It
-is meant for one person and is deliberately never written anywhere — not the
-log, and not a notification another node could read — so it reaches that
-person's connections on the node that received the answer and no others. The
-application is told how many connections received it, and an answer that
-reached none can be posted in the channel instead.
+**An application's private answer to a press crosses nodes without being
+stored.** It is meant for one person, so it never enters the log; it travels
+in the notification itself, which Postgres holds in memory only until every
+node has read it — no table, no write-ahead log, no backup. A node with nobody
+to give it to drops it unread. Only when presence says the person is connected
+to another node is it sent at all, and the program waits — a second at most —
+for those nodes to say they delivered it, so the count it is given is true.
 
 Scheduled messages are sent by whichever node gets to them first. Every node
 looks; each claims what it sends in the same statement that finds it, so
@@ -906,6 +907,4 @@ never leaves the server, whatever else is configured.
 
 **More than one node is optional, and one is enough.** One server process
 against one database will comfortably hold a community. Several are supported
-— see [Running more than one node](#running-more-than-one-node) — with one thing
-that stays on the node it happened on: an application's private answer to a
-press.
+— see [Running more than one node](#running-more-than-one-node).

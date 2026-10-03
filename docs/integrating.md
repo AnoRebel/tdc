@@ -617,8 +617,9 @@ the presser's open connections as a frame of its own:
 The answer is **201** with `{"delivered": 1}` — how many of their connections
 received it. **Nothing is kept.** Somebody not connected when you reply does not
 see it later, so post an ordinary message for anything that must not be missed.
-On a server running several nodes, only connections on the node that handled
-your request receive it.
+On a server running several nodes it reaches their connections on every node,
+and the count includes them — an answer may take up to a second longer while
+the other nodes say they have it.
 
 ### Remembering an exchange
 

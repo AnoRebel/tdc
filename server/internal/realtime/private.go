@@ -24,10 +24,9 @@ how many received it.
 Every connection rather than the one they pressed from: somebody who pressed on
 their phone and picked up their laptop should find the answer there too.
 
-Only this node's connections. On a server running several nodes, a person
-connected to another node does not receive it — a private answer is
-deliberately never written anywhere another node could read it from, which is
-the cost of that. The count lets the caller say so rather than claim delivery.
+Only this node's connections. The other nodes are reached through the
+broker's Whisper, which carries the frame in the notification itself rather
+than writing it anywhere.
 */
 func (h *Hub) SendToUser(userID uuid.UUID, frame Frame) int {
 	h.mu.RLock()
@@ -50,4 +49,12 @@ func (h *Hub) SendToUser(userID uuid.UUID, frame Frame) int {
 		delivered++
 	}
 	return delivered
+}
+
+// Holds reports whether this node has any connection for a person, which is
+// what lets a node ignore another's private frame without reading it.
+func (h *Hub) Holds(userID uuid.UUID) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.byUser[userID]) > 0
 }

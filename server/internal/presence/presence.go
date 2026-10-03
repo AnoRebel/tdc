@@ -107,6 +107,24 @@ func (s *Service) Of(ctx context.Context, userID uuid.UUID) (Presence, error) {
 	return s.present(ctx, record), nil
 }
 
+/*
+Connections is how many live connections somebody holds across every node.
+
+What they hold, not what they show: somebody appearing offline is still
+connected, and something addressed to them alone should still reach them. Not
+for display — Of is what decides what others are told.
+*/
+func (s *Service) Connections(ctx context.Context, userID uuid.UUID) (int, error) {
+	record, err := s.store.GetPresence(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("read presence: %w", err)
+	}
+	return int(record.Connections), nil
+}
+
 // ForMany returns presence for a set of people in one query, which is what a
 // member list or a room header needs.
 func (s *Service) ForMany(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]Presence, error) {

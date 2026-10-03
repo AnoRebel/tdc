@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -318,15 +319,18 @@ func (s *Server) handlePrivateReply(c *echo.Context) error {
 		return err
 	}
 
+	frame := realtime.Frame{
+		Type:    realtime.FramePrivate,
+		Room:    s.rooms.RoomAddress(invocation.Room),
+		RoomID:  roomID.String(),
+		Payload: payload,
+	}
+
 	delivered := 0
 	if s.hub != nil {
-		delivered = s.hub.SendToUser(invocation.Invoker.ID, realtime.Frame{
-			Type:    realtime.FramePrivate,
-			Room:    s.rooms.RoomAddress(invocation.Room),
-			RoomID:  roomID.String(),
-			Payload: payload,
-		})
+		delivered = s.hub.SendToUser(invocation.Invoker.ID, frame)
 	}
+	delivered += s.whisperElsewhere(ctx, invocation.Invoker.ID, frame, delivered)
 
 	return c.JSON(http.StatusCreated, privateReplyResponse{Delivered: delivered})
 }
@@ -427,4 +431,44 @@ func interactiveError(err error) error {
 	default:
 		return roomError(err)
 	}
+}
+
+/*
+privateReachLimit is how long an answer waits for other nodes to say they
+delivered it.
+
+Only spent when presence says the person holds connections somewhere else, and
+cut short as soon as they have all answered — so the ordinary case is a round
+trip through the database. The whole second is spent only when presence counts a
+connection that has gone without saying so, which the presence sweep clears.
+*/
+const privateReachLimit = time.Second
+
+/*
+whisperElsewhere sends a private frame to the person's connections on other
+nodes, and reports how many received it.
+
+Asked only when presence counts more connections than this node delivered to:
+a single node costs nothing, and somebody connected only here costs one
+presence read.
+*/
+func (s *Server) whisperElsewhere(ctx context.Context, userID uuid.UUID, frame realtime.Frame, here int) int {
+	if s.broker == nil || s.presence == nil {
+		return 0
+	}
+	// A server running alone has nobody to whisper to, and need not read
+	// presence to find that out.
+	if _, alone := s.broker.(realtime.Alone); alone {
+		return 0
+	}
+	total, err := s.presence.Connections(ctx, userID)
+	if err != nil || total <= here {
+		return 0
+	}
+
+	elsewhere, err := s.broker.Whisper(ctx, userID, frame, total-here, privateReachLimit)
+	if err != nil {
+		s.log.Warn("could not share a private answer with the other nodes", "error", err)
+	}
+	return elsewhere
 }

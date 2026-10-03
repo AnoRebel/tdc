@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -43,6 +44,26 @@ type Announcement struct {
 	Origin string `json:"o"`
 }
 
+/*
+Receivers is what a node does with what other nodes send it.
+
+Announcement is required. Private is optional: a node given none ignores
+private frames, which is the right answer for anything that holds no
+connections.
+*/
+type Receivers struct {
+	// Announcement handles an event another node stored.
+	Announcement func(Announcement)
+	// Private delivers a frame meant for one person to their connections on
+	// this node, and reports how many received it.
+	Private func(userID uuid.UUID, frame Frame) int
+	// Holds says whether this node has any connection for a person. Asked of
+	// every piece before anything is decoded or kept, so a node pays almost
+	// nothing for the private answers of people connected elsewhere. Nil is
+	// taken as yes.
+	Holds func(userID uuid.UUID) bool
+}
+
 // Broker carries announcements between nodes.
 type Broker interface {
 	/*
@@ -60,7 +81,20 @@ type Broker interface {
 		Called once at startup. The handler is invoked for each announcement
 		that did not originate here.
 	*/
-	Listen(ctx context.Context, handle func(Announcement)) error
+	Listen(ctx context.Context, receive Receivers) error
+
+	/*
+		Whisper delivers a frame meant for one person to their connections on
+		the other nodes, and reports how many received it.
+
+		Never written anywhere: it travels in the notification itself, which
+		Postgres holds in memory until every listener has read it, and is in
+		no table, no log and no backup. expect is how many connections the
+		person is believed to hold elsewhere; the answer comes back as soon as
+		that many have acknowledged it, and otherwise after wait, with however
+		many had.
+	*/
+	Whisper(ctx context.Context, userID uuid.UUID, frame Frame, expect int, wait time.Duration) (int, error)
 
 	// Close releases whatever the broker holds.
 	Close() error
@@ -80,9 +114,14 @@ type Alone struct{}
 func (Alone) Announce(context.Context, Announcement) error { return nil }
 
 // Listen blocks until the context ends, because nothing else will announce.
-func (Alone) Listen(ctx context.Context, _ func(Announcement)) error {
+func (Alone) Listen(ctx context.Context, _ Receivers) error {
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+// Whisper reaches nobody, because there is no other node to reach.
+func (Alone) Whisper(context.Context, uuid.UUID, Frame, int, time.Duration) (int, error) {
+	return 0, nil
 }
 
 // Close does nothing.
