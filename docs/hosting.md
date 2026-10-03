@@ -181,6 +181,17 @@ install: you are already running Postgres. The notification carries the event's
 identity, and each node reads the event from the database — so nothing is lost
 to the eight-kilobyte limit on a notification, however long the message.
 
+**One thing stays on its node: an application's private answer to a press.** It
+is meant for one person and is deliberately never written anywhere — not the
+log, and not a notification another node could read — so it reaches that
+person's connections on the node that received the answer and no others. The
+application is told how many connections received it, and an answer that
+reached none can be posted in the channel instead.
+
+Scheduled messages are sent by whichever node gets to them first. Every node
+looks; each claims what it sends in the same statement that finds it, so
+nothing is sent twice.
+
 What that does not give you is durability. A node that is restarting misses the
 announcements sent while it was down. That is fine here and would not be
 elsewhere: the event is in the log regardless, so a client reconnecting to that
@@ -888,12 +899,13 @@ and keep being sent in the clear.
 `127.0.0.1`, and only for local development and tests, but remove it from a
 production file anyway.
 
-**Federation does not exist.** Servers do not exchange events. Every event is
-signed and every address names its home server, so the groundwork is there, but
-nothing crosses a server boundary today. A deployment is one server and the
-people on it.
+**Federation is off until you turn it on, room by room.** A server exchanges
+nothing with any other until federation is enabled, a peer is trusted, and a
+room is federated — see [Choosing who to federate with](#choosing-who-to-federate-with). A room that is not federated
+never leaves the server, whatever else is configured.
 
-**One server, one process.** Multi-node deployment is not implemented — the
-shared cache and the cross-process fanout that would make it work are not built.
-Run one server process against one database. It will comfortably hold a
-community.
+**More than one node is optional, and one is enough.** One server process
+against one database will comfortably hold a community. Several are supported
+— see [Running more than one node](#running-more-than-one-node) — with one thing
+that stays on the node it happened on: an application's private answer to a
+press.
