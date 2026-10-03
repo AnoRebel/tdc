@@ -129,6 +129,9 @@ async function moveCard(card: BoardCard, to: BoardColumn) {
     announcement.value = $ts("projects.board.moved", { issue: card.key, state: to.name });
     emit("moved", card.key);
   } catch (cause) {
+    // Reloaded first: loading clears the last failure, and this one is the
+    // thing the person needs to read — why the card is not where they put it.
+    await load();
     if (isApiError(cause) && cause.status === 409) {
       announcement.value = $ts("projects.board.movedMeanwhile", { issue: card.key });
       failed.value = $ts("projects.board.movedMeanwhile", { issue: card.key });
@@ -136,7 +139,6 @@ async function moveCard(card: BoardCard, to: BoardColumn) {
       failed.value = isApiError(cause) ? cause.message : $ts("projects.couldNotMove");
       announcement.value = failed.value;
     }
-    await load();
   } finally {
     moving.value = false;
   }

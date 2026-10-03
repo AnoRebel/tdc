@@ -9,6 +9,40 @@ This guide is for the people using projects and for anybody integrating with
 them. [Hosting](hosting.md#projects) has the few things an operator needs to
 know.
 
+## From a conversation to done
+
+The whole of it, once, in the order you would meet it. Every step names what
+is on the screen; the sections after this one say more about each.
+
+1. **Start a project.** Choose **Projects** in the sidebar, then **New
+   project**. Give it a **Name** — "Community website" — and a **Key**, the
+   short code its issues will be named by: `WEB`. Choose **Create**. You are
+   its administrator, and it starts with three states: _To do_, _In progress_
+   and _Done_.
+2. **Turn a message into an issue.** In any conversation, open a message's menu
+   — right-click it, or long-press on a phone — and choose **Create an issue
+   from this**. Pick the **Project**, check the **Title** (it starts as the
+   message's first line), and choose **New issue**. You land on the issue,
+   `WEB-1`. Under **Where this came from** is the message it was made from; back
+   in the conversation, the message now reads **Tracked as WEB-1**.
+3. **Talk about it.** The issue's page has a **Discussion** beside it. Whoever
+   filed the issue is already in it; anybody else chooses **Join** first. Write
+   as in any channel — mention somebody with `@` and they are told.
+4. **Give it somewhere to land.** Open the project's **Milestones** tab, choose
+   **New milestone**, name it — "Launch" — and, if you like, a **Day to aim
+   for**; then **Make milestone**. On the issue's page, set **Milestone** to it.
+5. **Move it across the board.** Open the **Board** tab. Drag the card to
+   another column — or, from the keyboard, Tab to the card's move button, press
+   Enter, choose a column with the arrow keys, and press Enter again. Take it to
+   **Done**.
+6. **See it counted.** The milestone's page, and the project's **Progress** tab,
+   now say **1 of 1 done**. Nothing kept that number: it was counted from the
+   issue when you looked.
+
+Anybody can follow an issue's whole life from its **History**, which records
+every change and who made it, and which nobody — administrators included — can
+edit.
+
 ## Projects
 
 A project has a **name**, which can change, and a **key**, which cannot. The key
@@ -151,6 +185,15 @@ issues into a full project and fails if the board grows, or if it weighs more
 than the budget; it runs with the rest of the server's tests, so a change that
 breaks either fails the build. The budget lives in `projects.BoardBudgetBytes`,
 and raising it should be a decision made on purpose, in a commit that says why.
+
+The browser checks measure the same thing where it is felt. On a project of
+three hundred issues, `apps/web/tests/projects-payload.spec.ts` opens the board
+and an issue's page the way somebody already in the application does — by a
+link — and fails if the board's data is over its 48 KB, or if either screen,
+code and data together, fetches more than its own budget. The board and an
+issue's page are audited for accessibility the way the conversation is, with
+cards, filters, figures, a card picked up and another being planned, and an
+issue with every field filled.
 
 ## Finding issues
 

@@ -71,17 +71,24 @@ start_server() {
 
   # Plain HTTP here, so the session cookie must not be marked Secure or the
   # browser keeps it and never sends it back.
-  TDC_DATABASE_URL="postgres://tdc:tdc@127.0.0.1:55433/${DATABASE}?sslmode=disable" \
-  TDC_SERVER_ADDRESS="localhost:${DEMO_PORT}" \
-  TDC_SERVER_CANONICAL_ADDRESS="${CANONICAL}" \
-  TDC_SERVER_SECURE_COOKIES=false \
-  TDC_SERVER_WEB_ROOT="$ROOT/apps/web/.output/public" \
+  #
+  # AS_CI=1 starts the server as the CI suite meets it: no canonical address,
+  # so no passkeys, and the sign-in page offers exactly one way to sign in —
+  # which is what the suite's own sign-in step expects.
+  local canonical=(TDC_SERVER_CANONICAL_ADDRESS="${CANONICAL}")
+  if [[ -n "${AS_CI:-}" ]]; then canonical=(); fi
+  env TDC_DATABASE_URL="postgres://tdc:tdc@127.0.0.1:55433/${DATABASE}?sslmode=disable" \
+    TDC_SERVER_ADDRESS="localhost:${DEMO_PORT}" \
+    "${canonical[@]}" \
+    TDC_SERVER_SECURE_COOKIES=false \
+    TDC_SERVER_WEB_ROOT="$ROOT/apps/web/.output/public" \
     "$WORK/tdc-server" >"$WORK/server.log" 2>&1 &
   SERVER_PID=$!
 
-  for _ in $(seq 1 60); do
+  # Migrating a fresh database can take minutes on a busy machine.
+  for _ in $(seq 1 300); do
     curl -sf "${BASE}/api/health" >/dev/null 2>&1 && break
-    sleep 0.5
+    sleep 1
   done
   curl -sf "${BASE}/api/health" >/dev/null || { tail -40 "$WORK/server.log"; exit 1; }
 
