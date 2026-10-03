@@ -513,6 +513,15 @@ func (s *Server) routes() {
 	admin.DELETE("/users/:id/suspend", s.handleLiftSuspension,
 		requirePermission(authz.PermUserSuspend))
 
+	// Posting restrictions across the whole server: reading everything still,
+	// posting nowhere. The channel kind lives with the channel's routes.
+	admin.GET("/restrictions", s.handleListRestrictionsEverywhere,
+		requirePermission(authz.PermModerationRestrict))
+	admin.POST("/restrictions", s.handleRestrictPostingEverywhere,
+		requirePermission(authz.PermModerationRestrict))
+	admin.DELETE("/restrictions/:restrictionId", s.handleLiftRestrictionEverywhere,
+		requirePermission(authz.PermModerationRestrict))
+
 	// Policy an operator changes while the server runs: who may register, how
 	// much this server will hold.
 	admin.GET("/settings", s.handleListSettings,

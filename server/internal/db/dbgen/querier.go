@@ -426,8 +426,9 @@ type Querier interface {
 	LatestProposalVersion(ctx context.Context, engagementID uuid.UUID) (ProposalVersion, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
-	// Within the channel the request names, so lifting by identifier cannot reach a
-	// restriction made somewhere else.
+	// Within the scope the request names — one channel, or the whole server when
+	// the room is null — so lifting by identifier cannot reach a restriction made
+	// somewhere else.
 	LiftPostingRestriction(ctx context.Context, arg LiftPostingRestrictionParams) (int64, error)
 	LiftUserSuspension(ctx context.Context, id uuid.UUID) error
 	// Never the hash. What this returns is what a person is shown, and the token
@@ -509,7 +510,6 @@ type Querier interface {
 	ListPinnedRooms(ctx context.Context, userID uuid.UUID) ([]ListPinnedRoomsRow, error)
 	// The owner's own portfolio.
 	ListPortfolioItems(ctx context.Context, userID uuid.UUID) ([]PortfolioItem, error)
-	ListPostingRestrictions(ctx context.Context, limit int32) ([]ListPostingRestrictionsRow, error)
 	// Who is currently silenced in one channel.
 	ListPostingRestrictionsInRoom(ctx context.Context, roomID *uuid.UUID) ([]ListPostingRestrictionsInRoomRow, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
@@ -578,6 +578,8 @@ type Querier interface {
 	ListSentEnquiries(ctx context.Context, senderID uuid.UUID) ([]ListSentEnquiriesRow, error)
 	ListServerConfig(ctx context.Context) ([]ServerConfig, error)
 	ListServerInvitations(ctx context.Context, limit int32) ([]Invitation, error)
+	// Who is currently silenced everywhere on the server.
+	ListServerPostingRestrictions(ctx context.Context) ([]ListServerPostingRestrictionsRow, error)
 	ListServerStatuses(ctx context.Context) ([]ServerStatus, error)
 	ListSessionsForUser(ctx context.Context, userID uuid.UUID) ([]Session, error)
 	// Proposals waiting for a decision, oldest first, with who asked.

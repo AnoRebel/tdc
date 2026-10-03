@@ -157,20 +157,75 @@ type restrictionResponse struct {
 }
 
 /*
-handleRestrictPosting silences somebody in one channel without removing them.
+Posting restrictions, in one channel or across the server.
 
 The proportionate response to somebody arguing rather than attacking: they keep
-reading the conversation they are part of and stop adding to it, for as long as
-the moderator says. The request has the same shape as a ban's, because it is
+reading the conversations they are part of and stop adding to them, for as long
+as the moderator says. The request has the same shape as a ban's, because it is
 the same decision made more gently.
+
+Each handler takes its scope from the route — a channel from /api/rooms/:id, the
+whole server from /api/admin — so the two cannot drift apart, and lifting by
+identifier only reaches a restriction made in the scope the request names.
 */
 func (s *Server) handleRestrictPosting(c *echo.Context) error {
-	actor, _ := currentUser(c)
+	scope, err := restrictionScope(c)
+	if err != nil {
+		return err
+	}
+	return s.restrictPosting(c, scope)
+}
 
+func (s *Server) handleRestrictPostingEverywhere(c *echo.Context) error {
+	return s.restrictPosting(c, nil)
+}
+
+func (s *Server) handleLiftRestriction(c *echo.Context) error {
+	scope, err := restrictionScope(c)
+	if err != nil {
+		return err
+	}
+	return s.liftRestriction(c, scope)
+}
+
+func (s *Server) handleLiftRestrictionEverywhere(c *echo.Context) error {
+	return s.liftRestriction(c, nil)
+}
+
+// handleListRestrictions shows who is currently silenced in a channel.
+func (s *Server) handleListRestrictions(c *echo.Context) error {
+	scope, err := restrictionScope(c)
+	if err != nil {
+		return err
+	}
+	return s.listRestrictions(c, scope)
+}
+
+// handleListRestrictionsEverywhere shows who is currently silenced everywhere.
+func (s *Server) handleListRestrictionsEverywhere(c *echo.Context) error {
+	return s.listRestrictions(c, nil)
+}
+
+// restrictionScope is the channel a /api/rooms/:id route names.
+func restrictionScope(c *echo.Context) (*uuid.UUID, error) {
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+		return nil, echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
+	return &roomID, nil
+}
+
+// auditTarget is what a restriction's audit entry is about: the channel for
+// one made in a channel, the person for one made across the server.
+func auditTarget(scope *uuid.UUID, person string) (string, string) {
+	if scope == nil {
+		return "user", person
+	}
+	return "room", scope.String()
+}
+
+func (s *Server) restrictPosting(c *echo.Context, scope *uuid.UUID) error {
+	actor, _ := currentUser(c)
 
 	var request banRequest
 	if err := c.Bind(&request); err != nil {
@@ -187,7 +242,7 @@ func (s *Server) handleRestrictPosting(c *echo.Context) error {
 		until = &expiry
 	}
 
-	id, err := s.moderation.RestrictPosting(c.Request().Context(), target, &roomID, actor.ID,
+	id, err := s.moderation.RestrictPosting(c.Request().Context(), target, scope, actor.ID,
 		s.rooms.UserAddress(actor.Username), request.Reason, until)
 	if errors.Is(err, moderation.ErrReasonRequired) {
 		return echo.NewHTTPError(http.StatusBadRequest, "a reason is required")
@@ -196,29 +251,27 @@ func (s *Server) handleRestrictPosting(c *echo.Context) error {
 		return err
 	}
 
-	s.recordModeration(c, actor, audit.ActionPostingRestricted, "room", roomID.String(),
+	kind, subject := auditTarget(scope, target.String())
+	s.recordModeration(c, actor, audit.ActionPostingRestricted, kind, subject,
 		map[string]any{
-			"user":   target.String(),
-			"reason": request.Reason,
-			"hours":  request.Hours,
+			"user":       target.String(),
+			"reason":     request.Reason,
+			"hours":      request.Hours,
+			"everywhere": scope == nil,
 		})
 
 	return c.JSON(http.StatusCreated, map[string]string{"id": id.String()})
 }
 
-func (s *Server) handleLiftRestriction(c *echo.Context) error {
+func (s *Server) liftRestriction(c *echo.Context, scope *uuid.UUID) error {
 	actor, _ := currentUser(c)
 
-	roomID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "no such room")
-	}
 	id, err := uuid.Parse(c.Param("restrictionId"))
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "no such restriction")
 	}
 
-	err = s.moderation.LiftRestriction(c.Request().Context(), id, roomID, actor.ID)
+	err = s.moderation.LiftRestriction(c.Request().Context(), id, scope, actor.ID)
 	if errors.Is(err, moderation.ErrNoSuchRestriction) {
 		return echo.NewHTTPError(http.StatusNotFound, "no such restriction")
 	}
@@ -226,20 +279,15 @@ func (s *Server) handleLiftRestriction(c *echo.Context) error {
 		return err
 	}
 
-	s.recordModeration(c, actor, audit.ActionRestrictionLifted, "room", roomID.String(),
-		map[string]any{"restriction": id.String()})
+	kind, subject := auditTarget(scope, id.String())
+	s.recordModeration(c, actor, audit.ActionRestrictionLifted, kind, subject,
+		map[string]any{"restriction": id.String(), "everywhere": scope == nil})
 
 	return c.NoContent(http.StatusNoContent)
 }
 
-// handleListRestrictions shows who is currently silenced in a channel.
-func (s *Server) handleListRestrictions(c *echo.Context) error {
-	roomID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "no such room")
-	}
-
-	restrictions, err := s.moderation.RestrictionsIn(c.Request().Context(), roomID)
+func (s *Server) listRestrictions(c *echo.Context, scope *uuid.UUID) error {
+	restrictions, err := s.moderation.RestrictionsIn(c.Request().Context(), scope)
 	if err != nil {
 		return err
 	}

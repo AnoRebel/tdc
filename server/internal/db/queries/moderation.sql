@@ -44,11 +44,12 @@ INSERT INTO posting_restrictions (
 RETURNING *;
 
 -- name: LiftPostingRestriction :execrows
--- Within the channel the request names, so lifting by identifier cannot reach a
--- restriction made somewhere else.
+-- Within the scope the request names — one channel, or the whole server when
+-- the room is null — so lifting by identifier cannot reach a restriction made
+-- somewhere else.
 UPDATE posting_restrictions
 SET lifted_at = now(), lifted_by = $2
-WHERE id = $1 AND room_id = $3 AND lifted_at IS NULL;
+WHERE id = $1 AND room_id IS NOT DISTINCT FROM $3 AND lifted_at IS NULL;
 
 -- name: ListPostingRestrictionsInRoom :many
 -- Who is currently silenced in one channel.
@@ -72,13 +73,14 @@ SELECT EXISTS (
       AND (expires_at IS NULL OR expires_at > now())
 );
 
--- name: ListPostingRestrictions :many
+-- name: ListServerPostingRestrictions :many
+-- Who is currently silenced everywhere on the server.
 SELECT r.*, u.username
 FROM posting_restrictions r
 JOIN users u ON u.id = r.user_id
-WHERE r.lifted_at IS NULL AND (r.expires_at IS NULL OR r.expires_at > now())
-ORDER BY r.created_at DESC
-LIMIT $1;
+WHERE r.room_id IS NULL
+  AND r.lifted_at IS NULL AND (r.expires_at IS NULL OR r.expires_at > now())
+ORDER BY r.created_at DESC;
 
 -- name: BlockUser :exec
 INSERT INTO user_blocks (blocker_id, blocked_id)

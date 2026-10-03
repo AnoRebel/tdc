@@ -100,3 +100,70 @@ func TestRestrictingTakesTheModerationPermission(t *testing.T) {
 		map[string]any{"user": accountID(t, handler, other), "reason": "because"}, member, http.StatusForbidden)
 	mustCall(t, handler, http.MethodGet, "/api/rooms/"+room+"/restrictions", nil, member, http.StatusForbidden)
 }
+
+/*
+A restriction across the server silences somebody in every channel at once,
+and they go on reading all of them.
+
+Each scope is lifted only from its own route: a channel's restriction is not
+reachable through the server-wide one, nor the server's through a channel's,
+so a moderator of one channel cannot undo a decision made for the whole server.
+*/
+func TestARestrictionAcrossTheServerSilencesEveryChannel(t *testing.T) {
+	handler := newTestAPI(t)
+	admin := completeSetup(t, handler)
+
+	general := makeRoom(t, handler, admin, "general", "public")
+	random := makeRoom(t, handler, admin, "random", "public")
+	member := registerAndSignIn(t, handler, "amina")
+	for _, room := range []string{general, random} {
+		mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/join", nil, member, http.StatusOK)
+	}
+	person := accountID(t, handler, member)
+
+	mustCall(t, handler, http.MethodPost, "/api/admin/restrictions",
+		map[string]any{"user": person}, admin, http.StatusBadRequest)
+	everywhere := decode(t, mustCall(t, handler, http.MethodPost, "/api/admin/restrictions",
+		map[string]any{"user": person, "reason": "a week off"}, admin, http.StatusCreated))
+	everywhereID, _ := everywhere["id"].(string)
+
+	for _, room := range []string{general, random} {
+		if code := call(t, handler, http.MethodPost, "/api/rooms/"+room+"/messages",
+			map[string]any{"body": "hello"}, member).Code; code != http.StatusForbidden {
+			t.Errorf("posting in %s while restricted everywhere: status %d, want 403", room, code)
+		}
+		mustCall(t, handler, http.MethodGet, "/api/rooms/"+room+"/timeline", nil, member, http.StatusOK)
+	}
+
+	listed := decodeList(t, mustCall(t, handler, http.MethodGet, "/api/admin/restrictions",
+		nil, admin, http.StatusOK))
+	if len(listed) != 1 {
+		t.Errorf("the server-wide restrictions are %v, want amina's alone", listed)
+	}
+	if inChannel := decodeList(t, mustCall(t, handler, http.MethodGet, "/api/rooms/"+general+"/restrictions",
+		nil, admin, http.StatusOK)); len(inChannel) != 0 {
+		t.Errorf("a server-wide restriction is listed as one channel's: %v", inChannel)
+	}
+
+	// A channel's own restriction, alongside.
+	inGeneral := decode(t, mustCall(t, handler, http.MethodPost, "/api/rooms/"+general+"/restrictions",
+		map[string]any{"user": person, "reason": "and here especially"}, admin, http.StatusCreated))
+	inGeneralID, _ := inGeneral["id"].(string)
+
+	// Neither scope reaches the other's.
+	mustCall(t, handler, http.MethodDelete, "/api/rooms/"+general+"/restrictions/"+everywhereID,
+		nil, admin, http.StatusNotFound)
+	mustCall(t, handler, http.MethodDelete, "/api/admin/restrictions/"+inGeneralID,
+		nil, admin, http.StatusNotFound)
+
+	// Lifted where it was made, the other channels open again; the channel's
+	// own restriction still holds where it was made.
+	mustCall(t, handler, http.MethodDelete, "/api/admin/restrictions/"+everywhereID,
+		nil, admin, http.StatusNoContent)
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+random+"/messages",
+		map[string]any{"body": "back"}, member, http.StatusCreated)
+	if code := call(t, handler, http.MethodPost, "/api/rooms/"+general+"/messages",
+		map[string]any{"body": "here too?"}, member).Code; code != http.StatusForbidden {
+		t.Errorf("lifting the server-wide restriction lifted the channel's too: status %d", code)
+	}
+}

@@ -191,12 +191,13 @@ type Restriction struct {
 	CreatedAt    time.Time
 }
 
-// LiftRestriction ends a restriction early, within the channel it was made in.
-func (s *Service) LiftRestriction(ctx context.Context, id, roomID, by uuid.UUID) error {
+// LiftRestriction ends a restriction early, within the scope it was made in: a
+// channel, or the whole server when roomID is nil.
+func (s *Service) LiftRestriction(ctx context.Context, id uuid.UUID, roomID *uuid.UUID, by uuid.UUID) error {
 	lifted, err := s.queries.LiftPostingRestriction(ctx, dbgen.LiftPostingRestrictionParams{
 		ID:       id,
 		LiftedBy: &by,
-		RoomID:   &roomID,
+		RoomID:   roomID,
 	})
 	if err != nil {
 		return fmt.Errorf("moderation: lifting a restriction: %w", err)
@@ -207,11 +208,26 @@ func (s *Service) LiftRestriction(ctx context.Context, id, roomID, by uuid.UUID)
 	return nil
 }
 
-// RestrictionsIn lists who is currently silenced in a channel.
-func (s *Service) RestrictionsIn(ctx context.Context, roomID uuid.UUID) ([]Restriction, error) {
-	rows, err := s.queries.ListPostingRestrictionsInRoom(ctx, &roomID)
-	if err != nil {
-		return nil, fmt.Errorf("moderation: listing restrictions: %w", err)
+// RestrictionsIn lists who is currently silenced in a channel, or across the
+// whole server when roomID is nil.
+func (s *Service) RestrictionsIn(ctx context.Context, roomID *uuid.UUID) ([]Restriction, error) {
+	var rows []restrictionRow
+	if roomID == nil {
+		found, err := s.queries.ListServerPostingRestrictions(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("moderation: listing restrictions: %w", err)
+		}
+		for _, row := range found {
+			rows = append(rows, restrictionRow(row))
+		}
+	} else {
+		found, err := s.queries.ListPostingRestrictionsInRoom(ctx, roomID)
+		if err != nil {
+			return nil, fmt.Errorf("moderation: listing restrictions: %w", err)
+		}
+		for _, row := range found {
+			rows = append(rows, restrictionRow(row))
+		}
 	}
 
 	restrictions := make([]Restriction, 0, len(rows))
@@ -228,6 +244,10 @@ func (s *Service) RestrictionsIn(ctx context.Context, roomID uuid.UUID) ([]Restr
 	}
 	return restrictions, nil
 }
+
+// restrictionRow is the shape both listing queries return, named once so the
+// two can be read the same way.
+type restrictionRow dbgen.ListPostingRestrictionsInRoomRow
 
 /*
 IsPostingRestricted reports whether somebody may post in a channel.
