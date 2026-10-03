@@ -123,6 +123,8 @@ export function describeNotification(notification: Notification): string {
     case "webhook_disabled":
       // Said by the server, not a person, so the sender's name is not used.
       return `Your webhook “${notification.detail ?? ""}” was turned off after repeated failures`;
+    case "assigned":
+      return `${who} assigned you ${notification.detail ?? ""}`.trim();
     default:
       return `${who} did something`;
   }

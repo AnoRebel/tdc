@@ -57,6 +57,8 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { atTime, onDay } from "#layers/ui/app/lib/dates";
+import IssueFromMessage from "#layers/ui/app/components/projects/IssueFromMessage.vue";
+import IssueLinks from "#layers/ui/app/components/projects/IssueLinks.vue";
 
 const { $t, $ts } = useI18n();
 
@@ -187,6 +189,8 @@ const threadCounts = ref<Record<string, number>>({});
 
 const reactions = useReactions(roomId);
 const pins = usePins(roomId);
+// Which messages here became issues, and turning another into one.
+const issueLinks = useIssueLinks(roomId);
 
 /*
  * Messages the reader has picked out, for acting on several at once.
@@ -1357,6 +1361,11 @@ function menuFor(
     });
   }
 
+  // Turning what was said into tracked work, for anybody who can read it —
+  // whether they may file anywhere is the form's to find out.
+  const fileIssue = issueLinks.menuItem(message);
+  if (fileIssue) items.push(fileIssue);
+
   /*
    * When this message expires.
    *
@@ -2123,6 +2132,11 @@ watch(roomId, load, { immediate: true });
                           <X class="size-3.5" aria-hidden="true" />
                         </Button>
                       </div>
+                      <!-- The issues this message became, that the reader may see. -->
+                      <IssueLinks
+                        v-if="!message.removed"
+                        :issues="issueLinks.forMessage(message.id)"
+                      />
                       <!-- Dimmed, but not below what can be read. At 60% this
                            fell under 4.5:1 against a sender's own bubble,
                            which axe caught and an eye would forgive until it
@@ -2399,6 +2413,14 @@ watch(roomId, load, { immediate: true });
       :x="contextMenu.position.value.x"
       :y="contextMenu.position.value.y"
       @close="contextMenu.close"
+    />
+
+    <IssueFromMessage
+      v-if="issueLinks.filing.value"
+      :room-id="roomId"
+      :message="issueLinks.filing.value"
+      @close="issueLinks.filing.value = null"
+      @filed="issueLinks.refresh()"
     />
 
     <ConfirmDialog

@@ -32,6 +32,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/oauth"
 	"github.com/AnoRebel/tdc/server/internal/passkeys"
 	"github.com/AnoRebel/tdc/server/internal/presence"
+	"github.com/AnoRebel/tdc/server/internal/projects"
 	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/recovery"
@@ -159,6 +160,10 @@ type Server struct {
 	// What webhooks and applications hold between requests: the signer, the
 	// outbound client and the delivery queue. Built lazily, in integrations.go.
 	integrations integrationsState
+
+	// projects owns projects and issues. Built when its routes are mounted,
+	// from the pool and rooms service above; see projectroutes.go.
+	projects *projects.Service
 
 	// shell is the built application's index.html, held in memory so social
 	// metadata can be inserted per request.
@@ -354,6 +359,15 @@ func (s *Server) Run(ctx context.Context) error {
 	*/
 	if (s.oauth != nil && s.oauth.Enabled()) || s.passkeys.Enabled() || s.secondFactor != nil || s.recovery != nil {
 		go s.sweepCeremoniesPeriodically(ctx)
+	}
+
+	/*
+		Projects: cycles that have ended are dealt with by the server, once a
+		minute, under each project's policy. Started here for the same reason
+		as the sweep above: a server with projects always runs it.
+	*/
+	if s.projects != nil {
+		go s.projects.CloseCyclesPeriodically(ctx)
 	}
 
 	/*

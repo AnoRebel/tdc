@@ -12,6 +12,31 @@ definePageMeta({ middleware: "auth", layout: "app" });
 
 const route = useRoute();
 const roomId = computed(() => String(route.params.id));
+
+/*
+ * An issue's discussion is a room too, and a notification or a search result
+ * about a comment arrives here. It belongs beside the issue it is about, so
+ * that is where it goes — carrying the message to open at.
+ */
+const roomsApi = useRooms();
+const router = useRouter();
+const { $localeRoute: localeRoute } = useI18n();
+watch(
+  roomId,
+  async (id) => {
+    try {
+      const room = await roomsApi.get(id);
+      if ((room.kind as string) === "issue-discussion") {
+        await router.replace(
+          localeRoute({ name: "issues-ref", params: { ref: room.name }, query: route.query }),
+        );
+      }
+    } catch {
+      // ChatRoom reports what is wrong with the room; this only redirects.
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>

@@ -413,7 +413,9 @@ export type NotificationReason =
   | "forward"
   | "pin"
   // An outgoing webhook of yours was turned off after failing repeatedly.
-  | "webhook_disabled";
+  | "webhook_disabled"
+  // Somebody made you responsible for an issue; detail names it.
+  | "assigned";
 
 /** One thing somebody has been told about. */
 export interface Notification {

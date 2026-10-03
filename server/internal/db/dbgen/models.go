@@ -9,6 +9,7 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ActionPress struct {
@@ -151,6 +152,20 @@ type Credential struct {
 	UsedAt                *time.Time
 	LastPeriod            *int64
 	ConfirmedAt           *time.Time
+}
+
+type Cycle struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	Name         string
+	StartsOn     pgtype.Date
+	EndsOn       pgtype.Date
+	StartsAt     time.Time
+	EndsAt       time.Time
+	ClosedAt     *time.Time
+	ClosedPolicy *string
+	CreatedBy    *uuid.UUID
+	CreatedAt    time.Time
 }
 
 type DirectoryProfile struct {
@@ -312,6 +327,71 @@ type InvitationUse struct {
 	UsedAt       time.Time
 }
 
+type Issue struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Number      int64
+	Title       string
+	Description string
+	StateID     uuid.UUID
+	AuthorID    *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
+	DeletedBy   *uuid.UUID
+	PriorityID  *uuid.UUID
+}
+
+type IssueAssignee struct {
+	IssueID    uuid.UUID
+	UserID     uuid.UUID
+	AssignedAt time.Time
+	AssignedBy *uuid.UUID
+}
+
+type IssueCycle struct {
+	IssueID uuid.UUID
+	CycleID uuid.UUID
+	AddedAt time.Time
+}
+
+type IssueLabel struct {
+	IssueID uuid.UUID
+	LabelID uuid.UUID
+}
+
+type IssueMilestone struct {
+	IssueID     uuid.UUID
+	MilestoneID uuid.UUID
+	AddedAt     time.Time
+}
+
+type IssueRelation struct {
+	FromIssue uuid.UUID
+	ToIssue   uuid.UUID
+	Kind      string
+	CreatedAt time.Time
+	CreatedBy *uuid.UUID
+}
+
+type IssueSearch struct {
+	IssueID      uuid.UUID
+	ProjectID    uuid.UUID
+	Title        string
+	Description  string
+	SearchVector interface{}
+}
+
+type IssueState struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	Name         string
+	NameFolded   string
+	Position     int32
+	IsCompletion bool
+	CreatedAt    time.Time
+}
+
 type MessageInteraction struct {
 	EventID   string
 	RoomID    uuid.UUID
@@ -346,6 +426,17 @@ type MessageView struct {
 	EventID  string
 	ViewerID uuid.UUID
 	SeenAt   time.Time
+}
+
+type Milestone struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Name        string
+	Description string
+	TargetDate  pgtype.Date
+	DueAt       *time.Time
+	CreatedBy   *uuid.UUID
+	CreatedAt   time.Time
 }
 
 type Notification struct {
@@ -465,6 +556,59 @@ type ProfileVerification struct {
 	RevokedBy       *uuid.UUID
 	RevokeReason    *string
 	ClearedAt       *time.Time
+}
+
+type Project struct {
+	ID              uuid.UUID
+	Key             string
+	KeyFolded       string
+	Name            string
+	Description     string
+	Visibility      string
+	NextIssueNumber int64
+	CreatedBy       *uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	TimeZone        string
+	CyclePolicy     string
+}
+
+type ProjectLabel struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	Name       string
+	NameFolded string
+	Colour     string
+	CreatedAt  time.Time
+}
+
+type ProjectMember struct {
+	ProjectID uuid.UUID
+	UserID    uuid.UUID
+	Role      string
+	JoinedAt  time.Time
+	AddedBy   *uuid.UUID
+}
+
+type ProjectPriority struct {
+	ID         uuid.UUID
+	ProjectID  uuid.UUID
+	Name       string
+	NameFolded string
+	Rank       int32
+	CreatedAt  time.Time
+}
+
+type ProjectView struct {
+	ID        uuid.UUID
+	ProjectID *uuid.UUID
+	OwnerID   uuid.UUID
+	Name      string
+	Layout    string
+	Filter    []byte
+	Shared    bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type ProposalResponse struct {

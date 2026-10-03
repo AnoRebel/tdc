@@ -1,7 +1,8 @@
 # Charts
 
-Nothing in this application draws a chart yet. What exists is the interface one
-would be drawn through, and a fallback that needs no dependency at all.
+Progress reports in projects are the first charts this application draws. They
+go through an interface any library can sit behind, and a fallback that needs
+no dependency at all.
 
 ## Why an interface
 
@@ -39,7 +40,21 @@ Nothing else changes. `charts.test.ts` drives two implementations through one
 sequence of calls, which is what "no caller changes" means and how it is
 checked.
 
-## The fallback
+## When a chart cannot be drawn
+
+`Chart.vue` catches an adapter that throws — while drawing or while updating —
+and shows its `fallback` slot instead. A screen that draws a chart puts the
+same numbers in that slot, readable without any drawing: a table, usually.
+Progress reports do this, and build the chart and the table from the same rows
+(`lib/progress.ts`) so the table cannot say anything the chart would not. The
+figures a chart summarises are also always on the page beside it, so a reader
+loses the picture, never the numbers.
+
+A failure is easy to bring about on purpose: a browser with no
+`ResizeObserver` makes the SVG adapter throw. The projects milestone scripts
+do exactly that to show the fallback.
+
+## The SVG adapter
 
 `svg.ts` draws lines, areas and bars in plain SVG with no dependency. It is not
 a rival to a real charting library — it has no legends, no tooltips, no axes

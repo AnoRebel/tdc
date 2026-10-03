@@ -45,7 +45,7 @@ func (q *Queries) ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error 
 }
 
 const countRooms = `-- name: CountRooms :one
-SELECT count(*) FROM rooms WHERE kind <> 'direct'
+SELECT count(*) FROM rooms WHERE kind NOT IN ('direct', 'project', 'issue-discussion')
 `
 
 // How many channels exist, for the operator's capacity limit.
@@ -54,6 +54,9 @@ SELECT count(*) FROM rooms WHERE kind <> 'direct'
 // each other rather than by anybody choosing to add a channel, and counting
 // them would make the limit refuse conversations an operator never meant to
 // cap.
+//
+// Nor are a project's stream or an issue's discussion, which exist because
+// somebody filed work rather than because anybody added a channel.
 func (q *Queries) CountRooms(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, countRooms)
 	var count int64
@@ -378,14 +381,18 @@ const listRoomsForUser = `-- name: ListRoomsForUser :many
 SELECT DISTINCT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.kind, rooms.visibility, rooms.home_server, rooms.created_by, rooms.created_at, rooms.updated_at, rooms.archived_at, rooms.archived_by, rooms.message_ttl_seconds, rooms.participant_key, rooms.federated
 FROM rooms
 LEFT JOIN room_members ON room_members.room_id = rooms.id AND room_members.user_id = $1
-WHERE room_members.user_id IS NOT NULL
-   OR rooms.visibility = 'public'
+WHERE (room_members.user_id IS NOT NULL
+   OR rooms.visibility = 'public')
+  AND rooms.kind NOT IN ('project', 'issue-discussion')
 ORDER BY rooms.name
 `
 
 // Rooms the user is a member of, plus public rooms they could join. A private
 // room they are not in never appears, which is what keeps its existence
 // undisclosed.
+//
+// A project's event stream and an issue's discussion are rooms too, and are
+// reached through their project rather than listed among conversations.
 func (q *Queries) ListRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error) {
 	rows, err := q.db.Query(ctx, listRoomsForUser, userID)
 	if err != nil {
@@ -428,6 +435,8 @@ SELECT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.k
 FROM rooms
 JOIN room_members ON room_members.room_id = rooms.id
 WHERE room_members.user_id = $1
+  -- Taking part in an issue's discussion is not joining a channel.
+  AND rooms.kind NOT IN ('project', 'issue-discussion')
 ORDER BY rooms.name
 `
 

@@ -56,6 +56,10 @@ type Service struct {
 	// mark events as originating here.
 	serverName string
 	log        *slog.Logger
+
+	// deciders answer who may see rooms that belong to something else, by
+	// kind. See DelegateAccess.
+	deciders map[string]AccessDecider
 }
 
 // NewService builds a rooms service.
@@ -242,6 +246,19 @@ func (s *Service) Visible(ctx context.Context, roomID, userID uuid.UUID) (dbgen.
 	}
 	if err != nil {
 		return dbgen.Room{}, fmt.Errorf("read room: %w", err)
+	}
+
+	// A room belonging to something else is visible to whoever may see that
+	// thing, and decided there — before anything about the room's own
+	// visibility or membership, which for such a room are not the answer.
+	if handled, visible, err := s.delegated(ctx, room, userID); handled {
+		if err != nil {
+			return dbgen.Room{}, fmt.Errorf("decide access: %w", err)
+		}
+		if !visible {
+			return dbgen.Room{}, ErrRoomNotFound
+		}
+		return room, nil
 	}
 
 	if room.Visibility == "public" {

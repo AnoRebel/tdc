@@ -235,7 +235,7 @@ SELECT r.id, r.slug, r.name, r.topic, r.kind, r.visibility,
        (m.user_id IS NOT NULL) AS is_member
 FROM rooms r
 LEFT JOIN room_members m ON m.room_id = r.id AND m.user_id = $1
-WHERE r.kind <> 'direct'
+WHERE r.kind NOT IN ('direct', 'project', 'issue-discussion')
   AND (r.visibility = 'public' OR m.user_id IS NOT NULL)
   AND (
         r.name ILIKE '%' || $2::text || '%'

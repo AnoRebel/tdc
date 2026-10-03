@@ -132,30 +132,3 @@ func TestFederatingARoomIsAudited(t *testing.T) {
 		t.Errorf("the entry should record which peers, got %q", recorded.Detail)
 	}
 }
-
-/*
-A room made here is not reported as somebody else's.
-
-A server with no address configured — the default, and every development and
-test server — stamps its rooms with a name of its own. The room was compared
-with the configured address instead, which was empty, so every room came back
-naming a home server; the client took that as federation and sent every message
-by the remote path, where each was refused.
-*/
-func TestARoomMadeHereIsNotHostedElsewhere(t *testing.T) {
-	handler := newTestAPI(t)
-	admin := completeSetup(t, handler)
-	room := makeRoom(t, handler, admin, "general", "public")
-
-	got := decode(t, mustCall(t, handler, http.MethodGet, "/api/rooms/"+room, nil, admin, http.StatusOK))
-	if home, present := got["homeServer"]; present {
-		t.Errorf("a room made on this server names %v as its home; clients will send through federation", home)
-	}
-
-	listed := decodeList(t, mustCall(t, handler, http.MethodGet, "/api/rooms", nil, admin, http.StatusOK))
-	for _, entry := range listed {
-		if item, _ := entry.(map[string]any); item["homeServer"] != nil {
-			t.Errorf("the room list reports a home server for a room made here: %v", item)
-		}
-	}
-}

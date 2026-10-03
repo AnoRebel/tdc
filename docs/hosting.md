@@ -238,8 +238,10 @@ it with no administrator at all, and one that would remove the authority of the
 person making it. The second can be overridden — somebody stepping down
 deliberately is a real thing — by repeating the request with `confirmed`.
 
-Eighteen of the twenty-five catalogued permissions are enforced; the rest are
-names waiting for features. `channel.read` and `channel.post` are checked per
+Thirty-two of the thirty-nine catalogued permissions are enforced — every one
+that projects and the directory added among them — and the rest are names
+waiting for features (calls, renaming, archiving and removing from a channel,
+editing anybody's message, and reading every account). `channel.read` and `channel.post` are checked per
 channel, on top of membership, bans and posting restrictions, and Member holds
 both everywhere until you say otherwise.
 
@@ -673,6 +675,38 @@ companies, verifications, enquiries, engagements, proposals and agreements are
 all kept and reappear as they were when it is switched back on. The private
 conversation each enquiry opened is an ordinary direct conversation and stays
 available to the two people in it, like any other.
+
+### Projects
+
+Projects need nothing configured and nothing extra running: they are tables in
+the same database, and their history is the same event log messages use. Two
+things about how they are stored are worth knowing when you look at the
+database or its backups.
+
+- **Every project and every issue has a room behind it.** A project's history is
+  a room of kind `project` — its event stream, which nobody is a member of and
+  which no room endpoint serves — and each issue's discussion is a room of kind
+  `issue-discussion`. Neither kind appears among anybody's conversations, and
+  neither counts towards `limits.max_channels`. A backup of the database is a
+  backup of all of it.
+- **Upgrading grants `project.create` to the `Member` role**, the same way a new
+  server's `Member` role is made with it, so ordinary accounts can start
+  projects as they can make channels. Withdraw it like any other permission if
+  you want projects started only by some people.
+- **The server ends cycles by itself.** Once a minute it looks for cycles whose
+  last day is over in their project's calendar and deals with each under the
+  project's policy, moving only which cycle unfinished issues are in. Servers
+  sharing a database share the work: each cycle is locked while it is dealt
+  with, and another server skips it. The zone database is built into the
+  server, so a container without `/usr/share/zoneinfo` still knows every
+  project's calendar.
+
+The audit log records the administrative acts around projects — one started,
+its visibility changed, somebody added to or removed from it, a role granted a
+permission in one — as `project.*` actions. What happens to issues is not
+copied there: it is each project's own history, in the event log.
+
+[Projects and issues](projects.md) covers the rest.
 
 ## TLS
 

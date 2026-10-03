@@ -3,6 +3,7 @@ import type { Notification } from "@tdc/types";
 import {
   AtSign,
   Bell,
+  CircleUserRound,
   Forward,
   MessageSquare,
   MessageSquareText,
@@ -42,6 +43,7 @@ const icons: Record<string, Component> = {
   join: UserPlus,
   forward: Forward,
   pin: Pin,
+  assigned: CircleUserRound,
 };
 
 function iconFor(notification: Notification) {

@@ -18,3 +18,4 @@ export * from "./errors";
 export * from "./search";
 export * from "./integrations";
 export * from "./directory";
+export * from "./projects";

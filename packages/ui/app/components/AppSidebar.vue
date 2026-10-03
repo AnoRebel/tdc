@@ -50,6 +50,7 @@ const { branding, offers } = useServerInfo();
 const showNotifications = ref(false);
 const showAppearance = ref(false);
 const router = useRouter();
+const hasProjects = router.hasRoute("projects");
 
 /*
  * The badge, refreshed on a timer.
@@ -155,6 +156,51 @@ function conversationName(room: Room): string {
           </li>
         </ul>
       </section>
+      <!-- Projects: where work agreed in these conversations is tracked. Only
+           where the client has somewhere to show them — the desktop client
+           shares this sidebar and does not, yet. -->
+      <ul v-if="hasProjects" class="space-y-px">
+        <li>
+          <NuxtLink
+            :to="localeRoute({ name: 'projects' })"
+            class="nav-item"
+            :data-active="route.path.startsWith('/projects')"
+          >
+            <Icon name="lucide:kanban" class="size-3.5 shrink-0 opacity-60" />
+            <span class="truncate">{{ $t("projects.title") }}</span>
+          </NuxtLink>
+        </li>
+        <li>
+          <NuxtLink
+            :to="localeRoute({ name: 'issues' })"
+            class="nav-item"
+            :data-active="route.path === '/issues'"
+          >
+            <Icon name="lucide:circle-user-round" class="size-3.5 shrink-0 opacity-60" />
+            <span class="truncate">{{ $t("projects.mine.title") }}</span>
+          </NuxtLink>
+        </li>
+        <li>
+          <NuxtLink
+            :to="localeRoute({ name: 'issues-search' })"
+            class="nav-item"
+            :data-active="route.path === '/issues/search'"
+          >
+            <Icon name="lucide:file-search" class="size-3.5 shrink-0 opacity-60" />
+            <span class="truncate">{{ $t("projects.search.title") }}</span>
+          </NuxtLink>
+        </li>
+        <li>
+          <NuxtLink
+            :to="localeRoute({ name: 'views' })"
+            class="nav-item"
+            :data-active="route.path.startsWith('/views')"
+          >
+            <Icon name="lucide:bookmark" class="size-3.5 shrink-0 opacity-60" />
+            <span class="truncate">{{ $t("projects.saved.title") }}</span>
+          </NuxtLink>
+        </li>
+      </ul>
 
       <section v-if="joined.length">
         <h2

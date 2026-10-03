@@ -78,6 +78,43 @@ export function howLongAgo(value: string | number | Date): string {
 }
 
 /**
+ * A calendar day the server sent as a day — "2026-10-18" — read as that day.
+ *
+ * Not an instant, and never put through one: `new Date("2026-10-18")` is
+ * midnight UTC, which is the 17th for everybody west of Greenwich. The day's
+ * own numbers are formatted as they are, so it reads the same in Honolulu as
+ * in Tokyo — the date a project chose is the date everybody sees.
+ */
+function calendarDay(day: string): Date {
+  const [year, month, date] = day.split("-").map(Number);
+  // The process's own calendar, used only to carry the three numbers to the
+  // formatter, which reads them back in the same calendar.
+  return new Date(year ?? 1970, (month ?? 1) - 1, date ?? 1);
+}
+
+/** "18 Oct 2026" — a day a project planned by, exactly as it was chosen. */
+export function onCalendarDay(day: string): string {
+  return format(calendarDay(day), "d MMM yyyy");
+}
+
+/** "Sun 18 Oct" — a planned day, with its weekday, where the year goes without saying. */
+export function onCalendarWeekday(day: string): string {
+  return format(calendarDay(day), "EEE d MMM");
+}
+
+/** Today in a zone, as a day: "2026-10-18". What a project's calendar says now. */
+export function todayIn(timeZone: string): string {
+  return format(new Date(), "yyyy-MM-dd", { in: tz(timeZone) });
+}
+
+/** The day so many days after another, both as "YYYY-MM-DD". */
+export function daysAfter(day: string, days: number): string {
+  const moved = calendarDay(day);
+  moved.setDate(moved.getDate() + days);
+  return format(moved, "yyyy-MM-dd");
+}
+
+/**
  * The shortest thing that still says when.
  *
  * Today gives the time, this year the day and month, and anything older the

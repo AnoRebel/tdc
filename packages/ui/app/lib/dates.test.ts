@@ -1,13 +1,18 @@
+import { format } from "date-fns";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   atTime,
+  daysAfter,
   fully,
   howLongAgo,
+  onCalendarDay,
+  onCalendarWeekday,
   onDate,
   onDay,
   onDayAtTime,
   onWeekdayAtTime,
+  todayIn,
   whenBriefly,
 } from "./dates";
 
@@ -203,6 +208,45 @@ describe("the shortest thing that still says when", () => {
  * way can read differently in the two clients for the same instant. Every one
  * of them went through this module; this is what keeps them there.
  */
+/*
+ * A day a project planned by is that day for everybody.
+ *
+ * A cycle that ends on the 18th is sent as "2026-10-18", and has to read as
+ * the 18th in Honolulu, in Tokyo and at +03:00. These run with the process's
+ * own zone set to each in turn — the bug they catch is a day put through an
+ * instant, which reads correctly wherever its author lives and a day early
+ * for anybody far enough west.
+ */
+describe("a planned day", () => {
+  const original = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = original;
+  });
+
+  for (const zone of ["Pacific/Honolulu", "Asia/Tokyo", "Etc/GMT-3"]) {
+    it(`is the same day in ${zone}`, () => {
+      process.env.TZ = zone;
+      // The zone really changed: an instant read in it is a different day.
+      expect(format(new Date("2026-10-18T02:00:00Z"), "d")).toBe(
+        zone === "Pacific/Honolulu" ? "17" : "18",
+      );
+
+      expect(onCalendarDay("2026-10-18")).toBe("18 Oct 2026");
+      expect(onCalendarWeekday("2026-10-18")).toBe("Sun 18 Oct");
+      expect(daysAfter("2026-10-05", 13)).toBe("2026-10-18");
+      expect(daysAfter("2026-12-25", 14)).toBe("2027-01-08");
+    });
+  }
+
+  it("says what day it is in a project's calendar, not the reader's", () => {
+    const tokyo = todayIn("Asia/Tokyo");
+    const honolulu = todayIn("Pacific/Honolulu");
+    expect(tokyo).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // Nineteen hours apart: the same day or Tokyo's next, never Tokyo's last.
+    expect([honolulu, daysAfter(honolulu, 1)]).toContain(tokyo);
+  });
+});
+
 describe("date formatting across both applications", () => {
   it("goes through this module rather than the runtime's own formatter", async () => {
     const { existsSync, readdirSync, readFileSync } = await import("node:fs");

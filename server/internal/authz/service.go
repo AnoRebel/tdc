@@ -379,13 +379,13 @@ detail — it is one person doing setup by hand for everybody.
 
 So there is a role, and registration puts people in it. What it grants is
 deliberately small: reading and posting in the channels somebody belongs to,
-making a channel, and inviting somebody to one. None is destructive, all are
-what an ordinary member of a developer community does without asking, and an
-operator who disagrees can take any of them away — it is an ordinary role, and
-taking a permission from it is one call. Withdrawing channel.post for one
-channel is how an announcement channel is made, and granting it there on
-another role is how the people who announce keep it: what this role confers is
-a baseline every other role overrides.
+making a channel, inviting somebody to one, and starting a project. None is
+destructive, all are what an ordinary member of a developer community does
+without asking, and an operator who disagrees can take any of them away — it
+is an ordinary role, and taking a permission from it is one call. Withdrawing
+channel.post for one channel is how an announcement channel is made, and
+granting it there on another role is how the people who announce keep it: what
+this role confers is a baseline every other role overrides.
 */
 const DefaultRoleName = "Member"
 
@@ -399,7 +399,7 @@ administrators make channels withdraws channel.create and nothing else breaks.
 func (s *Service) EnsureDefaultRole(ctx context.Context) (dbgen.Role, error) {
 	return s.EnsureRole(ctx, DefaultRoleName,
 		"What every member can do",
-		PermChannelRead, PermChannelPost, PermChannelCreate, PermChannelInvite)
+		PermChannelRead, PermChannelPost, PermChannelCreate, PermChannelInvite, PermProjectCreate)
 }
 
 func (s *Service) EnsureRole(

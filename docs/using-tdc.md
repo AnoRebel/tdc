@@ -613,6 +613,28 @@ moderators their decision travelled when it had not.
 This works both ways: a moderator on another server can remove one of your
 messages from their copy, and your server keeps it.
 
+## Projects
+
+When a conversation decides something needs doing, it can be tracked where it
+was decided. **Projects** in the sidebar lists the projects you can see; each
+holds issues named by the project's key and a number — `WEB-12` — that never
+changes. An issue moves through the states its project defines, and everything
+that happens to it is kept in a history nobody can edit.
+
+A message becomes an issue from its own menu — **Create an issue from this** —
+and the two stay linked: the issue shows where it came from to anybody who can
+read that conversation, and the message shows the issue. Each issue has a
+discussion beside it that works like any channel.
+
+Work can be time-boxed in **cycles** and gathered across them into
+**milestones**, both optional. A cycle's days are the project's own calendar,
+and when one ends with work unfinished the server carries that work forward to
+the next cycle or leaves it — never deletes it.
+
+[Projects and issues](projects.md) is the whole guide: starting a project,
+configuring its states, filing and moving issues, cycles and milestones, and who
+may do what.
+
 ## Making it yours
 
 ### Appearance
@@ -774,8 +796,7 @@ So that nothing above is read as implying more than it says:
 - **Federation.** Servers do not exchange messages. Addresses name a home server
   and every event is signed, so the groundwork exists, but your conversations
   are with people on your own server.
-- **Project management and the developer directory.** Both are part of what TDC
-  is for and neither is built.
+- **The developer directory.** Part of what TDC is for, and not built.
 - **Changing your own username or display name.** Neither has a control or an
   endpoint, so both are whatever they were when the account was made. The
   server can already change a display name; nothing asks it to.
