@@ -1,4 +1,4 @@
-import { devices, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   account,
@@ -6,6 +6,7 @@ import {
   founderWithDirectory,
   onlyInDirectoryProjects,
   people,
+  secondPhone,
   signInAs,
 } from "./directory.helpers";
 
@@ -48,16 +49,22 @@ test("skills and availability make a developer findable", async ({ page, request
   await expect(page.getByText("Waiting for review")).toBeVisible();
 
   // The switch draws over its own checkbox, so the click goes to what is drawn.
-  await page.getByRole("switch", { name: "I am open to work" }).check({ force: true });
+  // Clicked where a person would: the switch's drawn track, which is the
+  // label of the checkbox underneath.
+  const openToWork = page.getByRole("switch", { name: "I am open to work" });
+  await openToWork.locator("xpath=..").click();
+  await expect(openToWork).toBeChecked();
   await page.getByLabel("What kind of work").fill("Short contracts");
   await expect(page.getByText(/^Until /)).toBeVisible();
 
   await page.getByRole("button", { name: "Create profile" }).click();
-  await expect(page.getByRole("status")).toHaveText("Your profile is created.");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Your profile is created." }),
+  ).toBeVisible();
   await fitsThePhone(page);
 
   // The client searches, on their own phone.
-  const clientsPhone = await browser.newContext({ ...devices["Pixel 7"] });
+  const clientsPhone = await secondPhone(browser);
   const phone = await clientsPhone.newPage();
   await signInAs(phone, client);
   await phone.goto("/directory");

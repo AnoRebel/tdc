@@ -501,6 +501,37 @@ be found. Every grant, revocation and clearing is written to the audit log:
 Each verification keeps a copy of the claim as it was when it was checked, so a
 record reviewed later shows exactly what was attested to.
 
+### Reading the trail
+
+Every directory decision a moderator or reviewer makes is in the server's audit
+log, under these actions:
+
+| Action                           | Written when                                              |
+| -------------------------------- | --------------------------------------------------------- |
+| `directory.profile.viewed`       | a moderator read a profile including what its owner hid   |
+| `directory.profile.moderated`    | a moderator changed, cleared or hid a profile             |
+| `directory.skill.added`          | a reviewer added a skill directly                         |
+| `directory.skill.approved`       | a reviewer approved a proposed skill                      |
+| `directory.skill.merged`         | a reviewer merged a proposal into an existing skill       |
+| `directory.skill.rejected`       | a reviewer rejected a proposed skill                      |
+| `directory.verification.granted` | a moderator verified a claim                              |
+| `directory.verification.revoked` | a moderator revoked a verification                        |
+| `directory.verification.cleared` | an owner's edit cleared a verification on their own claim |
+
+Reading the log takes **`server.audit.read`**, which is deliberately separate
+from the permissions that let somebody moderate: being able to act is not the
+same as being able to review who acted. Whoever holds it reads the log under
+**Audit** in the web client, or narrows it to one kind of decision over the API:
+
+```sh
+curl "https://tdc.example/api/admin/audit?action=directory.verification.revoked" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Each entry names who acted, when, and on what, with the reason where one was
+required. None of them holds what a moderator removed from a profile, or the
+hidden contents they read — only that they did.
+
 ## Not shared with other servers
 
 The directory belongs to this server. Federation carries rooms an operator has

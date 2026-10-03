@@ -56,7 +56,9 @@ test("a profile is created, edited and restricted on a phone", async ({ page, re
     .click();
 
   await page.getByRole("button", { name: "Create profile" }).click();
-  await expect(page.getByRole("status")).toHaveText("Your profile is created.");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Your profile is created." }),
+  ).toBeVisible();
   await fitsThePhone(page);
 
   // What a member sees: the profile, the portfolio, and no contact details.
@@ -73,7 +75,9 @@ test("a profile is created, edited and restricted on a phone", async ({ page, re
     .getByText("Only you", { exact: true })
     .click();
   await page.getByRole("button", { name: "Save profile" }).click();
-  await expect(page.getByRole("status")).toHaveText("Your profile is saved.");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Your profile is saved." }),
+  ).toBeVisible();
 
   // The form came back holding what the server kept, not what was typed.
   await expect(page.getByLabel("Headline")).toHaveValue("Mobile developer");

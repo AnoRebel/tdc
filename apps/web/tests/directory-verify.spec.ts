@@ -1,4 +1,4 @@
-import { devices, expect, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 import {
   account,
@@ -6,6 +6,7 @@ import {
   founderWithDirectory,
   onlyInDirectoryProjects,
   people,
+  secondPhone,
   signInAs,
 } from "./directory.helpers";
 
@@ -79,7 +80,7 @@ test("a moderator verifies one claim and revokes another from the interface", as
   await expect(link.getByRole("button", { name: "Verified" })).toHaveCount(0);
 
   // A client sees one verified skill among three, and the same statement.
-  const clientsPhone = await browser.newContext({ ...devices["Pixel 7"] });
+  const clientsPhone = await secondPhone(browser);
   const client = await clientsPhone.newPage();
   await signInAs(client, people.client);
   await client.goto(`/directory/people/${developer}`);
@@ -94,7 +95,7 @@ test("a moderator verifies one claim and revokes another from the interface", as
   await fitsThePhone(client);
 
   // The developer sees it on their own page, with what was checked.
-  const developersPhone = await browser.newContext({ ...devices["Pixel 7"] });
+  const developersPhone = await secondPhone(browser);
   const own = await developersPhone.newPage();
   await signInAs(own, developer);
   await own.goto("/directory/profile");

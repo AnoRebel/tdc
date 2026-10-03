@@ -1,11 +1,13 @@
-import { devices, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   account,
   fitsThePhone,
   founderWithDirectory,
+  noEnquiryPending,
   onlyInDirectoryProjects,
   people,
+  secondPhone,
   signInAs,
 } from "./directory.helpers";
 
@@ -24,6 +26,7 @@ test("both parties watch an engagement start and close together", async ({
   browser,
 }) => {
   await founderWithDirectory(request);
+  await noEnquiryPending(request);
   const asDeveloper = await account(request, people.developer);
   const asClient = await account(request, people.client);
   const subject = `Payroll export ${Date.now().toString(36)}`;
@@ -50,7 +53,7 @@ test("both parties watch an engagement start and close together", async ({
   await fitsThePhone(page);
 
   // The client, on their own phone, finds it in their engagements and talks.
-  const clientsPhone = await browser.newContext({ ...devices["Pixel 7"] });
+  const clientsPhone = await secondPhone(browser);
   const client = await clientsPhone.newPage();
   await signInAs(client, people.client);
   await client.goto("/directory/engagements");

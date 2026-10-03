@@ -443,6 +443,86 @@ short version:
   the record and nothing more: it holds no money and settles no disputes.
 - **Finished work needs both of you too.** One says it is complete; it stays
   outstanding until the other confirms.
+
+### From a profile to an agreement
+
+Two people who have never met: Amani, a developer, and Baraka, who needs work
+done. Each has an account on the server (**Create one** on the sign-in page)
+and the operator has switched the directory on.
+
+**Amani makes a profile.**
+
+1. Open **Directory** in the sidebar, then **Your profile**. It says _You have
+   no directory profile_, and nothing about the account changes until one is
+   made.
+2. Write a **Headline** — one line on what you do — and a **Location**. Add
+   skills by typing in **Find a skill** and choosing one; "golang" finds Go.
+3. Choose who sees it. **Who can find you** and **Who sees what you wrote**
+   are each _Anyone_, _Members_ or _Only you_. **Who sees your contact
+   details** starts at _Only you_, and can stay there: people can still reach
+   you through the directory without it.
+4. **Take enquiries through my profile** is on for a public profile unless you
+   turn it off.
+5. **Create profile.** _Your profile is created._ appears, and you are in the
+   directory for the people you chose.
+
+**Baraka finds Amani and asks.**
+
+6. Open **Directory**. Search by **Skill**, **Location**, a name or words from
+   a headline; tick **Available for work only** to see only people who said
+   so. Results show only what each person let you see.
+7. Open Amani's profile. Under _Send Amani an enquiry_, give a **Subject** and
+   describe **The work** — what, roughly when, and anything Amani needs to
+   decide. **Send enquiry.** It is one message: you cannot add to it until
+   Amani answers. It appears under **Enquiries** as _Waiting for an answer_.
+
+**Amani takes it up.**
+
+8. Amani is notified like any direct message. Under **Directory →
+   Enquiries**, **Take it up** turns the enquiry into an engagement and opens
+   its page; **Decline** answers it without one. Both of you now find it under
+   **Engagements**, and its **Conversation** tab is a private conversation
+   between the two of you.
+
+**Agreeing on the work.**
+
+9. On the engagement's **Proposal** tab, either of you chooses **Write a
+   proposal**: **What the work is**, **When**, a **Currency** (TZS unless you
+   change it), and each deliverable with its **Price**, typed the way you
+   would write it. **Send the proposal.**
+10. The other person can **Accept**, **Decline**, or **Ask for a change** to
+    one part — the work, the timeline, the currency, or one deliverable — and
+    say what they would like instead. The person who sent the proposal is
+    notified.
+11. Answering a request is **Send a new version**: the form starts from the
+    latest version, so you change only what was asked about. Every version
+    stays readable under **Earlier versions**, with what changed marked.
+12. When one of you accepts, the page says the agreement waits for the other.
+    When **both of you accept the same version**, the agreement is recorded,
+    with both acceptance times. Nobody can change it after that.
+13. Either of you can **Export the agreement** as a file. You both get the
+    same file.
+
+**Finishing.**
+
+14. Either of you chooses **Start the work**. When it is done, one of you
+    chooses **The work is complete: ask … to confirm**, with a note if you
+    like; the other sees it and chooses **Confirm the work is complete**.
+    Until they do, it shows as outstanding to both of you. The engagement then shows _Completed_, with every step and
+    who took it under **History**.
+
+Either of you can **Withdraw** at any point before an agreement, with a reason
+the other sees.
+
+**What an agreement record is, and is not.** It is a record, kept by this
+server, of what the two of you agreed and when, which either of you can refer
+to or export. **The server and whoever runs it are not a party to it.** They do
+not hold or move money, offer escrow or payment, guarantee that either of you
+will do what was agreed, or settle disputes about it, and no service that does
+any of those is connected. Every agreement, on screen and exported, carries
+that statement in the same words. Paying, and resolving a disagreement, are
+between the two of you.
+
 - **A company can ask to list you; only you can accept**, from your profile
   page. Leave, and it is gone from both the company's page and your profile at
   once.
@@ -476,6 +556,13 @@ themselves rather than needing somebody to remember.
 Your operator may also have a word filter configured, which can flag a message
 for a human, mask the word, or block the message outright. It is off unless
 somebody set it up.
+
+Where the directory is switched on, three more permissions may be handed out,
+each to whoever the community trusts with that judgement: moderating profiles,
+reviewing proposed skills, and verifying claims. [The directory's moderation
+section](directory.md#moderation) is the guide for all three — what each
+allows, how to approve, merge or reject a skill, how to verify and revoke a
+claim, and the audit entry each leaves.
 
 ### Messages from other servers
 

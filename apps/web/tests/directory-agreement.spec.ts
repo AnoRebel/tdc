@@ -1,14 +1,16 @@
 import { readFile } from "node:fs/promises";
 
-import { devices, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 import {
   account,
   fitsThePhone,
   founderWithDirectory,
+  noEnquiryPending,
   onlyInDirectoryProjects,
   people,
+  secondPhone,
   signInAs,
 } from "./directory.helpers";
 
@@ -41,6 +43,7 @@ test("a proposal is revised, agreed, exported and completed by both", async ({
   browser,
 }) => {
   await founderWithDirectory(request);
+  await noEnquiryPending(request);
   const asDeveloper = await account(request, people.developer);
   const asClient = await account(request, people.client);
   const subject = `Clinic bookings ${Date.now().toString(36)}`;
@@ -83,7 +86,7 @@ test("a proposal is revised, agreed, exported and completed by both", async ({
   await expect(page.locator("[data-engagement-state]")).toHaveText("Proposal");
 
   // The client opens it on their own phone and asks for the second line to change.
-  const clientsPhone = await browser.newContext({ ...devices["Pixel 7"] });
+  const clientsPhone = await secondPhone(browser);
   const client = await clientsPhone.newPage();
   await signInAs(client, people.client);
   await client.goto(`/directory/engagements/${engagement}`);

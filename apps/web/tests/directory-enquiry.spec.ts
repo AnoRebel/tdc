@@ -1,11 +1,13 @@
-import { devices, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import {
   account,
   fitsThePhone,
   founderWithDirectory,
+  noEnquiryPending,
   onlyInDirectoryProjects,
   people,
+  secondPhone,
   signInAs,
 } from "./directory.helpers";
 
@@ -26,6 +28,7 @@ test("a client's enquiry reaches the developer, who can read it", async ({
   browser,
 }) => {
   await founderWithDirectory(request);
+  await noEnquiryPending(request);
   const asDeveloper = await account(request, people.developer);
   await account(request, people.client);
 
@@ -41,7 +44,9 @@ test("a client's enquiry reaches the developer, who can read it", async ({
   await page.getByLabel("Subject").fill(subject);
   await page.getByLabel("The work").fill("A booking app for three clinics in Mwanza, by March.");
   await page.getByRole("button", { name: "Send enquiry" }).click();
-  await expect(page.getByRole("status")).toContainText("Your enquiry was sent.");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Your enquiry was sent." }),
+  ).toBeVisible();
   await fitsThePhone(page);
 
   await page.goto("/directory/enquiries?box=sent");
@@ -49,7 +54,7 @@ test("a client's enquiry reaches the developer, who can read it", async ({
   await expect(page.getByText("Waiting for an answer").first()).toBeVisible();
 
   // The developer, on their own phone.
-  const developersPhone = await browser.newContext({ ...devices["Pixel 7"] });
+  const developersPhone = await secondPhone(browser);
   const developer = await developersPhone.newPage();
   await signInAs(developer, people.developer);
   await developer.goto("/directory/enquiries");
@@ -57,7 +62,10 @@ test("a client's enquiry reaches the developer, who can read it", async ({
   const received = developer.getByRole("main").getByRole("listitem").filter({ hasText: subject });
   await expect(received).toBeVisible();
   await received.getByRole("link", { name: "Open the conversation" }).click();
-  await expect(developer.getByText("A booking app for three clinics in Mwanza")).toBeVisible();
+  await developer.waitForURL(/\/rooms\//);
+  await expect(
+    developer.getByRole("main").getByText("A booking app for three clinics in Mwanza").first(),
+  ).toBeVisible();
 
   // Notified the way any direct message notifies.
   const notifications = await (
