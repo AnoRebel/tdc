@@ -318,6 +318,8 @@ var memberGrants = map[authz.Permission]bool{
 	authz.PermIssueAssign:     true,
 	authz.PermIssueLabel:      true,
 	authz.PermIssueRelate:     true,
+	authz.PermIssuePlan:       true,
+	authz.PermProjectPlan:     true,
 }
 
 // adminGrants is what running a project confers: everything in it.
@@ -330,6 +332,8 @@ var adminGrants = map[authz.Permission]bool{
 	authz.PermIssueLabel:             true,
 	authz.PermIssueRelate:            true,
 	authz.PermIssueDelete:            true,
+	authz.PermIssuePlan:              true,
+	authz.PermProjectPlan:            true,
 }
 
 /*

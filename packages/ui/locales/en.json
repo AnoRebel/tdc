@@ -640,7 +640,10 @@
       "uncycled": "{actor} took this out of its cycle",
       "milestoned": "{actor} put this in the milestone {to}",
       "unmilestoned": "{actor} took this out of its milestone",
-      "other": "{actor}: {type}"
+      "other": "{actor}: {type}",
+      "carried": "When {from} ended, the server carried this forward to {to}",
+      "carriedOut": "When {from} ended, the server took this out of it, with no next cycle to carry it to",
+      "server": "The server"
     },
     "priority": {
       "none": "no priority",
@@ -815,7 +818,8 @@
         "state": "Move to state",
         "priority": "Set priority",
         "assign": "Assign",
-        "unassign": "Unassign"
+        "unassign": "Unassign",
+        "cycle": "Put in cycle"
       },
       "codes": {
         "changed": "Changed",
@@ -824,6 +828,63 @@
         "not_found": "Not found",
         "failed": "Failed"
       }
+    },
+    "planning": {
+      "anyCycle": "Any cycle",
+      "calendar": "Dates are days in {zone}. When a cycle ends, {policy}.",
+      "closed": "Ended {when}: {policy}.",
+      "cycle": "Cycle",
+      "cycleNotFound": "There is no such cycle in this project.",
+      "dateFormat": "Write the day as YYYY-MM-DD.",
+      "done": "{completed} of {total} done",
+      "dueAt": "over at {when}",
+      "emptyCycle": "Nothing is in this cycle.",
+      "emptyMilestone": "Nothing counts towards this milestone yet.",
+      "endsBeforeStart": "A cycle cannot end before it starts.",
+      "endsOn": "Last day",
+      "issuesInCycle": "Issues in this cycle",
+      "issuesInMilestone": "Issues in this milestone",
+      "makeCycle": "Make cycle",
+      "makeMilestone": "Make milestone",
+      "milestone": "Milestone",
+      "milestoneNotFound": "There is no such milestone in this project.",
+      "name": "Name",
+      "nameRequired": "Give it a name.",
+      "nameTooLong": "That name is too long.",
+      "newCycle": "New cycle",
+      "newMilestone": "New milestone",
+      "noCycle": "No cycle",
+      "noCycles": "No cycles yet. A project works the same without them.",
+      "noMilestone": "No milestone",
+      "noMilestones": "No milestones yet.",
+      "overdue": "Overdue",
+      "overdueHint": "Its day has passed with work unfinished. Nothing about the issues has been changed because of it.",
+      "planIssue": "Plan {issue}",
+      "policies": {
+        "carry-forward": "unfinished issues carry forward to the next cycle",
+        "remain": "unfinished issues remain in it"
+      },
+      "policy": "When a cycle ends",
+      "policyHints": {
+        "carry-forward": "Unfinished issues move to the next cycle, or out of any cycle if there is none. Each move is recorded on the issue.",
+        "remain": "Unfinished issues stay in the cycle that ended, which then shows the work left in it."
+      },
+      "progress": "Progress",
+      "removeCycle": "Remove cycle",
+      "saved": "Saved.",
+      "settings": "Cycles and dates",
+      "settingsHint": "The time zone a project's days are in, and what happens to unfinished work when a cycle ends. Nothing is ever deleted or moved to another state either way.",
+      "spans": "Cycles it spans",
+      "spansNone": "None of its issues is in a cycle.",
+      "startsOn": "First day",
+      "status": {
+        "upcoming": "Upcoming",
+        "active": "Under way",
+        "ended": "Ended"
+      },
+      "target": "Aiming for {day}",
+      "targetDate": "Day to aim for",
+      "timeZone": "Time zone"
     }
   }
 }

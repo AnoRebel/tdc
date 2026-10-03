@@ -65,6 +65,9 @@ type Querier interface {
 	// later action from the person who set it.
 	ClearExpiredStatuses(ctx context.Context) error
 	ClearExpiredTyping(ctx context.Context) error
+	ClearIssueCycle(ctx context.Context, issueID uuid.UUID) error
+	ClearIssueMilestone(ctx context.Context, issueID uuid.UUID) error
+	CloseCycle(ctx context.Context, arg CloseCycleParams) error
 	// Collected once: the row is deleted as it is read, so a handle presented twice
 	// yields nothing the second time.
 	CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error)
@@ -104,10 +107,16 @@ type Querier interface {
 	// of what it shows.
 	CountBoardColumns(ctx context.Context, arg CountBoardColumnsParams) ([]CountBoardColumnsRow, error)
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
+	// How many issues each of a project's cycles holds, and how many are done.
+	CountCycleIssues(ctx context.Context, projectID uuid.UUID) ([]CountCycleIssuesRow, error)
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
 	CountEventsSince(ctx context.Context, arg CountEventsSinceParams) (int64, error)
+	CountMilestoneIssues(ctx context.Context, projectID uuid.UUID) ([]CountMilestoneIssuesRow, error)
 	CountOpenReports(ctx context.Context) (int64, error)
+	// Cycles of the project sharing any instant with [starts_at, ends_at), apart
+	// from the one being changed.
+	CountOverlappingCycles(ctx context.Context, arg CountOverlappingCyclesParams) (int64, error)
 	CountPendingAttempt(ctx context.Context, id uuid.UUID) (PendingSignIn, error)
 	CountProjectAdmins(ctx context.Context, projectID uuid.UUID) (int64, error)
 	CountReactionsForEvent(ctx context.Context, eventID string) (int64, error)
@@ -138,11 +147,13 @@ type Querier interface {
 	CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) (ApiToken, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
+	CreateCycle(ctx context.Context, arg CreateCycleParams) (Cycle, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
 	CreateEmailConfirmation(ctx context.Context, arg CreateEmailConfirmationParams) (EmailConfirmation, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
 	CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error)
 	CreateIssueState(ctx context.Context, arg CreateIssueStateParams) (IssueState, error)
+	CreateMilestone(ctx context.Context, arg CreateMilestoneParams) (Milestone, error)
 	// Raises a notification, once.
 	//
 	// The conflict clause is what stops a redelivered or edited message notifying
@@ -171,6 +182,7 @@ type Querier interface {
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
+	DeleteCycle(ctx context.Context, id uuid.UUID) error
 	DeleteExpiredEmailConfirmations(ctx context.Context) (int64, error)
 	DeleteExpiredIdempotencyRecords(ctx context.Context, createdAt time.Time) error
 	DeleteExpiredOAuthAuthorizations(ctx context.Context) (int64, error)
@@ -183,6 +195,7 @@ type Querier interface {
 	// Housekeeping only. The expiry is already honoured on read, so this removes
 	// rows rather than changing any answer.
 	DeleteLapsedBans(ctx context.Context) (int64, error)
+	DeleteMilestone(ctx context.Context, id uuid.UUID) error
 	DeleteProjectLabel(ctx context.Context, id uuid.UUID) error
 	DeleteProjectPriority(ctx context.Context, id uuid.UUID) error
 	DeleteProjectView(ctx context.Context, id uuid.UUID) error
@@ -263,6 +276,7 @@ type Querier interface {
 	GetAppearance(ctx context.Context, id uuid.UUID) (GetAppearanceRow, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
+	GetCycle(ctx context.Context, id uuid.UUID) (Cycle, error)
 	GetDirectMessagePolicy(ctx context.Context, userID uuid.UUID) (string, error)
 	// What this person lets a member list say about them.
 	//
@@ -275,9 +289,12 @@ type Querier interface {
 	GetIssueByNumber(ctx context.Context, arg GetIssueByNumberParams) (Issue, error)
 	// The event that created an issue, which is where its origin is recorded.
 	GetIssueCreation(ctx context.Context, arg GetIssueCreationParams) (Event, error)
+	GetIssueCycle(ctx context.Context, issueID uuid.UUID) (Cycle, error)
+	GetIssueMilestone(ctx context.Context, issueID uuid.UUID) (Milestone, error)
 	GetIssueState(ctx context.Context, id uuid.UUID) (IssueState, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
 	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
+	GetMilestone(ctx context.Context, id uuid.UUID) (Milestone, error)
 	// The preference that applies to one conversation.
 	//
 	// The room's own row when there is one, the person's global default
@@ -388,6 +405,10 @@ type Querier interface {
 	ListBoardColumn(ctx context.Context, arg ListBoardColumnParams) ([]ListBoardColumnRow, error)
 	ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]ListChannelBansRow, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
+	ListCyclesForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListCyclesForIssuesRow, error)
+	ListCyclesOfProject(ctx context.Context, projectID uuid.UUID) ([]Cycle, error)
+	// Cycles that have ended and whose end has not been dealt with, oldest first.
+	ListCyclesToClose(ctx context.Context, arg ListCyclesToCloseParams) ([]Cycle, error)
 	ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	// What is ready to send.
 	//
@@ -422,10 +443,16 @@ type Querier interface {
 	// fetched, so the room's members learn nothing about it — not its title, and
 	// not that it exists.
 	ListIssuesFromRoom(ctx context.Context, arg ListIssuesFromRoomParams) ([]ListIssuesFromRoomRow, error)
+	ListIssuesInCycle(ctx context.Context, cycleID uuid.UUID) ([]Issue, error)
+	ListIssuesInMilestone(ctx context.Context, milestoneID uuid.UUID) ([]Issue, error)
 	ListLabelsForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListLabelsForIssuesRow, error)
 	// The lifetimes carried by a page of messages, so a timeline can disclose them
 	// without a query per message.
 	ListLifetimesForEvents(ctx context.Context, eventIds []string) ([]MessageLifetime, error)
+	// The cycles a milestone's issues are in: what it spans.
+	ListMilestoneCycles(ctx context.Context, milestoneID uuid.UUID) ([]Cycle, error)
+	ListMilestonesForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListMilestonesForIssuesRow, error)
+	ListMilestonesOfProject(ctx context.Context, projectID uuid.UUID) ([]Milestone, error)
 	// Everything assigned to somebody, in every project they may still see.
 	//
 	// Visibility is joined, not filtered afterwards: an assignment in a private
@@ -549,6 +576,8 @@ type Querier interface {
 	// so a timeline can show "3 replies" without fetching them.
 	ListThreadSummaries(ctx context.Context, dollar_1 []string) ([]ListThreadSummariesRow, error)
 	ListTyping(ctx context.Context, roomID uuid.UUID) ([]ListTypingRow, error)
+	// Issues still in a cycle whose state does not mean done, in number order.
+	ListUnfinishedIssuesInCycle(ctx context.Context, cycleID uuid.UUID) ([]Issue, error)
 	// Unread counts for every room a person is in, in one query rather than one
 	// per room.
 	ListUnreadCounts(ctx context.Context, userID uuid.UUID) ([]ListUnreadCountsRow, error)
@@ -577,6 +606,9 @@ type Querier interface {
 	// A project's views a person may use: their own, and those shared. The caller
 	// has already established that they may see the project.
 	ListViewsOfProject(ctx context.Context, arg ListViewsOfProjectParams) ([]ListViewsOfProjectRow, error)
+	// Taken by whoever deals with a cycle's end, so two servers sharing a database
+	// cannot both do it. SKIP LOCKED: the other simply moves on.
+	LockCycle(ctx context.Context, id uuid.UUID) (Cycle, error)
 	// Reads an issue and holds it until the transaction ends, so a change and the
 	// event recording it are decided against a value nobody else is changing.
 	LockIssue(ctx context.Context, id uuid.UUID) (Issue, error)
@@ -606,6 +638,9 @@ type Querier interface {
 	MarkRoomNotificationsReadForUser(ctx context.Context, arg MarkRoomNotificationsReadForUserParams) error
 	MarkScheduledMessageFailed(ctx context.Context, arg MarkScheduledMessageFailedParams) error
 	MarkScheduledMessageSent(ctx context.Context, arg MarkScheduledMessageSentParams) error
+	// Where unfinished work goes when a cycle ends: the first cycle starting no
+	// earlier than that one ended, that has not itself ended.
+	NextCycleAfter(ctx context.Context, arg NextCycleAfterParams) (Cycle, error)
 	NextIssueStatePosition(ctx context.Context, projectID uuid.UUID) (int32, error)
 	NextProjectPriorityRank(ctx context.Context, projectID uuid.UUID) (int32, error)
 	// Allocates the next position in a room's total order.
@@ -771,6 +806,8 @@ type Querier interface {
 	// Scoped to the uploader and to attachments not yet sent: a caption is written
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
+	// After a project's zone changes: the same days, at different instants.
+	SetCycleInstants(ctx context.Context, arg SetCycleInstantsParams) error
 	SetDirectMessagePolicy(ctx context.Context, arg SetDirectMessagePolicyParams) error
 	// All three together, because the interface presents them together: a person
 	// toggling one sends the state of all three, and writing them in one statement
@@ -786,7 +823,9 @@ type Querier interface {
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetHidePushContent(ctx context.Context, arg SetHidePushContentParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
+	SetIssueCycle(ctx context.Context, arg SetIssueCycleParams) error
 	SetIssueDescription(ctx context.Context, arg SetIssueDescriptionParams) (Issue, error)
+	SetIssueMilestone(ctx context.Context, arg SetIssueMilestoneParams) error
 	SetIssuePriority(ctx context.Context, arg SetIssuePriorityParams) (Issue, error)
 	SetIssueStatePosition(ctx context.Context, arg SetIssueStatePositionParams) error
 	SetIssueTitle(ctx context.Context, arg SetIssueTitleParams) (Issue, error)
@@ -796,9 +835,12 @@ type Querier interface {
 	// expires_at is supplied by the caller for 'after_sending', which knows it at
 	// once, and left null for the seen-based kinds until reading decides it.
 	SetMessageLifetime(ctx context.Context, arg SetMessageLifetimeParams) (MessageLifetime, error)
+	SetMilestoneDue(ctx context.Context, arg SetMilestoneDueParams) error
 	// Recording an address somebody has asked to prove, which does not touch the
 	// one they already have.
 	SetPendingEmail(ctx context.Context, arg SetPendingEmailParams) error
+	// Cycles and milestones.
+	SetProjectPlanning(ctx context.Context, arg SetProjectPlanningParams) (Project, error)
 	SetProjectPriorityRank(ctx context.Context, arg SetProjectPriorityRankParams) error
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
@@ -870,7 +912,9 @@ type Querier interface {
 	UnpinMessage(ctx context.Context, arg UnpinMessageParams) error
 	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error
 	UnrelateIssues(ctx context.Context, arg UnrelateIssuesParams) (int64, error)
+	UpdateCycle(ctx context.Context, arg UpdateCycleParams) (Cycle, error)
 	UpdateIssueState(ctx context.Context, arg UpdateIssueStateParams) (IssueState, error)
+	UpdateMilestone(ctx context.Context, arg UpdateMilestoneParams) (Milestone, error)
 	// The provider's claim about the account may change between sign-ins, so it is
 	// refreshed rather than left at whatever it was the first time.
 	UpdateOAuthCredentialEmail(ctx context.Context, arg UpdateOAuthCredentialEmailParams) error

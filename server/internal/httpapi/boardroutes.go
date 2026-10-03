@@ -38,7 +38,9 @@ boardFilter reads a board's filters from the query: label and priority by
 name, assignee by username.
 */
 func (s *Server) boardFilter(c *echo.Context) projects.BoardFilter {
-	filter := projects.BoardFilter{Label: c.QueryParam("label"), Priority: c.QueryParam("priority")}
+	filter := projects.BoardFilter{
+		Label: c.QueryParam("label"), Priority: c.QueryParam("priority"), Cycle: c.QueryParam("cycle"),
+	}
 	if username := c.QueryParam("assignee"); username != "" {
 		person, err := s.queries.GetUserByUsername(c.Request().Context(), identity.NormaliseUsername(username))
 		if err != nil {

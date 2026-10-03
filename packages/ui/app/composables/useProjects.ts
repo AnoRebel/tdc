@@ -4,6 +4,9 @@ import type {
   BoardFilter,
   BulkChange,
   BulkResult,
+  Cycle,
+  CyclePolicy,
+  Milestone,
   OpenedView,
   SavedView,
   ViewFilter,
@@ -190,6 +193,43 @@ export function useProjects() {
     /** Opens a view as the requester: its results are what they may see. */
     openView: (id: string) => api.get<OpenedView>(`/api/views/${encodeURIComponent(id)}/results`),
 
+    /** A project's calendar, and what happens to unfinished work when a cycle ends. */
+    setPlanning: (key: string, planning: { timeZone?: string; cyclePolicy?: CyclePolicy }) =>
+      api.put<Project>(`${at(key)}/planning`, planning),
+    cycles: (key: string) => api.get<Cycle[]>(`${at(key)}/cycles`),
+    cycle: (key: string, id: string) =>
+      api.get<{ cycle: Cycle; issues: Issue[] }>(`${at(key)}/cycles/${id}`),
+    /** Days are "YYYY-MM-DD", in the project's calendar. */
+    createCycle: (key: string, cycle: { name: string; startsOn: string; endsOn: string }) =>
+      api.post<Cycle>(`${at(key)}/cycles`, cycle),
+    updateCycle: (
+      key: string,
+      id: string,
+      cycle: { name: string; startsOn: string; endsOn: string },
+    ) => api.patch<Cycle>(`${at(key)}/cycles/${id}`, cycle),
+    deleteCycle: (key: string, id: string) => api.delete<void>(`${at(key)}/cycles/${id}`),
+    milestones: (key: string) => api.get<Milestone[]>(`${at(key)}/milestones`),
+    milestone: (key: string, id: string) =>
+      api.get<{ milestone: Milestone; issues: Issue[]; cycles: Cycle[] }>(
+        `${at(key)}/milestones/${id}`,
+      ),
+    createMilestone: (
+      key: string,
+      milestone: { name: string; description?: string; targetDate?: string },
+    ) => api.post<Milestone>(`${at(key)}/milestones`, milestone),
+    updateMilestone: (
+      key: string,
+      id: string,
+      milestone: { name: string; description?: string; targetDate?: string },
+    ) => api.patch<Milestone>(`${at(key)}/milestones/${id}`, milestone),
+    deleteMilestone: (key: string, id: string) => api.delete<void>(`${at(key)}/milestones/${id}`),
+    /** Puts an issue into a cycle; null takes it out. */
+    setCycle: (ref: string, cycleId: string | null) =>
+      api.put<Issue>(`${issueAt(ref)}/cycle`, { cycleId }),
+    /** Counts an issue towards a milestone; null towards none. */
+    setMilestone: (ref: string, milestoneId: string | null) =>
+      api.put<Issue>(`${issueAt(ref)}/milestone`, { milestoneId }),
+
     /**
      * Makes one change to many of a project's issues. Each issue is decided
      * on its own, and the answer says what became of every one.
@@ -201,7 +241,7 @@ export function useProjects() {
 
 function boardQuery(filter: BoardFilter): URLSearchParams {
   const query = new URLSearchParams();
-  for (const name of ["label", "priority", "assignee"] as const) {
+  for (const name of ["label", "priority", "assignee", "cycle"] as const) {
     const value = filter[name];
     if (value) query.set(name, value);
   }

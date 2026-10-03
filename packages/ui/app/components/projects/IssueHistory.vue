@@ -18,6 +18,8 @@ const props = defineProps<{ entries: IssueHistoryEntry[] }>();
 
 /** The person, without the server when it is this one's. */
 function who(address: string): string {
+  // No person in it: something the server did by itself, on schedule.
+  if (!address.includes("@")) return $ts("projects.history.server");
   return address.split("@")[0] ?? address;
 }
 
@@ -75,6 +77,15 @@ function describe(entry: IssueHistoryEntry): string {
         other: text(content.otherKey),
       });
     case "issue.cycle_changed":
+      // Done by the server itself when a cycle ended, under the project's policy.
+      if (content.reason === "cycle_ended") {
+        return content.newName
+          ? $ts("projects.history.carried", {
+              from: text(content.previousName),
+              to: text(content.newName),
+            })
+          : $ts("projects.history.carriedOut", { from: text(content.previousName) });
+      }
       return content.newName
         ? $ts("projects.history.cycled", { actor, to: text(content.newName) })
         : $ts("projects.history.uncycled", { actor });

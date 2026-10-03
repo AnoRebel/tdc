@@ -357,6 +357,15 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	/*
+		Projects: cycles that have ended are dealt with by the server, once a
+		minute, under each project's policy. Started here for the same reason
+		as the sweep above: a server with projects always runs it.
+	*/
+	if s.projects != nil {
+		go s.projects.CloseCyclesPeriodically(ctx)
+	}
+
+	/*
 		Events from the other nodes, where there are any.
 
 		Started before listening for requests, so a node is hearing about other

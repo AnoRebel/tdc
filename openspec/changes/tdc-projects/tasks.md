@@ -70,7 +70,7 @@ Goal: people can save how they like to look at a project, and act on more than o
 
 - [x] 6.1 Implement saved views (filter, sort, list-or-board) storing configuration rather than results, re-run under the viewer's own permissions on open; verify a shared view opened by another user shows only issues that user can see, even when it differs from what the view's owner sees
 - [x] 6.2 Build the web interface for saving, naming, and sharing a view; verify a saved view is reusable later and a shared view is reachable by the people it was shared with
-- [ ] 6.3 Implement bulk state, assignee, label, and cycle changes across selected issues, evaluating each issue's permission independently and reporting per-item outcome; verify a batch with some issues the caller cannot modify applies the successful ones and reports exactly which failed and why
+- [x] 6.3 Implement bulk state, assignee, label, and cycle changes across selected issues, evaluating each issue's permission independently and reporting per-item outcome; verify a batch with some issues the caller cannot modify applies the successful ones and reports exactly which failed and why
 - [x] 6.4 Verify each issue in a bulk operation records its own change in its own history; verify a partially-successful batch leaves no affected issue without its own recorded event
 - [x] 6.5 Build the web bulk-selection and bulk-action interface on the list view; verify a multi-issue selection, action, and outcome report are usable end to end
 - [x] **MILESTONE 6** — Demonstrate: save a filtered board view and share it with a second account that sees it correctly narrowed to their own permissions, then select a mixed batch of issues — some the acting user may modify and one they may not — apply a bulk label change, and see an itemised report of what succeeded and what was refused. Tag `v1.37.0-dev`.
@@ -79,11 +79,11 @@ Goal: people can save how they like to look at a project, and act on more than o
 
 Goal: optional time-boxing and cross-cycle grouping, without ever discarding work.
 
-- [ ] 7.1 Add `cycles` and `issue_cycle` with a project-level carry-forward policy; verify a project that does not use cycles retains full issue and board functionality unchanged
-- [ ] 7.2 Implement cycle-end handling that reassigns or retains incomplete issues per the configured policy, never deletes; verify an ended cycle with incomplete issues either carries them forward or leaves them assigned, and no issue is silently removed regardless of policy
-- [ ] 7.3 Add `milestones` and `issue_milestone`, spanning cycles, with an advisory target date; verify a milestone reports its issues and their completion, and a passed target date marks it overdue without altering any issue automatically
-- [ ] 7.4 Build the web cycle and milestone screens, including assigning issues to a cycle or milestone from the issue detail and board views; verify both are usable end to end
-- [ ] **MILESTONE 7** — Demonstrate: run a two-week cycle containing several issues, let it end with some incomplete, confirm the configured carry-forward or retain behaviour took effect on every one of them, and show a milestone spanning two cycles whose target date has passed displaying as overdue with its issues untouched. Tag `v1.38.0-dev`.
+- [x] 7.1 Add `cycles` and `issue_cycle` with a project-level carry-forward policy; verify a project that does not use cycles retains full issue and board functionality unchanged
+- [x] 7.2 Implement cycle-end handling that reassigns or retains incomplete issues per the configured policy, never deletes; verify an ended cycle with incomplete issues either carries them forward or leaves them assigned, and no issue is silently removed regardless of policy
+- [x] 7.3 Add `milestones` and `issue_milestone`, spanning cycles, with an advisory target date; verify a milestone reports its issues and their completion, and a passed target date marks it overdue without altering any issue automatically
+- [x] 7.4 Build the web cycle and milestone screens, including assigning issues to a cycle or milestone from the issue detail and board views; verify both are usable end to end
+- [x] **MILESTONE 7** — Demonstrate: run a two-week cycle containing several issues, let it end with some incomplete, confirm the configured carry-forward or retain behaviour took effect on every one of them, and show a milestone spanning two cycles whose target date has passed displaying as overdue with its issues untouched. Tag `v1.38.0-dev`.
 
 ## 8. Phase 8 — Progress reporting
 

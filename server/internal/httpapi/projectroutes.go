@@ -184,6 +184,10 @@ type projectAbilities struct {
 	Label           bool `json:"label"`
 	Relate          bool `json:"relate"`
 	Delete          bool `json:"delete"`
+	// Plan is making cycles and milestones; PlanIssues is putting issues
+	// into them.
+	Plan       bool `json:"plan"`
+	PlanIssues bool `json:"planIssues"`
 }
 
 func abilitiesOf(access projects.Access) projectAbilities {
@@ -196,6 +200,8 @@ func abilitiesOf(access projects.Access) projectAbilities {
 		Label:           access.Allows(authz.PermIssueLabel).Allowed,
 		Relate:          access.Allows(authz.PermIssueRelate).Allowed,
 		Delete:          access.Allows(authz.PermIssueDelete).Allowed,
+		Plan:            access.Allows(authz.PermProjectPlan).Allowed,
+		PlanIssues:      access.Allows(authz.PermIssuePlan).Allowed,
 	}
 }
 
@@ -215,6 +221,10 @@ type projectResponse struct {
 	// Its labels and priority scale, on a single project.
 	Labels     []labelResponse    `json:"labels,omitempty"`
 	Priorities []priorityResponse `json:"priorities,omitempty"`
+	// The calendar its dates are on, an IANA zone, and what happens to
+	// unfinished issues when a cycle ends: "carry-forward" or "remain".
+	TimeZone    string `json:"timeZone"`
+	CyclePolicy string `json:"cyclePolicy"`
 }
 
 func projectResponseOf(project dbgen.Project, role string) projectResponse {
@@ -226,6 +236,8 @@ func projectResponseOf(project dbgen.Project, role string) projectResponse {
 		Visibility:  project.Visibility,
 		CreatedAt:   project.CreatedAt,
 		Role:        role,
+		TimeZone:    project.TimeZone,
+		CyclePolicy: project.CyclePolicy,
 	}
 }
 
@@ -615,6 +627,9 @@ type issueResponse struct {
 	Labels    []labelResponse    `json:"labels"`
 	Priority  *priorityResponse  `json:"priority,omitempty"`
 	Relations *relationsResponse `json:"relations,omitempty"`
+	// The cycle it is in and the milestone it counts towards, if any.
+	Cycle     *planRef `json:"cycle,omitempty"`
+	Milestone *planRef `json:"milestone,omitempty"`
 
 	// Only on the full view of one issue.
 	Description *string          `json:"description,omitempty"`
@@ -631,6 +646,7 @@ type issueAbilities struct {
 	Label      bool `json:"label"`
 	Relate     bool `json:"relate"`
 	Delete     bool `json:"delete"`
+	Plan       bool `json:"plan"`
 }
 
 // issueSummaries renders a page of issues, reading each state and author once.
@@ -803,6 +819,7 @@ func (s *Server) fullIssue(ctx context.Context, c *echo.Context, access projects
 		Label:      access.AllowsOn(authz.PermIssueLabel, issue).Allowed,
 		Relate:     access.AllowsOn(authz.PermIssueRelate, issue).Allowed,
 		Delete:     access.Allows(authz.PermIssueDelete).Allowed,
+		Plan:       access.AllowsOn(authz.PermIssuePlan, issue).Allowed,
 	}
 
 	origin, err := s.originOf(ctx, c, access, issue)

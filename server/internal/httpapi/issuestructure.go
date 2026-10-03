@@ -167,6 +167,14 @@ func (s *Server) decorate(ctx context.Context, projectID uuid.UUID, issues []dbg
 	if err != nil {
 		return err
 	}
+	cycles, err := s.queries.ListCyclesForIssues(ctx, ids)
+	if err != nil {
+		return err
+	}
+	milestones, err := s.queries.ListMilestonesForIssues(ctx, ids)
+	if err != nil {
+		return err
+	}
 	priorities, err := s.projects.Priorities(ctx, projectID)
 	if err != nil {
 		return err
@@ -200,6 +208,14 @@ func (s *Server) decorate(ctx context.Context, projectID uuid.UUID, issues []dbg
 		summaries[i].Labels = append(summaries[i].Labels, labelResponse{
 			ID: label.ID.String(), Name: label.Name, Colour: label.Colour,
 		})
+	}
+	for _, cycle := range cycles {
+		i := index[cycle.IssueID.String()]
+		summaries[i].Cycle = &planRef{ID: cycle.ID.String(), Name: cycle.Name}
+	}
+	for _, milestone := range milestones {
+		i := index[milestone.IssueID.String()]
+		summaries[i].Milestone = &planRef{ID: milestone.ID.String(), Name: milestone.Name}
 	}
 	return nil
 }

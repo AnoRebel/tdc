@@ -32,6 +32,10 @@ export interface ProjectAbilities {
   label: boolean;
   relate: boolean;
   delete: boolean;
+  /** Making cycles and milestones. */
+  plan: boolean;
+  /** Putting issues into cycles and milestones. */
+  planIssues: boolean;
 }
 
 /** One of a project's labels. */
@@ -95,6 +99,10 @@ export interface Project {
   labels?: IssueLabel[];
   /** Present on a single project, most urgent first. */
   priorities?: IssuePriority[];
+  /** The calendar its dates are on: an IANA zone, UTC unless set. */
+  timeZone: string;
+  /** What happens to unfinished issues when a cycle ends. */
+  cyclePolicy: CyclePolicy;
 }
 
 export interface ProjectMember {
@@ -113,6 +121,7 @@ export interface IssueAbilities {
   label: boolean;
   relate: boolean;
   delete: boolean;
+  plan: boolean;
 }
 
 /**
@@ -150,6 +159,10 @@ export interface Issue {
   assignees: PersonRef[];
   labels: IssueLabel[];
   priority?: IssuePriority;
+  /** The cycle it is in, if any. */
+  cycle?: PlanRef;
+  /** The milestone it counts towards, if any. */
+  milestone?: PlanRef;
   /** On the full view of one issue only. */
   relations?: IssueRelations;
   description?: string;
@@ -263,6 +276,8 @@ export interface BoardFilter {
   label?: string;
   priority?: string;
   assignee?: string;
+  /** A cycle by id, or "none" for issues in no cycle. */
+  cycle?: string;
 }
 
 /**
@@ -301,8 +316,8 @@ export interface OpenedView {
 
 /** One change to make to many issues of a project. */
 export interface BulkChange {
-  kind: "state" | "assign" | "unassign" | "label" | "unlabel" | "priority";
-  /** A state, label or priority level by id, or a person by username. */
+  kind: "state" | "assign" | "unassign" | "label" | "unlabel" | "priority" | "cycle";
+  /** A state, label, priority level or cycle by id, or a person by username. */
   value: string;
 }
 
@@ -314,4 +329,51 @@ export interface BulkResult {
   reason?: string;
   /** For a refusal, the permission that would have allowed it. */
   permission?: string;
+}
+
+/** What happens to unfinished issues when a cycle ends. */
+export type CyclePolicy = "carry-forward" | "remain";
+
+/** A cycle or milestone, as an issue names it. */
+export interface PlanRef {
+  id: string;
+  name: string;
+}
+
+/**
+ * A cycle: a span of days in the project's calendar.
+ *
+ * `startsOn` and `endsOn` are days — "2026-10-18" — to show as they are, never
+ * through a Date, which would read them as midnight UTC and show the 17th to
+ * anybody west of Greenwich. `startsAt` and `endsAt` are those days' first
+ * instant and the first instant after, in the project's zone, with its offset.
+ */
+export interface Cycle {
+  id: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  startsAt: string;
+  endsAt: string;
+  status: "upcoming" | "active" | "ended";
+  total: number;
+  completed: number;
+  /** When its end was dealt with, and under which policy. */
+  closedAt?: string;
+  closedPolicy?: CyclePolicy;
+}
+
+/** A milestone: issues across cycles, with an advisory day to reach it by. */
+export interface Milestone {
+  id: string;
+  name: string;
+  description: string;
+  /** A day, like a cycle's. */
+  targetDate?: string;
+  /** The instant that day is over, in the project's zone. */
+  dueAt?: string;
+  /** Its day has passed with work unfinished. Nothing else changes because of it. */
+  overdue: boolean;
+  total: number;
+  completed: number;
 }

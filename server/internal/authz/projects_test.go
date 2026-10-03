@@ -18,6 +18,7 @@ func TestProjectPermissionsAreGrantableOnlyWhereTheyApply(t *testing.T) {
 		authz.PermProjectAdminister, authz.PermProjectConfigureStates,
 		authz.PermIssueCreate, authz.PermIssueTransition, authz.PermIssueAssign,
 		authz.PermIssueLabel, authz.PermIssueRelate, authz.PermIssueDelete,
+		authz.PermProjectPlan, authz.PermIssuePlan,
 	}
 	for _, permission := range projectScoped {
 		if !authz.GrantableAt(permission, authz.ScopeProject) {

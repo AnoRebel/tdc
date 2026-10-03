@@ -15,6 +15,7 @@ import { Input } from "#layers/ui/app/components/ui/input";
 import { Select } from "#layers/ui/app/components/ui/select";
 import LabelChip from "#layers/ui/app/components/projects/LabelChip.vue";
 import PriorityBadge from "#layers/ui/app/components/projects/PriorityBadge.vue";
+import IssuePlanning from "#layers/ui/app/components/projects/IssuePlanning.vue";
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
@@ -239,6 +240,16 @@ function unrelate(kind: RelationKind, other: RelatedIssue) {
       </h2>
       <PriorityBadge :priority="props.issue.priority" />
     </section>
+
+    <IssuePlanning
+      v-if="project"
+      :project-key="project.key"
+      :issue-key="props.issue.key"
+      :cycle="props.issue.cycle"
+      :milestone="props.issue.milestone"
+      :can-plan="Boolean(can?.plan)"
+      @changed="(updated) => emit('changed', updated)"
+    />
 
     <section :aria-label="$ts('projects.relation.title')">
       <h2 class="mb-1 text-xs font-semibold text-muted-foreground">

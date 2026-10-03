@@ -9,6 +9,7 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type ActionPress struct {
@@ -98,6 +99,20 @@ type Credential struct {
 	ConfirmedAt           *time.Time
 }
 
+type Cycle struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID
+	Name         string
+	StartsOn     pgtype.Date
+	EndsOn       pgtype.Date
+	StartsAt     time.Time
+	EndsAt       time.Time
+	ClosedAt     *time.Time
+	ClosedPolicy *string
+	CreatedBy    *uuid.UUID
+	CreatedAt    time.Time
+}
+
 type EmailConfirmation struct {
 	ID        uuid.UUID
 	TokenHash []byte
@@ -179,9 +194,21 @@ type IssueAssignee struct {
 	AssignedBy *uuid.UUID
 }
 
+type IssueCycle struct {
+	IssueID uuid.UUID
+	CycleID uuid.UUID
+	AddedAt time.Time
+}
+
 type IssueLabel struct {
 	IssueID uuid.UUID
 	LabelID uuid.UUID
+}
+
+type IssueMilestone struct {
+	IssueID     uuid.UUID
+	MilestoneID uuid.UUID
+	AddedAt     time.Time
 }
 
 type IssueRelation struct {
@@ -234,6 +261,17 @@ type MessageView struct {
 	EventID  string
 	ViewerID uuid.UUID
 	SeenAt   time.Time
+}
+
+type Milestone struct {
+	ID          uuid.UUID
+	ProjectID   uuid.UUID
+	Name        string
+	Description string
+	TargetDate  pgtype.Date
+	DueAt       *time.Time
+	CreatedBy   *uuid.UUID
+	CreatedAt   time.Time
 }
 
 type Notification struct {
@@ -329,6 +367,8 @@ type Project struct {
 	CreatedBy       *uuid.UUID
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	TimeZone        string
+	CyclePolicy     string
 }
 
 type ProjectLabel struct {

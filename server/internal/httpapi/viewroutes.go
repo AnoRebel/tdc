@@ -61,7 +61,9 @@ func viewError(err error) error {
 		errors.Is(err, projects.ErrViewFilter),
 		errors.Is(err, projects.ErrBulkChange),
 		errors.Is(err, projects.ErrBulkEmpty),
-		errors.Is(err, projects.ErrBulkTooMany):
+		errors.Is(err, projects.ErrBulkTooMany),
+		// The cycle a batch names, not any issue in it.
+		errors.Is(err, projects.ErrCycleNotFound):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return structureError(err)

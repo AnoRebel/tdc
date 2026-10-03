@@ -24,6 +24,16 @@ const (
 	TypeProjectStateChanged  Type = "project.state_changed"
 	TypeProjectStateRemoved  Type = "project.state_removed"
 
+	// Cycles and milestones. A cycle's end is recorded by the server, which
+	// is what dealt with it, saying what became of every unfinished issue.
+	TypeProjectCycleAdded       Type = "project.cycle_added"
+	TypeProjectCycleChanged     Type = "project.cycle_changed"
+	TypeProjectCycleRemoved     Type = "project.cycle_removed"
+	TypeProjectCycleEnded       Type = "project.cycle_ended"
+	TypeProjectMilestoneAdded   Type = "project.milestone_added"
+	TypeProjectMilestoneChanged Type = "project.milestone_changed"
+	TypeProjectMilestoneRemoved Type = "project.milestone_removed"
+
 	TypeIssueCreated            Type = "issue.created"
 	TypeIssueStateChanged       Type = "issue.state_changed"
 	TypeIssueTitleChanged       Type = "issue.title_changed"

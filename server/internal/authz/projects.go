@@ -32,6 +32,9 @@ const (
 	// PermProjectConfigureStates is adding, renaming, reordering and removing
 	// the states issues move between — the project's workflow.
 	PermProjectConfigureStates Permission = "project.configure_states"
+	// PermProjectPlan is making, changing and removing a project's cycles and
+	// milestones.
+	PermProjectPlan Permission = "project.plan"
 
 	PermIssueCreate     Permission = "issue.create"
 	PermIssueTransition Permission = "issue.transition"
@@ -39,6 +42,9 @@ const (
 	PermIssueLabel      Permission = "issue.label"
 	PermIssueRelate     Permission = "issue.relate"
 	PermIssueDelete     Permission = "issue.delete"
+	// PermIssuePlan is putting an issue into a cycle or a milestone, or
+	// taking it out of one.
+	PermIssuePlan Permission = "issue.plan"
 
 	/*
 		There is deliberately no issue.comment.
@@ -95,6 +101,16 @@ func init() {
 		{
 			Name:        PermIssueDelete,
 			Description: "Delete issues",
+			Scopes:      []Scope{ScopeServer, ScopeProject},
+		},
+		{
+			Name:        PermProjectPlan,
+			Description: "Make and change a project's cycles and milestones",
+			Scopes:      []Scope{ScopeServer, ScopeProject},
+		},
+		{
+			Name:        PermIssuePlan,
+			Description: "Put issues into cycles and milestones",
 			Scopes:      []Scope{ScopeServer, ScopeProject},
 		},
 	} {

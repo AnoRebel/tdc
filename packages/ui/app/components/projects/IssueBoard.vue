@@ -5,12 +5,14 @@ import {
   type BoardCard,
   type BoardColumn,
   type BoardFilter,
+  type Issue,
 } from "@tdc/types";
 import { useWindowFocus } from "@vueuse/core";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
 import LabelChip from "#layers/ui/app/components/projects/LabelChip.vue";
 import PriorityBadge from "#layers/ui/app/components/projects/PriorityBadge.vue";
+import IssuePlanning from "#layers/ui/app/components/projects/IssuePlanning.vue";
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
@@ -32,8 +34,10 @@ const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 const props = defineProps<{
   projectKey: string;
   canMove: boolean;
-  /** Narrows every column: by label, priority or assignee. */
+  /** Narrows every column: by label, priority, assignee or cycle. */
   filter?: BoardFilter;
+  /** Whether cards offer to be put into a cycle or milestone. */
+  canPlan?: boolean;
 }>();
 
 const projectsApi = useProjects();
@@ -59,6 +63,27 @@ const focused = useWindowFocus();
 watch(focused, (now) => {
   if (now && !moving.value) void load();
 });
+
+/*
+ * Planning one card: its cycle and milestone, from the board.
+ *
+ * A card carries only what it shows, so the issue is fetched when somebody
+ * asks to plan it rather than sent with every card on the chance. The board
+ * reloads afterwards when it is narrowed to a cycle, since the card may no
+ * longer belong on it.
+ */
+const planning = ref<Issue | null>(null);
+async function plan(card: BoardCard) {
+  try {
+    planning.value = await projectsApi.issue(card.key);
+  } catch (cause) {
+    failed.value = isApiError(cause) ? cause.message : $ts("projects.couldNotLoad");
+  }
+}
+function planned(issue: Issue) {
+  planning.value = issue;
+  if (props.filter?.cycle) void load();
+}
 
 async function more(column: BoardColumn) {
   if (!column.next) return;
@@ -190,6 +215,31 @@ function isTarget(index: number) {
     </p>
     <p id="board-instructions" class="sr-only">{{ $t("projects.board.instructions") }}</p>
 
+    <section
+      v-if="planning"
+      class="mx-4 mt-3 max-w-md rounded-xl border bg-card p-3"
+      :aria-label="$ts('projects.planning.planIssue', { issue: planning.key })"
+    >
+      <div class="mb-2 flex items-center gap-2">
+        <h2 class="min-w-0 flex-1 truncate text-sm font-medium">
+          <span class="mr-1 font-mono text-xs text-muted-foreground">{{ planning.key }}</span>
+          {{ planning.title }}
+        </h2>
+        <Button variant="ghost" size="small" @click="planning = null">
+          {{ $t("action.close") }}
+        </Button>
+      </div>
+      <IssuePlanning
+        :key="planning.key"
+        :project-key="props.projectKey"
+        :issue-key="planning.key"
+        :cycle="planning.cycle"
+        :milestone="planning.milestone"
+        :can-plan="Boolean(planning.can?.plan)"
+        @changed="planned"
+      />
+    </section>
+
     <div v-if="!board" class="flex gap-3 p-4" aria-busy="true">
       <UiSkeleton v-for="n in 3" :key="n" class="h-64 w-72 shrink-0 rounded-xl" />
     </div>
@@ -249,6 +299,16 @@ function isTarget(index: number) {
                 }}</span>
                 {{ card.title }}
               </NuxtLink>
+              <Button
+                v-if="props.canPlan"
+                variant="ghost"
+                size="icon"
+                class="size-6 shrink-0 opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
+                :label="$ts('projects.planning.planIssue', { issue: card.key })"
+                @click="plan(card)"
+              >
+                <Icon name="lucide:calendar-range" class="size-3.5" />
+              </Button>
               <Button
                 v-if="props.canMove"
                 :id="`move-${card.key}`"

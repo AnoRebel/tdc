@@ -227,7 +227,7 @@ person making it. The second can be overridden — somebody stepping down
 deliberately is a real thing — by repeating the request with `confirmed`.
 
 Thirteen of the twenty-three permissions catalogued before projects are
-enforced; the rest are names waiting for features. The nine that projects added
+enforced; the rest are names waiting for features. The eleven that projects added
 are all enforced — see [Projects](#projects). Notably `channel.post` is not enforced: who may
 speak in a channel is governed by membership, bans and posting restrictions.
 
@@ -534,6 +534,13 @@ database or its backups.
   server's `Member` role is made with it, so ordinary accounts can start
   projects as they can make channels. Withdraw it like any other permission if
   you want projects started only by some people.
+- **The server ends cycles by itself.** Once a minute it looks for cycles whose
+  last day is over in their project's calendar and deals with each under the
+  project's policy, moving only which cycle unfinished issues are in. Servers
+  sharing a database share the work: each cycle is locked while it is dealt
+  with, and another server skips it. The zone database is built into the
+  server, so a container without `/usr/share/zoneinfo` still knows every
+  project's calendar.
 
 The audit log records the administrative acts around projects — one started,
 its visibility changed, somebody added to or removed from it, a role granted a

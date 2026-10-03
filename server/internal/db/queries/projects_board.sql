@@ -26,6 +26,12 @@ WHERE i.project_id = @project_id
   AND (sqlc.narg('assignee_id')::uuid IS NULL OR EXISTS (
         SELECT 1 FROM issue_assignees a
         WHERE a.issue_id = i.id AND a.user_id = sqlc.narg('assignee_id')::uuid))
+  -- A cycle by its identifier, or 'none' for what is in no cycle.
+  AND (@cycle_filter::text = ''
+       OR (@cycle_filter::text = 'none'
+           AND NOT EXISTS (SELECT 1 FROM issue_cycle ic WHERE ic.issue_id = i.id))
+       OR EXISTS (SELECT 1 FROM issue_cycle ic
+                  WHERE ic.issue_id = i.id AND ic.cycle_id::text = @cycle_filter::text))
   AND (COALESCE(p.rank, 2147483647) > @after_rank::int
        OR (COALESCE(p.rank, 2147483647) = @after_rank::int AND i.number < @after_number::bigint))
 ORDER BY COALESCE(p.rank, 2147483647), i.number DESC
@@ -48,4 +54,10 @@ WHERE i.project_id = @project_id AND i.deleted_at IS NULL
   AND (sqlc.narg('assignee_id')::uuid IS NULL OR EXISTS (
         SELECT 1 FROM issue_assignees a
         WHERE a.issue_id = i.id AND a.user_id = sqlc.narg('assignee_id')::uuid))
+  -- A cycle by its identifier, or 'none' for what is in no cycle.
+  AND (@cycle_filter::text = ''
+       OR (@cycle_filter::text = 'none'
+           AND NOT EXISTS (SELECT 1 FROM issue_cycle ic WHERE ic.issue_id = i.id))
+       OR EXISTS (SELECT 1 FROM issue_cycle ic
+                  WHERE ic.issue_id = i.id AND ic.cycle_id::text = @cycle_filter::text))
 GROUP BY i.state_id;

@@ -34,6 +34,36 @@ func (s *Service) appendTo(
 	eventType events.Type,
 	content any,
 ) (dbgen.Event, error) {
+	return s.appendSigned(ctx, q, room, s.rooms.UserAddress(sender.Username), &sender.ID, eventType, content)
+}
+
+/*
+appendAsServer records something the server did by itself, on a schedule
+rather than because anybody asked: the end of a cycle.
+
+The sender is the server's own name, with no person in it, and no account is
+linked to the event. Attributing it to whoever made the cycle would be a
+record of something they did not do, at a time they may have been asleep.
+*/
+func (s *Service) appendAsServer(
+	ctx context.Context,
+	q *dbgen.Queries,
+	room dbgen.Room,
+	eventType events.Type,
+	content any,
+) (dbgen.Event, error) {
+	return s.appendSigned(ctx, q, room, s.rooms.ServerName(), nil, eventType, content)
+}
+
+func (s *Service) appendSigned(
+	ctx context.Context,
+	q *dbgen.Queries,
+	room dbgen.Room,
+	senderAddress string,
+	senderID *uuid.UUID,
+	eventType events.Type,
+	content any,
+) (dbgen.Event, error) {
 	/*
 		Never on a room another server orders.
 
@@ -62,7 +92,7 @@ func (s *Service) appendTo(
 
 	event := events.Event{
 		Room:      s.rooms.RoomAddress(room),
-		Sender:    s.rooms.UserAddress(sender.Username),
+		Sender:    senderAddress,
 		Origin:    s.rooms.ServerName(),
 		Type:      eventType,
 		CreatedAt: events.Now(),
@@ -78,7 +108,7 @@ func (s *Service) appendTo(
 		ID:            event.ID,
 		RoomID:        room.ID,
 		Sequence:      sequence,
-		SenderID:      &sender.ID,
+		SenderID:      senderID,
 		SenderAddress: event.Sender,
 		RoomAddress:   event.Room,
 		OriginServer:  event.Origin,

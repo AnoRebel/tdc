@@ -105,6 +105,8 @@ type BoardFilter struct {
 	Label    string
 	Priority string
 	Assignee *uuid.UUID
+	// Cycle is a cycle's identifier, or "none" for issues in no cycle.
+	Cycle string
 }
 
 // Board returns a project's board: every state, each with its first page.
@@ -115,7 +117,7 @@ func (s *Service) Board(ctx context.Context, access Access, filter BoardFilter, 
 	}
 	counts, err := s.queries.CountBoardColumns(ctx, dbgen.CountBoardColumnsParams{
 		ProjectID: access.Project.ID, LabelName: filter.Label,
-		PriorityName: filter.Priority, AssigneeID: filter.Assignee,
+		PriorityName: filter.Priority, AssigneeID: filter.Assignee, CycleFilter: filter.Cycle,
 	})
 	if err != nil {
 		return Board{}, fmt.Errorf("count columns: %w", err)
@@ -156,7 +158,8 @@ func (s *Service) column(ctx context.Context, access Access, state dbgen.IssueSt
 	rows, err := s.queries.ListBoardColumn(ctx, dbgen.ListBoardColumnParams{
 		ProjectID: access.Project.ID, StateID: state.ID,
 		LabelName: filter.Label, PriorityName: filter.Priority, AssigneeID: filter.Assignee,
-		AfterRank: rank, AfterNumber: number, PageSize: size,
+		CycleFilter: filter.Cycle,
+		AfterRank:   rank, AfterNumber: number, PageSize: size,
 	})
 	if err != nil {
 		return BoardColumn{}, fmt.Errorf("read column: %w", err)

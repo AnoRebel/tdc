@@ -250,6 +250,89 @@ priority), or `assign` or `unassign` with a username. It answers 200 with
 `unchanged`, `refused`, `not_found` or `failed`), `changed`, and for anything
 not changed a `reason` — and for a refusal, `permission`.
 
+## Cycles and milestones
+
+Both are optional. A project that never makes a cycle or a milestone works
+exactly as it did: nothing about its issues, its list or its board depends on
+them.
+
+### Days, and the calendar they are in
+
+Cycles and milestones are planned in **days** — "Sprint 1 runs from the 5th to
+the 18th", "Beta by the 30th" — and a day only means something in a calendar.
+Each project has one: a time zone, set under **Settings → Cycles and dates**,
+UTC until somebody sets it. A cycle ending on the 18th in a project on
+`Africa/Dar_es_Salaam` ends when the 18th is over in Dar es Salaam, wherever the
+server is and wherever the person reading it is.
+
+So days are shown as days, exactly as they were chosen — never converted into
+the reader's zone, which would show the 17th to somebody in Honolulu — and the
+zone is named beside them. Changing the project's zone keeps every cycle and
+milestone on the same days, and moves the instants those days begin and end.
+The API sends both: `startsOn` and `endsOn` (or a milestone's `targetDate`) as
+`YYYY-MM-DD`, and `startsAt`, `endsAt` (or `dueAt`) as the instants those days
+begin and are over, with the project's offset — `2026-10-19T00:00:00+03:00`.
+
+### Cycles
+
+**Cycles** on a project lists its cycles, with how much of each is done; **New
+cycle** makes one, two weeks from today by default. A project's cycles never
+overlap, so the one under way is always one; they need not be back to back.
+The board opens on the cycle under way when there is one, and can be narrowed to
+any cycle, or to the issues in none.
+
+An issue is put into a cycle from its own page, from a card on the board (the
+calendar button beside it), or many at once from the list with **Put in cycle**.
+Each move is recorded in the issue's history.
+
+**When a cycle ends**, the server deals with it by itself, within a minute of
+midnight in the project's calendar, under the project's policy:
+
+- **Carry forward** (the default): every unfinished issue moves to the next
+  cycle — the first that starts once this one has ended — or out of any cycle if
+  there is none.
+- **Remain**: unfinished issues stay in the cycle that ended, which then shows
+  the work left in it.
+
+Either way, **nothing is deleted and no issue changes state.** Finished issues
+stay in the cycle they were finished in. Every issue that moves has the move in
+its own history, recorded as the server's own act ("When Sprint 1 ended, the
+server carried this forward to Sprint 2") rather than as anybody's; and the end
+itself is recorded in the project's history, naming the policy and every issue
+that was unfinished. An ended cycle shows when it ended and under which policy.
+
+A cycle with issues in it cannot be removed — they would leave it with no record
+of why — and once its end has been dealt with, its days are fixed.
+
+### Milestones
+
+**Milestones** groups issues across cycles towards something — a release, a
+launch — with a day to aim for if you want one. An issue counts towards one
+milestone at most, set from its own page or from a board card. A milestone shows
+its issues, how many are done, and which cycles they are in: what it spans.
+
+The day is advisory. Once it is over in the project's calendar with work still
+unfinished, the milestone shows **Overdue** — and that is all. No issue in it
+is moved, closed or changed because of it.
+
+Progress for a cycle or a milestone is counted when it is shown, from the
+issues' states as they are, so there is no second number that could drift.
+
+The API: `PUT /api/projects/:key/planning` with `timeZone` (an IANA name) and
+`cyclePolicy` (`carry-forward` or `remain`); `GET`, `POST
+/api/projects/:key/cycles` (`name`, `startsOn`, `endsOn`) and `GET`, `PATCH`,
+`DELETE …/cycles/:cycle`, where `GET` gives the cycle and its `issues`; `GET`,
+`POST /api/projects/:key/milestones` (`name`, `description`, `targetDate`) and
+`GET`, `PATCH`, `DELETE …/milestones/:milestone`, where `GET` gives the
+milestone, its `issues` and the `cycles` it spans. `PUT /api/issues/:ref/cycle`
+takes `cycleId`, and `PUT /api/issues/:ref/milestone` takes `milestoneId`;
+`null` takes the issue out. A cycle carries `status` (`upcoming`, `active`,
+`ended`), `total` and `completed`, and once dealt with `closedAt` and
+`closedPolicy`; a milestone carries `overdue`, `total` and `completed`. An issue
+names its `cycle` and `milestone` when it has them. The batch endpoint takes
+`"kind": "cycle"` with a cycle's id, or an empty value to take issues out, and
+the board takes `cycle` — an id, or `none`.
+
 ## Who may do what
 
 | Permission                 | What it allows                                   | Held by default by                 |
@@ -263,6 +346,8 @@ not changed a `reason` — and for a refusal, `permission`.
 | `issue.label`              | Labels and priority                              | members, and an issue's own author |
 | `issue.relate`             | Parent, child and blocking relationships         | members                            |
 | `issue.delete`             | Deleting issues                                  | the project's administrators       |
+| `project.plan`             | Making and changing cycles and milestones        | members                            |
+| `issue.plan`               | Putting issues into cycles and milestones        | members                            |
 
 Each of these except `project.create` can also be granted to a role, either
 server-wide or for one project only (`PUT /api/admin/roles/:id/project-permissions`).

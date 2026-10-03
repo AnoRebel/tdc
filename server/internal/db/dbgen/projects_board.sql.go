@@ -23,6 +23,12 @@ WHERE i.project_id = $1 AND i.deleted_at IS NULL
   AND ($4::uuid IS NULL OR EXISTS (
         SELECT 1 FROM issue_assignees a
         WHERE a.issue_id = i.id AND a.user_id = $4::uuid))
+  -- A cycle by its identifier, or 'none' for what is in no cycle.
+  AND ($5::text = ''
+       OR ($5::text = 'none'
+           AND NOT EXISTS (SELECT 1 FROM issue_cycle ic WHERE ic.issue_id = i.id))
+       OR EXISTS (SELECT 1 FROM issue_cycle ic
+                  WHERE ic.issue_id = i.id AND ic.cycle_id::text = $5::text))
 GROUP BY i.state_id
 `
 
@@ -31,6 +37,7 @@ type CountBoardColumnsParams struct {
 	LabelName    string
 	PriorityName string
 	AssigneeID   *uuid.UUID
+	CycleFilter  string
 }
 
 type CountBoardColumnsRow struct {
@@ -49,6 +56,7 @@ func (q *Queries) CountBoardColumns(ctx context.Context, arg CountBoardColumnsPa
 		arg.LabelName,
 		arg.PriorityName,
 		arg.AssigneeID,
+		arg.CycleFilter,
 	)
 	if err != nil {
 		return nil, err
@@ -85,10 +93,16 @@ WHERE i.project_id = $1
   AND ($5::uuid IS NULL OR EXISTS (
         SELECT 1 FROM issue_assignees a
         WHERE a.issue_id = i.id AND a.user_id = $5::uuid))
-  AND (COALESCE(p.rank, 2147483647) > $6::int
-       OR (COALESCE(p.rank, 2147483647) = $6::int AND i.number < $7::bigint))
+  -- A cycle by its identifier, or 'none' for what is in no cycle.
+  AND ($6::text = ''
+       OR ($6::text = 'none'
+           AND NOT EXISTS (SELECT 1 FROM issue_cycle ic WHERE ic.issue_id = i.id))
+       OR EXISTS (SELECT 1 FROM issue_cycle ic
+                  WHERE ic.issue_id = i.id AND ic.cycle_id::text = $6::text))
+  AND (COALESCE(p.rank, 2147483647) > $7::int
+       OR (COALESCE(p.rank, 2147483647) = $7::int AND i.number < $8::bigint))
 ORDER BY COALESCE(p.rank, 2147483647), i.number DESC
-LIMIT $8
+LIMIT $9
 `
 
 type ListBoardColumnParams struct {
@@ -97,6 +111,7 @@ type ListBoardColumnParams struct {
 	LabelName    string
 	PriorityName string
 	AssigneeID   *uuid.UUID
+	CycleFilter  string
 	AfterRank    int32
 	AfterNumber  int64
 	PageSize     int32
@@ -128,6 +143,7 @@ func (q *Queries) ListBoardColumn(ctx context.Context, arg ListBoardColumnParams
 		arg.LabelName,
 		arg.PriorityName,
 		arg.AssigneeID,
+		arg.CycleFilter,
 		arg.AfterRank,
 		arg.AfterNumber,
 		arg.PageSize,

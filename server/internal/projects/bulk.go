@@ -23,10 +23,10 @@ const maxBulk = 200
 /*
 BulkChange is one change to make to many issues.
 
-Kind is "state", "assign", "unassign", "label", "unlabel" or "priority", and
-Value is what the change names: a state, a label or a priority level
-by identifier, a person by username. An empty Value clears a
-priority.
+Kind is "state", "assign", "unassign", "label", "unlabel", "priority" or
+"cycle", and Value is what the change names: a state, a label, a priority level
+or a cycle by identifier, a person by username. An empty Value clears a
+priority or takes issues out of their cycle.
 */
 type BulkChange struct {
 	Kind  string `json:"kind"`
@@ -207,6 +207,21 @@ func (s *Service) bulkChange(ctx context.Context, actor Actor, access Access, ch
 			return err == nil && !sameID(ref.issue.PriorityID, updated.PriorityID), err
 		}, nil
 
+	case "cycle":
+		var cycle *uuid.UUID
+		if value != "" {
+			id, err := parseID(ErrCycleNotFound)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := cycleOf(ctx, s.queries, access.Project.ID, id); err != nil {
+				return nil, err
+			}
+			cycle = &id
+		}
+		return func(ctx context.Context, access Access, ref issueRef) (bool, error) {
+			return s.SetIssueCycle(ctx, actor, access, ref.issue, cycle)
+		}, nil
 	}
 	return nil, ErrBulkChange
 }

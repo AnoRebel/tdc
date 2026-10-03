@@ -640,7 +640,10 @@
       "uncycled": "{actor} aliliondoa kwenye mzunguko wake",
       "milestoned": "{actor} aliliweka kwenye hatua muhimu {to}",
       "unmilestoned": "{actor} aliliondoa kwenye hatua muhimu yake",
-      "other": "{actor}: {type}"
+      "other": "{actor}: {type}",
+      "carried": "{from} ulipoisha, seva ililihamishia {to}",
+      "carriedOut": "{from} ulipoisha, seva ililiondoa humo, kwa kuwa hapakuwa na mzunguko unaofuata",
+      "server": "Seva"
     },
     "priority": {
       "none": "bila kipaumbele",
@@ -815,7 +818,8 @@
         "state": "Hamishia hali",
         "priority": "Weka kipaumbele",
         "assign": "Mpe",
-        "unassign": "Mwondolee"
+        "unassign": "Mwondolee",
+        "cycle": "Weka katika mzunguko"
       },
       "codes": {
         "changed": "Limebadilishwa",
@@ -824,6 +828,63 @@
         "not_found": "Halipatikani",
         "failed": "Limeshindikana"
       }
+    },
+    "planning": {
+      "anyCycle": "Mzunguko wowote",
+      "calendar": "Tarehe ni siku za {zone}. Mzunguko ukiisha, {policy}.",
+      "closed": "Uliisha {when}: {policy}.",
+      "cycle": "Mzunguko",
+      "cycleNotFound": "Hakuna mzunguko kama huo katika mradi huu.",
+      "dateFormat": "Andika siku kama YYYY-MM-DD.",
+      "done": "{completed} kati ya {total} yamekamilika",
+      "dueAt": "inaisha {when}",
+      "emptyCycle": "Hakuna kitu katika mzunguko huu.",
+      "emptyMilestone": "Bado hakuna kinachohesabiwa kwa hatua hii.",
+      "endsBeforeStart": "Mzunguko hauwezi kuisha kabla haujaanza.",
+      "endsOn": "Siku ya mwisho",
+      "issuesInCycle": "Masuala katika mzunguko huu",
+      "issuesInMilestone": "Masuala katika hatua hii",
+      "makeCycle": "Unda mzunguko",
+      "makeMilestone": "Unda hatua",
+      "milestone": "Hatua",
+      "milestoneNotFound": "Hakuna hatua kama hiyo katika mradi huu.",
+      "name": "Jina",
+      "nameRequired": "Lipe jina.",
+      "nameTooLong": "Jina hilo ni refu mno.",
+      "newCycle": "Mzunguko mpya",
+      "newMilestone": "Hatua mpya",
+      "noCycle": "Hakuna mzunguko",
+      "noCycles": "Bado hakuna mizunguko. Mradi unafanya kazi vilevile bila hiyo.",
+      "noMilestone": "Hakuna hatua",
+      "noMilestones": "Bado hakuna hatua.",
+      "overdue": "Imepitwa na wakati",
+      "overdueHint": "Siku yake imepita kazi ikiwa haijakamilika. Hakuna chochote kuhusu masuala kilichobadilishwa kwa sababu hiyo.",
+      "planIssue": "Panga {issue}",
+      "policies": {
+        "carry-forward": "masuala yasiyokamilika yanahamia mzunguko unaofuata",
+        "remain": "masuala yasiyokamilika yanabaki ndani yake"
+      },
+      "policy": "Mzunguko ukiisha",
+      "policyHints": {
+        "carry-forward": "Masuala yasiyokamilika yanahamia mzunguko unaofuata, au nje ya mzunguko wowote kama hakuna. Kila uhamisho unarekodiwa kwenye suala.",
+        "remain": "Masuala yasiyokamilika yanabaki katika mzunguko ulioisha, ambao kisha unaonyesha kazi iliyobaki ndani yake."
+      },
+      "progress": "Maendeleo",
+      "removeCycle": "Ondoa mzunguko",
+      "saved": "Imehifadhiwa.",
+      "settings": "Mizunguko na tarehe",
+      "settingsHint": "Saa za eneo ambamo siku za mradi zipo, na kinachotokea kwa kazi isiyokamilika mzunguko ukiisha. Kwa njia yoyote, hakuna kinachofutwa wala kuhamishiwa hali nyingine.",
+      "spans": "Mizunguko inayohusika",
+      "spansNone": "Hakuna suala lake lililo katika mzunguko.",
+      "startsOn": "Siku ya kwanza",
+      "status": {
+        "upcoming": "Unakuja",
+        "active": "Unaendelea",
+        "ended": "Umeisha"
+      },
+      "target": "Lengo ni {day}",
+      "targetDate": "Siku ya kulenga",
+      "timeZone": "Saa za eneo"
     }
   }
 }

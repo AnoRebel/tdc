@@ -471,8 +471,14 @@ and the two stay linked: the issue shows where it came from to anybody who can
 read that conversation, and the message shows the issue. Each issue has a
 discussion beside it that works like any channel.
 
+Work can be time-boxed in **cycles** and gathered across them into
+**milestones**, both optional. A cycle's days are the project's own calendar,
+and when one ends with work unfinished the server carries that work forward to
+the next cycle or leaves it — never deletes it.
+
 [Projects and issues](projects.md) is the whole guide: starting a project,
-configuring its states, filing and moving issues, and who may do what.
+configuring its states, filing and moving issues, cycles and milestones, and who
+may do what.
 
 ## Making it yours
 

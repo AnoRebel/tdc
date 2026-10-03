@@ -2,7 +2,13 @@
 import { useForm } from "@tanstack/vue-form";
 import * as v from "valibot";
 
-import { isApiError, type IssueState, type Project, type ProjectMember } from "@tdc/types";
+import {
+  isApiError,
+  type CyclePolicy,
+  type IssueState,
+  type Project,
+  type ProjectMember,
+} from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 import { Field } from "#layers/ui/app/components/ui/field";
@@ -197,6 +203,39 @@ const visibilities = computed(() => [
 async function setVisibility(visibility: "public" | "private" | undefined) {
   if (!visibility || visibility === project.value?.visibility) return;
   await attempt(() => projectsApi.update(key.value, { visibility }));
+}
+
+/*
+ * The calendar its dates are on, and what a cycle's end does with unfinished
+ * work. The zone is typed as its IANA name and checked by the server, which
+ * knows every zone it can keep a calendar in.
+ */
+const zone = ref("");
+watch(
+  () => project.value?.timeZone,
+  (current) => {
+    if (current) zone.value = current;
+  },
+  { immediate: true },
+);
+async function saveZone() {
+  const timeZone = zone.value.trim();
+  if (!timeZone || timeZone === project.value?.timeZone) return;
+  await attempt(
+    () => projectsApi.setPlanning(key.value, { timeZone }),
+    $ts("projects.planning.saved"),
+  );
+}
+const policies = computed(() => [
+  { value: "carry-forward" as const, label: $ts("projects.planning.policies.carry-forward") },
+  { value: "remain" as const, label: $ts("projects.planning.policies.remain") },
+]);
+async function setPolicy(cyclePolicy: CyclePolicy | undefined) {
+  if (!cyclePolicy || cyclePolicy === project.value?.cyclePolicy) return;
+  await attempt(
+    () => projectsApi.setPlanning(key.value, { cyclePolicy }),
+    $ts("projects.planning.saved"),
+  );
 }
 </script>
 
@@ -535,6 +574,37 @@ async function setVisibility(visibility: "public" | "private" | undefined) {
                 />
               </template>
             </Field>
+          </section>
+
+          <section v-if="canAdminister" :aria-labelledby="'planning-heading'">
+            <h2 id="planning-heading" class="text-sm font-semibold">
+              {{ $t("projects.planning.settings") }}
+            </h2>
+            <p class="mt-0.5 text-xs text-muted-foreground">
+              {{ $t("projects.planning.settingsHint") }}
+            </p>
+            <form class="mt-2 flex flex-wrap items-end gap-2" @submit.prevent="saveZone">
+              <Field :label="$ts('projects.planning.timeZone')" class="w-64">
+                <template #default="{ id }">
+                  <Input :id="id" v-model="zone" placeholder="Africa/Dar_es_Salaam" />
+                </template>
+              </Field>
+              <Button type="submit" variant="outline">{{ $t("action.save") }}</Button>
+            </form>
+            <Field :label="$ts('projects.planning.policy')" class="mt-3 w-64">
+              <template #default="{ id }">
+                <Select
+                  :id="id"
+                  :model-value="project.cyclePolicy"
+                  :label="$ts('projects.planning.policy')"
+                  :options="policies"
+                  @update:model-value="setPolicy"
+                />
+              </template>
+            </Field>
+            <p class="mt-1 text-xs text-muted-foreground">
+              {{ $t(`projects.planning.policyHints.${project.cyclePolicy}`) }}
+            </p>
           </section>
         </div>
       </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isApiError, type BulkChange, type BulkResult, type Project } from "@tdc/types";
+import { isApiError, type BulkChange, type BulkResult, type Cycle, type Project } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
@@ -27,9 +27,18 @@ const person = ref("");
 const busy = ref(false);
 const failed = ref<string | null>(null);
 const results = ref<BulkResult[] | null>(null);
+const cycles = ref<Cycle[]>([]);
+
+onMounted(async () => {
+  try {
+    cycles.value = await projectsApi.cycles(props.project.key);
+  } catch {
+    // Without them there is no cycle to offer; every other change still works.
+  }
+});
 
 const kindOptions = computed(() =>
-  (["label", "unlabel", "state", "priority", "assign", "unassign"] as const).map((k) => ({
+  (["label", "unlabel", "state", "priority", "cycle", "assign", "unassign"] as const).map((k) => ({
     value: k,
     label: $ts(`projects.bulk.kinds.${k}`),
   })),
@@ -50,6 +59,11 @@ const valueOptions = computed(() => {
           value: level.id,
           label: level.name,
         })),
+      ];
+    case "cycle":
+      return [
+        { value: "none", label: $ts("projects.planning.noCycle") },
+        ...cycles.value.map((cycle) => ({ value: cycle.id, label: cycle.name })),
       ];
     default:
       return [];
@@ -85,7 +99,7 @@ async function apply() {
       kind: kind.value,
       value: namesPerson.value
         ? person.value.trim()
-        : kind.value === "priority" && value.value === "none"
+        : (kind.value === "priority" || kind.value === "cycle") && value.value === "none"
           ? ""
           : value.value,
     };
