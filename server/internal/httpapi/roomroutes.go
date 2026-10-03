@@ -78,10 +78,18 @@ func (s *Server) roomResponse(room dbgen.Room, member bool) roomResponse {
 		slug = *room.Slug
 	}
 
-	// Only when it is somebody else's: a client that knows nothing about
-	// federation should see exactly the shape it saw before.
+	/*
+		Only when it is somebody else's: a client that knows nothing about
+		federation should see exactly the shape it saw before.
+
+		Compared with the name rooms are recorded under, not the canonical
+		address's host. The two agree when a canonical address is set; without
+		one the host is empty while rooms are recorded as "localhost", and every
+		room on the server was reported as another server's — which the client
+		takes at its word and sends through federation, which is off.
+	*/
 	homeServer := ""
-	if !strings.EqualFold(room.HomeServer, s.federationAuthorityHost()) {
+	if !strings.EqualFold(room.HomeServer, s.rooms.ServerName()) {
 		homeServer = room.HomeServer
 	}
 
