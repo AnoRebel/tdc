@@ -40,9 +40,15 @@ const BUDGETS = {
    * an interface that can only address them in English is a worse thing to
    * ship than a slower one. The room above today's figure is for the work
    * still to come rather than for further growth to go unnoticed.
+   *
+   * Raised again, from 200 and 70, when integrations, the directory and
+   * projects arrived together: each put a little into what every page already
+   * holds — the sidebar's entries, the notification kinds, the chat room's
+   * link from a message to its issue — and none was one import to move. The
+   * room left is about one more feature's worth, on purpose.
    */
-  blocking: 200,
-  prefetched: 70,
+  blocking: 218,
+  prefetched: 90,
 };
 
 /** Gzipped size in kilobytes, or zero for something that is not there. */
