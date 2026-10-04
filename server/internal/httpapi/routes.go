@@ -708,6 +708,9 @@ type serverInfoResponse struct {
 		something nobody can deliver.
 	*/
 	Recovery bool `json:"recovery"`
+
+	// Legal links to the operator's own policies, absent where none is set.
+	Legal *legalResponse `json:"legal,omitempty"`
 }
 
 // brandingResponse is what an operator may change about how this server looks.
@@ -806,6 +809,7 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		SignInProviders:       s.signInProviders(),
 		Passkeys:              s.passkeys.Enabled(),
 		Recovery:              s.recovery != nil && s.recovery.Available(),
+		Legal:                 s.legal(c.Request().Context()),
 	})
 }
 
