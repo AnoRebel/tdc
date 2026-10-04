@@ -1260,7 +1260,10 @@
       "filterState": "hali {value}",
       "filterPriority": "kipaumbele {value}",
       "filterAssignee": "aliyepewa {value}",
-      "filterWords": "yenye “{value}”"
+      "filterWords": "yenye “{value}”",
+      "filterCurrentCycle": "mzunguko unaoendelea",
+      "filterNoCycle": "bila mzunguko",
+      "filterCycle": "mzunguko {value}"
     },
     "bulk": {
       "title": "Badilisha masuala yaliyochaguliwa",
@@ -1348,7 +1351,8 @@
       },
       "target": "Lengo ni {day}",
       "targetDate": "Siku ya kulenga",
-      "timeZone": "Saa za eneo"
+      "timeZone": "Saa za eneo",
+      "currentCycle": "Mzunguko unaoendelea"
     },
     "progress": {
       "title": "Maendeleo",

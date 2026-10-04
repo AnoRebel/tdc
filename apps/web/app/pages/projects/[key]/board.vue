@@ -48,9 +48,17 @@ const filter = computed<BoardFilter>(() => ({
 }));
 const cycleOptions = computed(() => [
   { value: "any", label: $ts("projects.planning.anyCycle") },
+  { value: "current", label: $ts("projects.planning.currentCycle") },
   { value: "none", label: $ts("projects.planning.noCycle") },
   ...cycles.value.map((entry) => ({ value: entry.id, label: entry.name })),
 ]);
+/** The cycle under way, which "current" stands for. */
+const underWay = computed(() => cycles.value.find((entry) => entry.status === "active"));
+/** The cycle the figures above the board are about, if one. */
+const reportedCycle = computed(() => {
+  if (cycle.value === "current") return underWay.value?.id;
+  return cycle.value === "any" || cycle.value === "none" ? undefined : cycle.value;
+});
 const labelOptions = computed(() => [
   { value: "any", label: $ts("projects.board.anyLabel") },
   ...(project.value?.labels ?? []).map((entry) => ({ value: entry.name, label: entry.name })),
@@ -68,9 +76,10 @@ onMounted(async () => {
     ]);
     cycles.value = planned;
     // Opened on the cycle under way, if there is one: that is the board a
-    // team in the middle of a cycle is looking for.
-    const current = cycles.value.find((entry) => entry.status === "active");
-    if (current && !route.query.cycle) cycle.value = current.id;
+    // team in the middle of a cycle is looking for. As "current" rather than
+    // that cycle's id, so a view saved from here keeps showing this cycle's
+    // board once the next one starts.
+    if (underWay.value && !route.query.cycle) cycle.value = "current";
     if (typeof route.query.cycle === "string") cycle.value = route.query.cycle;
     project.value = found;
   } catch (cause) {
@@ -136,7 +145,7 @@ onMounted(async () => {
         </div>
         <ProjectsProgressReport
           :project-key="project.key"
-          :of="filter.cycle && filter.cycle !== 'none' ? { cycle: filter.cycle } : undefined"
+          :of="reportedCycle ? { cycle: reportedCycle } : undefined"
           :freshness="freshness"
           compact
         />

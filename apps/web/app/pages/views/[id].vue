@@ -21,6 +21,7 @@ const opened = ref<OpenedView | null>(null);
 const project = ref<Project | null>(null);
 const missing = ref(false);
 const failed = ref<string | null>(null);
+const cycleNames = ref<Record<string, string>>({});
 
 useHead({ title: computed(() => opened.value?.view.name ?? $ts("projects.saved.title")) });
 
@@ -31,6 +32,12 @@ async function load() {
     opened.value = await projectsApi.openView(String(route.params.id));
     const key = opened.value.view.project;
     project.value = key ? await projectsApi.get(key) : null;
+    // A particular cycle is kept by identifier; its name is for saying so.
+    const kept = opened.value.view.filter.cycle;
+    cycleNames.value = {};
+    if (key && kept && kept !== "current" && kept !== "none") {
+      for (const entry of await projectsApi.cycles(key)) cycleNames.value[entry.id] = entry.name;
+    }
   } catch (cause) {
     if (isApiError(cause) && cause.status === 404) missing.value = true;
     else failed.value = isApiError(cause) ? cause.message : $ts("projects.saved.couldNotOpen");
@@ -48,12 +55,23 @@ const asks = computed(() => {
   if (filter.label) parts.push($ts("projects.saved.filterLabel", { value: filter.label }));
   if (filter.priority) parts.push($ts("projects.saved.filterPriority", { value: filter.priority }));
   if (filter.assignee) parts.push($ts("projects.saved.filterAssignee", { value: filter.assignee }));
+  if (filter.cycle === "current") parts.push($ts("projects.saved.filterCurrentCycle"));
+  else if (filter.cycle === "none") parts.push($ts("projects.saved.filterNoCycle"));
+  else if (filter.cycle) {
+    const named = cycleNames.value[filter.cycle];
+    if (named) parts.push($ts("projects.saved.filterCycle", { value: named }));
+  }
   return parts.length ? parts.join(", ") : $ts("projects.saved.everything");
 });
 
 const boardFilter = computed(() => {
   const filter = opened.value?.view.filter ?? {};
-  return { label: filter.label, priority: filter.priority, assignee: filter.assignee };
+  return {
+    label: filter.label,
+    priority: filter.priority,
+    assignee: filter.assignee,
+    cycle: filter.cycle,
+  };
 });
 </script>
 

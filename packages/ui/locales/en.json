@@ -1260,7 +1260,10 @@
       "filterState": "state {value}",
       "filterPriority": "priority {value}",
       "filterAssignee": "assigned to {value}",
-      "filterWords": "matching “{value}”"
+      "filterWords": "matching “{value}”",
+      "filterCurrentCycle": "the cycle under way",
+      "filterNoCycle": "in no cycle",
+      "filterCycle": "cycle {value}"
     },
     "bulk": {
       "title": "Change selected issues",
@@ -1348,7 +1351,8 @@
       },
       "target": "Aiming for {day}",
       "targetDate": "Day to aim for",
-      "timeZone": "Time zone"
+      "timeZone": "Time zone",
+      "currentCycle": "Cycle under way"
     },
     "progress": {
       "title": "Progress",

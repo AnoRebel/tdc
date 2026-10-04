@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -105,12 +106,49 @@ type BoardFilter struct {
 	Label    string
 	Priority string
 	Assignee *uuid.UUID
-	// Cycle is a cycle's identifier, or "none" for issues in no cycle.
+	// Cycle is a cycle's identifier, CycleNone for issues in no cycle, or
+	// CycleCurrent for whichever cycle is under way.
 	Cycle string
+}
+
+// The two cycle filters that name no particular cycle.
+const (
+	CycleNone    = "none"
+	CycleCurrent = "current"
+)
+
+/*
+resolveCycle turns CycleCurrent into the cycle under way, as of now.
+
+With none under way the board is not narrowed at all: "the board this cycle"
+between two cycles is the board, and an empty one would look like lost work.
+Anything else is passed through as it was given.
+*/
+func (s *Service) resolveCycle(ctx context.Context, access Access, filter BoardFilter) (BoardFilter, error) {
+	if filter.Cycle != CycleCurrent {
+		return filter, nil
+	}
+	rows, err := s.queries.ListCyclesOfProject(ctx, access.Project.ID)
+	if err != nil {
+		return filter, fmt.Errorf("find the cycle under way: %w", err)
+	}
+	now := time.Now()
+	filter.Cycle = ""
+	for _, row := range rows {
+		if statusAt(row, now) == "active" {
+			filter.Cycle = row.ID.String()
+			break
+		}
+	}
+	return filter, nil
 }
 
 // Board returns a project's board: every state, each with its first page.
 func (s *Service) Board(ctx context.Context, access Access, filter BoardFilter, limit int) (Board, error) {
+	filter, err := s.resolveCycle(ctx, access, filter)
+	if err != nil {
+		return Board{}, err
+	}
 	states, err := s.queries.ListIssueStates(ctx, access.Project.ID)
 	if err != nil {
 		return Board{}, fmt.Errorf("list states: %w", err)
@@ -142,6 +180,10 @@ func (s *Service) Board(ctx context.Context, access Access, filter BoardFilter, 
 // Column returns one more page of one column, after the cursor a previous
 // page gave.
 func (s *Service) Column(ctx context.Context, access Access, stateID uuid.UUID, filter BoardFilter, after string, limit int) (BoardColumn, error) {
+	filter, err := s.resolveCycle(ctx, access, filter)
+	if err != nil {
+		return BoardColumn{}, err
+	}
 	state, err := stateOf(ctx, s.queries, access.Project.ID, stateID)
 	if err != nil {
 		return BoardColumn{}, err

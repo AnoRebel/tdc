@@ -36,6 +36,17 @@ type ViewFilter struct {
 	Label    string `json:"label,omitempty"`
 	Priority string `json:"priority,omitempty"`
 	Assignee string `json:"assignee,omitempty"`
+	/*
+		Cycle is "current" for whichever cycle is under way when the view is
+		opened, "none" for issues in no cycle, or one cycle's identifier.
+
+		An identifier rather than a name, unlike the rest: a project may have
+		two cycles of the same name, and a board view belongs to one project, so
+		the identifier is as lasting as the view. "current" is what a team in
+		the middle of its work usually means — the board as it stands this
+		cycle, not the cycle that was under way when somebody saved it.
+	*/
+	Cycle string `json:"cycle,omitempty"`
 	// Sort is "newest" or "priority".
 	Sort string `json:"sort,omitempty"`
 }
@@ -46,7 +57,20 @@ func (f ViewFilter) valid() bool {
 			return false
 		}
 	}
+	if !validCycleFilter(f.Cycle) {
+		return false
+	}
 	return f.Sort == "" || f.Sort == "newest" || f.Sort == "priority"
+}
+
+// validCycleFilter is whether a cycle filter says something a board can ask.
+func validCycleFilter(cycle string) bool {
+	switch cycle {
+	case "", CycleNone, CycleCurrent:
+		return true
+	}
+	_, err := uuid.Parse(cycle)
+	return err == nil
 }
 
 // NewView describes a view to save.

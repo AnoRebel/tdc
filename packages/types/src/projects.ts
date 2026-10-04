@@ -276,7 +276,11 @@ export interface BoardFilter {
   label?: string;
   priority?: string;
   assignee?: string;
-  /** A cycle by id, or "none" for issues in no cycle. */
+  /**
+   * A cycle by id, "none" for issues in no cycle, or "current" for whichever
+   * cycle is under way when the board is asked for — what a saved view of
+   * "this cycle's board" keeps.
+   */
   cycle?: string;
 }
 

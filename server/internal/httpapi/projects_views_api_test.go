@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"slices"
 	"testing"
+	"time"
 )
 
 func viewResultKeys(t *testing.T, handler http.Handler, token, id string) []string {
@@ -164,5 +165,65 @@ func TestABulkChangeReportsEveryIssue(t *testing.T) {
 	}, founder, http.StatusBadRequest)
 	mustCall(t, handler, http.MethodPost, "/api/projects/TEAM/issues/bulk", map[string]any{
 		"issues": []string{}, "change": map[string]any{"kind": "label", "value": label},
+	}, founder, http.StatusBadRequest)
+}
+
+/*
+A board view keeps its cycle, and "the cycle under way" stays the one under way.
+
+A team saves the board it looks at every day. Kept by identifier it would show
+the cycle that was under way when it was saved, forever after; kept as
+"current" it shows this cycle's board, whichever that is — and, between two
+cycles, the whole board rather than an empty one.
+*/
+func TestABoardViewKeepsItsCycle(t *testing.T) {
+	handler := newTestAPI(t)
+	founder := completeSetup(t, handler)
+	startProject(t, handler, founder, "CYC", "public")
+	fileIssue(t, handler, founder, "CYC", "In the cycle")
+	fileIssue(t, handler, founder, "CYC", "Not in it")
+
+	cards := func(query string) int {
+		board := decode(t, mustCall(t, handler, http.MethodGet, "/api/projects/CYC/board?"+query, nil, founder, http.StatusOK))
+		count := 0
+		for _, column := range board["columns"].([]any) {
+			count += len(column.(map[string]any)["cards"].([]any))
+		}
+		return count
+	}
+
+	// No cycle under way yet: the whole board, not an empty one.
+	if got := cards("cycle=current"); got != 2 {
+		t.Errorf("with no cycle under way the board shows %d cards, want all 2", got)
+	}
+
+	today := time.Now().UTC()
+	cycle := decode(t, mustCall(t, handler, http.MethodPost, "/api/projects/CYC/cycles", map[string]any{
+		"name":     "This one",
+		"startsOn": today.AddDate(0, 0, -2).Format(time.DateOnly),
+		"endsOn":   today.AddDate(0, 0, 7).Format(time.DateOnly),
+	}, founder, http.StatusCreated))
+	mustCall(t, handler, http.MethodPut, "/api/issues/CYC-1/cycle",
+		map[string]any{"cycleId": cycle["id"]}, founder, http.StatusOK)
+
+	if got := cards("cycle=current"); got != 1 {
+		t.Errorf("the board of the cycle under way shows %d cards, want 1", got)
+	}
+
+	saved := decode(t, mustCall(t, handler, http.MethodPost, "/api/projects/CYC/views", map[string]any{
+		"name": "This cycle", "layout": "board", "filter": map[string]any{"cycle": "current"},
+	}, founder, http.StatusCreated))
+	opened := decode(t, mustCall(t, handler, http.MethodGet, "/api/views/"+saved["id"].(string), nil, founder, http.StatusOK))
+	view, _ := opened["view"].(map[string]any)
+	if view == nil {
+		view = opened
+	}
+	if filter, _ := view["filter"].(map[string]any); filter["cycle"] != "current" {
+		t.Errorf("the saved view's filter reads %v; its cycle was dropped", view["filter"])
+	}
+
+	// A name is not a cycle filter: two cycles may share one.
+	mustCall(t, handler, http.MethodPost, "/api/projects/CYC/views", map[string]any{
+		"name": "By name", "layout": "board", "filter": map[string]any{"cycle": "This one"},
 	}, founder, http.StatusBadRequest)
 }
