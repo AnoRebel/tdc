@@ -627,6 +627,9 @@ type Querier interface {
 	// Who is currently silenced in one channel.
 	ListPostingRestrictionsInRoom(ctx context.Context, roomID *uuid.UUID) ([]ListPostingRestrictionsInRoomRow, error)
 	ListPresenceFor(ctx context.Context, dollar_1 []uuid.UUID) ([]UserPresence, error)
+	// The engagements linked to a project that the viewer is a party to. Nobody
+	// else learns that a project has any.
+	ListProjectEngagementsFor(ctx context.Context, arg ListProjectEngagementsForParams) ([]ListProjectEngagementsForRow, error)
 	// A page of a project's issues, newest first.
 	//
 	// Callers check the project is visible to the person asking before calling
@@ -1040,6 +1043,9 @@ type Querier interface {
 	// Recording a code that has just been mailed. Replaces any outstanding one, so
 	// asking again is how somebody who lost the first message gets a usable code.
 	SetEmailedCode(ctx context.Context, arg SetEmailedCodeParams) error
+	// Links an engagement to a project, or unlinks it with a null project, for one
+	// of its two parties only.
+	SetEngagementProject(ctx context.Context, arg SetEngagementProjectParams) (int64, error)
 	// Answering an enquiry, once: only a pending one moves.
 	SetEnquiryStatus(ctx context.Context, arg SetEnquiryStatusParams) (int64, error)
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error

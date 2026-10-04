@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Project } from "@tdc/types";
+import type { LinkedEngagement, Project } from "@tdc/types";
 
 const { $ts, $localeRoute: localeRoute } = useI18n();
 
@@ -44,6 +44,23 @@ const tabs = computed(() => [
     to: localeRoute({ name: "projects-key-settings", params: { key: props.project.key } }),
   },
 ]);
+
+/*
+ * The engagements this project tracks the work of, for whoever is a party to
+ * them — the way back from the work to what was agreed. Everybody else is told
+ * of none, by the server, so a member who is not a party learns nothing here.
+ */
+const { offers } = useServerInfo();
+const router = useRouter();
+const linked = ref<LinkedEngagement[]>([]);
+onMounted(async () => {
+  if (!offers("directory") || !router.hasRoute("directory-engagements-id")) return;
+  try {
+    linked.value = await useDirectory().projectEngagements(props.project.key);
+  } catch {
+    // Not worth an error over: the project is what this page is about.
+  }
+});
 </script>
 
 <template>
@@ -70,6 +87,21 @@ const tabs = computed(() => [
       />
       <slot name="actions" />
     </div>
+    <p
+      v-if="linked.length"
+      class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-1.5 text-xs text-muted-foreground"
+    >
+      <Icon name="lucide:handshake" class="size-3.5" aria-hidden="true" />
+      {{ $ts("directory.engagement.linkedEngagements") }}:
+      <NuxtLink
+        v-for="engagement in linked"
+        :key="engagement.id"
+        :to="localeRoute({ name: 'directory-engagements-id', params: { id: engagement.id } })"
+        class="font-medium text-foreground hover:underline"
+      >
+        {{ engagement.title }}
+      </NuxtLink>
+    </p>
     <nav class="-mb-px flex gap-1 overflow-x-auto px-3" :aria-label="$ts('projects.views')">
       <NuxtLink
         v-for="tab in tabs"

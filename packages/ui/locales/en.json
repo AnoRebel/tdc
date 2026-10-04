@@ -941,7 +941,14 @@
         "completion_pending": "Completion awaiting confirmation",
         "completed": "Completed",
         "withdrawn": "Withdrawn"
-      }
+      },
+      "trackedIn": "Work tracked in",
+      "trackIn": "Track the work in",
+      "linkProject": "Link",
+      "unlinkProject": "Unlink",
+      "noProjectToLink": "You are in no project to track this work in.",
+      "linkHint": "Project members see the issues, never the proposal, prices or this conversation.",
+      "linkedEngagements": "Your engagements tracked here"
     },
     "agreement": {
       "tabs": {

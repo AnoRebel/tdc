@@ -108,8 +108,21 @@ export interface Engagement {
   completionRequestedBy?: string;
   completionRequestedAt?: string;
   transitions?: EngagementTransition[];
+  /**
+   * The project the agreed work is tracked in — present only when the viewer
+   * can see that project, so a private one is never named to somebody outside
+   * it.
+   */
+  project?: { key: string; name: string };
   createdAt: string;
   updatedAt: string;
+}
+
+/** An engagement as a project shows it to one of its parties: no terms. */
+export interface LinkedEngagement {
+  id: string;
+  title: string;
+  state: EngagementState;
 }
 
 /** Whether a skill is in the vocabulary or waiting for review. */

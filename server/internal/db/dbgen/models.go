@@ -215,6 +215,7 @@ type Engagement struct {
 	CompletionRequestedAt *time.Time
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
+	ProjectID             *uuid.UUID
 }
 
 type EngagementAgreement struct {

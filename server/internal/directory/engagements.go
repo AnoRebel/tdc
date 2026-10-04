@@ -104,9 +104,11 @@ type Engagement struct {
 	// complete, while it waits for the other.
 	CompletionRequestedBy *uuid.UUID
 	CompletionRequestedAt *time.Time
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
-	Transitions           []Transition
+	// ProjectID is the project the agreed work is tracked in, if linked.
+	ProjectID   *uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Transitions []Transition
 }
 
 // Transition is one change of state.
@@ -134,6 +136,7 @@ func engagementOf(row dbgen.Engagement) Engagement {
 		ClientLabel: row.ClientLabel, DeveloperLabel: row.DeveloperLabel, Title: row.Title,
 		RoomID: row.RoomID, State: State(row.State),
 		CompletionRequestedBy: row.CompletionRequestedBy, CompletionRequestedAt: row.CompletionRequestedAt,
+		ProjectID: row.ProjectID,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
 }
@@ -164,6 +167,50 @@ func engagementWith(ctx context.Context, queries *dbgen.Queries, id, viewer uuid
 		})
 	}
 	return engagement, nil
+}
+
+/*
+LinkProject links an engagement to the project its work is tracked in, or
+unlinks it when projectID is nil.
+
+Only a party may, and whether they may use that project is the caller's to
+have checked: this package knows engagements, not projects.
+*/
+func (s *Service) LinkProject(ctx context.Context, id, actor uuid.UUID, projectID *uuid.UUID) (Engagement, error) {
+	changed, err := s.queries.SetEngagementProject(ctx, dbgen.SetEngagementProjectParams{
+		ID: id, Actor: actor, ProjectID: projectID,
+	})
+	if err != nil {
+		return Engagement{}, fmt.Errorf("link an engagement to a project: %w", err)
+	}
+	if changed == 0 {
+		return Engagement{}, ErrNoEngagement
+	}
+	return engagementWith(ctx, s.queries, id, actor)
+}
+
+// LinkedSummary is an engagement as a project shows it to one of its parties:
+// what it is called and where it stands, and nothing of its terms.
+type LinkedSummary struct {
+	ID    uuid.UUID
+	Title string
+	State State
+}
+
+// LinkedTo lists the engagements linked to a project that the viewer is a
+// party to.
+func (s *Service) LinkedTo(ctx context.Context, projectID, viewer uuid.UUID) ([]LinkedSummary, error) {
+	rows, err := s.queries.ListProjectEngagementsFor(ctx, dbgen.ListProjectEngagementsForParams{
+		ProjectID: &projectID, Viewer: viewer,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list a project's engagements: %w", err)
+	}
+	linked := make([]LinkedSummary, 0, len(rows))
+	for _, row := range rows {
+		linked = append(linked, LinkedSummary{ID: row.ID, Title: row.Title, State: State(row.State)})
+	}
+	return linked, nil
 }
 
 // Engagements lists somebody's engagements, most recently changed first.

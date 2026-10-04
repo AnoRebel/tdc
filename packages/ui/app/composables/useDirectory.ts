@@ -6,6 +6,7 @@ import type {
   DirectoryVisibility,
   Engagement,
   Enquiry,
+  LinkedEngagement,
   Negotiation,
   OwnProfile,
   ProfileClaims,
@@ -237,6 +238,22 @@ export function useDirectory() {
     return api.get<Engagement>(`/api/directory/engagements/${id}`);
   }
 
+  /** Says the engagement's agreed work is tracked in a project you are in. */
+  function linkProject(id: string, project: string) {
+    return api.put<Engagement>(`/api/directory/engagements/${id}/project`, { project });
+  }
+
+  function unlinkProject(id: string) {
+    return api.delete<Engagement>(`/api/directory/engagements/${id}/project`);
+  }
+
+  /** The engagements you are party to that a project tracks. */
+  function projectEngagements(key: string) {
+    return api.get<LinkedEngagement[]>(
+      `/api/directory/projects/${encodeURIComponent(key)}/engagements`,
+    );
+  }
+
   function withdrawEngagement(id: string, reason: string) {
     return api.post<Engagement>(`/api/directory/engagements/${id}/withdraw`, { reason });
   }
@@ -296,6 +313,9 @@ export function useDirectory() {
     engagements,
     engagement,
     withdrawEngagement,
+    linkProject,
+    unlinkProject,
+    projectEngagements,
     sendEnquiry,
     enquiries,
     claims,

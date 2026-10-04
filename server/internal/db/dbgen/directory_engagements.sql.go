@@ -28,7 +28,7 @@ func (q *Queries) ArchiveEngagementRoom(ctx context.Context, arg ArchiveEngageme
 }
 
 const getEngagementFor = `-- name: GetEngagementFor :one
-SELECT id, enquiry_id, client_id, developer_id, client_label, developer_label, title, room_id, state, completion_requested_by, completion_requested_at, created_at, updated_at FROM engagements
+SELECT id, enquiry_id, client_id, developer_id, client_label, developer_label, title, room_id, state, completion_requested_by, completion_requested_at, created_at, updated_at, project_id FROM engagements
 WHERE id = $1 AND (client_id = $2::uuid OR developer_id = $2::uuid)
 `
 
@@ -55,6 +55,7 @@ func (q *Queries) GetEngagementFor(ctx context.Context, arg GetEngagementForPara
 		&i.CompletionRequestedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ProjectID,
 	)
 	return i, err
 }
@@ -72,7 +73,7 @@ INSERT INTO engagements (id, enquiry_id, client_id, developer_id, client_label, 
                          title, room_id, state)
 VALUES ($1, $2, $3, $4, $5, $6,
         $7, $8, 'discussion')
-RETURNING id, enquiry_id, client_id, developer_id, client_label, developer_label, title, room_id, state, completion_requested_by, completion_requested_at, created_at, updated_at
+RETURNING id, enquiry_id, client_id, developer_id, client_label, developer_label, title, room_id, state, completion_requested_by, completion_requested_at, created_at, updated_at, project_id
 `
 
 type InsertEngagementParams struct {
@@ -112,12 +113,13 @@ func (q *Queries) InsertEngagement(ctx context.Context, arg InsertEngagementPara
 		&i.CompletionRequestedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ProjectID,
 	)
 	return i, err
 }
 
 const listEngagementsFor = `-- name: ListEngagementsFor :many
-SELECT id, enquiry_id, client_id, developer_id, client_label, developer_label, title, room_id, state, completion_requested_by, completion_requested_at, created_at, updated_at FROM engagements
+SELECT id, enquiry_id, client_id, developer_id, client_label, developer_label, title, room_id, state, completion_requested_by, completion_requested_at, created_at, updated_at, project_id FROM engagements
 WHERE client_id = $1::uuid OR developer_id = $1::uuid
 ORDER BY updated_at DESC
 LIMIT 100
@@ -146,7 +148,49 @@ func (q *Queries) ListEngagementsFor(ctx context.Context, viewer uuid.UUID) ([]E
 			&i.CompletionRequestedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ProjectID,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectEngagementsFor = `-- name: ListProjectEngagementsFor :many
+SELECT id, title, state FROM engagements
+WHERE project_id = $1
+  AND (client_id = $2::uuid OR developer_id = $2::uuid)
+ORDER BY updated_at DESC
+LIMIT 100
+`
+
+type ListProjectEngagementsForParams struct {
+	ProjectID *uuid.UUID
+	Viewer    uuid.UUID
+}
+
+type ListProjectEngagementsForRow struct {
+	ID    uuid.UUID
+	Title string
+	State string
+}
+
+// The engagements linked to a project that the viewer is a party to. Nobody
+// else learns that a project has any.
+func (q *Queries) ListProjectEngagementsFor(ctx context.Context, arg ListProjectEngagementsForParams) ([]ListProjectEngagementsForRow, error) {
+	rows, err := q.db.Query(ctx, listProjectEngagementsFor, arg.ProjectID, arg.Viewer)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectEngagementsForRow{}
+	for rows.Next() {
+		var i ListProjectEngagementsForRow
+		if err := rows.Scan(&i.ID, &i.Title, &i.State); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -236,4 +280,26 @@ func (q *Queries) RecordTransition(ctx context.Context, arg RecordTransitionPara
 		arg.Note,
 	)
 	return err
+}
+
+const setEngagementProject = `-- name: SetEngagementProject :execrows
+UPDATE engagements
+SET project_id = $1::uuid, updated_at = NOW()
+WHERE id = $2 AND (client_id = $3::uuid OR developer_id = $3::uuid)
+`
+
+type SetEngagementProjectParams struct {
+	ProjectID *uuid.UUID
+	ID        uuid.UUID
+	Actor     uuid.UUID
+}
+
+// Links an engagement to a project, or unlinks it with a null project, for one
+// of its two parties only.
+func (q *Queries) SetEngagementProject(ctx context.Context, arg SetEngagementProjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setEngagementProject, arg.ProjectID, arg.ID, arg.Actor)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

@@ -25,11 +25,14 @@ that said "forbidden" would confirm it exists.
 
 func init() {
 	documentRoutes(map[string]entry{
-		"POST /api/directory/enquiries/:id/accept":   {Summary: "Take up an enquiry you received", Authentication: "session or token"},
-		"POST /api/directory/enquiries/:id/decline":  {Summary: "Decline an enquiry you received", Authentication: "session or token"},
-		"POST /api/directory/enquiries/:id/withdraw": {Summary: "Withdraw an enquiry you sent", Authentication: "session or token"},
-		"GET /api/directory/me/engagements":          {Summary: "Your engagements", Authentication: "session or token"},
-		"GET /api/directory/engagements/:id":         {Summary: "An engagement you are party to", Authentication: "session or token"},
+		"POST /api/directory/enquiries/:id/accept":      {Summary: "Take up an enquiry you received", Authentication: "session or token"},
+		"POST /api/directory/enquiries/:id/decline":     {Summary: "Decline an enquiry you received", Authentication: "session or token"},
+		"POST /api/directory/enquiries/:id/withdraw":    {Summary: "Withdraw an enquiry you sent", Authentication: "session or token"},
+		"GET /api/directory/me/engagements":             {Summary: "Your engagements", Authentication: "session or token"},
+		"GET /api/directory/engagements/:id":            {Summary: "An engagement you are party to", Authentication: "session or token"},
+		"PUT /api/directory/engagements/:id/project":    {Summary: "Link an engagement to a project you are in", Authentication: "session or token"},
+		"DELETE /api/directory/engagements/:id/project": {Summary: "Unlink an engagement from its project", Authentication: "session or token"},
+		"GET /api/directory/projects/:key/engagements":  {Summary: "The engagements you are party to that a project tracks", Authentication: "session or token"},
 		"POST /api/directory/engagements/:id/withdraw": {
 			Summary: "Withdraw from an engagement before an agreement", Authentication: "session or token",
 		},
@@ -47,6 +50,10 @@ func (api *directoryAPI) mountEngagements(directoryGroup, me *echo.Group) {
 	engagements := directoryGroup.Group("/engagements", requireAuthentication)
 	engagements.GET("/:id", api.handleGetEngagement)
 	engagements.POST("/:id/withdraw", api.handleWithdrawEngagement)
+	engagements.PUT("/:id/project", api.handleLinkProject)
+	engagements.DELETE("/:id/project", api.handleUnlinkProject)
+
+	directoryGroup.GET("/projects/:key/engagements", api.handleProjectEngagements, requireAuthentication)
 }
 
 type partyView struct {
@@ -80,8 +87,12 @@ type engagementView struct {
 	CompletionRequestedBy string           `json:"completionRequestedBy,omitempty"`
 	CompletionRequestedAt string           `json:"completionRequestedAt,omitempty"`
 	Transitions           []transitionView `json:"transitions,omitempty"`
-	CreatedAt             string           `json:"createdAt"`
-	UpdatedAt             string           `json:"updatedAt"`
+	// Project is where the agreed work is tracked — present only for a viewer
+	// who can see that project, so linking never tells the other party the
+	// name of a private project they are not in.
+	Project   *linkedProjectView `json:"project,omitempty"`
+	CreatedAt string             `json:"createdAt"`
+	UpdatedAt string             `json:"updatedAt"`
 }
 
 func (api *directoryAPI) engagementViewOf(engagement directory.Engagement, viewer uuid.UUID) engagementView {
@@ -229,7 +240,127 @@ func (api *directoryAPI) handleGetEngagement(c *echo.Context) error {
 	if err != nil {
 		return engagementError(err)
 	}
-	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
+	return c.JSON(http.StatusOK, api.engagementWithProject(c, engagement))
+}
+
+type linkedProjectView struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+// engagementWithProject is the engagement as the requester sees it, with the
+// project it is linked to if the requester may see that project.
+func (api *directoryAPI) engagementWithProject(c *echo.Context, engagement directory.Engagement) engagementView {
+	user, _ := currentUser(c)
+	view := api.engagementViewOf(engagement, user.ID)
+	if engagement.ProjectID != nil && api.projects != nil {
+		access, err := api.projects.ProjectByID(c.Request().Context(), actorOf(c), *engagement.ProjectID)
+		if err == nil {
+			view.Project = &linkedProjectView{Key: access.Project.Key, Name: access.Project.Name}
+		}
+	}
+	return view
+}
+
+type linkProjectRequest struct {
+	// Project is the project's key.
+	Project string `json:"project"`
+}
+
+/*
+handleLinkProject links an engagement to the project its agreed work is tracked
+in.
+
+Either party may, to a project they are in: linking says "this work is tracked
+there", which is a claim about the project only somebody in it can make. A
+project somebody can merely see, being public, is refused the same as one they
+cannot.
+*/
+func (api *directoryAPI) handleLinkProject(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	var request linkProjectRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	if api.projects == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "this server keeps no projects")
+	}
+
+	// A party first, so somebody who is not one learns nothing about the
+	// engagement from how the project check answers.
+	if _, err := api.directory.Engagement(ctx, id, user.ID); err != nil {
+		return engagementError(err)
+	}
+	access, err := api.projects.ProjectByKey(ctx, actorOf(c), request.Project)
+	if err != nil {
+		return projectError(err)
+	}
+	if access.Role == "" {
+		return echo.NewHTTPError(http.StatusForbidden, "only somebody in a project can link work to it")
+	}
+
+	engagement, err := api.directory.LinkProject(ctx, id, user.ID, &access.Project.ID)
+	if err != nil {
+		return engagementError(err)
+	}
+	api.announce(ctx, engagement, user.ID, user.Username+" linked the engagement to a project")
+	return c.JSON(http.StatusOK, api.engagementWithProject(c, engagement))
+}
+
+// handleUnlinkProject undoes a link. Either party may, whatever their place in
+// the project: taking work out of a project claims nothing about it.
+func (api *directoryAPI) handleUnlinkProject(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	engagement, err := api.directory.LinkProject(ctx, id, user.ID, nil)
+	if err != nil {
+		return engagementError(err)
+	}
+	api.announce(ctx, engagement, user.ID, user.Username+" unlinked the engagement from its project")
+	return c.JSON(http.StatusOK, api.engagementWithProject(c, engagement))
+}
+
+type linkedEngagementView struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	State string `json:"state"`
+}
+
+/*
+handleProjectEngagements lists, for a project, the engagements linked to it
+that the requester is a party to — so a party can go from the work to the
+agreement. Anybody else gets an empty list: a project member who is not a party
+learns neither the terms nor that there are any.
+*/
+func (api *directoryAPI) handleProjectEngagements(c *echo.Context) error {
+	user, _ := currentUser(c)
+	if api.projects == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "this server keeps no projects")
+	}
+	access, err := api.projectFrom(c)
+	if err != nil {
+		return err
+	}
+	linked, err := api.directory.LinkedTo(c.Request().Context(), access.Project.ID, user.ID)
+	if err != nil {
+		return err
+	}
+	views := make([]linkedEngagementView, 0, len(linked))
+	for _, engagement := range linked {
+		views = append(views, linkedEngagementView{
+			ID: engagement.ID.String(), Title: engagement.Title, State: string(engagement.State),
+		})
+	}
+	return c.JSON(http.StatusOK, views)
 }
 
 type withdrawRequest struct {

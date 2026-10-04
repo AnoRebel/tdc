@@ -941,7 +941,14 @@
         "completion_pending": "Kukamilika kunasubiri uthibitisho",
         "completed": "Imekamilika",
         "withdrawn": "Imeondolewa"
-      }
+      },
+      "trackedIn": "Kazi inafuatiliwa katika",
+      "trackIn": "Fuatilia kazi katika",
+      "linkProject": "Unganisha",
+      "unlinkProject": "Tenganisha",
+      "noProjectToLink": "Hauko katika mradi wowote wa kufuatilia kazi hii.",
+      "linkHint": "Wanachama wa mradi wanaona masuala tu, kamwe si pendekezo, bei au mazungumzo haya.",
+      "linkedEngagements": "Makubaliano yako yanayofuatiliwa hapa"
     },
     "agreement": {
       "tabs": {

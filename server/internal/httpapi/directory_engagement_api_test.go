@@ -306,3 +306,90 @@ func TestAnEngagementConversationFollowsTheOrdinaryRules(t *testing.T) {
 		t.Error("the server's retention did not reach the engagement's conversation")
 	}
 }
+
+/*
+An engagement linked to a project: the work is tracked there, the terms are not.
+
+The developer tracks the agreed work in a private project of their own, which a
+teammate is in and the client is not. The teammate sees the issues, as any
+member does, and nothing of the engagement — not its proposals, not its prices,
+not that there is one. The client, outside the project, is not told its name.
+Only somebody in a project can say work is tracked in it.
+*/
+func TestALinkedProjectShowsTheWorkAndNotTheTerms(t *testing.T) {
+	handler, founder := withDirectory(t)
+	juma := publicDeveloper(t, handler, "juma")
+	client := registerAndSignIn(t, handler, "client")
+	teammate := registerAndSignIn(t, handler, "teammate")
+
+	startProject(t, handler, juma, "WORK", "private")
+	mustCall(t, handler, http.MethodPut, "/api/projects/WORK/members/teammate",
+		map[string]any{"role": "member"}, juma, http.StatusNoContent)
+	fileIssue(t, handler, juma, "WORK", "Booking screen")
+
+	id := engagementID(t, handler, client, juma)
+	propose(t, handler, juma, id, "A clinic booking app", 1_500_000)
+
+	// The client is not in the project, so cannot say the work is tracked there.
+	if code := call(t, handler, http.MethodPut, "/api/directory/engagements/"+id+"/project",
+		map[string]any{"project": "WORK"}, client).Code; code != http.StatusNotFound && code != http.StatusForbidden {
+		t.Errorf("a party outside the project linked it: status %d", code)
+	}
+	// Nor can somebody who is not a party, whatever their place in the project.
+	if code := call(t, handler, http.MethodPut, "/api/directory/engagements/"+id+"/project",
+		map[string]any{"project": "WORK"}, teammate).Code; code != http.StatusNotFound {
+		t.Errorf("somebody not a party linked the engagement: status %d", code)
+	}
+
+	// A public project the developer can see but is not in is refused too.
+	startProject(t, handler, founder, "OPEN", "public")
+	mustCall(t, handler, http.MethodPut, "/api/directory/engagements/"+id+"/project",
+		map[string]any{"project": "OPEN"}, juma, http.StatusForbidden)
+
+	linked := decode(t, mustCall(t, handler, http.MethodPut, "/api/directory/engagements/"+id+"/project",
+		map[string]any{"project": "WORK"}, juma, http.StatusOK))
+	if project, _ := linked["project"].(map[string]any); project["key"] != "WORK" {
+		t.Errorf("the developer's engagement names project %v", linked["project"])
+	}
+
+	// The client is a party, but not told the name of a private project.
+	_, asClient, _ := engagementAs(t, handler, client, id)
+	if _, present := asClient["project"]; present {
+		t.Errorf("the client was told about a private project they are not in: %v", asClient["project"])
+	}
+
+	// The teammate sees the work...
+	mustCall(t, handler, http.MethodGet, "/api/issues/WORK-1", nil, teammate, http.StatusOK)
+	// ...and nothing of the engagement: not it, not its terms, not that it exists.
+	if code, _, _ := engagementAs(t, handler, teammate, id); code != http.StatusNotFound {
+		t.Errorf("a project member who is not a party read the engagement: status %d", code)
+	}
+	mustCall(t, handler, http.MethodGet, "/api/directory/engagements/"+id+"/proposals", nil, teammate, http.StatusNotFound)
+	if listed := decodeRows(t, mustCall(t, handler, http.MethodGet, "/api/directory/projects/WORK/engagements",
+		nil, teammate, http.StatusOK).Body.Bytes()); len(listed) != 0 {
+		t.Errorf("a project member who is not a party is shown its engagements: %v", listed)
+	}
+
+	// The developer goes from the work back to the engagement, and only to its name.
+	listed := decodeRows(t, mustCall(t, handler, http.MethodGet, "/api/directory/projects/WORK/engagements",
+		nil, juma, http.StatusOK).Body.Bytes())
+	if len(listed) != 1 || listed[0]["id"] != id {
+		t.Fatalf("the developer's project lists %v", listed)
+	}
+	for field := range listed[0] {
+		if field != "id" && field != "title" && field != "state" {
+			t.Errorf("a project's engagement carries %q, more than its name and state", field)
+		}
+	}
+
+	// Either party unlinks.
+	unlinked := decode(t, mustCall(t, handler, http.MethodDelete, "/api/directory/engagements/"+id+"/project",
+		nil, client, http.StatusOK))
+	if _, present := unlinked["project"]; present {
+		t.Error("unlinking left the engagement linked")
+	}
+
+	// And with the directory off, the project says nothing about engagements.
+	setFeature(t, handler, founder, "directory", false)
+	mustCall(t, handler, http.MethodGet, "/api/directory/projects/WORK/engagements", nil, juma, http.StatusNotFound)
+}

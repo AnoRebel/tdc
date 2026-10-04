@@ -209,6 +209,8 @@ const reached = computed(() => {
             <span v-if="step.note" class="text-muted-foreground">— {{ step.note }}</span>
           </li>
         </ol>
+
+        <DirectoryEngagementProject :engagement="engagement" @changed="engagement = $event" />
       </section>
 
       <!-- The conversation and the proposal side by side as tabs: on a phone

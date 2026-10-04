@@ -42,3 +42,19 @@ SELECT * FROM engagement_transitions WHERE engagement_id = $1 ORDER BY id;
 -- Closing an engagement's conversation to new messages, keeping what was said.
 UPDATE rooms SET archived_at = NOW(), archived_by = @actor
 WHERE id = @id AND archived_at IS NULL AND participant_key LIKE 'enquiry:%';
+
+-- name: SetEngagementProject :execrows
+-- Links an engagement to a project, or unlinks it with a null project, for one
+-- of its two parties only.
+UPDATE engagements
+SET project_id = sqlc.narg('project_id')::uuid, updated_at = NOW()
+WHERE id = @id AND (client_id = @actor::uuid OR developer_id = @actor::uuid);
+
+-- name: ListProjectEngagementsFor :many
+-- The engagements linked to a project that the viewer is a party to. Nobody
+-- else learns that a project has any.
+SELECT id, title, state FROM engagements
+WHERE project_id = @project_id
+  AND (client_id = @viewer::uuid OR developer_id = @viewer::uuid)
+ORDER BY updated_at DESC
+LIMIT 100;
