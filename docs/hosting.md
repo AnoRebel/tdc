@@ -313,6 +313,51 @@ A confirmation link lasts a day rather than an hour — nothing is at stake in a
 unclaimed one — and the account keeps whatever address it already had until the
 link is used, so a mistyped address costs nothing but the message.
 
+### Notifications: bursts, and summaries by email
+
+Two pieces of policy decide how much notifications interrupt people. Both
+change while the server runs, through `/api/admin/settings` or the settings
+page, and need no restart:
+
+| Setting                                  | Default | What it does                                                                                                                                             |
+| ---------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `notifications.batch_seconds`            | `60`    | After a device is told about a conversation, further messages there within this many seconds are not pushed again. `0` pushes every one; at most `3600`. |
+| `notifications.digest_max_conversations` | `20`    | The most conversations one emailed summary lists; the rest are counted. At least `1`.                                                                    |
+
+**Batching** applies to pushes only. Every message is still raised as a
+notification, still counted and still listed — the list already shows one entry
+per conversation — so what the window changes is how often somebody's phone
+lights up during a busy exchange. Reading the conversation ends the window
+early, so the next message after that is news again.
+
+**Summaries** are each member's own choice: a daily or weekly email, at an hour
+in their own time zone, listing the conversations where something went unread
+and how much. They replace pushes for whoever chooses them. A summary counts and
+never quotes — no message text goes into the mail — and it is checked at the
+moment it is sent, so a channel somebody has left, been banned from, had
+`channel.read` withdrawn in, or muted is left out entirely. A status that
+suppresses notifications holds the summary until it changes. Summaries go only
+to a confirmed address, like recovery.
+
+They need mail. A server with no `mail.host` does not offer them — the control
+is not shown, `notification-digests` is absent from `/api/server`, and the
+routes answer `404` — and anybody who chose one before mail was switched off
+goes back to ordinary pushes rather than being left with neither. With mail
+configured they are on by default; the `notification-digests` feature toggle
+withdraws them if you want mail to carry recovery and nothing else:
+
+```sh
+curl -X PUT https://tdc.example/api/admin/features/notification-digests \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled": false}'
+```
+
+Every node looks for due summaries once a minute. Servers sharing a database
+share the work: each summary is claimed in the statement that finds it, so
+nobody is mailed twice however many nodes run. The zone database is built into
+the server, so "08:00 in Africa/Dar_es_Salaam" is right whatever zone the host
+itself is set to.
+
 ### Passkeys
 
 Nothing to configure, and nothing to turn on. A server signs people in with

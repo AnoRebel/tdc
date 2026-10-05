@@ -390,6 +390,10 @@ notifications bearable:
 - Nothing is raised for the conversation you are currently looking at.
 - A notification is withdrawn when you read the thing elsewhere.
 - A burst of messages arrives as one batched notification rather than one each.
+  Your notification list shows one entry per conversation with a count, and
+  your devices are told about the first message of a burst and not again until
+  you have read the conversation or a minute has passed. Your operator chooses
+  that window, and can turn it off.
 - A status that suppresses notifications suppresses them.
 
 Notifications also reach you with the browser closed, where your operator has
@@ -397,6 +401,34 @@ configured that. **You can choose to hide the content** in those, so a push for
 a private conversation says that something arrived without saying what. That
 switch is in your settings, and it fails closed — a push it cannot be sure about
 conceals the sender rather than guessing.
+
+#### A summary instead of interruptions
+
+If you would rather not be interrupted at all, you can ask for **a summary by
+email** instead, daily or weekly, at an hour you choose. It is in your settings
+under _Summaries by email_, and it is off until you turn it on.
+
+- **The hour is yours.** "Daily at 08:00" means eight in the morning where you
+  are, taken from your device's time zone when you first choose it and shown
+  beside the setting. If you move, the setting offers to switch to the zone
+  your device is now in.
+- **It replaces the interruptions.** While it is on, your devices are not
+  notified. Everything still appears in your notification list and still counts
+  as unread, which is what the summary is made from.
+- **It counts; it never quotes.** A summary lists each conversation with
+  something unread — how many notifications, from how many people, and how many
+  were addressed to you — with a link to open it. What anybody wrote is not in
+  the mail, because mail leaves this server.
+- **Only what you can still read.** Each summary is checked when it is sent: a
+  channel you have left, been removed from or muted since is left out, counts
+  and all. If nothing is left, no mail is sent.
+- **It waits for you.** If your status says not to interrupt you when a summary
+  is due, it is held and sent once that changes, with nothing lost.
+- **It goes only to a confirmed address**, like account recovery. Confirm one
+  in your settings first.
+
+The control appears only where it can work. A server whose operator has not
+configured mail cannot send a summary, and does not offer one.
 
 Muting a single conversation is in the server and the API but has no control in
 either client yet, and it is a plain on or off rather than a duration. Following

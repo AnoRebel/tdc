@@ -70,6 +70,7 @@ type Querier interface {
 	BlockUser(ctx context.Context, arg BlockUserParams) error
 	// Everything still waiting for a subscription that has been turned off.
 	CancelPendingWebhookDeliveries(ctx context.Context, subscriptionID *uuid.UUID) (int64, error)
+	ClaimDueNotificationDigests(ctx context.Context, limit int32) ([]NotificationDigest, error)
 	// What is ready to send, claimed by whoever asked.
 	//
 	// One statement, so finding a row and claiming it cannot be separated: SKIP
@@ -97,6 +98,7 @@ type Querier interface {
 	// Collected once: the row is deleted as it is read, so a handle presented twice
 	// yields nothing the second time.
 	CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error)
+	CompleteNotificationDigest(ctx context.Context, arg CompleteNotificationDigestParams) error
 	CompleteWebhookDelivery(ctx context.Context, arg CompleteWebhookDeliveryParams) error
 	ConfirmEmail(ctx context.Context, arg ConfirmEmailParams) (User, error)
 	// Confirming enrolment: the person proved their app holds the secret. The
@@ -392,6 +394,7 @@ type Querier interface {
 	GetMessageInteraction(ctx context.Context, eventID string) (MessageInteraction, error)
 	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
 	GetMilestone(ctx context.Context, id uuid.UUID) (Milestone, error)
+	GetNotificationDigest(ctx context.Context, userID uuid.UUID) (NotificationDigest, error)
 	// The preference that applies to one conversation.
 	//
 	// The room's own row when there is one, the person's global default
@@ -546,6 +549,7 @@ type Querier interface {
 	ListCyclesOfProject(ctx context.Context, projectID uuid.UUID) ([]Cycle, error)
 	// Cycles that have ended and whose end has not been dealt with, oldest first.
 	ListCyclesToClose(ctx context.Context, arg ListCyclesToCloseParams) ([]Cycle, error)
+	ListDigestActivity(ctx context.Context, arg ListDigestActivityParams) ([]ListDigestActivityRow, error)
 	ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) ([]Room, error)
 	ListEngagementsFor(ctx context.Context, viewer uuid.UUID) ([]Engagement, error)
 	// What an account posted, for removing it with the application it acted for.
@@ -828,6 +832,8 @@ type Querier interface {
 	// The UPDATE takes a row lock, so two concurrent writers serialise here rather
 	// than both reading the same maximum and colliding.
 	NextRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
+	// Whether somebody has asked for a summary instead of interruptions.
+	NotificationDigestChosen(ctx context.Context, userID uuid.UUID) (bool, error)
 	ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomeParams) (OauthOutcome, error)
 	PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomPeer, error)
 	// Pinning something already pinned updates who pinned it and when, rather than
@@ -835,6 +841,7 @@ type Querier interface {
 	PinMessage(ctx context.Context, arg PinMessageParams) error
 	// A person's own pinned conversation, which says nothing to anybody else.
 	PinRoom(ctx context.Context, arg PinRoomParams) error
+	PostponeNotificationDigest(ctx context.Context, arg PostponeNotificationDigestParams) error
 	// Held back by a rate limit: not an attempt, so the count is given back.
 	PostponeWebhookDelivery(ctx context.Context, arg PostponeWebhookDeliveryParams) error
 	// Removes subscriptions that have failed repeatedly without the service ever
@@ -849,6 +856,7 @@ type Querier interface {
 	PruneWebhookDeliveries(ctx context.Context, createdAt time.Time) (int64, error)
 	PublishedRooms(ctx context.Context, limit int32) ([]PublishedRoomsRow, error)
 	PutIntegrationContext(ctx context.Context, arg PutIntegrationContextParams) (IntegrationContext, error)
+	RecentlyNotifiedInRoom(ctx context.Context, arg RecentlyNotifiedInRoomParams) (bool, error)
 	// The press, recorded before it is announced.
 	//
 	// ON CONFLICT DO NOTHING rather than an upsert: a second press of the same
@@ -1064,6 +1072,7 @@ type Querier interface {
 	// once, and left null for the seen-based kinds until reading decides it.
 	SetMessageLifetime(ctx context.Context, arg SetMessageLifetimeParams) (MessageLifetime, error)
 	SetMilestoneDue(ctx context.Context, arg SetMilestoneDueParams) error
+	SetNotificationDigest(ctx context.Context, arg SetNotificationDigestParams) (NotificationDigest, error)
 	// Recording an address somebody has asked to prove, which does not touch the
 	// one they already have.
 	SetPendingEmail(ctx context.Context, arg SetPendingEmailParams) error

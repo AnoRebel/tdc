@@ -452,6 +452,20 @@ type Notification struct {
 	Detail       string
 }
 
+type NotificationDigest struct {
+	UserID       uuid.UUID
+	Frequency    string
+	Hour         int16
+	Weekday      int16
+	TimeZone     string
+	NextDueAt    *time.Time
+	CoveredUntil time.Time
+	ClaimedUntil *time.Time
+	LastSentAt   *time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
 type NotificationPreference struct {
 	UserID    uuid.UUID
 	RoomID    *uuid.UUID

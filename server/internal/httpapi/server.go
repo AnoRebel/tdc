@@ -299,6 +299,16 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		generated no keys, which leaves notifications working as they always
 		have — in the application.
 	*/
+	/*
+		What reaches a device, decided by policy that changes while the server
+		runs: a burst in one conversation is gathered into one push, and
+		somebody who chose a summary is not pushed at all. Both read the
+		server's state when asked, so they are wired whether or not push is.
+	*/
+	if services.Notify != nil {
+		services.Notify.WithBatching(s.batchWindow).WithDigests(s.digestChosen)
+	}
+
 	if services.Notify != nil && services.Push != nil {
 		if deliveries := push.Deliveries(services.Push); deliveries != nil {
 			services.Notify.WithPush(deliveries)
@@ -410,6 +420,10 @@ func (s *Server) Run(ctx context.Context) error {
 	// Messages written earlier and sent now. Every node runs a pass; each
 	// claims what it sends, so nothing goes out twice.
 	go s.RunScheduled(ctx)
+
+	// Summaries of missed activity, mailed to whoever chose one. Every node
+	// runs a pass for the same reason, and claims what it sends the same way.
+	go s.RunDigests(ctx)
 
 	serveErr := make(chan error, 1)
 	go func() {
