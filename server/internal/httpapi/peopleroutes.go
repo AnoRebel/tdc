@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -48,9 +49,18 @@ func (s *Server) handleListPeople(c *echo.Context) error {
 		}
 	}
 
+	// Paged, so "every account" means every account on a server with more of
+	// them than one page holds.
+	offset := int32(0)
+	if raw := c.QueryParam("offset"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= math.MaxInt32 {
+			offset = int32(parsed)
+		}
+	}
+
 	people, err := s.queries.ListUsers(c.Request().Context(), dbgen.ListUsersParams{
 		Limit:  limit,
-		Offset: 0,
+		Offset: offset,
 	})
 	if err != nil {
 		return err

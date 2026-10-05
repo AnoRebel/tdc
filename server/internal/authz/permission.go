@@ -115,7 +115,7 @@ var catalogue = map[Permission]Definition{
 	},
 	PermUserViewAll: {
 		Name:        PermUserViewAll,
-		Description: "See every account on the server, including hidden profiles",
+		Description: "List every account on the server, suspended ones included — never their email addresses, and not a directory profile its owner has hidden",
 		Scopes:      []Scope{ScopeServer},
 	},
 	PermRoleManage: {
