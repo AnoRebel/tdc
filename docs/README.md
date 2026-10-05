@@ -25,6 +25,9 @@
   source.
 - **[Contributing](contributing.md)** — how changes reach this project, what the
   licence requires, and what a pull request has to say.
+- **[Security policy](../SECURITY.md)** — how to report a vulnerability
+  privately, what happens afterwards, which versions are supported, and what is
+  in scope.
 - **[Privacy policy](privacy-policy.md)** — a template an operator adapts,
   describing what the software actually stores and what leaves the server.
 - **[Terms of use](terms-of-use.md)** — a template an operator adapts, covering
