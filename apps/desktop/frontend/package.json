@@ -24,6 +24,7 @@
     "vue": "catalog:vue"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.133",
     "@vue/test-utils": "catalog:testing",
     "jsdom": "^30.1.0",
     "typescript": "catalog:tooling",
