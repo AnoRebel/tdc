@@ -27,9 +27,9 @@ import * as Api from "#bindings/api";
 definePageMeta({ layout: "auth" });
 useHead({ title: "Sign in" });
 
-const { signIn, refresh } = useAuth();
+const { signIn, refresh, setupStatus } = useAuth();
 const router = useRouter();
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $localeRoute: localeRoute } = useI18n();
 
 const server = ref("");
 const remember = ref(false);
@@ -182,6 +182,21 @@ onMounted(async () => {
       return;
     }
     server.value = current;
+
+    /*
+     * A server with no accounts yet cannot be signed in to, so its first
+     * visitor sets it up instead — as on the web. Unknown is not an error
+     * here: the form is shown, and signing in reports the problem against
+     * something the person actually did.
+     */
+    try {
+      if ((await setupStatus()).setupRequired) {
+        await router.replace(localeRoute({ name: "setup" }));
+        return;
+      }
+    } catch {
+      // Unreachable or unanswerable; the form stays.
+    }
 
     try {
       keychain.value = (await Api.Service.CredentialStorage()) !== "none";
@@ -384,6 +399,16 @@ const form = useForm({
       </p>
 
       <p class="mt-6 text-center text-xs text-muted-foreground">
+        {{ $t("auth.noAccountYet") }}
+        <NuxtLink
+          :to="localeRoute({ name: 'register' })"
+          class="font-medium text-primary hover:underline"
+        >
+          {{ $t("auth.createOne") }}
+        </NuxtLink>
+      </p>
+
+      <p class="mt-2 text-center text-xs text-muted-foreground">
         Signing in to a different server?
         <NuxtLink
           :to="localeRoute({ name: 'servers' })"

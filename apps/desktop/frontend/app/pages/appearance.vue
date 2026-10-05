@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
+import { ArrowLeft } from "lucide-vue-next";
+
+const router = useRouter();
 
 /**
  * How the application looks.
@@ -70,6 +73,11 @@ onMounted(async () => {
 
 <template>
   <main class="mx-auto max-w-lg p-8">
+    <!-- Back to wherever this was opened from: the menu or settings. -->
+    <button type="button" class="btn btn-ghost mb-4 -ml-2 h-7 px-2 text-xs" @click="router.back()">
+      <ArrowLeft class="size-3.5" />
+      {{ $t("action.back") }}
+    </button>
     <h1 class="text-lg font-semibold">Appearance</h1>
 
     <section class="mt-5">
