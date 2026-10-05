@@ -346,7 +346,10 @@ were last here does not hide whether you are online now.
 **A detail you turn off is left out of what the server sends**, rather than sent
 and hidden by the application. This is the difference that matters: a detail
 that reaches the client has been disclosed whatever the client then does with
-it, and anybody who can read a network response can read it.
+it, and anybody who can read a network response can read it. That holds
+everywhere the server answers these questions: the member list, and the online
+count a conversation shows, which leaves you out of it rather than counting you
+as offline.
 
 These are standing choices, and not the same as _Appear offline_. Appearing
 offline is about this afternoon and lapses when you turn it off; these hold

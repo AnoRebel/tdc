@@ -205,13 +205,19 @@ func (s *Server) handleUnreadCounts(c *echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
-// presenceResponse is what one person's presence looks like to another.
+/*
+presenceResponse is what one person's presence looks like to another.
+
+Each detail is optional because each is somebody's to withhold, and a withheld
+detail is left out rather than sent empty: "offline" or a zero time is an
+answer to the question they declined to answer.
+*/
 type presenceResponse struct {
-	UserID     string    `json:"userId"`
-	State      string    `json:"state"`
-	Status     string    `json:"status"`
-	StatusText string    `json:"statusText,omitempty"`
-	LastSeenAt time.Time `json:"lastSeenAt"`
+	UserID     string     `json:"userId"`
+	State      string     `json:"state,omitempty"`
+	Status     string     `json:"status,omitempty"`
+	StatusText string     `json:"statusText,omitempty"`
+	LastSeenAt *time.Time `json:"lastSeenAt,omitempty"`
 }
 
 func (s *Server) handleRoomPresence(c *echo.Context) error {
@@ -240,16 +246,49 @@ func (s *Server) handleRoomPresence(c *echo.Context) error {
 		return err
 	}
 
+	/*
+		What each person withholds, by the rule the member list follows.
+
+		Read from the same query rather than decided again here, so the two
+		answers to "is this person online" cannot come to disagree. Never in the
+		moderation context: this is what a conversation polls, not a report
+		being reviewed.
+	*/
+	disclosure, err := s.rooms.MembersWithDisclosure(ctx, roomID, user.ID, false)
+	if err != nil {
+		return roomError(err)
+	}
+	withholds := make(map[uuid.UUID]dbgen.ListRoomMembersWithDisclosureRow, len(disclosure))
+	for _, member := range disclosure {
+		withholds[member.ID] = member
+	}
+
 	response := make([]presenceResponse, 0, len(members))
 	for _, member := range members {
 		state := states[member.ID]
-		response = append(response, presenceResponse{
-			UserID:     member.ID.String(),
-			State:      string(state.State),
-			Status:     state.Status,
-			StatusText: state.StatusText,
-			LastSeenAt: state.LastSeenAt,
-		})
+		entry := presenceResponse{UserID: member.ID.String()}
+
+		// Somebody's own presence is theirs to see whatever they withhold.
+		chosen, known := withholds[member.ID]
+		own := member.ID == user.ID
+		if !known && !own {
+			// Not in the disclosure list, so nothing is known to be allowed.
+			response = append(response, entry)
+			continue
+		}
+
+		if own || !chosen.WithholdsPresence {
+			entry.State = string(state.State)
+		}
+		if own || !chosen.WithholdsStatus {
+			entry.Status = state.Status
+			entry.StatusText = state.StatusText
+		}
+		if own || !chosen.WithholdsLastSeen {
+			lastSeen := state.LastSeenAt
+			entry.LastSeenAt = &lastSeen
+		}
+		response = append(response, entry)
 	}
 
 	return c.JSON(http.StatusOK, response)
@@ -299,7 +338,7 @@ func (s *Server) handleSetStatus(c *echo.Context) error {
 		State:      string(state.State),
 		Status:     state.Status,
 		StatusText: state.StatusText,
-		LastSeenAt: state.LastSeenAt,
+		LastSeenAt: &state.LastSeenAt,
 	})
 }
 

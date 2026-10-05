@@ -51,6 +51,14 @@ func TestPrivacyAndDirectoryVisibilityCompose(t *testing.T) {
 					t.Errorf("%s: the member list has %s=%v, want present=%v", case_, field, present, discloses)
 				}
 			}
+			// So does the presence a conversation polls, which is a second
+			// answer to the same question and must not be the one that leaks.
+			polled := presenceOf(t, handler, amina, roomID, member["id"].(string))
+			for _, field := range []string{"state", "status", "lastSeenAt"} {
+				if _, present := polled[field]; present != discloses {
+					t.Errorf("%s: room presence has %s present=%v, want %v", case_, field, present, discloses)
+				}
+			}
 
 			// The directory follows its own visibility alone.
 			memberMaySee := visibility == "public" || visibility == "members"
