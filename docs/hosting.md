@@ -238,12 +238,26 @@ it with no administrator at all, and one that would remove the authority of the
 person making it. The second can be overridden — somebody stepping down
 deliberately is a real thing — by repeating the request with `confirmed`.
 
-Thirty-two of the thirty-nine catalogued permissions are enforced — every one
-that projects and the directory added among them — and the rest are names
-waiting for features (calls, renaming, archiving and removing from a channel,
-editing anybody's message, and reading every account). `channel.read` and `channel.post` are checked per
-channel, on top of membership, bans and posting restrictions, and Member holds
-both everywhere until you say otherwise.
+Thirty-seven of the thirty-nine catalogued permissions are enforced — every one
+that projects and the directory added among them — and the two left,
+`call.start` and `call.join`, are names waiting for calls. `channel.read` and
+`channel.post` are checked per channel, on top of membership, bans and posting
+restrictions, and Member holds both everywhere until you say otherwise.
+
+Looking after a channel is four permissions, each grantable for one channel so
+a channel can have keepers with no say anywhere else: `channel.rename` (its
+name, its topic, and making it private), `channel.archive` (archiving and
+restoring), `channel.member.remove` (taking somebody out, which is not a ban),
+and `message.edit.any` (changing somebody else's message, shown as the
+moderator's edit). Making a channel **public** needs `channel.rename` for the
+whole server, since it opens the channel's entire history to everybody. Every
+one of these is audited — `channel.renamed`, `channel.visibility.changed` with
+both values, `channel.archived`, `channel.restored`, `channel.member.removed`
+and `message.edited_by_moderator`. None applies to a direct conversation, a
+project's discussions, or a channel another server holds. `user.read.all`
+opens the list of every account at `/api/admin/users` (as `user.suspend`
+already did), paged with `limit` and `offset`; it shows no email addresses,
+and a hidden directory profile stays behind `directory.profile.manage`.
 
 Member is a baseline beneath every other role: whatever another role says about
 a permission in the same place replaces what Member says there. That is what

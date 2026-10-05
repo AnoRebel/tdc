@@ -75,10 +75,13 @@ assignment — which is worth setting up before the move, so that the people who
 moderated your Telegram group are moderating here on the first day rather than
 asking you to do it for them.
 
-Note what a role does **not** cover. Thirty-two of the thirty-nine catalogued
-permissions are enforced anywhere; the rest are names waiting for the features
-they belong to. Reading and posting are among the enforced ones, per channel —
-which is how the announcement channel described below is made.
+Note what a role does **not** cover. Thirty-seven of the thirty-nine catalogued
+permissions are enforced; the two that are not, starting and joining a call,
+are waiting for calls to exist. Reading and posting are among the enforced ones,
+per channel — which is how the announcement channel described below is made —
+and so is looking after one channel: renaming it, archiving it, and taking
+somebody out of it can each be granted for that channel alone, which is the
+nearest thing here to a Telegram group's own admins.
 
 Decide who holds what before the move rather than during it. An organiser who
 was an admin in Telegram is not automatically anything here.

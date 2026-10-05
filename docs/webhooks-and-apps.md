@@ -62,7 +62,8 @@ What can go wrong when subscribing, and what each looks like:
 `GET /api/webhooks/event-types` lists what can be asked for. Today:
 `message.sent`, `message.edited`, `message.deleted`, `message.updated`,
 `action.pressed`, `member.joined`, `member.left`, `member.removed`,
-`room.renamed`, `room.archived` and `room.restored` — everything somebody
+`room.renamed`, `room.archived`, `room.restored` and
+`room.visibility_changed` — everything somebody
 reading a channel sees happen in it, and nothing they do not.
 
 `GET /api/me/webhooks` lists yours, never with secrets. `DELETE
