@@ -54,11 +54,6 @@ function firstError(field: AnyFieldApi): string | undefined {
   return typeof issue === "string" ? issue : (issue as { message?: string }).message;
 }
 
-const status = await setupStatus();
-if (!status.setupRequired) {
-  await router.replace(localeRoute({ name: "signin" }));
-}
-
 const form = useForm({
   defaultValues: { username: "", displayName: "", password: "" },
   validators: { onSubmit: administrator },
@@ -80,6 +75,16 @@ const form = useForm({
     }
   },
 });
+
+/*
+ * After the form rather than before it: the form registers lifecycle hooks,
+ * and anything after this await runs with no component instance to attach
+ * them to.
+ */
+const status = await setupStatus();
+if (!status.setupRequired) {
+  await router.replace(localeRoute({ name: "signin" }));
+}
 </script>
 
 <template>

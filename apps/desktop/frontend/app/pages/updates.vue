@@ -8,6 +8,9 @@
  */
 import { Interval } from "#bindings/updater/models";
 import { Button } from "#layers/ui/app/components/ui/button";
+import { ArrowLeft } from "lucide-vue-next";
+
+const router = useRouter();
 
 useHead({ title: "Updates" });
 
@@ -57,6 +60,11 @@ const intervals = [
 
 <template>
   <main class="mx-auto max-w-lg p-8">
+    <!-- Back to wherever this was opened from: the menu or settings. -->
+    <button type="button" class="btn btn-ghost mb-4 -ml-2 h-7 px-2 text-xs" @click="router.back()">
+      <ArrowLeft class="size-3.5" />
+      {{ $t("action.back") }}
+    </button>
     <h1 class="text-lg font-semibold">Updates</h1>
 
     <template v-if="state">

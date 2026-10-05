@@ -13,20 +13,15 @@ import { Select } from "#layers/ui/app/components/ui/select";
  * somebody in the project can say. The project's members see its issues as
  * they always do; nothing of the engagement — its proposals, prices or
  * conversation — goes with the link.
- *
- * Shown only where the client has projects to link to: a client without the
- * projects pages has nowhere to go from here.
  */
 
 const props = defineProps<{ engagement: Engagement }>();
 const emit = defineEmits<{ changed: [engagement: Engagement] }>();
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
-const router = useRouter();
 const directory = useDirectory();
 const projectsApi = useProjects();
 
-const available = computed(() => router.hasRoute("projects-key"));
 const mine = ref<Project[]>([]);
 const chosen = ref("");
 const busy = ref(false);
@@ -37,7 +32,7 @@ const options = computed(() =>
 );
 
 onMounted(async () => {
-  if (!available.value || props.engagement.project) return;
+  if (props.engagement.project) return;
   try {
     mine.value = (await projectsApi.list()).filter((project) => Boolean(project.role));
     chosen.value = mine.value[0]?.key ?? "";
@@ -73,7 +68,7 @@ async function unlink() {
 </script>
 
 <template>
-  <div v-if="available" class="flex flex-wrap items-center gap-2 text-xs" data-engagement-project>
+  <div class="flex flex-wrap items-center gap-2 text-xs" data-engagement-project>
     <Kanban class="size-3.5 text-muted-foreground" aria-hidden="true" />
     <template v-if="engagement.project">
       <span class="text-muted-foreground">{{ $t("directory.engagement.trackedIn") }}</span>

@@ -18,33 +18,43 @@ import { describe, expect, it } from "vitest";
  * never showed the problem, which is exactly how it survived to be found here.
  */
 
-const MIDDLEWARE = import.meta.dirname;
+/*
+ * This client's own middleware, and the shared layer's — which runs here just
+ * the same, and is where a new one is most likely to be written by somebody
+ * looking only at the web.
+ */
+const MIDDLEWARE = [
+  import.meta.dirname,
+  join(import.meta.dirname, "..", "..", "..", "..", "..", "packages", "ui", "app", "middleware"),
+];
 
 describe("route middleware", () => {
   it("calls its composables before it awaits", () => {
     const offenders: string[] = [];
 
-    if (!existsSync(MIDDLEWARE)) return;
+    for (const directory of MIDDLEWARE) {
+      if (!existsSync(directory)) continue;
 
-    for (const name of readdirSync(MIDDLEWARE)) {
-      if (!name.endsWith(".ts") || name.endsWith(".test.ts")) continue;
+      for (const name of readdirSync(directory)) {
+        if (!name.endsWith(".ts") || name.endsWith(".test.ts")) continue;
 
-      const contents = readFileSync(join(MIDDLEWARE, name), "utf8");
+        const contents = readFileSync(join(directory, name), "utf8");
 
-      /*
-       * The first await inside the middleware body, which is indented by two.
-       * Anything deeper sits in a nested function and runs later, on its own
-       * terms, rather than suspending the middleware itself.
-       */
-      const firstAwait = contents.search(/^ {2}(?:await |(?:const|let) [^=]*= await )/m);
-      if (firstAwait < 0) continue;
+        /*
+         * The first await inside the middleware body, which is indented by
+         * two. Anything deeper sits in a nested function and runs later, on its
+         * own terms, rather than suspending the middleware itself.
+         */
+        const firstAwait = contents.search(/^ {2}(?:await |(?:const|let) [^=]*= await )/m);
+        if (firstAwait < 0) continue;
 
-      for (const match of contents
-        .slice(firstAwait)
-        .matchAll(/^ {2}(?:(?:const|let)\s.*?=\s*)?\b(use[A-Z][A-Za-z]*)\s*\(/gm)) {
-        const name2 = match[1];
-        if (!name2 || name2 === "useState") continue;
-        offenders.push(`${name}: ${name2}()`);
+        for (const match of contents
+          .slice(firstAwait)
+          .matchAll(/^ {2}(?:(?:const|let)\s.*?=\s*)?\b(use[A-Z][A-Za-z]*)\s*\(/gm)) {
+          const name2 = match[1];
+          if (!name2 || name2 === "useState") continue;
+          offenders.push(`${name}: ${name2}()`);
+        }
       }
     }
 

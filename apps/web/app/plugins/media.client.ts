@@ -1,11 +1,13 @@
 import type { Attachment } from "@tdc/types";
 
+import { downloadKey } from "#layers/ui/app/composables/useDownload";
 import { mediaBaseKey } from "#layers/ui/app/composables/useMediaBase";
 import { mediaFetchKey } from "#layers/ui/app/composables/useMediaFetch";
 import { uploadTransferKey } from "#layers/ui/app/composables/useUploadTransfer";
 
 /**
- * Installs the web client's media base, byte fetcher, and upload transfer.
+ * Installs the web client's media base, byte fetcher, upload transfer, and
+ * download.
  *
  * The base is the configured API base — empty in production, where the
  * interface and the API share an origin and a relative path resolves against
@@ -76,6 +78,18 @@ export default defineNuxtPlugin({
       request.send(form);
 
       return { abort: () => request.abort() };
+    });
+
+    /*
+     * A plain link, followed. The browser carries the session cookie on it and
+     * streams the response straight to disk, which is better than any copy
+     * this could make in memory first.
+     */
+    nuxtApp.vueApp.provide(downloadKey, async (path, filename) => {
+      const link = document.createElement("a");
+      link.href = `${base}${path}`;
+      link.download = filename;
+      link.click();
     });
   },
 });

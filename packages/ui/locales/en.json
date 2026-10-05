@@ -1371,5 +1371,20 @@
       "day": "Day",
       "wholeProject": "The whole project, the last two weeks"
     }
+  },
+  "desktop": {
+    "settings": {
+      "title": "This computer",
+      "hint": "Settings for this installation of TDC, rather than for your account.",
+      "server": "Server",
+      "switchServer": "Switch server",
+      "notifications": "System notifications",
+      "notificationsOn": "On. New messages appear as system notifications, even while TDC is in the tray.",
+      "notificationsOff": "Off. Turn them on to hear about new messages while TDC is in the tray.",
+      "turnOnNotifications": "Turn on",
+      "notificationsRefused": "Your system did not allow them. You can change that in its notification settings.",
+      "windowAndStartup": "Window and startup",
+      "updates": "Updates"
+    }
   }
 }

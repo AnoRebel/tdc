@@ -41,17 +41,14 @@ async function load() {
   }
 }
 
-await load();
-
 /*
  * Which tab is open. The proposal once there is one to talk about; before
- * that, the conversation, which is where an engagement starts.
+ * that, the conversation, which is where an engagement starts. Settled once
+ * the engagement has loaded, below.
  */
 const tabs = ["conversation", "proposal"] as const;
 const revision = ref(0);
-const view = ref<(typeof tabs)[number]>(
-  engagement.value && engagement.value.state !== "discussion" ? "proposal" : "conversation",
-);
+const view = ref<(typeof tabs)[number]>("conversation");
 
 /*
  * Following the other person's changes.
@@ -82,6 +79,15 @@ watch(
   { immediate: true },
 );
 onBeforeUnmount(() => live.close());
+
+/*
+ * Loaded after the connection is made rather than before: the connection
+ * injects the client's socket and registers a hook, and after an await there
+ * is no component instance for either — which the desktop client, with its
+ * socket provided by injection, would report as a missing socket.
+ */
+await load();
+if (engagement.value && engagement.value.state !== "discussion") view.value = "proposal";
 
 const otherParty = computed(() =>
   engagement.value?.you === "client"
