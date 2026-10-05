@@ -233,9 +233,10 @@ describe("a screen that exists to be typed into", () => {
 
     const forms = [
       join(REPO, "apps", "web", "app", "pages", "signin.vue"),
-      join(REPO, "apps", "web", "app", "pages", "register.vue"),
-      join(REPO, "apps", "web", "app", "pages", "setup.vue"),
       join(REPO, "apps", "desktop", "frontend", "app", "pages", "signin.vue"),
+      // Shared by both clients, from the layer.
+      join(REPO, "packages", "ui", "app", "pages", "register.vue"),
+      join(REPO, "packages", "ui", "app", "pages", "setup.vue"),
     ];
 
     const offenders: string[] = [];

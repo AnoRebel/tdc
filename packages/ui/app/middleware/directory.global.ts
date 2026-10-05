@@ -12,10 +12,13 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   if (!String(to.name ?? "").startsWith("directory")) return;
 
+  // Both asked for before anything is awaited: an injection after an await in
+  // middleware reaches for a context that is no longer there.
   const server = useServerInfo();
+  const { $localeRoute: localeRoute } = useI18n();
+
   await server.load();
   if (server.offers("directory")) return;
 
-  const { $localeRoute: localeRoute } = useI18n();
   return navigateTo(localeRoute({ name: "index" }), { replace: true });
 });

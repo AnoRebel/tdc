@@ -1,16 +1,18 @@
 import type { Attachment } from "@tdc/types";
 
+import { downloadKey } from "#layers/ui/app/composables/useDownload";
 import { mediaBaseKey } from "#layers/ui/app/composables/useMediaBase";
 import { mediaFetchKey } from "#layers/ui/app/composables/useMediaFetch";
 import { uploadTransferKey } from "#layers/ui/app/composables/useUploadTransfer";
 import * as Api from "#bindings/api";
 
 /**
- * Installs the desktop client's media base, byte fetcher, and upload transfer.
+ * Installs the desktop client's media base, byte fetcher, upload transfer, and
+ * download.
  *
  * The session is in the Go client's cookie jar, not the webview, so the webview
- * cannot fetch or upload authenticated media on its own — the three seams the
- * shared chat asks for are all filled by asking Go to do it.
+ * cannot fetch, upload or save authenticated files on its own — the seams the
+ * shared layer asks for are all filled by asking Go to do it.
  *
  * Synchronous on purpose. An async plugin that awaited the current server here
  * would both hold up the others and capture the server as it was at startup,
@@ -92,6 +94,28 @@ export default defineNuxtPlugin({
           handlers.onCancel();
         },
       };
+    });
+
+    /*
+     * A server file, saved. A link would leave the webview without the
+     * session, so Go fetches the bytes and they are handed over as a file from
+     * here — held in memory on the way, which the size limit on FetchMedia
+     * keeps bounded.
+     */
+    nuxtApp.vueApp.provide(downloadKey, async (path, filename) => {
+      const result = await Api.Service.FetchMedia(path);
+      if (!result.ok) {
+        throw new Error(`The file could not be read (${result.status}).`);
+      }
+
+      const blob = new Blob([bytesFromBase64(result.data ?? "")], {
+        type: result.contentType || "application/octet-stream",
+      });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
     });
   },
 });
