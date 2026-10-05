@@ -137,7 +137,7 @@ var catalogue = map[Permission]Definition{
 	},
 	PermChannelRename: {
 		Name:        PermChannelRename,
-		Description: "Rename a channel and change its topic",
+		Description: "Rename a channel, change its topic, and make it private — making one public needs this granted for the whole server",
 		Scopes:      []Scope{ScopeServer, ScopeChannel},
 	},
 	PermChannelArchive: {

@@ -26,6 +26,10 @@ const (
 	TypeRoomRenamed  Type = "room.renamed"
 	TypeRoomArchived Type = "room.archived"
 	TypeRoomRestored Type = "room.restored"
+	// A channel made public or private. Its own type rather than folded into
+	// a rename, because who may find a channel is a different thing to be told
+	// about from what it is called.
+	TypeRoomVisibilityChanged Type = "room.visibility_changed"
 
 	// Membership.
 	TypeMemberJoined  Type = "member.joined"

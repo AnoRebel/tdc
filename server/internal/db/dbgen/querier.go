@@ -1078,6 +1078,7 @@ type Querier interface {
 	// setting: enabling federation must not silently expose existing rooms.
 	SetRoomFederated(ctx context.Context, arg SetRoomFederatedParams) error
 	SetRoomNotificationPreference(ctx context.Context, arg SetRoomNotificationPreferenceParams) error
+	SetRoomVisibility(ctx context.Context, arg SetRoomVisibilityParams) (Room, error)
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
 	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
 	SetTourProgress(ctx context.Context, arg SetTourProgressParams) error

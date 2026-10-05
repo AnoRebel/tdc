@@ -552,3 +552,38 @@ func (q *Queries) SetReadPosition(ctx context.Context, arg SetReadPositionParams
 	_, err := q.db.Exec(ctx, setReadPosition, arg.RoomID, arg.UserID, arg.ReadSequence)
 	return err
 }
+
+const setRoomVisibility = `-- name: SetRoomVisibility :one
+UPDATE rooms SET visibility = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key, federated
+`
+
+type SetRoomVisibilityParams struct {
+	ID         uuid.UUID
+	Visibility string
+}
+
+func (q *Queries) SetRoomVisibility(ctx context.Context, arg SetRoomVisibilityParams) (Room, error) {
+	row := q.db.QueryRow(ctx, setRoomVisibility, arg.ID, arg.Visibility)
+	var i Room
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.SlugFolded,
+		&i.Name,
+		&i.Topic,
+		&i.Kind,
+		&i.Visibility,
+		&i.HomeServer,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+		&i.ArchivedBy,
+		&i.MessageTtlSeconds,
+		&i.ParticipantKey,
+		&i.Federated,
+	)
+	return i, err
+}

@@ -203,6 +203,25 @@ func (s *Service) EditMessage(
 	roomID, senderID uuid.UUID,
 	targetEventID, body string,
 ) (dbgen.Event, error) {
+	return s.EditMessageAs(ctx, roomID, senderID, targetEventID, body, false)
+}
+
+/*
+EditMessageAs replaces a message's body, by its author or — when moderator is
+true — by somebody the caller has established may edit anybody's.
+
+The edit is sent by whoever made it, never by the author: the event's sender is
+the moderator, and its content says it was a moderator's doing, so every reader
+sees that somebody other than the author changed what the author is shown to
+have said. A moderator may edit only a message, not a membership or a room's
+own events, and not one already deleted.
+*/
+func (s *Service) EditMessageAs(
+	ctx context.Context,
+	roomID, senderID uuid.UUID,
+	targetEventID, body string,
+	moderator bool,
+) (dbgen.Event, error) {
 	trimmed := strings.TrimSpace(body)
 	if trimmed == "" {
 		return dbgen.Event{}, ErrEmptyMessage
@@ -232,9 +251,17 @@ func (s *Service) EditMessage(
 		return dbgen.Event{}, ErrRoomNotFound
 	}
 	// Editing someone else's message needs a moderation permission, which the
-	// caller checks; this service enforces only authorship.
-	if target.SenderID == nil || *target.SenderID != senderID {
-		return dbgen.Event{}, ErrNotTheAuthor
+	// caller checks; this service enforces authorship when it is absent.
+	authored := target.SenderID != nil && *target.SenderID == senderID
+	if !authored {
+		if !moderator {
+			return dbgen.Event{}, ErrNotTheAuthor
+		}
+		// Only what somebody said, and only while it can still be read: a
+		// deleted message edited back into view would undo the deletion.
+		if target.Type != string(events.TypeMessageSent) || target.RedactedAt != nil {
+			return dbgen.Event{}, ErrNotTheAuthor
+		}
 	}
 
 	sender, err := s.store.GetUserByID(ctx, senderID)
@@ -242,10 +269,16 @@ func (s *Service) EditMessage(
 		return dbgen.Event{}, fmt.Errorf("read sender: %w", err)
 	}
 
-	content, err := json.Marshal(map[string]any{
+	edit := map[string]any{
 		"body":     trimmed,
 		"replaces": targetEventID,
-	})
+	}
+	// Recorded because a moderator changing somebody else's words is a
+	// different act from an author correcting their own, as with deletion.
+	if !authored {
+		edit["byModerator"] = true
+	}
+	content, err := json.Marshal(edit)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("encode edit: %w", err)
 	}

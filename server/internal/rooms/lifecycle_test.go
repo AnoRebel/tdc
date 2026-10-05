@@ -25,7 +25,7 @@ func TestArchivePreservesHistoryAndRefusesPosts(t *testing.T) {
 		t.Fatalf("SendMessage: %v", err)
 	}
 
-	if err := service.Archive(ctx, room.ID, owner.ID); err != nil {
+	if _, err := service.Archive(ctx, room.ID, owner.ID); err != nil {
 		t.Fatalf("Archive: %v", err)
 	}
 
@@ -49,7 +49,7 @@ func TestArchivePreservesHistoryAndRefusesPosts(t *testing.T) {
 	}
 
 	// And the decision must be reversible.
-	if err := service.Restore(ctx, room.ID, owner.ID); err != nil {
+	if _, err := service.Restore(ctx, room.ID, owner.ID); err != nil {
 		t.Fatalf("Restore: %v", err)
 	}
 	if _, err := service.SendMessage(ctx, room.ID, owner.ID, "after restoring", ""); err != nil {
@@ -169,7 +169,7 @@ func TestRemovedMemberLosesAccess(t *testing.T) {
 		t.Fatalf("Invite: %v", err)
 	}
 
-	if err := service.Remove(ctx, private.ID, owner.ID, member.ID); err != nil {
+	if _, err := service.Remove(ctx, private.ID, owner.ID, member.ID); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
 

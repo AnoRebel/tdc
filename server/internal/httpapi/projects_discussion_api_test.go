@@ -60,9 +60,12 @@ func TestAnIssueCommentIsAChannelMessage(t *testing.T) {
 
 	mustCall(t, handler, http.MethodPatch, "/api/rooms/"+room+"/messages/"+id,
 		map[string]any{"body": "I can reproduce this on Firefox"}, amina, http.StatusCreated)
-	// Only its author may edit it, as in a channel.
+	// Only its author may edit it, as in a channel — or somebody holding
+	// message.edit.any, which an ordinary member does not.
+	bystander := registerMember(t, handler, "bystander")
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/join", nil, bystander, http.StatusOK)
 	mustCall(t, handler, http.MethodPatch, "/api/rooms/"+room+"/messages/"+id,
-		map[string]any{"body": "hijacked"}, founder, http.StatusForbidden)
+		map[string]any{"body": "hijacked"}, bystander, http.StatusForbidden)
 
 	tooLong := strings.Repeat("x", 8001)
 	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/messages",

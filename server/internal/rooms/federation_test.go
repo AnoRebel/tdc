@@ -29,7 +29,7 @@ func TestArchivedRoomsAreNotPublished(t *testing.T) {
 	live := makeRoom(t, service, owner.ID, "general")
 	retired := makeRoom(t, service, owner.ID, "retired")
 
-	if err := service.Archive(ctx, retired.ID, owner.ID); err != nil {
+	if _, err := service.Archive(ctx, retired.ID, owner.ID); err != nil {
 		t.Fatalf("Archive: %v", err)
 	}
 
