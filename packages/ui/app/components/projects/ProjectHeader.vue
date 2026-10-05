@@ -51,10 +51,9 @@ const tabs = computed(() => [
  * of none, by the server, so a member who is not a party learns nothing here.
  */
 const { offers } = useServerInfo();
-const router = useRouter();
 const linked = ref<LinkedEngagement[]>([]);
 onMounted(async () => {
-  if (!offers("directory") || !router.hasRoute("directory-engagements-id")) return;
+  if (!offers("directory")) return;
   try {
     linked.value = await useDirectory().projectEngagements(props.project.key);
   } catch {

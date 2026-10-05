@@ -50,7 +50,6 @@ const { branding, offers } = useServerInfo();
 const showNotifications = ref(false);
 const showAppearance = ref(false);
 const router = useRouter();
-const hasProjects = router.hasRoute("projects");
 
 /*
  * The badge, refreshed on a timer.
@@ -156,10 +155,8 @@ function conversationName(room: Room): string {
           </li>
         </ul>
       </section>
-      <!-- Projects: where work agreed in these conversations is tracked. Only
-           where the client has somewhere to show them — the desktop client
-           shares this sidebar and does not, yet. -->
-      <ul v-if="hasProjects" class="space-y-px">
+      <!-- Projects: where work agreed in these conversations is tracked. -->
+      <ul class="space-y-px">
         <li>
           <NuxtLink
             :to="localeRoute({ name: 'projects' })"
@@ -370,8 +367,7 @@ function conversationName(room: Room): string {
       <NotificationPanel v-model="showNotifications" @open="goToNotification" />
 
       <!-- Beside the bell rather than only in settings: somebody trying
-           colours wants to see the result immediately, and the desktop client
-           has no settings URL to send them to. -->
+           colours wants to see the result immediately. -->
       <ThemeToggle v-model="showAppearance" />
 
       <NuxtLink
