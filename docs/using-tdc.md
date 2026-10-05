@@ -734,10 +734,23 @@ HTTP hands all of it to anybody on the same wire. Typing a bare hostname gets
 upgraded, because quietly changing what somebody asked for is how people end up
 trusting the wrong thing.
 
+**Everything the web client has is here too**: conversations, projects and
+issues, the directory where your server offers one, integrations, the
+administration pages for those who may use them, and the same settings —
+passkeys, two-step sign-in, privacy, signed-in devices. Creating an account,
+setting up a new server and recovering a password all work against whichever
+server you chose.
+
 What the desktop client adds:
 
 - **Notifications from the operating system**, which respect system quiet modes
-  and open the conversation they are about when you activate them.
+  and open the conversation they are about when you activate them. Where your
+  system wants permission first, **Settings → This computer** is where to give
+  it: TDC asks only when you press the button there, because some systems ask
+  only once.
+- **Window and update settings** alongside the rest, under the same heading:
+  how see-through the window is, starting at login, and when to look for a new
+  version.
 - **Your session in the OS keychain**, so you are not asked for a password every
   launch. Where there is no keychain it says so and asks each time. It never
   falls back to storing anything in plain text.
