@@ -1771,6 +1771,8 @@ watch(roomId, load, { immediate: true });
             {{ live.state.value === "reconnecting" ? "Reconnecting" : "Offline" }}
           </span>
 
+          <ChannelSettings :room="room" :events="messages" @changed="room = $event" />
+
           <!-- Only for whoever moderates: a ban that can only be issued is a
                ban nobody reverses, so the way back in lives beside it. -->
           <Button
