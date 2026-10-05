@@ -447,6 +447,31 @@ export interface Notification {
   actors?: number;
 }
 
+/** How often somebody wants a summary of what they missed. */
+export type DigestFrequency = "off" | "daily" | "weekly";
+
+/**
+ * Somebody's emailed summary setting.
+ *
+ * The hour and day are in `timeZone`, an IANA name, so "eight in the morning"
+ * stays eight in the morning wherever the server is and across a change to
+ * summer time.
+ */
+export interface DigestSetting {
+  frequency: DigestFrequency;
+  /** 0 to 23, in `timeZone`. */
+  hour: number;
+  /** The day of a weekly summary, Sunday being 0. */
+  weekday: number;
+  /** Empty for somebody who has never chosen; a client fills in its own. */
+  timeZone: string;
+  /** When the next one is due, absent while off. */
+  nextAt?: string;
+  lastSentAt?: string;
+  /** Whether there is a confirmed address a summary may go to. */
+  addressConfirmed: boolean;
+}
+
 /** One GIF from a third-party library. */
 export interface GifResult {
   id: string;

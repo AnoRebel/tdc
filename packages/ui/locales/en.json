@@ -326,6 +326,34 @@
     "unreadCount": "{count} unread",
     "upToDate": "You are up to date."
   },
+  "digests": {
+    "title": "Summaries by email",
+    "hint": "Instead of being interrupted, get one email listing what went unread. It says where and how much, never what was said.",
+    "howOften": "How often",
+    "off": "Off — notify me as things happen",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "timeOfDay": "Time of day",
+    "day": "Day",
+    "inZone": "Times are in {zone}.",
+    "useThisDevice": "Use this device's time zone ({zone})",
+    "next": "Next summary: {when}",
+    "lastSent": "Last sent {when}",
+    "needsAddress": "A summary is sent only to an email address you have confirmed. Confirm one above to turn this on.",
+    "replacesPush": "While this is on, your devices are not notified. Everything still appears in your notification list.",
+    "saving": "Saving…",
+    "couldNotLoad": "Could not read your summary setting.",
+    "couldNotSave": "Could not save your summary setting.",
+    "weekday": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    }
+  },
   "settings": {
     "title": "Settings",
     "status": "Status",
