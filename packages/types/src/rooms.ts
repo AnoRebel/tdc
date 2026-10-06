@@ -153,7 +153,10 @@ export type LiveFrameType =
   | "error"
   | "pong"
   // A program's answer to one person, never part of a room's log.
-  | "private";
+  | "private"
+  // Another participant's call negotiation, and who is in a call.
+  | "call.signal"
+  | "call.state";
 
 /** One frame from the live connection. */
 export interface LiveFrame {

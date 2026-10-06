@@ -241,6 +241,7 @@ func Load(path string) (Config, error) {
 	cfg.Push.Subject = l.str("push.subject", d.Push.Subject)
 
 	cfg.Cache.Address = l.str("cache.address", d.Cache.Address)
+	cfg.Calls.TURNSecret = l.str("calls.turn_secret", "")
 	cfg.Cache.Username = l.str("cache.username", d.Cache.Username)
 	cfg.Cache.Password = l.str("cache.password", d.Cache.Password)
 	cfg.Cache.Database = l.int32OrZero("cache.database", d.Cache.Database)

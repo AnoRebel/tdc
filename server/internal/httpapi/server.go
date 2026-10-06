@@ -47,6 +47,8 @@ import (
 type Config struct {
 	// Address is the host:port to listen on.
 	Address string
+	// TURNSecret mints call relay credentials; empty means no relay.
+	TURNSecret string
 	// ReadTimeout bounds how long reading a request may take.
 	ReadTimeout time.Duration
 	// WriteTimeout bounds how long writing a response may take.
@@ -420,6 +422,9 @@ func (s *Server) Run(ctx context.Context) error {
 	// Messages written earlier and sent now. Every node runs a pass; each
 	// claims what it sends, so nothing goes out twice.
 	go s.RunScheduled(ctx)
+
+	// People whose connection went without saying goodbye leave their calls.
+	go s.sweepCallsPeriodically(ctx)
 
 	// Summaries of missed activity, mailed to whoever chose one. Every node
 	// runs a pass for the same reason, and claims what it sends the same way.

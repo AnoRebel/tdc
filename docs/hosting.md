@@ -789,6 +789,100 @@ copied there: it is each project's own history, in the event log.
 
 [Projects and issues](projects.md) covers the rest.
 
+### Calls
+
+Voice and video calls are **off by default**. Turn them on while the server
+runs:
+
+```sh
+curl -X PUT https://tdc.example/api/admin/features/calls \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled": true}'
+```
+
+**What the server does, and does not.** It tells the people in a call about each
+other and passes on the few kilobytes each pair needs to find a way to connect.
+The audio and video go **directly between the people in the call**, encrypted by
+WebRTC itself (DTLS-SRTP) — they never pass through the TDC server. So calling
+costs the server almost nothing: a few small messages per person joining, and a
+sweep every fifteen seconds that takes people whose connection dropped out of
+their calls. Nothing a call carries is stored, and the server has no way to
+record one.
+
+**What it costs the people in it.** Every participant sends their own stream to
+every other participant (a _mesh_), so upload grows with the size of the call:
+
+| People in the call | Each person sends (voice) | Each person sends (video, ~720p) | Each person receives |
+| ------------------ | ------------------------- | -------------------------------- | -------------------- |
+| 2                  | ~50 kbit/s                | ~1–1.5 Mbit/s                    | the same             |
+| 3                  | ~100 kbit/s               | ~2–3 Mbit/s                      | the same             |
+| 4                  | ~150 kbit/s               | ~3–4.5 Mbit/s                    | the same             |
+| 6                  | ~250 kbit/s               | ~5–7.5 Mbit/s                    | the same             |
+
+Browsers lower video quality by themselves when a connection cannot keep up,
+and encoding one stream per other person also costs CPU — comfortable for four
+people on a laptop, hard work for a phone with video past three. That is why
+`calls.max_participants` defaults to **4**. Raise it for voice-heavy
+communities with good connections; past six, a mesh stops being a good idea for
+anybody, and calls that size wait for the forwarding unit still to come.
+
+| Setting                  | Default | What it does                                                                     |
+| ------------------------ | ------- | -------------------------------------------------------------------------------- |
+| `calls.max_participants` | `4`     | The most people one call may hold; the next is told the call is full             |
+| `calls.stun_urls`        | —       | STUN servers, comma-separated (`stun:host:3478`), for finding a direct path      |
+| `calls.turn_urls`        | —       | TURN relays, comma-separated (`turn:host:3478?transport=udp`, `turns:host:5349`) |
+
+And one piece of configuration, a secret rather than a setting:
+
+| Configuration       | Environment             | What it does                                                    |
+| ------------------- | ----------------------- | --------------------------------------------------------------- |
+| `calls.turn_secret` | `TDC_CALLS_TURN_SECRET` | Shared with the relay; without it no relay is offered to anyone |
+
+**Nothing is configured to a third party by default.** No public STUN server is
+set, because one learns who is calling whom. With nothing set, calls connect
+between people who can reach each other directly — on one network, or on
+ordinary home connections — and fail between people behind stricter networks
+(offices, mobile carriers, some routers). For a community whose members call
+from phones and offices, run the relay.
+
+**The relay** is [coturn](https://github.com/coturn/coturn) (BSD licence),
+included in the compose file behind the `calls` profile:
+
+```sh
+export TDC_CALLS_TURN_SECRET="$(openssl rand -hex 32)"   # the server reads the same variable
+docker compose --profile calls up -d
+curl -X PUT https://tdc.example/api/admin/settings/calls.turn_urls \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value": "turn:tdc.example:3478?transport=udp,turn:tdc.example:3478?transport=tcp"}'
+```
+
+It also answers STUN, so `calls.stun_urls` can be `stun:tdc.example:3478`.
+
+- **Ports to open:** `3478` UDP and TCP, and `49160–49200` UDP for relayed media.
+  Each relayed participant in a call holds a port from that range, so the range
+  is how many relayed participants you can carry at once; widen `--min-port` /
+  `--max-port` together with the firewall for more.
+- **Bandwidth:** the relay carries a relayed participant's streams both ways,
+  so plan for the table above, per relayed person, on the relay's host — a
+  four-person video call with everybody relayed is roughly 12–18 Mbit/s each way.
+  In practice most people connect directly and only a few calls are relayed.
+- **CPU and memory:** small — it forwards encrypted packets it cannot read.
+  Half a CPU core and 256 MB carry dozens of relayed participants.
+- **Credentials** are minted by the TDC server per person and expire after four
+  hours, so the relay is not an open proxy; it refuses to start without a
+  secret, and never relays into private networks.
+
+**Clients.** Current Chrome, Edge, Firefox and Safari all place calls, on
+desktops and phones. The desktop application uses its platform's web view:
+Windows and macOS support calls; on Linux they depend on WebKitGTK being built
+with WebRTC and GStreamer's WebRTC plugins being installed. Picture-in-picture
+of the whole call needs a Chromium-based browser; others put the main video
+there instead.
+
+**Not yet:** ringing people, links to a call, screen sharing and recording;
+calls in conversations shared with other servers; and calls of more than a few
+people through a forwarding unit.
+
 ## TLS
 
 **The server does not terminate TLS.** It speaks plain HTTP on its configured

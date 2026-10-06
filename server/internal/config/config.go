@@ -23,6 +23,7 @@ type Config struct {
 	OAuth       OAuthConfig
 	Mail        MailConfig
 	Cache       CacheConfig
+	Calls       CallsConfig
 }
 
 /*
@@ -101,6 +102,21 @@ become one shared count rather than one per process. Valkey rather than Redis
 because Redis is no longer open source under a licence this project can depend
 on, and Valkey is the fork that stayed.
 */
+/*
+CallsConfig holds what voice and video calls need that must not be shown.
+
+The relay's shared secret: with it anybody can mint credentials for the relay
+and use it as an open proxy, so it is configuration — redacted wherever
+configuration is shown — rather than a setting an administrator reads back.
+Which relay and the rest of calling's policy are settings, changeable while the
+server runs.
+*/
+type CallsConfig struct {
+	// TURNSecret is the static-auth-secret configured on the TURN relay
+	// (coturn's use-auth-secret), from which short-lived credentials are made.
+	TURNSecret string
+}
+
 type CacheConfig struct {
 	// Address of the Valkey, host:port. Empty means the in-process cache.
 	Address string

@@ -24,6 +24,11 @@ type clientMessage struct {
 	// Room is the one this client currently has on screen, for the viewing
 	// action. Empty means it is looking at none.
 	Room string `json:"room,omitempty"`
+	// Call, To and Signal carry one piece of a call's negotiation — an offer,
+	// an answer or a network candidate — for one other participant.
+	Call   string          `json:"call,omitempty"`
+	To     string          `json:"to,omitempty"`
+	Signal json.RawMessage `json:"signal,omitempty"`
 }
 
 // Client actions.
@@ -34,13 +39,25 @@ const (
 	// actionViewing tells the server which room this client has on screen, so
 	// notifications for it can be suppressed while somebody is looking at it.
 	actionViewing = "viewing"
+	// actionSignal relays call negotiation to another participant.
+	actionSignal = "signal"
 )
+
+/*
+Signaller authorises and delivers a call's negotiation between two of its
+participants. Implemented where calls are known; a server without calls passes
+none, and signal messages are refused.
+*/
+type Signaller interface {
+	Signal(ctx context.Context, from, callID, to uuid.UUID, signal json.RawMessage) error
+}
 
 // maxClientMessageBytes bounds one client message.
 //
-// Clients only send small control messages; a limit stops a connection being
-// used to make the server allocate.
-const maxClientMessageBytes = 16 * 1024
+// Clients send control messages and a call's session descriptions, which run to
+// a few kilobytes; a limit stops a connection being used to make the server
+// allocate.
+const maxClientMessageBytes = 64 * 1024
 
 // Replayer supplies the events a reconnecting client missed.
 type Replayer interface {
@@ -66,9 +83,13 @@ type Server struct {
 	hub       *Hub
 	replayer  Replayer
 	lifecycle Lifecycle
+	signaller Signaller
 	keepalive time.Duration
 	log       *slog.Logger
 }
+
+// SetSignaller gives the server somewhere to send call negotiation.
+func (s *Server) SetSignaller(signaller Signaller) { s.signaller = signaller }
 
 // NewServer builds the WebSocket server.
 //
@@ -179,6 +200,8 @@ func (s *Server) readLoop(ctx context.Context, socket *websocket.Conn, conn *Con
 			s.hub.SendTo(conn, Frame{Type: FramePong})
 		case actionViewing:
 			s.handleViewing(conn, message)
+		case actionSignal:
+			s.handleSignal(ctx, conn, message)
 		default:
 			s.sendError(conn, "unknown action "+message.Action)
 		}
@@ -360,4 +383,25 @@ func isNormalClosure(err error) bool {
 	return status == websocket.StatusNormalClosure ||
 		status == websocket.StatusGoingAway ||
 		errors.Is(err, context.Canceled)
+}
+
+/*
+handleSignal passes one piece of call negotiation on, if the signaller allows
+it. A refusal is reported to the sender only, and says nothing about whether the
+call or the recipient exists.
+*/
+func (s *Server) handleSignal(ctx context.Context, conn *Connection, message clientMessage) {
+	if s.signaller == nil {
+		s.sendError(conn, "calls are not available")
+		return
+	}
+	callID, errCall := uuid.Parse(message.Call)
+	to, errTo := uuid.Parse(message.To)
+	if errCall != nil || errTo != nil || len(message.Signal) == 0 {
+		s.sendError(conn, "a signal needs a call, a recipient and a body")
+		return
+	}
+	if err := s.signaller.Signal(ctx, conn.UserID, callID, to, message.Signal); err != nil {
+		s.sendError(conn, "cannot signal that call")
+	}
 }

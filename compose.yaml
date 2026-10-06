@@ -35,6 +35,9 @@ services:
       TDC_SERVER_SECURE_COOKIES: "false"
       TDC_LOG_FORMAT: "json"
       TDC_LOG_LEVEL: "info"
+      # The secret the call relay (the turn service below) shares with this
+      # server; empty means no relay is offered. Set the same value for both.
+      TDC_CALLS_TURN_SECRET: "${TDC_CALLS_TURN_SECRET:-}"
       # Where uploaded files are kept. Inside the volume mounted below, so they
       # survive a restart: without it they are written to the container's
       # writable layer and every attachment is lost the next time the image is
@@ -103,6 +106,48 @@ services:
     # up the isolation this container exists for. The server treats an
     # unreachable sidecar as "no preview" rather than as a failure, so an
     # unhealthy one degrades rather than breaks.
+
+  # The relay for calls that cannot connect directly — people behind
+  # restrictive networks, mobile carriers, most offices. Optional: without it,
+  # calls connect between people who can reach each other and fail between
+  # those who cannot. Enable with `docker compose --profile calls up -d`, set
+  # TDC_CALLS_TURN_SECRET (the same value is passed to the server above), and
+  # set calls.turn_urls to turn:YOUR-HOST:3478. See "Calls" in docs/hosting.md
+  # for the ports to open and what it costs.
+  turn:
+    profiles: ["calls"]
+    image: coturn/coturn
+    restart: unless-stopped
+    # Host networking: a relay hands out a port per relayed stream, and
+    # publishing a range through Docker's proxy costs a process per port.
+    network_mode: host
+    environment:
+      TDC_CALLS_TURN_SECRET: "${TDC_CALLS_TURN_SECRET:-}"
+      TDC_CALLS_TURN_REALM: "${TDC_CALLS_TURN_REALM:-tdc}"
+    # Refuses to start without a secret: an empty one is a key anybody can
+    # compute, which would make this an open relay. And never relays into
+    # private networks, which would let anybody holding credentials reach the
+    # machines behind it.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        [ -n "$$TDC_CALLS_TURN_SECRET" ] || { echo "set TDC_CALLS_TURN_SECRET" >&2; exit 1; }
+        exec turnserver \
+          --listening-port=3478 --min-port=49160 --max-port=49200 \
+          --use-auth-secret --static-auth-secret="$$TDC_CALLS_TURN_SECRET" \
+          --realm="$$TDC_CALLS_TURN_REALM" \
+          --fingerprint --no-cli --no-multicast-peers \
+          --denied-peer-ip=0.0.0.0-0.255.255.255 \
+          --denied-peer-ip=10.0.0.0-10.255.255.255 \
+          --denied-peer-ip=100.64.0.0-100.127.255.255 \
+          --denied-peer-ip=127.0.0.0-127.255.255.255 \
+          --denied-peer-ip=169.254.0.0-169.254.255.255 \
+          --denied-peer-ip=172.16.0.0-172.31.255.255 \
+          --denied-peer-ip=192.168.0.0-192.168.255.255 \
+          --denied-peer-ip=::1 \
+          --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
+          --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
 
   database:
     # The Debian-based image rather than Alpine: it is the better-tested

@@ -68,6 +68,8 @@ type Querier interface {
 	// a moderator extending a ban means the new terms, not an error.
 	BanFromChannel(ctx context.Context, arg BanFromChannelParams) error
 	BlockUser(ctx context.Context, arg BlockUserParams) error
+	// The room of an open call somebody is in now; no row if they are not in it.
+	CallRoomOfParticipant(ctx context.Context, arg CallRoomOfParticipantParams) (uuid.UUID, error)
 	// Everything still waiting for a subscription that has been turned off.
 	CancelPendingWebhookDeliveries(ctx context.Context, subscriptionID *uuid.UUID) (int64, error)
 	ClaimDueNotificationDigests(ctx context.Context, limit int32) ([]NotificationDigest, error)
@@ -284,6 +286,8 @@ type Querier interface {
 	DisableWebhookSubscription(ctx context.Context, arg DisableWebhookSubscriptionParams) (WebhookSubscription, error)
 	// Turning it back on starts the count again; what failed before is history.
 	EnableWebhookSubscription(ctx context.Context, arg EnableWebhookSubscriptionParams) (WebhookSubscription, error)
+	// Ends a call nobody is in any more, returning it if this ended it.
+	EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error)
 	EnqueueInvocation(ctx context.Context, arg EnqueueInvocationParams) (WebhookDelivery, error)
 	EnqueueWebhookDelivery(ctx context.Context, arg EnqueueWebhookDeliveryParams) (WebhookDelivery, error)
 	// Whom an enquiry to this username would reach, and whether they take one
@@ -488,6 +492,7 @@ type Querier interface {
 	IsPostingRestricted(ctx context.Context, arg IsPostingRestrictedParams) (bool, error)
 	IsRemoteMember(ctx context.Context, arg IsRemoteMemberParams) (bool, error)
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
+	JoinCall(ctx context.Context, arg JoinCallParams) error
 	KnownPeers(ctx context.Context) ([]KnownPeersRow, error)
 	LabelIssue(ctx context.Context, arg LabelIssueParams) (int64, error)
 	// The newest edit of a message, so a message an issue was made from reads as
@@ -495,6 +500,10 @@ type Querier interface {
 	LatestMessageEdit(ctx context.Context, arg LatestMessageEditParams) (Event, error)
 	LatestProposalVersion(ctx context.Context, engagementID uuid.UUID) (ProposalVersion, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
+	LeaveCall(ctx context.Context, arg LeaveCallParams) (int64, error)
+	// Takes out of their calls everybody with no live connection left, so a
+	// closed laptop or a lost network does not leave somebody "in" a call forever.
+	LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfDisconnectedRow, error)
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
 	// Within the scope the request names — one channel, or the whole server when
 	// the room is null — so lifting by identifier cannot reach a restriction made
@@ -543,6 +552,7 @@ type Querier interface {
 	// description, a history or a comment count is what turns a page of cards into
 	// a page of issues.
 	ListBoardColumn(ctx context.Context, arg ListBoardColumnParams) ([]ListBoardColumnRow, error)
+	ListCallParticipants(ctx context.Context, callID uuid.UUID) ([]ListCallParticipantsRow, error)
 	ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]ListChannelBansRow, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	ListCyclesForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListCyclesForIssuesRow, error)
@@ -834,6 +844,7 @@ type Querier interface {
 	NextRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	// Whether somebody has asked for a summary instead of interruptions.
 	NotificationDigestChosen(ctx context.Context, userID uuid.UUID) (bool, error)
+	OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, error)
 	ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomeParams) (OauthOutcome, error)
 	PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomPeer, error)
 	// Pinning something already pinned updates who pinned it and when, rather than
@@ -1037,6 +1048,7 @@ type Querier interface {
 	// Scoped to the uploader and to attachments not yet sent: a caption is written
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
+	SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int64, error)
 	// After a project's zone changes: the same days, at different instants.
 	SetCycleInstants(ctx context.Context, arg SetCycleInstantsParams) error
 	SetDirectMessagePolicy(ctx context.Context, arg SetDirectMessagePolicyParams) error
@@ -1109,6 +1121,9 @@ type Querier interface {
 	// Whether each still matches its claim is decided by the caller, which holds
 	// the claim as it stands.
 	StandingVerifications(ctx context.Context, userID uuid.UUID) ([]ProfileVerification, error)
+	// ON CONFLICT so two people starting at once both end up in one call: the
+	// second insert finds the first's row instead of failing.
+	StartCall(ctx context.Context, arg StartCallParams) (Call, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)
 	StartPendingSignIn(ctx context.Context, arg StartPendingSignInParams) (PendingSignIn, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error

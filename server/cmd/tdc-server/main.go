@@ -376,6 +376,7 @@ func run() error {
 		ServerName:             cfg.Server.Name,
 		ServerDescription:      cfg.Server.Description,
 		CanonicalAddress:       cfg.Server.CanonicalAddress,
+		TURNSecret:             cfg.Calls.TURNSecret,
 		DefaultLanguage:        cfg.Server.DefaultLanguage,
 		AllowedOrigins:         cfg.Server.AllowedOrigins,
 		SecureCookies:          cfg.Server.SecureCookies,

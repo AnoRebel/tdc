@@ -8,11 +8,11 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 
 ## 1. Phase 1 — Calls exist, between two people
 
-- [ ] 1.1 Add the calling feature toggle (off by default), and settings for STUN/TURN URLs, the TURN shared secret, mesh limit and participant limit; verify with calling off no calling endpoint answers, nothing is advertised, and the client shows no calling interface
-- [ ] 1.2 Add `calls` and `call_participants` with at most one open call per room, `call.started`/`call.ended` in the room's log; enforce `call.start` and `call.join` at channel scope on top of `channel.post`, bans and restrictions; grant both to the Member role on new servers and by migration on existing ones; verify a role with posting but not calling can post and cannot start or join
-- [ ] 1.3 Signalling frames on the live connection (`call.signal`, `call.state`), each authorised per frame for sender and recipient, crossing nodes through the broker's private path; verify a frame addressed to a non-participant, or from somebody no longer allowed, is refused and not relayed
-- [ ] 1.4 `GET /api/calls/ice` with short-lived TURN credentials in coturn's shared-secret scheme; coturn as an optional compose service; verify credentials expire and are per person
-- [ ] 1.5 Shared `useCall` and `CallPanel`: start, join with or without video, mute, camera, leave; nothing captured before permission; participants' state shown; departure updates everybody; verify two browsers on one machine complete a call, one audio-only
+- [x] 1.1 Add the calling feature toggle (off by default), and settings for STUN/TURN URLs, the TURN shared secret, mesh limit and participant limit; verify with calling off no calling endpoint answers, nothing is advertised, and the client shows no calling interface
+- [x] 1.2 Add `calls` and `call_participants` with at most one open call per room, `call.started`/`call.ended` in the room's log; enforce `call.start` and `call.join` at channel scope on top of `channel.post`, bans and restrictions; grant both to the Member role on new servers and by migration on existing ones; verify a role with posting but not calling can post and cannot start or join
+- [x] 1.3 Signalling frames on the live connection (`call.signal`, `call.state`), each authorised per frame for sender and recipient, crossing nodes through the broker's private path; verify a frame addressed to a non-participant, or from somebody no longer allowed, is refused and not relayed
+- [x] 1.4 `GET /api/calls/ice` with short-lived TURN credentials in coturn's shared-secret scheme; coturn as an optional compose service; verify credentials expire and are per person
+- [x] 1.5 Shared `useCall` and `CallPanel`: start, join with or without video, mute, camera, leave; nothing captured before permission; participants' state shown; departure updates everybody; verify two browsers on one machine complete a call, one audio-only
 - [ ] **MILESTONE 1** — Demonstrate: an operator enables calling, two members of a channel hold a video call, one mutes and the other sees it, one leaves and the call ends in the conversation's history; with a TURN relay, a call between two networks that cannot reach each other connects. Tag `v1.49.0-dev`.
 
 ## 2. Phase 2 — Group calls

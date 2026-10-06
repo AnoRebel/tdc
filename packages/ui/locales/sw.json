@@ -1623,5 +1623,31 @@
       "pickUpCard": "Inua kadi kwa kishikio chake, kisha iweke chini",
       "moveCard": "Hamisha kadi safu moja, kwa kishikio chake"
     }
+  },
+  "calls": {
+    "start": "Anzisha simu",
+    "inProgress": "Simu inaendelea",
+    "people": "{count} kwenye simu",
+    "joinAudio": "Jiunge",
+    "joinVideo": "Jiunge na video",
+    "metered": "Inaonekana uko kwenye mtandao unaopimwa; simu ya video hutumia data nyingi.",
+    "you": "Wewe",
+    "muted": "Sauti imezimwa",
+    "mute": "Zima sauti",
+    "unmute": "Washa sauti",
+    "cameraOn": "Washa kamera",
+    "cameraOff": "Zima kamera",
+    "leave": "Ondoka",
+    "needPermission": "Ruhusu maikrofoni yako itumike ili ujiunge na simu.",
+    "couldNotJoin": "Imeshindikana kujiunga na simu. Angalia mtandao wako ujaribu tena.",
+    "window": "Simu",
+    "move": "Hamisha simu (iburute, au tumia vitufe vya mishale)",
+    "restore": "Onyesha simu",
+    "minimize": "Punguza",
+    "expand": "Panua",
+    "dock": "Fanya iwe ndogo",
+    "pictureInPicture": "Picha ndani ya picha",
+    "youAreIn": "Uko kwenye simu hii",
+    "show": "Onyesha simu"
   }
 }

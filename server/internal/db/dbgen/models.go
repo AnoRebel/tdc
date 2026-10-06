@@ -100,6 +100,23 @@ type AuditEntry struct {
 	Detail     []byte
 }
 
+type Call struct {
+	ID        uuid.UUID
+	RoomID    uuid.UUID
+	StartedBy *uuid.UUID
+	StartedAt time.Time
+	EndedAt   *time.Time
+}
+
+type CallParticipant struct {
+	CallID   uuid.UUID
+	UserID   uuid.UUID
+	JoinedAt time.Time
+	LeftAt   *time.Time
+	Audio    bool
+	Video    bool
+}
+
 type ChannelBan struct {
 	RoomID          uuid.UUID
 	UserID          uuid.UUID

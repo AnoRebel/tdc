@@ -668,6 +668,58 @@ moderators their decision travelled when it had not.
 This works both ways: a moderator on another server can remove one of your
 messages from their copy, and your server keeps it.
 
+## Calls
+
+Where your server offers them, any channel or direct conversation can hold a
+voice or video call. Calls are off unless the server's operator turns them on,
+so if you see no phone button in a conversation's header, that is why.
+
+**Starting one.** The phone button in the header starts a call by voice; you
+can turn your camera on once you are in. Everybody in the conversation sees a
+bar saying a call is going on and who is in it, with **Join** and **Join with
+video**. Your browser asks for your microphone (and camera) the first time;
+nothing is sent until you allow it, and nobody is told you have joined until
+then either.
+
+**While you are in it.** The call sits in a small window in the corner, so you
+can carry on reading, writing, opening projects — anywhere in the application —
+without leaving it. From that window you can:
+
+- **mute** and unmute, and turn your **camera** on and off — everybody sees
+  which, on your tile;
+- **expand** it to fill the screen, and make it small again;
+- **minimize** it to a bar with just your microphone and **Leave**;
+- **move** it: drag it by its grip (the dotted handle) anywhere on the screen,
+  or focus the grip and use the arrow keys (Shift moves it further). It stays
+  where you put it, on this device;
+- **picture in picture**: take the call out of the page into a small window
+  that stays above your other windows, so you can work in another app. Where
+  your browser can only put a single video there, it is the first person's.
+
+Closing the tab or reloading the page ends your part in the call; moving
+between pages inside TDC does not. You are in one call at a time — joining
+another leaves the first.
+
+**What a call uses.** Calls go directly between the people in them, not
+through the server, so what matters is your own connection:
+
+| In a call with   | Voice only (send / receive) | With video (send / receive)  |
+| ---------------- | --------------------------- | ---------------------------- |
+| one other person | about 0.4 MB a minute each  | about 5–10 MB a minute each  |
+| three others     | about 1.2 MB a minute each  | about 15–30 MB a minute each |
+
+Every person in a call sends their own audio and video to every other person,
+so each extra person adds to what _you_ send, not only to what you receive. On
+a phone, or on a connection that charges for data, prefer voice; TDC warns you
+before you join where your device says the connection is metered. A call has a
+limit on how many people it can hold, set by your server — four, unless your
+operator chose otherwise — and the next person is told the call is full.
+
+Some networks — offices, mobile carriers, some home routers — stop two people
+reaching each other directly. Your server's operator can run a relay so those
+calls still connect; without one, a call between two such people fails, and
+TDC says so.
+
 ## Projects
 
 When a conversation decides something needs doing, it can be tracked where it
@@ -911,19 +963,16 @@ a dialog that appears for everything is a dialog nobody reads.
 
 So that nothing above is read as implying more than it says:
 
-- **Federation.** Servers do not exchange messages. Addresses name a home server
-  and every event is signed, so the groundwork exists, but your conversations
-  are with people on your own server.
-- **The developer directory.** Part of what TDC is for, and not built.
 - **Changing your own username or display name.** Neither has a control or an
   endpoint, so both are whatever they were when the account was made. The
   server can already change a display name; nothing asks it to.
 - **Choosing who may do what, from the interface.** Roles and permissions are
   managed through the API rather than a screen, so an administrator setting up
   a moderator is doing it with a tool rather than a form.
-- **Voice and video calls.** The permission list mentions starting and joining
-  one; nothing enforces those and no call can be made. They are names waiting
-  for a feature, not a feature waiting to be switched on.
+- **More of calls.** Calls between a few people work, on servers that switch
+  them on (see [Calls](#calls)). Ringing people, links to a call, sharing a
+  screen, recording, and calls of more than a handful of people are still to
+  come.
 - **Message formatting.** No bold, italic, lists or code blocks in a message.
 
 Several capabilities are finished on the server and are waiting only for a

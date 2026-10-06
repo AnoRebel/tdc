@@ -1,4 +1,4 @@
-import type { LiveEventPayload, LiveFrame, PrivateReply } from "@tdc/types";
+import type { Call, CallSignal, LiveEventPayload, LiveFrame, PrivateReply } from "@tdc/types";
 
 /**
  * The live connection to a TDC server.
@@ -25,6 +25,10 @@ interface LiveHandlers {
    * part of the room's log, so it has no sequence and is never replayed.
    */
   onPrivate?: (roomId: string, reply: PrivateReply) => void;
+  /** Called with who is in a call, whenever that changes. */
+  onCallState?: (call: Call) => void;
+  /** Called with another participant's call negotiation. */
+  onCallSignal?: (signal: CallSignal) => void;
 }
 
 // Backoff bounds. The first retry is quick, because most disconnections are
@@ -165,6 +169,16 @@ export function useLiveConnection(handlers: LiveHandlers) {
         break;
       }
 
+      case "call.state": {
+        if (frame.payload) handlers.onCallState?.(frame.payload as unknown as Call);
+        break;
+      }
+
+      case "call.signal": {
+        if (frame.payload) handlers.onCallSignal?.(frame.payload as unknown as CallSignal);
+        break;
+      }
+
       case "ready":
       case "subscribed":
       case "pong":
@@ -246,5 +260,10 @@ export function useLiveConnection(handlers: LiveHandlers) {
     send({ action: "viewing", room: roomId ?? "" });
   }
 
-  return { state: readonly(state), subscribe, unsubscribe, markRead, viewing, close };
+  /** Sends one piece of call negotiation to another participant. */
+  function signal(call: string, to: string, body: CallSignal["signal"]) {
+    send({ action: "signal", call, to, signal: body });
+  }
+
+  return { state: readonly(state), subscribe, unsubscribe, markRead, viewing, close, signal };
 }

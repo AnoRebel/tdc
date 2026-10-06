@@ -50,6 +50,11 @@ const (
 		failures and its own way of being wrong.
 	*/
 	TypeActionPressed Type = "action.pressed"
+
+	// A call began or ended in the conversation. Who joined and left in
+	// between is live state rather than history.
+	TypeCallStarted Type = "call.started"
+	TypeCallEnded   Type = "call.ended"
 )
 
 // Event is one entry in a room's log.

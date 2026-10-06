@@ -47,6 +47,10 @@ const (
 	FrameError = "error"
 	// FramePong answers a client's keepalive.
 	FramePong = "pong"
+	// FrameCallSignal carries another participant's call negotiation.
+	FrameCallSignal = "call.signal"
+	// FrameCallState says who is in a call and what each is sending.
+	FrameCallState = "call.state"
 )
 
 // Connection is one client's live connection.

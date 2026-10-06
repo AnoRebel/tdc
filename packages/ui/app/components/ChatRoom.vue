@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {
   Attachment,
+  Call,
   LiveEventPayload,
   Message,
   MessageAction,
@@ -38,6 +39,7 @@ import {
   MoreVertical,
   Music,
   Paperclip,
+  Phone,
   Pencil,
   Pin,
   SendHorizontal,
@@ -918,6 +920,9 @@ function dayBreakBefore(index: number): string | null {
 const live = useLiveConnection({
   onEvent(eventRoomId, sequence, payload: LiveEventPayload) {
     if (eventRoomId !== roomId.value) return;
+    if (payload.type === "call.started" || payload.type === "call.ended") {
+      void refreshCall();
+    }
 
     // The sender receives their own message twice: once as the response to
     // their request, once as a live frame.
@@ -960,7 +965,39 @@ const live = useLiveConnection({
       [reply.message]: [...(privateReplies.value[reply.message] ?? []), reply],
     };
   },
+
+  // Who is in this conversation's call, for the bar that offers to join it.
+  // The call itself — media and negotiation — is the call window's.
+  onCallState: (state) => {
+    if (state.roomId === roomId.value) roomCall.value = state.participants.length ? state : null;
+  },
 });
+
+/*
+ * This conversation's call, if there is one. A call's start or end arriving as
+ * an event, or a change of conversation, is the cue to look again.
+ */
+const calling = useCall();
+const roomCall = ref<Call | null>(null);
+const { offers: serverOffers } = useServerInfo();
+const callable = computed(
+  () =>
+    serverOffers("calls") &&
+    calling.supported.value &&
+    Boolean(room.value) &&
+    !room.value?.homeServer &&
+    !room.value?.archived,
+);
+const inThisCall = computed(() => calling.joined.value && calling.roomId.value === roomId.value);
+async function refreshCall() {
+  if (!callable.value) return;
+  try {
+    roomCall.value = await api.get<Call>(`/api/rooms/${roomId.value}/call`);
+  } catch {
+    roomCall.value = null;
+  }
+}
+watch([callable, roomId], () => void refreshCall(), { immediate: true });
 
 /*
  * Queued messages go out when the server is reachable again.
@@ -1843,6 +1880,18 @@ watch(roomId, load, { immediate: true });
             {{ live.state.value === "reconnecting" ? "Reconnecting" : "Offline" }}
           </span>
 
+          <Button
+            v-if="callable && !roomCall && !inThisCall"
+            variant="ghost"
+            size="icon"
+            :label="$ts('calls.start')"
+            :title="$ts('calls.start')"
+            :disabled="calling.joining.value"
+            @click="calling.join(roomId, false)"
+          >
+            <Phone class="size-3.5" />
+          </Button>
+
           <ChannelSettings :room="room" :events="messages" @changed="room = $event" />
 
           <!-- Only for whoever moderates: a ban that can only be issued is a
@@ -1863,6 +1912,8 @@ watch(roomId, load, { immediate: true });
       <div v-if="showBans" class="shrink-0 border-b bg-muted/10 px-4 py-3">
         <ChannelBans :room-id="roomId" />
       </div>
+
+      <CallBanner v-if="callable" :room-id="roomId" :call="roomCall" />
 
       <!-- What the channel has marked as important, collapsed to one line: a
            list of pinned messages above every conversation would push the

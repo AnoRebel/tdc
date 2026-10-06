@@ -148,7 +148,8 @@ export interface Appearance {
  */
 export type Capability =
   | "federation"
-  | "voice-video"
+  // Voice and video calls in conversations. Off unless an operator turns it on.
+  | "calls"
   | "webhooks"
   | "applications"
   | "interactive-messages"

@@ -33,6 +33,8 @@ type settingValue struct {
 // is displayed, logged or exported.
 var secretKeys = map[string]bool{
 	"database.url": true,
+	// Mints credentials for the call relay; see CallsConfig.
+	"calls.turn_secret": true,
 	// The object store's credentials. The access key is an identifier rather
 	// than a secret, but it is redacted too: together the pair is a working
 	// credential, and an operator reading this view needs neither half of it.
@@ -148,6 +150,7 @@ func (c Config) Describe(path string) []Setting {
 		{"push.subject", c.Push.Subject, defaults.Push.Subject},
 		{"server.multi_node", fmt.Sprint(c.Server.MultiNode), fmt.Sprint(defaults.Server.MultiNode)},
 		{"cache.address", c.Cache.Address, defaults.Cache.Address},
+		{"calls.turn_secret", c.Calls.TURNSecret, ""},
 		{"cache.username", c.Cache.Username, defaults.Cache.Username},
 		{"cache.password", c.Cache.Password, defaults.Cache.Password},
 		{"cache.database", fmt.Sprint(c.Cache.Database), fmt.Sprint(defaults.Cache.Database)},

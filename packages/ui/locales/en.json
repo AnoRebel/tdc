@@ -1623,5 +1623,31 @@
       "pickUpCard": "Pick up a card from its handle, then put it down",
       "moveCard": "Move a card one column, from its handle"
     }
+  },
+  "calls": {
+    "start": "Start a call",
+    "inProgress": "Call in progress",
+    "people": "{count} in the call",
+    "joinAudio": "Join",
+    "joinVideo": "Join with video",
+    "metered": "You seem to be on a metered connection; a video call uses a lot of data.",
+    "you": "You",
+    "muted": "Muted",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "cameraOn": "Turn camera on",
+    "cameraOff": "Turn camera off",
+    "leave": "Leave",
+    "needPermission": "Allow access to your microphone to join the call.",
+    "couldNotJoin": "Could not join the call. Check your connection and try again.",
+    "window": "Call",
+    "move": "Move the call (drag, or use the arrow keys)",
+    "restore": "Show the call",
+    "minimize": "Minimize",
+    "expand": "Expand",
+    "dock": "Make smaller",
+    "pictureInPicture": "Picture in picture",
+    "youAreIn": "You're in this call",
+    "show": "Show call"
   }
 }
