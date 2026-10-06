@@ -62,9 +62,20 @@ export const ANCHOR_PREFIX = "guide-";
 /** A heading token, once this file has given it an anchor. */
 type Anchored = Tokens.Heading & { anchor?: string };
 
+/**
+ * A guide without the YAML front matter an editor may have put at its top.
+ *
+ * The guides carry none, but the public documentation site's editor (Studio)
+ * writes a title and description there when it saves a page. Left in, the
+ * parser would read the block as a rule followed by a heading made of YAML.
+ */
+export function withoutFrontMatter(source: string): string {
+  return source.replace(/^﻿?---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, "");
+}
+
 export function renderGuide(source: string, labels: RenderLabels): RenderedGuide {
   const parser = new Marked({ gfm: true, async: false });
-  const tokens = parser.lexer(source);
+  const tokens = parser.lexer(withoutFrontMatter(source));
 
   let title = "";
   const toc: TocEntry[] = [];
@@ -163,7 +174,7 @@ export function renderGuide(source: string, labels: RenderLabels): RenderedGuide
  * explains tokens rather than on every request example that carries one.
  */
 export function guideSections(source: string): { title: string; sections: GuideSection[] } {
-  const tokens = new Marked({ gfm: true }).lexer(source);
+  const tokens = new Marked({ gfm: true }).lexer(withoutFrontMatter(source));
   const slug = createSlugger();
 
   let title = "";

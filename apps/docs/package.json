@@ -1,0 +1,24 @@
+{
+  "name": "@tdc/docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 9003",
+    "build": "nuxt build",
+    "preview": "node .output/server/index.mjs",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "test": "bun test lib"
+  },
+  "dependencies": {
+    "@nuxt/content": "^3.16.1",
+    "docus": "^5.14.0",
+    "nuxt": "catalog:vue",
+    "nuxt-studio": "^1.7.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:tooling",
+    "vue-tsc": "catalog:tooling"
+  }
+}

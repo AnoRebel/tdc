@@ -11,6 +11,7 @@
   "workspaces": {
     "packages": [
       "apps/web",
+      "apps/docs",
       "apps/desktop/frontend",
       "packages/*"
     ],
@@ -77,18 +78,20 @@
     "dev": "bun run --filter=@tdc/web dev",
     "dev:web": "bun run --filter=@tdc/web dev",
     "dev:server": "cd server && air",
+    "dev:docs": "bun run --filter=@tdc/docs dev",
     "dev:desktop": "cd apps/desktop && wails3 dev",
     "build": "bun run --filter=@tdc/web build",
     "build:web": "bun run --filter=@tdc/web build",
+    "build:docs": "bun run --filter=@tdc/docs build",
     "build:server": "cd server && go build -o ../bin/tdc-server ./cmd/tdc-server",
     "build:desktop": "cd apps/desktop && wails3 task build",
-    "typecheck": "bun run --filter=@tdc/web --filter=@tdc/types --filter=@tdc/desktop-frontend typecheck",
+    "typecheck": "bun run --filter=@tdc/web --filter=@tdc/types --filter=@tdc/desktop-frontend --filter=@tdc/docs typecheck",
     "lint": "bun run --filter=@tdc/web --filter=@tdc/types --filter=@tdc/desktop-frontend --filter=@tdc/ui lint",
     "lint:fix": "bun run --filter=@tdc/web --filter=@tdc/types lint:fix",
     "lint:go": "cd server && golangci-lint run",
     "format": "prettier --write \"**/*.{ts,tsx,vue,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,vue,js,json,md}\"",
-    "test": "bun run --filter=@tdc/web --filter=@tdc/types --filter=@tdc/desktop-frontend test",
+    "test": "bun run --filter=@tdc/web --filter=@tdc/types --filter=@tdc/desktop-frontend --filter=@tdc/docs test",
     "test:go": "cd server && go test -race ./...",
     "clean": "rm -rf node_modules apps/*/node_modules apps/*/*/node_modules packages/*/node_modules bin"
   }

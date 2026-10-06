@@ -139,6 +139,53 @@ describe("the table of contents", () => {
   });
 });
 
+/*
+ * The public documentation site edits these files through Studio, which saves
+ * a title and description as front matter. The help centre reads the same
+ * files, and has to read them as the guide they are.
+ */
+describe("front matter", () => {
+  const edited =
+    "---\ntitle: Hosting a TDC server\ndescription: Everything needed.\n---\n\n# Hosting a TDC server\n\nEverything needed.\n\n## TLS\n\nText.\n";
+
+  it("is not shown, and the guide's own heading stays its title", () => {
+    const { title, toc, page } = render(edited);
+    expect(title).toBe("Hosting a TDC server");
+    expect(toc).toEqual([{ id: "tls", text: "TLS", depth: 2 }]);
+    expect(page.querySelector("hr")).toBeNull();
+    expect(page.textContent).not.toContain("description:");
+  });
+
+  it("is not searched", () => {
+    const { sections } = guideSections(edited);
+    expect(sections.map((section) => section.text).join(" ")).not.toContain("title:");
+  });
+
+  it("is only a block at the very top, so a rule further down is left alone", () => {
+    const { page } = render("# Guide\n\nAbove.\n\n---\n\nBelow.\n\n---\n");
+    expect(page.querySelectorAll("hr")).toHaveLength(2);
+  });
+});
+
+/*
+ * Studio can insert Nuxt Content's component syntax. The help centre would
+ * print it as text, so the guides stay plain GitHub-flavoured markdown.
+ */
+describe("the guides as written", () => {
+  it("use no component blocks, which only the documentation site understands", () => {
+    const offenders: string[] = [];
+    for (const guide of GUIDES) {
+      const source = readFileSync(join(DOCS, `${guide.slug}.md`), "utf8");
+      let fenced = false;
+      source.split("\n").forEach((line, index) => {
+        if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+        if (!fenced && /^\s*::+[a-z]/i.test(line)) offenders.push(`${guide.slug}.md:${index + 1}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("code", () => {
   it("is shown as text, with a button to copy it", () => {
     const { page } = render("```go\nif a < b && c > d {}\n```\n");
