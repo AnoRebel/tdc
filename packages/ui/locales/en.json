@@ -1371,5 +1371,113 @@
       "day": "Day",
       "wholeProject": "The whole project, the last two weeks"
     }
+  },
+  "help": {
+    "nav": "Help",
+    "title": "Help",
+    "subtitle": "Guides to using this server, running one, and building on it.",
+    "searchLabel": "Search the guides",
+    "searchPlaceholder": "Search the guides",
+    "searching": "Searching the guides…",
+    "searchFailed": "The guides could not be searched. Try again.",
+    "noResults": "Nothing in the guides matches “{query}”.",
+    "results": "Results",
+    "groups": {
+      "using": "Using it",
+      "usingHint": "For everybody with an account here.",
+      "operators": "For operators",
+      "operatorsHint": "Running a server: deploying, configuring, upgrading.",
+      "developers": "For developers",
+      "developersHint": "Building on the API, and contributing to the project.",
+      "templates": "Policy templates",
+      "templatesHint": "Starting points an operator adapts and publishes. Not this server's policies."
+    },
+    "guides": {
+      "usingTdc": {
+        "title": "Using TDC",
+        "description": "Conversations, messages, files, notifications and settings."
+      },
+      "movingFromTelegramAndWhatsapp": {
+        "title": "Moving from Telegram and WhatsApp",
+        "description": "How a group maps onto channels, and what changes for its members."
+      },
+      "projects": {
+        "title": "Projects and issues",
+        "description": "Tracking the work a conversation agrees."
+      },
+      "directory": {
+        "title": "The directory",
+        "description": "Profiles, companies, enquiries and who sees what."
+      },
+      "hosting": {
+        "title": "Hosting",
+        "description": "Deploying a server, TLS, backup and restore."
+      },
+      "upgrading": {
+        "title": "Upgrading",
+        "description": "Moving between releases, and rolling back."
+      },
+      "integrating": {
+        "title": "Integrating",
+        "description": "The HTTP API and the live connection, for bots and clients."
+      },
+      "webhooksAndApps": {
+        "title": "Webhooks and applications",
+        "description": "Telling other systems what happens, and programs with permissions of their own."
+      },
+      "federationProtocol": {
+        "title": "Federation protocol",
+        "description": "The wire protocol between servers."
+      },
+      "contributing": {
+        "title": "Contributing",
+        "description": "How changes reach the project."
+      },
+      "privacyPolicy": {
+        "title": "Privacy policy template",
+        "description": "What the software stores and what leaves the server."
+      },
+      "termsOfUse": {
+        "title": "Terms of use template",
+        "description": "Acceptable use, moderation, ownership and liability."
+      }
+    },
+    "apiReference": {
+      "title": "API reference",
+      "description": "Every endpoint this server serves, generated from its routes."
+    },
+    "allGuides": "All guides",
+    "onThisPage": "On this page",
+    "copy": "Copy",
+    "copied": "Copied",
+    "anchor": "Link to this section",
+    "minutes": "{count} min read",
+    "viewSource": "View source",
+    "notFound": "There is no guide at this address.",
+    "loadFailed": "This guide could not be loaded. Try again.",
+    "retry": "Try again",
+    "notTranslated": "This guide has not been translated into your language yet, so it is shown in English.",
+    "templateNote": "This is a template for operators to adapt. It is not this server's policy.",
+    "policies": {
+      "title": "This server's policies",
+      "privacy": "Privacy policy",
+      "terms": "Terms of use",
+      "none": "The operator of this server has not published a privacy policy or terms of use here."
+    },
+    "learnMore": "Learn more",
+    "api": {
+      "filter": "Filter endpoints",
+      "count": "{count} endpoints",
+      "none": "No endpoint matches “{query}”.",
+      "loadFailed": "The API description could not be loaded. Try again.",
+      "method": "Method",
+      "path": "Path",
+      "summary": "What it does",
+      "authentication": "Authentication",
+      "permission": "Permission",
+      "intro": "Paths, methods and what each needs, as this server reports them. Request and response bodies are described in the Integrating guide.",
+      "openGuide": "Open the Integrating guide",
+      "raw": "Raw JSON"
+    }
   }
 }
