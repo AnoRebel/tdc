@@ -21,18 +21,12 @@ withDefaults(defineProps<{ tag?: string }>(), { tag: "div" });
     them, which is the sort of inconsistency people notice without being able
     to say why.
 
-    motion-reduce is honoured throughout: somebody who asked their system for
-    less movement has asked this application too.
+    The motion-list preset, from the motion stylesheet, which answers the
+    motion preference: under "reduced" a message fades in without rising, and
+    under "off" it simply appears. Somebody who asked their system for less
+    movement has asked this application too, without a second setting here.
   -->
-  <TransitionGroup
-    :tag="tag"
-    appear
-    enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
-    enter-from-class="translate-y-1 opacity-0"
-    leave-active-class="transition duration-150 ease-in motion-reduce:transition-none absolute"
-    leave-to-class="opacity-0"
-    move-class="transition-transform duration-200 motion-reduce:transition-none"
-  >
+  <TransitionGroup :tag="tag" appear name="motion-list">
     <slot />
   </TransitionGroup>
 </template>

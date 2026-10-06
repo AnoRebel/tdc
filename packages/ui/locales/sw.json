@@ -1530,5 +1530,70 @@
     "removePublicConsequence": "Ataacha kuipokea mara moja, na anaweza kujiunga tena wakati wowote atakapo.",
     "removePrivateConsequence": "Ataacha kuipokea mara moja, na hawezi kurudi isipokuwa mtu amwalike.",
     "remove": "Mwondoe"
+  },
+  "interface": {
+    "title": "Mwendo na kibodi",
+    "command": "Mapendeleo ya mwendo na kibodi",
+    "turnShortcutsOff": "Zima njia za mkato za kibodi",
+    "turnShortcutsOn": "Washa njia za mkato za kibodi",
+    "showSidebar": "Onyesha upau wa pembeni",
+    "shortcutsLabel": "Njia za mkato za kibodi",
+    "shortcutsHint": "Vitufe kimoja kimoja kama C, au G kisha P. Escape na {key} vinaendelea kufanya kazi kwa vyovyote vile.",
+    "shortcutsOffNotice": "Njia za mkato za kibodi zimezimwa. Escape na utafutaji pekee ndivyo bado vinafanya kazi — ziwashe tena hapa chini.",
+    "more": "Mapendeleo zaidi",
+    "or": "au",
+    "then": "kisha",
+    "motion": {
+      "title": "Mwendo",
+      "hint": "Kiasi ambacho kiolesura kinasogea kitu kinapofunguka, kinapofika au kinapobadilika.",
+      "system": "Fuata kifaa changu",
+      "full": "Kamili",
+      "reduced": "Uliopunguzwa",
+      "off": "Umezimwa",
+      "systemReduces": "Kifaa chako kinaomba mwendo mdogo.",
+      "systemAllows": "Kifaa chako hakina pendeleo la mwendo.",
+      "describes": {
+        "full": "Vitu hufifia, huinuka na huteleza mahali pake.",
+        "reduced": "Vitu hufifia, lakini hakuna kinachoteleza wala kudunda.",
+        "off": "Hakuna kinachosogea; mabadiliko hutokea papo hapo."
+      }
+    },
+    "density": {
+      "title": "Msongamano",
+      "comfortable": "Nafasi ya kutosha",
+      "compact": "Iliyobanwa"
+    },
+    "shortcutGroups": {
+      "everywhere": "Kila mahali",
+      "navigation": "Kuzunguka",
+      "conversation": "Ndani ya mazungumzo",
+      "projects": "Ndani ya mradi"
+    },
+    "shortcuts": {
+      "search": "Tafuta jumbe, chaneli na watu",
+      "reference": "Onyesha orodha hii",
+      "escape": "Funga kilichofunguliwa, au toka kwenye kisanduku cha maandishi",
+      "sidebar": "Onyesha au ficha upau wa pembeni",
+      "switchConversation": "Badilisha mazungumzo",
+      "previousConversation": "Chaneli iliyotangulia",
+      "nextConversation": "Chaneli inayofuata",
+      "previousUnread": "Mazungumzo yaliyotangulia yenye jumbe ambazo hazijasomwa",
+      "nextUnread": "Mazungumzo yanayofuata yenye jumbe ambazo hazijasomwa",
+      "goConversations": "Nenda kwenye mazungumzo",
+      "goProjects": "Nenda kwenye miradi",
+      "goIssues": "Nenda kwenye masuala yangu",
+      "goBoard": "Nenda kwenye ubao wa mradi huu",
+      "goDirectory": "Nenda kwenye saraka",
+      "goSettings": "Nenda kwenye mipangilio",
+      "composer": "Andika ujumbe",
+      "editLast": "Hariri ujumbe wako wa mwisho",
+      "editLastFromComposer": "Hariri ujumbe wako wa mwisho, ukiwa kwenye kisanduku cha ujumbe kilicho tupu",
+      "thread": "Jibu ujumbe wa mwisho kwenye uzi",
+      "react": "Toa hisia kwa ujumbe wa mwisho",
+      "markRead": "Weka alama kuwa imesomwa na uruke hadi ujumbe mpya zaidi",
+      "newIssue": "Fungua suala jipya",
+      "pickUpCard": "Inua kadi kwa kishikio chake, kisha iweke chini",
+      "moveCard": "Hamisha kadi safu moja, kwa kishikio chake"
+    }
   }
 }

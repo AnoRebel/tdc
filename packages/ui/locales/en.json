@@ -1530,5 +1530,70 @@
     "removePublicConsequence": "They stop receiving it at once, and can join again whenever they choose.",
     "removePrivateConsequence": "They stop receiving it at once, and cannot come back unless somebody invites them.",
     "remove": "Remove"
+  },
+  "interface": {
+    "title": "Motion and keyboard",
+    "command": "Motion and keyboard preferences",
+    "turnShortcutsOff": "Turn keyboard shortcuts off",
+    "turnShortcutsOn": "Turn keyboard shortcuts on",
+    "showSidebar": "Show the sidebar",
+    "shortcutsLabel": "Keyboard shortcuts",
+    "shortcutsHint": "Single keys like C, or G then P. Escape and {key} keep working either way.",
+    "shortcutsOffNotice": "Keyboard shortcuts are off. Only Escape and search still work — switch them back on below.",
+    "more": "More preferences",
+    "or": "or",
+    "then": "then",
+    "motion": {
+      "title": "Motion",
+      "hint": "How much the interface moves when something opens, arrives or changes.",
+      "system": "Follow my device",
+      "full": "Full",
+      "reduced": "Reduced",
+      "off": "Off",
+      "systemReduces": "Your device asks for less motion.",
+      "systemAllows": "Your device has no motion preference.",
+      "describes": {
+        "full": "Things fade, rise and slide into place.",
+        "reduced": "Things fade, but nothing slides or bounces.",
+        "off": "Nothing moves; changes happen at once."
+      }
+    },
+    "density": {
+      "title": "Density",
+      "comfortable": "Comfortable",
+      "compact": "Compact"
+    },
+    "shortcutGroups": {
+      "everywhere": "Everywhere",
+      "navigation": "Getting around",
+      "conversation": "In a conversation",
+      "projects": "In a project"
+    },
+    "shortcuts": {
+      "search": "Search messages, channels and people",
+      "reference": "Show this list",
+      "escape": "Close what is open, or leave the text box",
+      "sidebar": "Show or hide the sidebar",
+      "switchConversation": "Switch conversation",
+      "previousConversation": "Previous channel",
+      "nextConversation": "Next channel",
+      "previousUnread": "Previous conversation with unread messages",
+      "nextUnread": "Next conversation with unread messages",
+      "goConversations": "Go to conversations",
+      "goProjects": "Go to projects",
+      "goIssues": "Go to my issues",
+      "goBoard": "Go to this project's board",
+      "goDirectory": "Go to the directory",
+      "goSettings": "Go to settings",
+      "composer": "Write a message",
+      "editLast": "Edit your last message",
+      "editLastFromComposer": "Edit your last message, from an empty message box",
+      "thread": "Reply in a thread to the last message",
+      "react": "React to the last message",
+      "markRead": "Mark as read and jump to the newest message",
+      "newIssue": "File a new issue",
+      "pickUpCard": "Pick up a card from its handle, then put it down",
+      "moveCard": "Move a card one column, from its handle"
+    }
   }
 }

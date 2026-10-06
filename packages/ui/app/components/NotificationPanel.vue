@@ -79,7 +79,7 @@ function when(notification: Notification): string {
        the text off at the window edge. -->
   <div
     v-if="open"
-    class="absolute bottom-full left-2 z-30 mb-2 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-xl"
+    class="motion-pop-in absolute bottom-full left-2 z-30 origin-bottom-left mb-2 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-xl"
   >
     <header class="flex items-center justify-between border-b border-border px-3 py-2">
       <h2 class="text-xs font-semibold">{{ $t("notification.title") }}</h2>
@@ -97,7 +97,7 @@ function when(notification: Notification): string {
         v-for="notification in items"
         :key="notification.id"
         type="button"
-        class="flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-accent"
+        class="motion-row flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-left hover:bg-accent"
         @click="go(notification)"
       >
         <span class="relative mt-0.5 shrink-0">
@@ -107,7 +107,11 @@ function when(notification: Notification): string {
           <span
             class="absolute -right-1 -bottom-1 grid size-4 place-items-center rounded-full bg-card"
           >
-            <component :is="iconFor(notification)" class="size-3 text-muted-foreground" />
+            <component
+              :is="iconFor(notification)"
+              class="size-3 text-muted-foreground"
+              aria-hidden="true"
+            />
           </span>
         </span>
 

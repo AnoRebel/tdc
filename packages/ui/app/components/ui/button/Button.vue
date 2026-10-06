@@ -64,7 +64,7 @@ const sizes: Record<Size, string> = {
     :class="
       cn(
         'inline-flex items-center justify-center gap-1.5 rounded-md text-[0.8125rem] font-medium whitespace-nowrap',
-        'transition-[background-color,border-color,transform,opacity] duration-150 ease-out',
+        'transition-[background-color,border-color,transform,opacity] duration-(--motion-duration-fast) ease-(--motion-ease-out)',
         // A press that moves is what makes a control feel physical.
         'active:not-disabled:translate-y-px',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',

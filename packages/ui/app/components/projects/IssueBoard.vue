@@ -176,9 +176,34 @@ function pickUp(card: BoardCard) {
   announcement.value = $ts("projects.board.pickedUp", { issue: card.key, state: from.name });
 }
 
-function onHeldKey(event: KeyboardEvent) {
-  const holding = held.value;
+function onHeldKey(event: KeyboardEvent, card?: BoardCard) {
   const columns = board.value?.columns;
+
+  /*
+   * Shift and an arrow moves a card one column straight away, without picking
+   * it up first — the quick version of the same move, for somebody who knows
+   * exactly where it is going.
+   */
+  if (
+    !held.value &&
+    card &&
+    columns &&
+    event.shiftKey &&
+    (event.key === "ArrowRight" || event.key === "ArrowLeft")
+  ) {
+    const from = columnOf(card.key);
+    if (!from) return;
+    const target = columns[columnIndex(from.stateId) + (event.key === "ArrowRight" ? 1 : -1)];
+    event.preventDefault();
+    if (!target) return;
+    void moveCard(card, target).then(async () => {
+      await nextTick();
+      document.getElementById(`move-${card.key}`)?.focus();
+    });
+    return;
+  }
+
+  const holding = held.value;
   if (!holding || !columns) return;
 
   if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
@@ -280,11 +305,17 @@ function isTarget(index: number) {
           <span class="tabular ml-auto text-xs text-muted-foreground">{{ column.total }}</span>
         </header>
 
-        <ol class="min-h-12 flex-1 space-y-1.5 overflow-y-auto px-2 pb-2">
+        <!-- Cards glide to their new places when one moves, and rise into
+             the column they were moved to, rather than the column redrawing. -->
+        <TransitionGroup
+          tag="ol"
+          name="motion-cards"
+          class="min-h-12 flex-1 space-y-1.5 overflow-y-auto px-2 pb-2"
+        >
           <li
             v-for="card in column.cards"
             :key="card.key"
-            class="group rounded-lg border bg-card p-2.5 shadow-xs transition-shadow hover:shadow-sm"
+            class="group rounded-lg border bg-card p-2.5 shadow-xs transition-shadow duration-(--motion-duration-fast) hover:shadow-sm"
             :class="[
               dragged?.key === card.key && 'opacity-50',
               held?.card.key === card.key && 'ring-2 ring-primary',
@@ -312,7 +343,7 @@ function isTarget(index: number) {
                 :label="$ts('projects.planning.planIssue', { issue: card.key })"
                 @click="plan(card)"
               >
-                <Icon name="lucide:calendar-range" class="size-3.5" />
+                <Icon name="lucide:calendar-range" class="size-3.5" aria-hidden="true" />
               </Button>
               <Button
                 v-if="props.canMove"
@@ -324,10 +355,10 @@ function isTarget(index: number) {
                 aria-describedby="board-instructions"
                 :aria-pressed="held?.card.key === card.key"
                 @click="held?.card.key === card.key ? undefined : pickUp(card)"
-                @keydown="onHeldKey"
+                @keydown="onHeldKey($event, card)"
                 @blur="held?.card.key === card.key && (held = null)"
               >
-                <Icon name="lucide:grip-vertical" class="size-3.5" />
+                <Icon name="lucide:grip-vertical" class="size-3.5" aria-hidden="true" />
               </Button>
             </div>
             <div
@@ -357,11 +388,17 @@ function isTarget(index: number) {
           </li>
           <li
             v-if="!column.cards.length"
+            key="empty"
             class="px-1 py-3 text-center text-xs text-muted-foreground"
           >
+            <Icon
+              name="lucide:inbox"
+              class="mx-auto mb-1 block size-4 opacity-60"
+              aria-hidden="true"
+            />
             {{ $t("projects.board.empty") }}
           </li>
-        </ol>
+        </TransitionGroup>
 
         <Button
           v-if="column.next"

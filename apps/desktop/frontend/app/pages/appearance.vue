@@ -115,6 +115,10 @@ onMounted(async () => {
     </section>
 
     <section class="mt-5">
+      <InterfacePreferences heading />
+    </section>
+
+    <section class="mt-5">
       <h2 class="text-sm font-semibold">Window</h2>
       <p class="mt-1 text-xs text-muted-foreground">
         How much of what is behind TDC shows through. Only the empty space becomes see-through —

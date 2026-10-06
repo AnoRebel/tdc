@@ -14,7 +14,7 @@ const props = defineProps<{ class?: HTMLAttributes["class"] }>();
 <template>
   <div
     data-slot="skeleton"
-    :class="cn('animate-pulse rounded-md bg-muted', props.class)"
+    :class="cn('motion-shimmer rounded-md bg-muted', props.class)"
     aria-hidden="true"
   />
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import { useForm } from "@tanstack/vue-form";
+import { useLocalStorage, useMediaQuery } from "@vueuse/core";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 
@@ -196,25 +197,55 @@ const searching = useState("search.open", () => false);
 const showingShortcuts = useState("shortcuts.open", () => false);
 
 /*
- * What the conversation can do, registered by whichever page is showing.
- *
- * Refs rather than an event: the layout has to call these, and a page that is
- * not a conversation simply never sets them — pressing the key then does
- * nothing, which is the right outcome.
+ * Whether the interface preferences are open, from the palette or the
+ * shortcut list. Shared state for the same reason the search palette is.
  */
-const composerFocus = ref<(() => void) | null>(null);
-const threadOpen = ref<(() => void) | null>(null);
-provide("composerFocus", composerFocus);
-provide("threadOpen", threadOpen);
+const showingInterface = useState("interface.open", () => false);
+
+/*
+ * Whether each has ever been opened, so it is fetched on first use and then
+ * kept — staying mounted is what lets it animate out as well as in.
+ */
+const opened = reactive({ shortcuts: false, interface: false });
+watchEffect(() => {
+  if (showingShortcuts.value) opened.shortcuts = true;
+  if (showingInterface.value) opened.interface = true;
+});
+
+/*
+ * Whether the sidebar is put away on a wide screen.
+ *
+ * Kept in this browser: somebody who wants the conversation full width wants
+ * it next time too. On a narrow screen the sidebar is a drawer already, and
+ * the same key opens and closes that instead.
+ */
+const sidebarHidden = useLocalStorage("tdc-sidebar-hidden", false, { writeDefaults: false });
+const wide = useMediaQuery("(min-width: 768px)");
+
+function toggleSidebar() {
+  if (wide.value) sidebarHidden.value = !sidebarHidden.value;
+  else navigationOpen.value = !navigationOpen.value;
+}
+
+/**
+ * Goes somewhere by route name, if that somewhere exists here.
+ *
+ * The desktop client shares this layout and has no projects or directory
+ * screens yet; there the key is left alone rather than navigating to nothing.
+ */
+function go(name: string, params?: Record<string, string>) {
+  if (!router.hasRoute(name)) return false;
+  void router.push(localeRoute({ name, params }));
+}
 
 /*
  * The keyboard, bound once for the whole application.
  *
  * Here rather than in each page because a shortcut that worked on one screen
- * and not another would be one nobody relies on. What the conversation itself
- * needs — focusing the message box, opening a thread — is provided by the page
- * currently showing, which is the only thing that knows what "the last
- * message" means.
+ * and not another would be one nobody relies on. What a particular screen
+ * means by a key — focusing its message box, opening a thread, filing an
+ * issue — is registered by that screen with useShortcutAction, because only
+ * it knows what "the last message" or "this project" is.
  */
 useShortcuts({
   search: () => (searching.value = !searching.value),
@@ -222,13 +253,51 @@ useShortcuts({
 
   // Switching channel is search with the channels already in front of you;
   // there is no second palette to write.
-  switchChannel: () => (searching.value = true),
+  switchConversation: () => (searching.value = true),
 
-  previousChannel: () => moveChannel(-1),
-  nextChannel: () => moveChannel(1),
+  previousConversation: () => moveChannel(-1),
+  nextConversation: () => moveChannel(1),
+  previousUnread: () => moveToUnread(-1),
+  nextUnread: () => moveToUnread(1),
 
-  composer: () => composerFocus.value?.(),
-  thread: () => threadOpen.value?.(),
+  sidebar: toggleSidebar,
+
+  goConversations: () => go("index"),
+  goProjects: () => go("projects"),
+  goIssues: () => go("issues"),
+  goSettings: () => go("settings"),
+  goDirectory: () => go("directory"),
+  goBoard: () => {
+    // The board of the project somebody is in: from its own pages by its key,
+    // and from an issue by the key its reference starts with.
+    const key =
+      typeof route.params.key === "string"
+        ? route.params.key
+        : typeof route.params.ref === "string"
+          ? route.params.ref.split("-")[0]
+          : undefined;
+    if (!key) return false;
+    return go("projects-key-board", { key });
+  },
+
+  /*
+   * Escape, once everything nearer the focus has had it.
+   *
+   * A modal dialog closes itself. Otherwise somebody in a text field leaves
+   * it, and somebody who is not is closing whatever this layout has open.
+   */
+  escape: (event) => {
+    if (document.querySelector('[aria-modal="true"]')) return false;
+
+    const target = event.target as HTMLElement | null;
+    if (target && (target.matches("input, textarea, select") || target.isContentEditable)) {
+      target.blur();
+      return;
+    }
+    if (creating.value) return void (creating.value = false);
+    if (navigationOpen.value) return void (navigationOpen.value = false);
+    return false;
+  },
 });
 
 /*
@@ -418,6 +487,29 @@ function moveChannel(direction: number) {
 }
 
 /*
+ * Moving to the next conversation with something unread, in sidebar order.
+ *
+ * Channels then direct messages, which is the order they are listed. Wraps,
+ * so pressing it repeatedly visits every unread conversation and comes back.
+ */
+function moveToUnread(direction: number) {
+  const order = [...joined.value, ...direct.value];
+  if (!order.length) return;
+
+  const current = order.findIndex((room) => route.params.id === room.id);
+  for (let step = 1; step <= order.length; step++) {
+    const index =
+      ((((current < 0 ? -1 : current) + direction * step) % order.length) + order.length) %
+      order.length;
+    const room = order[index]!;
+    if (unread.value[room.id]) {
+      void router.push(localeRoute({ name: "rooms-id", params: { id: room.id } }));
+      return;
+    }
+  }
+}
+
+/*
  * Moving between channels, shared with whatever asks.
  *
  * The keyboard and a swipe do the same thing, so they call the same function:
@@ -454,8 +546,11 @@ provide("openSearch", () => {
       :unread="unread"
       :can-create="can('channel.create')"
       :servers="servers"
-      class="max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:transition-transform max-md:duration-200"
-      :class="navigationOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'"
+      class="max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:transition-transform max-md:duration-(--motion-duration-slow) max-md:ease-(--motion-ease-out)"
+      :class="[
+        navigationOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full',
+        sidebarHidden && 'md:hidden',
+      ]"
       @create="creating = true"
       @search="searching = true"
     />
@@ -466,13 +561,31 @@ provide("openSearch", () => {
       Only on a narrow screen, and only while it is open: on a wide one the
       sidebar is part of the layout and there is nothing to dismiss.
     -->
-    <button
-      v-if="navigationOpen"
-      type="button"
-      class="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm md:hidden"
-      :aria-label="$ts('nav.closeChannelList')"
-      @click="navigationOpen = false"
-    />
+    <Transition name="motion-fade">
+      <button
+        v-if="navigationOpen"
+        type="button"
+        class="fixed inset-0 z-30 bg-background/60 backdrop-blur-sm md:hidden"
+        :aria-label="$ts('nav.closeChannelList')"
+        @click="navigationOpen = false"
+      />
+    </Transition>
+
+    <!--
+      The way back to a sidebar that was put away, for somebody who did it by
+      key and does not remember which. Only on a wide screen, where hiding it
+      is possible at all.
+    -->
+    <Button
+      v-if="sidebarHidden"
+      variant="outline"
+      size="icon"
+      class="fixed bottom-3 left-3 z-20 max-md:hidden"
+      :label="$ts('interface.showSidebar')"
+      @click="sidebarHidden = false"
+    >
+      <Icon name="lucide:panel-left-open" class="size-4" aria-hidden="true" />
+    </Button>
 
     <main class="flex min-w-0 flex-1 flex-col">
       <slot />
@@ -484,16 +597,18 @@ provide("openSearch", () => {
       @create-channel="creating = true"
     />
 
-    <ShortcutReference v-model="showingShortcuts" />
+    <!-- Loaded when first opened: neither is part of what somebody needs to
+         see the application, so neither belongs in its first download. -->
+    <LazyShortcutReference
+      v-if="opened.shortcuts"
+      v-model="showingShortcuts"
+      @preferences="showingInterface = true"
+    />
+    <LazyInterfacePreferencesDialog v-if="opened.interface" v-model="showingInterface" />
 
     <!-- Creating a channel is a small, focused task, so it is a slide-over
          rather than a modal that dims the whole application. -->
-    <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="translate-x-full"
-      leave-active-class="transition duration-150 ease-in"
-      leave-to-class="translate-x-full"
-    >
+    <Transition name="motion-sheet">
       <aside
         v-if="creating"
         class="fixed inset-y-0 right-0 z-20 w-80 border-l bg-surface p-4 shadow-lg"

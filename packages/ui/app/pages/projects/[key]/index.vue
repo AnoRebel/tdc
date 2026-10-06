@@ -269,6 +269,13 @@ const form = useForm({
   },
 });
 
+// N files a new issue here, for whoever may.
+useShortcutAction("newIssue", () => {
+  if (!project.value?.can?.createIssues) return false;
+  filing.value = true;
+  form.reset();
+});
+
 function firstError(field: AnyFieldApi): string | undefined {
   if (!field.state.meta.isTouched) return undefined;
   const [issue] = field.state.meta.errors;

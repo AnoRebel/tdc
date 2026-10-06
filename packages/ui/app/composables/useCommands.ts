@@ -4,6 +4,7 @@ import {
   Flag,
   Keyboard,
   LifeBuoy,
+  KeyboardOff,
   LogOut,
   Moon,
   Plus,
@@ -12,6 +13,7 @@ import {
   SlidersHorizontal,
   Sun,
   Users,
+  Wind,
 } from "lucide-vue-next";
 
 /** Something the palette can do, rather than somewhere it can go. */
@@ -37,7 +39,10 @@ export interface Command {
  * showing, never what is allowed.
  */
 export function useCommands(options: { openShortcuts: () => void; createChannel: () => void }) {
-  const { $ts, $localeRoute: localeRoute } = useI18n();
+  const { $localeRoute: localeRoute, $ts } = useI18n();
+  // The motion and keyboard preferences, which a dialog in the layout shows.
+  const showingInterface = useState("interface.open", () => false);
+  const { shortcuts: shortcutsOn } = useInterfacePreferences();
   const { can, signOut } = useAuth();
   const router = useRouter();
   const theme = useTheme();
@@ -86,6 +91,26 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         icon: Braces,
         keywords: "endpoints routes developers integrating http",
         run: () => void router.push(localeRoute({ name: "help-api" })),
+      },
+      {
+        id: "interface",
+        label: $ts("interface.command"),
+        icon: Wind,
+        keywords: "motion animation reduce density compact keyboard shortcuts",
+        run: () => {
+          showingInterface.value = true;
+        },
+      },
+      {
+        id: "shortcuts-toggle",
+        label: shortcutsOn.value
+          ? $ts("interface.turnShortcutsOff")
+          : $ts("interface.turnShortcutsOn"),
+        icon: shortcutsOn.value ? KeyboardOff : Keyboard,
+        keywords: "keys keyboard disable enable",
+        run: () => {
+          shortcutsOn.value = !shortcutsOn.value;
+        },
       },
       {
         id: "theme-dark",

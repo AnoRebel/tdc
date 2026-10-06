@@ -455,6 +455,10 @@ function deviceName(userAgent: string): string {
         </p>
       </section>
 
+      <section class="space-y-3">
+        <InterfacePreferences heading />
+      </section>
+
       <!-- What only this kind of device has: notifications through the
            browser's service worker on the web, the window and the updater on
            the desktop. Each client supplies its own; see DeviceSettings. -->

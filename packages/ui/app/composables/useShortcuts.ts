@@ -1,115 +1,89 @@
-import { onKeyStroke } from "@vueuse/core";
+import { useEventListener } from "@vueuse/core";
+import { onBeforeUnmount, onMounted } from "vue";
 
+import { useInterfacePreferences } from "#layers/ui/app/composables/useInterfacePreferences";
 import { isMac } from "#layers/ui/app/lib/platform";
-import { isTyping } from "#layers/ui/app/lib/shortcuts";
+import { SHORTCUTS, createShortcutDispatcher, type ShortcutId } from "#layers/ui/app/lib/shortcuts";
 
 /**
- * One keyboard shortcut, as somebody reading the reference sees it.
+ * Something a shortcut does.
+ *
+ * Returns false to say "not here" — a conversation's Escape with no thread
+ * open, say — so the next handler gets the key instead.
  */
-export interface Shortcut {
-  /** The keys, in the order they are pressed. */
-  keys: string[];
-  /** What it does, in the words the reference shows. */
-  description: string;
-  /** Which part of the application it belongs to, for grouping. */
-  group: "Navigation" | "Conversation" | "Everywhere";
+export type ShortcutAction = (event: KeyboardEvent) => boolean | void;
+
+/*
+ * What the screens currently showing have registered, newest last.
+ *
+ * Module state rather than provide/inject: the layout owns the keyboard, and
+ * the conversation, the board or a panel several components down are what
+ * know what a key means right now. Registration happens on mount, which is
+ * client-only, so nothing here is shared between server requests.
+ */
+const registered = new Map<ShortcutId, ShortcutAction[]>();
+
+/**
+ * Registers what a shortcut does while the calling component is mounted.
+ *
+ * The most recently mounted wins, so a thread panel's Escape is tried before
+ * the layout's, and a page that is not a conversation simply registers
+ * nothing — the key then does nothing, which is the right outcome.
+ */
+export function useShortcutAction(id: ShortcutId, action: ShortcutAction) {
+  onMounted(() => {
+    registered.set(id, [...(registered.get(id) ?? []), action]);
+  });
+  onBeforeUnmount(() => {
+    registered.set(
+      id,
+      (registered.get(id) ?? []).filter((existing) => existing !== action),
+    );
+  });
 }
 
-/**
- * Whether this is the platform's own command modifier.
- *
- * Command on a Mac and Control elsewhere, which is what every application
- * these people already use binds. Accepting either would mean Ctrl-K doing
- * something unexpected on a Mac, where Ctrl is a different modifier.
- */
-function hasCommandModifier(event: KeyboardEvent): boolean {
-  return isMac() ? event.metaKey : event.ctrlKey;
-}
+/** Runs the handlers for a shortcut, newest first, until one acts. */
+function runRegistered(
+  id: ShortcutId,
+  event: KeyboardEvent,
+  fallback: ShortcutAction | undefined,
+): boolean {
+  const handlers = [...(registered.get(id) ?? [])].reverse();
+  if (fallback) handlers.push(fallback);
 
-/**
- * The shortcuts this application answers to.
- *
- * Listed here rather than declared where each is handled, so the reference
- * shown to somebody pressing "?" is the same list that is bound — a reference
- * assembled by hand is one that drifts from what the keys actually do.
- */
-export const shortcuts: Shortcut[] = [
-  { keys: ["Ctrl", "K"], description: "Search messages, channels and people", group: "Everywhere" },
-  { keys: ["?"], description: "Show this list", group: "Everywhere" },
-  { keys: ["Ctrl", "Shift", "K"], description: "Switch channel", group: "Navigation" },
-  { keys: ["Alt", "↑"], description: "Previous channel", group: "Navigation" },
-  { keys: ["Alt", "↓"], description: "Next channel", group: "Navigation" },
-  {
-    keys: ["Esc"],
-    description: "Close what is open, or leave the message box",
-    group: "Everywhere",
-  },
-  { keys: ["C"], description: "Write a message", group: "Conversation" },
-  { keys: ["T"], description: "Open the thread on the last message", group: "Conversation" },
-];
-
-/** What the application can be asked to do from the keyboard. */
-export interface ShortcutActions {
-  search?: () => void;
-  switchChannel?: () => void;
-  previousChannel?: () => void;
-  nextChannel?: () => void;
-  composer?: () => void;
-  thread?: () => void;
-  reference?: () => void;
-}
-
-/**
- * Binds the shortcuts.
- *
- * Every unmodified one checks isTyping first, so none of them reach somebody
- * writing a message. The modified ones do not need to and deliberately do not:
- * Ctrl-K should open search from inside the message box, which is where
- * somebody usually is when they want it.
- */
-export function useShortcuts(actions: ShortcutActions) {
-  function run(action: (() => void) | undefined, event: KeyboardEvent) {
-    if (!action) return;
-    event.preventDefault();
-    action();
+  for (const handler of handlers) {
+    if (handler(event) !== false) return true;
   }
+  return false;
+}
 
-  // Search: from anywhere, including the message box.
-  onKeyStroke("k", (event) => {
-    if (!hasCommandModifier(event) || event.shiftKey) return;
-    run(actions.search, event);
+/** Whether a modal dialog is open, which owns the keyboard until it closes. */
+function modalOpen(): boolean {
+  return typeof document !== "undefined" && Boolean(document.querySelector('[aria-modal="true"]'));
+}
+
+/**
+ * Binds the shortcuts, once, for the whole application.
+ *
+ * The application-wide actions are passed here; what belongs to a particular
+ * screen is registered by that screen with useShortcutAction. One listener
+ * on the window, after everything nearer the focus has had its chance — a key
+ * a menu or a list has already handled is left alone.
+ */
+export function useShortcuts(actions: Partial<Record<ShortcutId, ShortcutAction>>) {
+  const preferences = useInterfacePreferences();
+
+  const handle = createShortcutDispatcher(SHORTCUTS, {
+    enabled: () => preferences.shortcuts.value,
+    modalOpen,
+    mac: isMac(),
+    run: (id, event) => runRegistered(id, event, actions[id]),
   });
 
-  // Switching channel is the same key with Shift, which is what an application
-  // with both a search and a switcher conventionally does.
-  onKeyStroke("K", (event) => {
-    if (!hasCommandModifier(event) || !event.shiftKey) return;
-    run(actions.switchChannel, event);
-  });
+  useEventListener(typeof window === "undefined" ? undefined : window, "keydown", handle);
+}
 
-  onKeyStroke("ArrowUp", (event) => {
-    if (!event.altKey) return;
-    run(actions.previousChannel, event);
-  });
-
-  onKeyStroke("ArrowDown", (event) => {
-    if (!event.altKey) return;
-    run(actions.nextChannel, event);
-  });
-
-  // The unmodified ones, which must never fire while somebody is writing.
-  onKeyStroke("c", (event) => {
-    if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return;
-    run(actions.composer, event);
-  });
-
-  onKeyStroke("t", (event) => {
-    if (isTyping(event) || event.metaKey || event.ctrlKey || event.altKey) return;
-    run(actions.thread, event);
-  });
-
-  onKeyStroke("?", (event) => {
-    if (isTyping(event)) return;
-    run(actions.reference, event);
-  });
+/** Clears every registration. For tests, which share the module between cases. */
+export function forgetShortcutActions() {
+  registered.clear();
 }
