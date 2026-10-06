@@ -70,7 +70,7 @@ function whoReacted(reaction: Reaction): string {
         title="Add a reaction"
         @click="picking = !picking"
       >
-        <SmilePlus class="size-3.5" />
+        <SmilePlus class="size-3.5" aria-hidden="true" />
       </button>
 
       <!-- The six that carry most reactions, without opening the picker: the
@@ -80,7 +80,7 @@ function whoReacted(reaction: Reaction): string {
            to, which is exactly what the reader needs to see to choose. -->
       <div
         v-if="picking"
-        class="absolute top-full left-0 z-20 mt-1 flex items-center gap-0.5 rounded-lg border border-border bg-card p-1 shadow-lg"
+        class="motion-pop-in absolute top-full left-0 z-20 origin-top-left mt-1 flex items-center gap-0.5 rounded-lg border border-border bg-card p-1 shadow-lg"
       >
         <button
           v-for="emoji in quickReactions"

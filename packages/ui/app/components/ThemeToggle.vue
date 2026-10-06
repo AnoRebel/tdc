@@ -60,7 +60,7 @@ function onKeydown(event: KeyboardEvent) {
       aria-haspopup="menu"
       @click="open = !open"
     >
-      <Palette class="size-3.5" />
+      <Palette class="size-3.5" aria-hidden="true" />
     </Button>
 
     <div
@@ -68,7 +68,7 @@ function onKeydown(event: KeyboardEvent) {
       ref="panel"
       role="menu"
       :aria-label="$ts('settings.appearance')"
-      class="absolute right-0 bottom-full z-30 mb-2 w-52 overflow-hidden rounded-xl border border-border bg-surface-raised p-1 shadow-lg"
+      class="motion-pop-in absolute right-0 bottom-full z-30 origin-bottom-right mb-2 w-52 overflow-hidden rounded-xl border border-border bg-surface-raised p-1 shadow-lg"
     >
       <p class="px-2 pt-1.5 pb-1 text-[0.6875rem] font-semibold text-muted-foreground uppercase">
         {{ $t("settings.appearance") }}

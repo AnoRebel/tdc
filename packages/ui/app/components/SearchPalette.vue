@@ -210,12 +210,7 @@ function iconFor(room: RoomHit) {
 
 <template>
   <Teleport to="body">
-    <Transition
-      enter-active-class="transition duration-150 ease-out"
-      enter-from-class="opacity-0"
-      leave-active-class="transition duration-100 ease-in"
-      leave-to-class="opacity-0"
-    >
+    <Transition name="motion-fade">
       <div
         v-if="open"
         class="fixed inset-0 z-50 bg-background/70 backdrop-blur-sm"
@@ -224,7 +219,7 @@ function iconFor(room: RoomHit) {
         <!-- Held above centre: the list grows downwards, and a centred panel
              would shift the input under the reader's eye as results arrive. -->
         <div
-          class="mx-auto mt-[12vh] w-[min(40rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+          class="motion-pop-in mx-auto mt-[12vh] w-[min(40rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
           role="dialog"
           aria-modal="true"
           :aria-label="$ts('nav.search')"

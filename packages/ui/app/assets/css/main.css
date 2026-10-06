@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 
 /*
+ * Motion: the vocabulary every animation uses, and the switch that turns it
+ * down or off. Its own file, so what moves and why is in one place.
+ */
+@import "./motion.css";
+
+/*
  * Geist: a grotesque with enough character to not read as a browser default,
  * and a variable weight axis so hierarchy can be built from 400/500/600
  * rather than only regular and bold.
@@ -292,10 +298,6 @@
     border-color: var(--border);
   }
 
-  html {
-    scroll-behavior: smooth;
-  }
-
   body {
     /*
      * The ground everything is drawn on.
@@ -416,10 +418,10 @@
     font-weight: 500;
     white-space: nowrap;
     transition:
-      background-color 160ms cubic-bezier(0.4, 0, 0.2, 1),
-      border-color 160ms cubic-bezier(0.4, 0, 0.2, 1),
-      transform 100ms cubic-bezier(0.4, 0, 0.2, 1),
-      opacity 160ms;
+      background-color var(--motion-duration) var(--motion-ease-in-out),
+      border-color var(--motion-duration) var(--motion-ease-in-out),
+      transform var(--motion-duration-fast) var(--motion-ease-in-out),
+      opacity var(--motion-duration);
   }
 
   /* A press that moves is what makes a control feel physical. */
@@ -506,8 +508,8 @@
     font-size: 0.8125rem;
     color: var(--muted-foreground);
     transition:
-      background-color 140ms,
-      color 140ms;
+      background-color var(--motion-duration-fast) var(--motion-ease-out),
+      color var(--motion-duration-fast) var(--motion-ease-out);
   }
 
   .nav-item:hover {
@@ -519,17 +521,6 @@
     background: color-mix(in oklch, var(--primary) 14%, transparent);
     color: var(--foreground);
     font-weight: 500;
-  }
-}
-
-/* Someone who prefers less motion gets none of it. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }
 

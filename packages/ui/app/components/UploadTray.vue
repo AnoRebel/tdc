@@ -59,11 +59,8 @@ function readableSize(bytes: number): string {
   <TransitionGroup
     v-if="shown.length"
     tag="div"
-    class="mb-2 space-y-1.5"
-    enter-active-class="transition duration-200 ease-out"
-    enter-from-class="translate-y-1 opacity-0"
-    leave-active-class="transition duration-150 ease-in"
-    leave-to-class="opacity-0"
+    class="relative mb-2 space-y-1.5"
+    name="motion-list"
   >
     <div
       v-for="upload in shown"

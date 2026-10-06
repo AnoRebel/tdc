@@ -50,18 +50,17 @@ describe("the count on a badge", () => {
 });
 
 describe("things that arrive", () => {
+  /*
+   * Through a named preset from the motion stylesheet, which is keyed off the
+   * interface's motion preference — entrance, exit and reordering alike, since
+   * a leave animation that keeps moving is the same problem arriving later.
+   * Classes of its own would be classes the preference cannot reach.
+   */
   it("honours a preference for less motion", () => {
-    // Every transition, not only the entrance: a leave animation that keeps
-    // moving is the same problem arriving later.
-    const transitions = arrive.match(/(enter|leave|move)-[a-z-]*class="[^"]*"/g) ?? [];
-
-    expect(transitions.length).toBeGreaterThan(0);
-    for (const transition of transitions) {
-      if (!transition.includes("transition")) continue;
-      expect(transition, `${transition} moves regardless of preference`).toContain(
-        "motion-reduce:",
-      );
-    }
+    expect(arrive).toMatch(/name="motion-[a-z]+"/);
+    expect(arrive, "classes of its own would ignore the preference").not.toMatch(
+      /(enter|leave|move)-[a-z-]*class=/,
+    );
   });
 
   /*

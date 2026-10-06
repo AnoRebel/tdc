@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 // A relative path, not an alias: this runs while the configuration is being
 // evaluated, before Nuxt has resolved any of its own aliases.
 import { PREPAINT_THEME_SCRIPT } from "./app/lib/theme";
+import { PREPAINT_INTERFACE_SCRIPT } from "./app/lib/interface";
 
 /*
  * This layer's own directory.
@@ -86,6 +87,16 @@ export default defineNuxtConfig({
            */
           key: "theme-prepaint",
           innerHTML: PREPAINT_THEME_SCRIPT,
+        },
+        {
+          /*
+           * Motion and density, decided before the first paint for the same
+           * reason: somebody who turned motion off should not watch the first
+           * screen animate in before the application has loaded enough to
+           * know.
+           */
+          key: "interface-prepaint",
+          innerHTML: PREPAINT_INTERFACE_SCRIPT,
         },
       ],
     },
