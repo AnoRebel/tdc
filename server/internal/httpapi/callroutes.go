@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
@@ -67,6 +69,8 @@ const callSweepInterval = 15 * time.Second
 type callMediaRequest struct {
 	Audio bool `json:"audio"`
 	Video bool `json:"video"`
+	// Held says they are in another call for now, and send nothing to this one.
+	Held bool `json:"held"`
 }
 
 type callParticipantView struct {
@@ -75,6 +79,7 @@ type callParticipantView struct {
 	Address  string `json:"address"`
 	Audio    bool   `json:"audio"`
 	Video    bool   `json:"video"`
+	Held     bool   `json:"held"`
 	JoinedAt string `json:"joinedAt"`
 }
 
@@ -94,7 +99,7 @@ func (s *Server) callViewOf(roomID, callID uuid.UUID, startedAt time.Time, parti
 	for _, p := range participants {
 		view.Participants = append(view.Participants, callParticipantView{
 			UserID: p.UserID.String(), Username: p.Username, Address: s.rooms.UserAddress(p.Username),
-			Audio: p.Audio, Video: p.Video, JoinedAt: p.JoinedAt.UTC().Format(time.RFC3339),
+			Audio: p.Audio, Video: p.Video, Held: p.Held, JoinedAt: p.JoinedAt.UTC().Format(time.RFC3339),
 		})
 	}
 	return view
@@ -184,7 +189,7 @@ func (s *Server) handleCallMedia(c *echo.Context) error {
 	if err != nil {
 		return callError(err)
 	}
-	if err := s.rooms.SetCallMedia(ctx, call.ID, user.ID, request.Audio, request.Video); err != nil {
+	if err := s.rooms.SetCallMedia(ctx, call.ID, user.ID, request.Audio, request.Video, request.Held); err != nil {
 		return callError(err)
 	}
 	return s.respondWithCallState(c, roomID, call)
@@ -378,6 +383,9 @@ var ringTimeout = 45 * time.Second
 // to pester somebody.
 var ringsPerCaller = cache.RateLimit{Attempts: 10, Window: 5 * time.Minute}
 
+// maxDeclineMessage is how long the words sent with a decline may be.
+const maxDeclineMessage = 280
+
 type ringRequest struct {
 	// Users to ring, by id. Empty rings everybody else in a direct
 	// conversation, and nobody in a channel.
@@ -554,6 +562,18 @@ func (s *Server) handleDeclineRing(c *echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
+	var request struct {
+		// Message is a few words for the caller, shown with the decline. The
+		// client also posts it in the conversation, where it stays.
+		Message string `json:"message"`
+	}
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	message := strings.TrimSpace(request.Message)
+	if utf8.RuneCountInString(message) > maxDeclineMessage {
+		return echo.NewHTTPError(http.StatusBadRequest, "a message with a decline is a few words, not a letter")
+	}
 	call, err := s.rooms.OpenCall(ctx, roomID, user.ID)
 	if err != nil {
 		return callError(err)
@@ -562,6 +582,7 @@ func (s *Server) handleDeclineRing(c *echo.Context) error {
 
 	payload, _ := json.Marshal(map[string]string{
 		"call": call.ID.String(), "userId": user.ID.String(), "username": user.Username,
+		"message": message,
 	})
 	frame := realtime.Frame{Type: realtime.FrameCallDeclined, RoomID: roomID.String(), Payload: payload}
 	for _, participant := range call.Participants {

@@ -127,8 +127,16 @@ func TestDecliningTellsTheCall(t *testing.T) {
 
 	room := directCallBetween(t, handler, amina, baraka)
 	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call/ring", map[string]any{}, amina, http.StatusOK)
-	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call/decline", nil, baraka, http.StatusNoContent)
-	if frame, ok := nextCallFrame(t, ctx, caller, "call.declined"); !ok || !strings.Contains(mustJSON(t, frame), "baraka") {
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call/decline",
+		map[string]any{"message": "  In a meeting, call you after  "}, baraka, http.StatusNoContent)
+	frame, ok := nextCallFrame(t, ctx, caller, "call.declined")
+	if !ok || !strings.Contains(mustJSON(t, frame), "baraka") {
 		t.Errorf("the caller was not told who declined: %v", frame)
 	}
+	if !strings.Contains(mustJSON(t, frame), `"message":"In a meeting, call you after"`) {
+		t.Errorf("the caller did not get the words sent with the decline: %v", frame)
+	}
+
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call/decline",
+		map[string]any{"message": strings.Repeat("a", 281)}, baraka, http.StatusBadRequest)
 }

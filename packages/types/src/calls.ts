@@ -5,6 +5,8 @@ export interface CallParticipant {
   address: string;
   audio: boolean;
   video: boolean;
+  /** In another call for now, and sending nothing to this one. */
+  held: boolean;
   joinedAt: string;
 }
 
@@ -44,4 +46,6 @@ export interface CallDeclined {
   call: string;
   userId: string;
   username: string;
+  /** A few words sent with the decline, if any. */
+  message?: string;
 }

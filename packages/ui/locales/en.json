@@ -1676,9 +1676,8 @@
     "nobodyToRing": "Everybody here is already in the call.",
     "incomingOne": "Incoming call",
     "incomingMany": "{count} incoming calls",
-    "whileInCall": "You're in a call. Answering ends it and joins this one.",
+    "whileInCall": "You're in a call. Hold it to answer this one, or end it.",
     "endAndAnswer": "End & answer",
-    "endAndAnswerVideo": "End & video",
     "muteRinger": "Mute the ringer on this device",
     "unmuteRinger": "Turn the ringer back on",
     "ringtones": "Ringing",
@@ -1696,6 +1695,32 @@
     "setPersonTone": "Set",
     "toneForPerson": "Ringtone for {name}",
     "startVideo": "Start a video call",
-    "vibrate": "Vibrate for incoming calls"
+    "vibrate": "Vibrate for incoming calls",
+    "holding": "holding",
+    "youAreHolding": "You're holding this call",
+    "resume": "Resume",
+    "hold": "Hold",
+    "onHold": "On hold",
+    "switch": "Switch",
+    "heldCalls": "Your other calls",
+    "leaveHeld": "Leave the call with {name}",
+    "moreHeld": "+{count} held",
+    "declinedSaying": "{name} declined: “{message}”",
+    "declineWithMessage": "Decline with a message",
+    "declineAndSend": "Decline and send",
+    "ownWords": "Or write your own…",
+    "holdAndAnswer": "Hold & answer",
+    "farewellLabel": "If you end it, tell them",
+    "farewellNone": "Nothing",
+    "quick": {
+      "busy": "Can't talk right now.",
+      "later": "I'll call you back soon.",
+      "meeting": "In a meeting. Can you write instead?",
+      "write": "On my way, I'll call when I can."
+    },
+    "farewell": {
+      "other": "Sorry, I have to take another call.",
+      "back": "Have to go, I'll call back shortly."
+    }
   }
 }

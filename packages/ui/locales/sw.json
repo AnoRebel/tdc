@@ -1676,9 +1676,8 @@
     "nobodyToRing": "Kila mtu hapa tayari yuko kwenye simu.",
     "incomingOne": "Simu inaingia",
     "incomingMany": "Simu {count} zinaingia",
-    "whileInCall": "Uko kwenye simu. Kupokea kutaimaliza na kujiunga na hii.",
+    "whileInCall": "Uko kwenye simu. Isubirishe ili upokee hii, au uikate.",
     "endAndAnswer": "Maliza & pokea",
-    "endAndAnswerVideo": "Maliza & video",
     "muteRinger": "Nyamazisha mlio kwenye kifaa hiki",
     "unmuteRinger": "Washa tena mlio",
     "ringtones": "Mlio wa simu",
@@ -1696,6 +1695,32 @@
     "setPersonTone": "Weka",
     "toneForPerson": "Mlio wa {name}",
     "startVideo": "Anzisha simu ya video",
-    "vibrate": "Tetemeka simu zinapoingia"
+    "vibrate": "Tetemeka simu zinapoingia",
+    "holding": "amesubirisha",
+    "youAreHolding": "Umesubirisha simu hii",
+    "resume": "Endelea",
+    "hold": "Subirisha",
+    "onHold": "Imesubirishwa",
+    "switch": "Badilisha",
+    "heldCalls": "Simu zako nyingine",
+    "leaveHeld": "Ondoka kwenye simu na {name}",
+    "moreHeld": "+{count} zimesubirishwa",
+    "declinedSaying": "{name} amekataa: “{message}”",
+    "declineWithMessage": "Kataa na ujumbe",
+    "declineAndSend": "Kataa na utume",
+    "ownWords": "Au andika maneno yako…",
+    "holdAndAnswer": "Subirisha & pokea",
+    "farewellLabel": "Ukiikata, waambie",
+    "farewellNone": "Hakuna",
+    "quick": {
+      "busy": "Siwezi kuongea sasa hivi.",
+      "later": "Nitakupigia baadaye kidogo.",
+      "meeting": "Niko kwenye kikao. Unaweza kuandika?",
+      "write": "Niko njiani, nitakupigia nikiweza."
+    },
+    "farewell": {
+      "other": "Samahani, lazima nipokee simu nyingine.",
+      "back": "Lazima niondoke, nitapiga tena punde."
+    }
   }
 }

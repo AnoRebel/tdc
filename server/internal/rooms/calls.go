@@ -196,10 +196,11 @@ func (s *Service) endIfEmpty(ctx context.Context, callID, actorID uuid.UUID) (*d
 	return &event, nil
 }
 
-// SetCallMedia records what somebody in a call is sending.
-func (s *Service) SetCallMedia(ctx context.Context, callID, userID uuid.UUID, audio, video bool) error {
+// SetCallMedia records what somebody in a call is sending, and whether they
+// are holding it while in another.
+func (s *Service) SetCallMedia(ctx context.Context, callID, userID uuid.UUID, audio, video, held bool) error {
 	changed, err := s.store.SetCallMedia(ctx, dbgen.SetCallMediaParams{
-		CallID: callID, UserID: userID, Audio: audio, Video: video,
+		CallID: callID, UserID: userID, Audio: audio, Video: video, Held: held,
 	})
 	if err != nil {
 		return fmt.Errorf("set call media: %w", err)

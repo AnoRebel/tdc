@@ -74,7 +74,8 @@ const joinCall = `-- name: JoinCall :exec
 INSERT INTO call_participants (call_id, user_id, audio, video)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (call_id, user_id)
-DO UPDATE SET left_at = NULL, joined_at = NOW(), audio = EXCLUDED.audio, video = EXCLUDED.video
+DO UPDATE SET left_at = NULL, joined_at = NOW(), audio = EXCLUDED.audio, video = EXCLUDED.video,
+              held = FALSE
 `
 
 type JoinCallParams struct {
@@ -150,7 +151,7 @@ func (q *Queries) LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfD
 }
 
 const listCallParticipants = `-- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, u.username
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, u.username
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -162,6 +163,7 @@ type ListCallParticipantsRow struct {
 	JoinedAt time.Time
 	Audio    bool
 	Video    bool
+	Held     bool
 	Username string
 }
 
@@ -179,6 +181,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 			&i.JoinedAt,
 			&i.Audio,
 			&i.Video,
+			&i.Held,
 			&i.Username,
 		); err != nil {
 			return nil, err
@@ -210,7 +213,7 @@ func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, e
 }
 
 const setCallMedia = `-- name: SetCallMedia :execrows
-UPDATE call_participants SET audio = $3, video = $4
+UPDATE call_participants SET audio = $3, video = $4, held = $5
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
 `
 
@@ -219,6 +222,7 @@ type SetCallMediaParams struct {
 	UserID uuid.UUID
 	Audio  bool
 	Video  bool
+	Held   bool
 }
 
 func (q *Queries) SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int64, error) {
@@ -227,6 +231,7 @@ func (q *Queries) SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int
 		arg.UserID,
 		arg.Audio,
 		arg.Video,
+		arg.Held,
 	)
 	if err != nil {
 		return 0, err

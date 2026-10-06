@@ -54,9 +54,10 @@ function attach(element: unknown, stream: MediaStream | null | undefined) {
     </li>
     <li v-for="person in others" :key="person.userId" class="tile">
       <video
-        :ref="(el) => attach(el, c.remote.get(person.userId))"
+        :ref="(el) => attach(el, c.remote.value.get(person.userId))"
         autoplay
         playsinline
+        :muted="c.onHold.value"
         data-remote-video
         class="size-full object-cover"
         :class="!person.video && 'invisible absolute'"
@@ -67,6 +68,7 @@ function attach(element: unknown, stream: MediaStream | null | undefined) {
       <span class="tile-label">
         <MicOff v-if="!person.audio" class="size-3" :aria-label="$ts('calls.muted')" />
         {{ person.username }}
+        <span v-if="person.held" class="text-white/75">· {{ $t("calls.holding") }}</span>
       </span>
     </li>
   </ul>

@@ -113,6 +113,7 @@ const {
     <Teleport v-if="pipTarget" :to="pipTarget">
       <div class="flex h-screen flex-col gap-2 p-2">
         <div class="min-h-0 flex-1 overflow-y-auto"><CallTiles compact /></div>
+        <CallHeld />
         <CallControls :room-name="roomName" in-picture />
       </div>
     </Teleport>
@@ -147,7 +148,18 @@ const {
         {{ title }}
       </NuxtLink>
       <span class="text-xs text-muted-foreground">
-        {{ $t("calls.people", { count: c.call.value?.participants.length ?? 1 }) }}
+        {{
+          c.onHold.value
+            ? $t("calls.onHold")
+            : $t("calls.people", { count: c.call.value?.participants.length ?? 1 })
+        }}
+      </span>
+      <span
+        v-if="c.others.value.length"
+        class="rounded bg-warning/15 px-1 text-[0.6875rem] text-warning"
+        :title="$ts('calls.heldCalls')"
+      >
+        {{ $t("calls.moreHeld", { count: c.others.value.length }) }}
       </span>
       <Button
         variant="ghost"
@@ -231,6 +243,7 @@ const {
       <div class="min-h-0 flex-1 overflow-y-auto">
         <CallTiles />
       </div>
+      <CallHeld />
       <CallControls :room-name="roomName" />
     </div>
 
@@ -298,6 +311,7 @@ const {
       <div class="min-h-0 flex-1 overflow-y-auto">
         <CallTiles compact />
       </div>
+      <CallHeld />
       <CallControls :room-name="roomName" />
     </div>
   </div>

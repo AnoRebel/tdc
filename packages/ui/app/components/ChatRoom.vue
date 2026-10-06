@@ -989,7 +989,7 @@ const callable = computed(
     !room.value?.homeServer &&
     !room.value?.archived,
 );
-const inThisCall = computed(() => calling.joined.value && calling.roomId.value === roomId.value);
+const inThisCall = computed(() => Boolean(roomId.value && calling.isIn(roomId.value)));
 async function refreshCall() {
   if (!callable.value) return;
   try {

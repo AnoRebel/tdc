@@ -252,3 +252,29 @@ func TestSignallingPassesOnlyBetweenParticipants(t *testing.T) {
 		t.Errorf("the participant received %s", payload)
 	}
 }
+
+// Holding a call while in another shows the others, and coming back clears it.
+func TestHoldingACallIsShownToTheOthers(t *testing.T) {
+	handler, _, room, amina, baraka := withCalls(t)
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call", map[string]any{"audio": true}, amina, http.StatusOK)
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call", map[string]any{"audio": true}, baraka, http.StatusOK)
+
+	heldOf := func(call map[string]any) any {
+		for _, raw := range call["participants"].([]any) {
+			if p := raw.(map[string]any); p["username"] == "amina" {
+				return p["held"]
+			}
+		}
+		return nil
+	}
+	held := decode(t, mustCall(t, handler, http.MethodPatch, "/api/rooms/"+room+"/call",
+		map[string]any{"audio": true, "held": true}, amina, http.StatusOK))
+	if heldOf(held) != true {
+		t.Errorf("holding is not shown: %v", held)
+	}
+	back := decode(t, mustCall(t, handler, http.MethodPatch, "/api/rooms/"+room+"/call",
+		map[string]any{"audio": true}, amina, http.StatusOK))
+	if heldOf(back) != false {
+		t.Errorf("returning to the call still shows it held: %v", back)
+	}
+}

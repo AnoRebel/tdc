@@ -15,10 +15,17 @@ import { createGlobalState } from "@vueuse/core";
  * the camera or microphone on and off swaps or mutes a track without
  * renegotiating.
  *
- * One call for the whole application, not one per page: a call goes on while
+ * Calls belong to the whole application, not to a page: a call goes on while
  * somebody reads another conversation, opens a project or changes a setting.
- * The call window in the layout shows it and holds the connection its
- * negotiation travels on; a conversation only offers to start or join.
+ * The call window in the layout shows it and the call host holds the
+ * connection its negotiation travels on; a conversation only offers to start
+ * or join.
+ *
+ * Somebody can be in several calls at once, talking in one and holding the
+ * rest, as on a phone. One microphone and camera serve them all: the active
+ * call's connections carry them, a held call's carry nothing, and nothing a
+ * held call sends is played. The others in a held call are told, so they know
+ * why it went quiet.
  */
 
 type SignalSender = (call: string, to: string, body: CallSignal["signal"]) => void;
@@ -37,39 +44,56 @@ interface Peer {
 
 export const useCall = createGlobalState(() => {
   const api = useApi();
+  const rooms = useRooms();
   const { user } = useAuth();
 
   /**
-   * The conversation whose call we are in, or are joining. Shared state by
-   * name, so the layout can mount the call window when a call begins without
-   * loading any of the call's code before then.
+   * The conversation of the call shown — the one being talked in, or the one
+   * last talked in while every call is held. Shared state by name, so the
+   * layout can mount the call window when a call begins without loading any of
+   * the call's code before then.
    */
   const roomId = useState<string | null>("call.room", () => null);
   const view = ref<CallView>("docked");
   let sendSignal: SignalSender = () => {};
-  /** Set by the call window, whose connection carries the negotiation. */
+  /** Set by the call host, whose connection carries the negotiation. */
   function setSignaller(sender: SignalSender) {
     sendSignal = sender;
   }
 
-  /** The call we are in, as the server last described it. */
-  const call = ref<Call | null>(null);
-  const joined = ref(false);
+  /** Every call we are in, by conversation, as the server last described it. */
+  const calls = ref<Record<string, Call>>({});
+  /** The conversations whose calls we are holding. */
+  const holding = ref<string[]>([]);
+  /** The call shown. */
+  const call = computed<Call | null>(
+    () => (roomId.value ? calls.value[roomId.value] : null) ?? null,
+  );
+  const joined = computed(() => Boolean(call.value));
+  /** Whether the call shown is one we are holding. */
+  const onHold = computed(() => Boolean(roomId.value && holding.value.includes(roomId.value)));
+  /** The calls we are in other than the one shown. */
+  const others = computed(() =>
+    Object.values(calls.value).filter((each) => each.roomId !== roomId.value),
+  );
   const joining = ref(false);
   const microphone = ref(true);
   const camera = ref(false);
   const error = ref<string | null>(null);
-  /** Our own camera, to show ourselves. */
+  /** Our own microphone and camera, shared by every call we are in. */
   const local = shallowRef<MediaStream | null>(null);
-  /** What each other participant is sending, by their user id. */
-  const remote = shallowReactive(new Map<string, MediaStream>());
+  /** What each other participant is sending, by conversation and user id. */
+  const remotes = shallowReactive(new Map<string, Map<string, MediaStream>>());
+  /** What the people in the call shown are sending, by user id. */
+  const remote = computed(() => remotes.get(roomId.value ?? "") ?? new Map<string, MediaStream>());
 
   /** People ringing us now, newest last. */
   const incoming = ref<CallRing[]>([]);
   /** The last person who declined our ring, for a moment's notice. */
   const declined = ref<CallDeclined | null>(null);
 
-  const peers = new Map<string, Peer>();
+  /** Each call's connections, by conversation and then by the other person. */
+  const peers = new Map<string, Map<string, Peer>>();
   /*
    * Negotiation that arrives while we are still joining. The others learn we
    * are in the call as soon as the server records it, and may send an offer
@@ -104,12 +128,31 @@ export const useCall = createGlobalState(() => {
     return local.value?.getTracks().find((each) => each.kind === kind) ?? null;
   }
 
-  function createPeer(other: string): Peer {
+  /** Whether a conversation's call is the one being talked in. */
+  function live(room: string): boolean {
+    return room === roomId.value && !holding.value.includes(room);
+  }
+
+  /** Whether we are in a conversation's call, talking or holding. */
+  function isIn(room: string): boolean {
+    return Boolean(calls.value[room]);
+  }
+
+  function roomOfCall(callId: string): string | null {
+    return Object.values(calls.value).find((each) => each.id === callId)?.roomId ?? null;
+  }
+
+  function createPeer(room: string, other: string): Peer {
     const connection = new RTCPeerConnection({ iceServers });
+    const sending = live(room);
     const peer: Peer = {
       connection,
-      audio: connection.addTransceiver(track("audio") ?? "audio", { direction: "sendrecv" }).sender,
-      video: connection.addTransceiver(track("video") ?? "video", { direction: "sendrecv" }).sender,
+      audio: connection.addTransceiver((sending && track("audio")) || "audio", {
+        direction: "sendrecv",
+      }).sender,
+      video: connection.addTransceiver((sending && track("video")) || "video", {
+        direction: "sendrecv",
+      }).sender,
       // Decided by something both sides know and agree on, so exactly one of
       // each pair yields when both offer at once.
       polite: (user.value?.id ?? "") > other,
@@ -117,20 +160,24 @@ export const useCall = createGlobalState(() => {
       ignoreOffer: false,
     };
 
-    const incoming = new MediaStream();
+    const arriving = new MediaStream();
     connection.ontrack = ({ track: arrived }) => {
-      incoming.addTrack(arrived);
-      remote.set(other, incoming);
+      arriving.addTrack(arrived);
+      const streams = new Map(remotes.get(room));
+      streams.set(other, arriving);
+      remotes.set(room, streams);
     };
     connection.onicecandidate = ({ candidate }) => {
-      if (call.value) sendSignal(call.value.id, other, { candidate: candidate?.toJSON() ?? null });
+      const current = calls.value[room];
+      if (current) sendSignal(current.id, other, { candidate: candidate?.toJSON() ?? null });
     };
     connection.onnegotiationneeded = async () => {
       try {
         peer.makingOffer = true;
         await connection.setLocalDescription();
-        if (call.value && connection.localDescription) {
-          sendSignal(call.value.id, other, { description: connection.localDescription.toJSON() });
+        const current = calls.value[room];
+        if (current && connection.localDescription) {
+          sendSignal(current.id, other, { description: connection.localDescription.toJSON() });
         }
       } finally {
         peer.makingOffer = false;
@@ -142,76 +189,136 @@ export const useCall = createGlobalState(() => {
       }
     };
 
-    peers.set(other, peer);
+    if (!peers.has(room)) peers.set(room, new Map());
+    peers.get(room)!.set(other, peer);
     return peer;
   }
 
-  function closePeer(other: string) {
-    peers.get(other)?.connection.close();
-    peers.delete(other);
-    remote.delete(other);
+  function closePeer(room: string, other: string) {
+    peers.get(room)?.get(other)?.connection.close();
+    peers.get(room)?.delete(other);
+    const streams = remotes.get(room);
+    if (streams?.has(other)) {
+      const rest = new Map(streams);
+      rest.delete(other);
+      remotes.set(room, rest);
+    }
   }
 
-  /** Brings the peer connections in line with who is in the call. */
-  function reconcile() {
-    if (!joined.value || !call.value) return;
+  /** Brings a call's connections in line with who is in it. */
+  function reconcile(room: string) {
+    const current = calls.value[room];
+    if (!current) return;
     const me = user.value?.id;
-    const present = new Set(call.value.participants.map((each) => each.userId));
+    const present = new Set(current.participants.map((each) => each.userId));
     for (const other of present) {
-      if (other !== me && !peers.has(other)) createPeer(other);
+      if (other !== me && !peers.get(room)?.has(other)) createPeer(room, other);
     }
-    for (const other of [...peers.keys()]) {
-      if (!present.has(other)) closePeer(other);
+    for (const other of [...(peers.get(room)?.keys() ?? [])]) {
+      if (!present.has(other)) closePeer(room, other);
     }
+  }
+
+  /** Points a call's connections at our microphone and camera, or at nothing. */
+  async function feed(room: string, sending: boolean) {
+    for (const peer of peers.get(room)?.values() ?? []) {
+      await peer.audio.replaceTrack(sending ? track("audio") : null);
+      await peer.video.replaceTrack(sending ? track("video") : null);
+    }
+  }
+
+  async function report(room: string | null = roomId.value) {
+    if (!room || !calls.value[room]) return;
+    try {
+      const state = await api.patch<Call>(`/api/rooms/${room}/call`, {
+        audio: microphone.value,
+        video: camera.value,
+        held: holding.value.includes(room),
+      });
+      if (calls.value[room]) calls.value = { ...calls.value, [room]: state };
+    } catch {
+      // The others see the old state until the next change; the media itself
+      // has already changed.
+    }
+  }
+
+  /** Holds the call being talked in, if there is one. */
+  async function holdCurrent() {
+    const room = roomId.value;
+    if (!room || !live(room)) return;
+    holding.value = [...holding.value, room];
+    await feed(room, false);
+    await report(room);
   }
 
   /**
-   * Joins the call, or starts one.
+   * Talks in a call we are in: the one being talked in is held, and this one
+   * gets the microphone and camera.
+   */
+  async function switchTo(room: string) {
+    if (!calls.value[room] || live(room)) return;
+    if (room !== roomId.value) await holdCurrent();
+    roomId.value = room;
+    holding.value = holding.value.filter((each) => each !== room);
+    await feed(room, true);
+    await report(room);
+  }
+
+  /**
+   * Joins a conversation's call, or starts one.
    *
    * The microphone (and camera, if asked) first: nothing is sent, and nobody is
-   * told we are in the call, until the person has granted it.
+   * told we are in the call, until the person has granted it. A call we are
+   * already talking in is held, unless asked to end it.
    */
-  async function join(room: string, withVideo: boolean, options: { ring?: boolean } = {}) {
+  async function join(
+    room: string,
+    withVideo: boolean,
+    options: { ring?: boolean; endCurrent?: boolean } = {},
+  ) {
     if (joining.value) return;
-    if (joined.value) {
-      if (roomId.value === room) return;
-      // One call at a time: joining another leaves this one.
-      await leave();
+    if (calls.value[room]) {
+      await switchTo(room);
+      return;
     }
-    roomId.value = room;
     joining.value = true;
     error.value = null;
     try {
-      local.value = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: withVideo,
-      });
+      if (!local.value) {
+        local.value = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: withVideo,
+        });
+        microphone.value = true;
+        camera.value = withVideo;
+      }
     } catch {
       error.value = "permission";
       joining.value = false;
-      roomId.value = null;
       return;
     }
     try {
       iceServers = (await api.get<IceConfiguration>("/api/calls/ice")).iceServers;
-      call.value = await api.post<Call>(`/api/rooms/${roomId.value}/call`, {
-        audio: true,
-        video: withVideo,
+      if (options.endCurrent && roomId.value) await leave(roomId.value, { keepMedia: true });
+      else await holdCurrent();
+      const started = await api.post<Call>(`/api/rooms/${room}/call`, {
+        audio: microphone.value,
+        video: camera.value,
       });
-      joined.value = true;
-      microphone.value = true;
-      camera.value = withVideo;
+      calls.value = { ...calls.value, [room]: started };
+      roomId.value = room;
+      holding.value = holding.value.filter((each) => each !== room);
       view.value = "docked";
-      reconcile();
+      reconcile(room);
       const waiting = early;
       early = [];
       for (const signal of waiting) await onSignal(signal);
       incoming.value = incoming.value.filter((ring) => ring.roomId !== room);
+      if (withVideo && !camera.value) await toggleCamera();
       if (options.ring) await ring();
     } catch (cause) {
-      stopLocal();
+      if (!Object.keys(calls.value).length) stopLocal();
       early = [];
-      roomId.value = null;
       error.value = isApiError(cause) ? cause.message : "unreachable";
     } finally {
       joining.value = false;
@@ -223,19 +330,6 @@ export const useCall = createGlobalState(() => {
     local.value = null;
   }
 
-  async function report() {
-    if (!joined.value) return;
-    try {
-      call.value = await api.patch<Call>(`/api/rooms/${roomId.value}/call`, {
-        audio: microphone.value,
-        video: camera.value,
-      });
-    } catch {
-      // The others see the old state until the next change; the media itself
-      // has already changed.
-    }
-  }
-
   async function toggleMicrophone() {
     microphone.value = !microphone.value;
     const audio = track("audio");
@@ -244,6 +338,8 @@ export const useCall = createGlobalState(() => {
   }
 
   async function toggleCamera() {
+    const room = roomId.value;
+    const sending = Boolean(room && live(room));
     if (!camera.value) {
       try {
         const [video] = (
@@ -252,7 +348,9 @@ export const useCall = createGlobalState(() => {
         if (!video) return;
         local.value?.addTrack(video);
         local.value = new MediaStream(local.value?.getTracks() ?? [video]);
-        for (const peer of peers.values()) await peer.video.replaceTrack(video);
+        if (sending && room) {
+          for (const peer of peers.get(room)?.values() ?? []) await peer.video.replaceTrack(video);
+        }
         camera.value = true;
       } catch {
         error.value = "permission";
@@ -260,7 +358,9 @@ export const useCall = createGlobalState(() => {
       }
     } else {
       const video = track("video");
-      for (const peer of peers.values()) await peer.video.replaceTrack(null);
+      if (room) {
+        for (const peer of peers.get(room)?.values() ?? []) await peer.video.replaceTrack(null);
+      }
       video?.stop();
       if (video) local.value?.removeTrack(video);
       local.value = new MediaStream(local.value?.getTracks() ?? []);
@@ -269,14 +369,26 @@ export const useCall = createGlobalState(() => {
     await report();
   }
 
-  async function leave() {
-    if (!joined.value) return;
-    for (const other of [...peers.keys()]) closePeer(other);
-    stopLocal();
-    joined.value = false;
-    const room = roomId.value;
-    call.value = null;
-    roomId.value = null;
+  /**
+   * Leaves a call — the one shown unless another is named. Leaving the one
+   * shown shows another we are holding, still held: nobody is put back on
+   * the air without choosing to be.
+   */
+  async function leave(room: string | null = roomId.value, options: { keepMedia?: boolean } = {}) {
+    if (!room || !calls.value[room]) return;
+    for (const other of [...(peers.get(room)?.keys() ?? [])]) closePeer(room, other);
+    peers.delete(room);
+    remotes.delete(room);
+    const rest = { ...calls.value };
+    delete rest[room];
+    calls.value = rest;
+    holding.value = holding.value.filter((each) => each !== room);
+    if (roomId.value === room) {
+      const next = Object.keys(rest).at(-1) ?? null;
+      roomId.value = next;
+      if (next && !holding.value.includes(next)) holding.value = [...holding.value, next];
+    }
+    if (!Object.keys(rest).length && !options.keepMedia) stopLocal();
     try {
       await api.delete(`/api/rooms/${room}/call`);
     } catch {
@@ -284,9 +396,14 @@ export const useCall = createGlobalState(() => {
     }
   }
 
+  /** Leaves every call we are in. */
+  async function leaveAll() {
+    for (const room of Object.keys(calls.value)) await leave(room);
+  }
+
   /**
-   * Rings people into the call we are in: the given people, or everybody else
-   * in a direct conversation. Who could not be rung is not said, by design.
+   * Rings people into the call shown: the given people, or everybody else in
+   * a direct conversation. Who could not be rung is not said, by design.
    */
   async function ring(users: string[] = []) {
     if (!joined.value || !roomId.value) return;
@@ -298,7 +415,7 @@ export const useCall = createGlobalState(() => {
   }
 
   function onRing(incomingRing: CallRing) {
-    if (joined.value && call.value?.id === incomingRing.call) return;
+    if (roomOfCall(incomingRing.call)) return;
     if (incoming.value.some((each) => each.call === incomingRing.call)) return;
     incoming.value = [...incoming.value, incomingRing];
   }
@@ -308,43 +425,70 @@ export const useCall = createGlobalState(() => {
   }
 
   function onDeclined(notice: CallDeclined) {
-    if (notice.call !== call.value?.id) return;
+    if (!roomOfCall(notice.call)) return;
     declined.value = notice;
-    setTimeout(() => {
-      if (declined.value === notice) declined.value = null;
-    }, 5000);
+    setTimeout(
+      () => {
+        if (declined.value === notice) declined.value = null;
+      },
+      notice.message ? 12000 : 5000,
+    );
   }
 
-  async function answer(incomingRing: CallRing, withVideo: boolean) {
-    onRingEnded(incomingRing.call);
-    await join(incomingRing.roomId, withVideo);
-  }
-
-  async function decline(incomingRing: CallRing) {
-    onRingEnded(incomingRing.call);
+  /** Posts a few words in a conversation, as the person. */
+  async function say(room: string, words: string) {
+    if (!words.trim()) return;
     try {
-      await api.post(`/api/rooms/${incomingRing.roomId}/call/decline`);
+      await rooms.send(room, words.trim(), crypto.randomUUID());
     } catch {
-      // The ring ends by itself; declining only says so sooner.
+      // The call goes on; the words are the only thing lost.
     }
   }
 
-  /** Who is in the call changed. */
+  /**
+   * Answers somebody calling. A call being talked in is held, or ended when
+   * asked — with a few words to the people in it, if given.
+   */
+  async function answer(
+    incomingRing: CallRing,
+    withVideo: boolean,
+    options: { endCurrent?: boolean; farewell?: string } = {},
+  ) {
+    onRingEnded(incomingRing.call);
+    if (options.farewell && roomId.value) await say(roomId.value, options.farewell);
+    await join(incomingRing.roomId, withVideo, { endCurrent: options.endCurrent });
+  }
+
+  /** Declines somebody calling, with a few words for them if given. */
+  async function decline(incomingRing: CallRing, message = "") {
+    onRingEnded(incomingRing.call);
+    try {
+      await api.post(`/api/rooms/${incomingRing.roomId}/call/decline`, {
+        message: message.trim(),
+      });
+    } catch {
+      // The ring ends by itself; declining only says so sooner.
+    }
+    await say(incomingRing.roomId, message);
+  }
+
+  /** Who is in a call changed. */
   function onState(state: Call) {
-    if (!joined.value || state.roomId !== roomId.value) return;
-    call.value = state;
-    reconcile();
+    const mine = calls.value[state.roomId];
+    if (!mine || mine.id !== state.id) return;
+    calls.value = { ...calls.value, [state.roomId]: state };
+    reconcile(state.roomId);
   }
 
   /** Another participant's negotiation, handled by the perfect-negotiation rules. */
   async function onSignal(message: CallSignal) {
     const { call: callId, from, signal } = message;
-    if (!joined.value) {
+    const room = roomOfCall(callId);
+    if (!room) {
       if (joining.value) early.push(message);
       return;
     }
-    if (callId !== call.value?.id) return;
-    const peer = peers.get(from) ?? createPeer(from);
+    const peer = peers.get(room)?.get(from) ?? createPeer(room, from);
     const { connection } = peer;
 
     if (signal.description) {
@@ -375,6 +519,10 @@ export const useCall = createGlobalState(() => {
     view,
     setSignaller,
     call,
+    calls,
+    others,
+    holding,
+    onHold,
     joined,
     joining,
     microphone,
@@ -384,8 +532,12 @@ export const useCall = createGlobalState(() => {
     remote,
     metered,
     supported,
+    isIn,
     join,
+    switchTo,
+    hold: holdCurrent,
     leave,
+    leaveAll,
     toggleMicrophone,
     toggleCamera,
     onState,

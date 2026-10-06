@@ -12,18 +12,19 @@ RETURNING *;
 INSERT INTO call_participants (call_id, user_id, audio, video)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (call_id, user_id)
-DO UPDATE SET left_at = NULL, joined_at = NOW(), audio = EXCLUDED.audio, video = EXCLUDED.video;
+DO UPDATE SET left_at = NULL, joined_at = NOW(), audio = EXCLUDED.audio, video = EXCLUDED.video,
+              held = FALSE;
 
 -- name: LeaveCall :execrows
 UPDATE call_participants SET left_at = NOW()
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: SetCallMedia :execrows
-UPDATE call_participants SET audio = $3, video = $4
+UPDATE call_participants SET audio = $3, video = $4, held = $5
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, u.username
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, u.username
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Call } from "@tdc/types";
-import { Maximize2, Mic, Phone, TriangleAlert, Video } from "lucide-vue-next";
+import { Maximize2, Mic, Phone, Play, TriangleAlert, Video } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
@@ -15,7 +15,9 @@ const props = defineProps<{ roomId: string; call: Call | null }>();
 const { $t, $ts } = useI18n();
 const c = useCall();
 
-const here = computed(() => c.joined.value && c.roomId.value === props.roomId);
+const here = computed(() => c.isIn(props.roomId));
+// In it, but talking in another call, or holding every call.
+const held = computed(() => here.value && c.holding.value.includes(props.roomId));
 const names = computed(() =>
   (props.call?.participants ?? []).map((each) => each.username).join(", "),
 );
@@ -36,7 +38,9 @@ const errorText = computed(() => {
     >
       <Phone class="size-4 text-primary" aria-hidden="true" />
       <span class="font-medium">
-        {{ here ? $t("calls.youAreIn") : $t("calls.inProgress") }}
+        {{
+          held ? $t("calls.youAreHolding") : here ? $t("calls.youAreIn") : $t("calls.inProgress")
+        }}
       </span>
       <span class="min-w-0 truncate text-muted-foreground" :title="names">{{ names }}</span>
       <span v-if="!here && c.metered.value" class="flex items-center gap-1 text-xs text-warning">
@@ -44,7 +48,11 @@ const errorText = computed(() => {
         {{ $t("calls.metered") }}
       </span>
       <div class="ml-auto flex gap-1.5">
-        <Button v-if="here" size="small" variant="ghost" @click="c.view.value = 'expanded'">
+        <Button v-if="held" size="small" variant="ghost" @click="c.switchTo(roomId)">
+          <Play class="size-3.5" aria-hidden="true" />
+          {{ $t("calls.resume") }}
+        </Button>
+        <Button v-else-if="here" size="small" variant="ghost" @click="c.view.value = 'expanded'">
           <Maximize2 class="size-3.5" aria-hidden="true" />
           {{ $t("calls.show") }}
         </Button>

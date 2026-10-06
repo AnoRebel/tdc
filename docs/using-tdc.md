@@ -695,14 +695,31 @@ screen, never over what you are doing; drag it anywhere, or move it from the
 keyboard by its grip. It stays while you move between pages, and offers
 **Answer**, **Video** (answer with your camera on) and **Decline**. Several
 calls at once are listed together, newest first, each with its own buttons.
-If you are already in a call, the window says so and offers **End & answer**:
-the current call ends and the new one joins. **Silence** stops the sound
+If you are already in a call, the
+window says so and offers **Hold & answer** — the current call waits while you
+take the new one — or **End & answer**, with a choice of a few words for the
+people you are leaving. **Silence** stops the sound
 without declining. When the browser is in the background or closed, a ring
 arrives as a notification, where you have allowed notifications; the desktop
 application shows a banner, even when closed to the tray.
 
 You can switch between voice and video at any time: answer by voice or with
 video, and turn your camera on or off during the call.
+
+**Declining with a message.** The speech-bubble button beside **Decline**
+offers quick replies — "Can't talk right now", "I'll call you back soon" and
+others — or a box for your own words. The caller sees them at once in their
+call window, and they are posted in your conversation with them, where they
+stay.
+
+**Several calls at once.** You can be in more than one call, talking in one
+and holding the others, as on a phone. Your microphone and camera go only to
+the call you are talking in; nothing reaches a held call, and its people see
+that you are holding. Held calls are listed in the call window with
+**Switch**, which holds the current call and takes you back to that one, and a
+button to leave them. **Hold** in the call controls holds the call you are in,
+and **Resume** brings it back. Joining another conversation's call while in one
+holds the first rather than ending it.
 
 **Who may call you** is in **Settings → Privacy**: anybody on this server,
 only people you share a conversation with, or nobody — you can still join calls
@@ -732,8 +749,8 @@ without leaving it. From that window you can:
   your browser can only put a single video there, it is the first person's.
 
 Closing the tab or reloading the page ends your part in the call; moving
-between pages inside TDC does not. You are in one call at a time — joining
-another leaves the first.
+between pages inside TDC does not. Joining another call holds this one; see
+**Several calls at once** above.
 
 **What a call uses.** Calls go directly between the people in them, not
 through the server, so what matters is your own connection:

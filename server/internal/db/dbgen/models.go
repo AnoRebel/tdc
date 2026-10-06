@@ -116,6 +116,7 @@ type CallParticipant struct {
 	LeftAt   *time.Time
 	Audio    bool
 	Video    bool
+	Held     bool
 }
 
 type ChannelBan struct {
