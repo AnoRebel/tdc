@@ -276,8 +276,10 @@ describe("what the shared layer may depend on", () => {
       for (const match of template.matchAll(/<([A-Z][A-Za-z0-9]*)[\s/>]/g)) {
         const name = match[1];
         if (!name) continue;
-        // Ui-prefixed names are this layer's own, resolved by pathPrefix.
-        if (own.has(name) || own.has(name.replace(/^Ui/, ""))) continue;
+        // Ui-prefixed names are this layer's own, resolved by pathPrefix, and a
+        // Lazy prefix is Nuxt's way of loading one of them on first use.
+        const component = name.replace(/^Lazy/, "");
+        if (own.has(component) || own.has(component.replace(/^Ui/, ""))) continue;
         if (framework.has(name) || imported.has(name)) continue;
         missing.add(name);
       }

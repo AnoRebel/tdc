@@ -202,12 +202,7 @@ function conversationName(room: Room): string {
         </li>
       </ul>
 
-      <section v-if="joined.length">
-        <h2
-          class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
-        >
-          {{ $t("nav.channels") }}
-        </h2>
+      <SidebarSection v-if="joined.length" id="channels" :title="$ts('nav.channels')">
         <ul class="space-y-px">
           <li v-for="room in joined" :key="room.id">
             <NuxtLink :to="`/rooms/${room.id}`" class="nav-item" :data-active="isCurrent(room.id)">
@@ -222,21 +217,16 @@ function conversationName(room: Room): string {
               <span class="truncate">{{ room.name }}</span>
               <span
                 v-if="unread[room.id]"
-                class="tabular ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-semibold text-primary-foreground"
+                class="motion-badge tabular ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-semibold text-primary-foreground"
               >
-                {{ unread[room.id] }}
+                <UiCount :value="unread[room.id]!" />
               </span>
             </NuxtLink>
           </li>
         </ul>
-      </section>
+      </SidebarSection>
 
-      <section v-if="conversations.length">
-        <h2
-          class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
-        >
-          {{ $t("nav.directMessages") }}
-        </h2>
+      <SidebarSection v-if="conversations.length" id="direct" :title="$ts('nav.directMessages')">
         <ul class="space-y-px">
           <li v-for="room in conversations" :key="room.id">
             <NuxtLink :to="`/rooms/${room.id}`" class="nav-item" :data-active="isCurrent(room.id)">
@@ -244,21 +234,16 @@ function conversationName(room: Room): string {
               <span class="truncate">{{ conversationName(room) }}</span>
               <span
                 v-if="unread[room.id]"
-                class="tabular ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-semibold text-primary-foreground"
+                class="motion-badge tabular ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-semibold text-primary-foreground"
               >
-                {{ unread[room.id] }}
+                <UiCount :value="unread[room.id]!" />
               </span>
             </NuxtLink>
           </li>
         </ul>
-      </section>
+      </SidebarSection>
 
-      <section v-if="joinable.length">
-        <h2
-          class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
-        >
-          {{ $t("nav.browse") }}
-        </h2>
+      <SidebarSection v-if="joinable.length" id="browse" :title="$ts('nav.browse')">
         <ul class="space-y-px">
           <li v-for="room in joinable" :key="room.id">
             <NuxtLink :to="`/rooms/${room.id}`" class="nav-item" :data-active="isCurrent(room.id)">
@@ -267,14 +252,9 @@ function conversationName(room: Room): string {
             </NuxtLink>
           </li>
         </ul>
-      </section>
+      </SidebarSection>
 
-      <section v-if="peers.length">
-        <h2
-          class="px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
-        >
-          {{ $t("nav.servers") }}
-        </h2>
+      <SidebarSection v-if="peers.length" id="servers" :title="$ts('nav.servers')">
         <ul class="space-y-px">
           <li v-for="peer in peers" :key="peer.domain">
             <NuxtLink
@@ -317,7 +297,7 @@ function conversationName(room: Room): string {
             </NuxtLink>
           </li>
         </ul>
-      </section>
+      </SidebarSection>
 
       <p
         v-if="!joined.length && !conversations.length && !joinable.length && !peers.length"

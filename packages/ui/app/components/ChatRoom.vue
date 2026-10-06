@@ -57,6 +57,7 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { atTime, onDay } from "#layers/ui/app/lib/dates";
+import { isTyping } from "#layers/ui/app/lib/shortcuts";
 import IssueFromMessage from "#layers/ui/app/components/projects/IssueFromMessage.vue";
 import IssueLinks from "#layers/ui/app/components/projects/IssueLinks.vue";
 
@@ -276,17 +277,6 @@ const api = useApi();
 const navigationOpen = inject<Ref<boolean>>("navigationOpen", ref(false));
 
 /*
- * What the keyboard can do to a conversation.
- *
- * Registered with the layout, which owns the bindings: only this page knows
- * where the message box is or which message is last, and only the layout knows
- * that a key was pressed. A page that is not a conversation registers nothing
- * and the keys do nothing, which is the right outcome rather than an error.
- */
-const composerFocus = inject<Ref<(() => void) | null>>("composerFocus", ref(null));
-const threadOpen = inject<Ref<(() => void) | null>>("threadOpen", ref(null));
-
-/*
  * Touch gestures over the conversation.
  *
  * Each is a shortcut for somebody who knows it and never the only way to reach
@@ -306,23 +296,105 @@ useConversationSwipes(timelineElement, {
 
 const pull = usePullToRefresh(timelineElement, () => load());
 
-onMounted(() => {
-  composerFocus.value = () => composer.value?.focus();
+/*
+ * What the keyboard can do to a conversation.
+ *
+ * Registered with the layout, which owns the bindings: only this page knows
+ * where the message box is or which message is last, and only the layout knows
+ * that a key was pressed. Each registration lasts while this is mounted, so on
+ * any other screen the keys do nothing rather than reach into a conversation
+ * that is no longer there.
+ */
 
-  // The most recent message with something to reply to. Opening a thread on
-  // nothing would be a key that appears broken.
-  threadOpen.value = () => {
-    const last = [...visible.value].reverse().find((message) => !message.removed);
-    if (last) openThread(last.id);
-  };
+/** The newest message still standing, optionally only the reader's own. */
+function lastMessage(onlyMine = false) {
+  return [...visible.value]
+    .reverse()
+    .find((message) => !message.removed && (!onlyMine || message.sender === user.value?.address));
+}
+
+/** Opens the reader's own latest message for editing, if there is one. */
+function editLast(): boolean {
+  const mine = lastMessage(true);
+  if (!mine || !room.value?.member) return false;
+  startEditing(mine);
+  jumpTo(mine.id);
+
+  // Into the field, so the keyboard that asked for the edit can make it: an
+  // edit box opened from a key and left unfocused is one more Tab hunt.
+  void nextTick(() =>
+    document
+      .getElementById(`message-${mine.id}`)
+      ?.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea")
+      ?.focus(),
+  );
+  return true;
+}
+
+useShortcutAction("composer", () => {
+  if (!composer.value) return false;
+  composer.value.focus();
 });
 
-// Cleared on leaving, so the keys do nothing rather than reaching into a
-// conversation that is no longer on screen.
-onUnmounted(() => {
-  composerFocus.value = null;
-  threadOpen.value = null;
+// The most recent message with something to reply to. Opening a thread on
+// nothing would be a key that appears broken.
+useShortcutAction("thread", () => {
+  const last = lastMessage();
+  if (!last) return false;
+  openThread(last.id);
 });
+
+useShortcutAction("editLast", () => editLast());
+
+/*
+ * Reacting to the latest message: its own quick row is opened, and the first
+ * reaction in it focused, so the arrow keys and Enter finish the job — the
+ * same row a pointer would use, rather than a second way of reacting.
+ */
+useShortcutAction("react", () => {
+  const last = lastMessage();
+  if (!last || !room.value?.member) return false;
+
+  const row = document.getElementById(`message-${last.id}`);
+  const add = row?.querySelector<HTMLButtonElement>(".reaction-add");
+  if (!add) return false;
+
+  add.click();
+  void nextTick(() => row?.querySelector<HTMLButtonElement>(".quick-emoji")?.focus());
+});
+
+useShortcutAction("markRead", () => {
+  markCaughtUp();
+  scrollToLatest();
+  void refreshRooms();
+});
+
+/*
+ * Escape closes the thread beside the conversation — once somebody is out of
+ * whatever field they were typing in. Leaving the field is the first Escape;
+ * a thread closing under somebody mid-reply would lose their place.
+ */
+useShortcutAction("escape", (event) => {
+  if (!openThreadId.value || isTyping(event)) return false;
+  openThreadId.value = null;
+});
+
+/*
+ * The up arrow in an empty message box edits the last thing the reader sent,
+ * which is what every chat application they have used does. Only when the box
+ * is empty: anywhere else the arrow moves the caret, and taking that away
+ * would be stealing a key from somebody writing.
+ */
+const interfacePreferences = useInterfacePreferences();
+
+function editLastFromComposer(event: KeyboardEvent) {
+  if (draft.value !== "" || event.altKey || event.shiftKey || event.ctrlKey || event.metaKey) {
+    return;
+  }
+  if (!interfacePreferences.shortcuts.value) return;
+  if (editLast()) event.preventDefault();
+}
+
 const personal = usePersonalModeration();
 
 /** Who is about to be blocked, while the confirmation is up. */
@@ -1992,7 +2064,7 @@ watch(roomId, load, { immediate: true });
                     variant="ghost"
                     size="icon"
                     v-if="room?.member"
-                    title="Reply in thread"
+                    label="Reply in thread"
                     @click="openThread(message.id)"
                   >
                     <MessageSquareText class="size-3.5" />
@@ -2001,7 +2073,7 @@ watch(roomId, load, { immediate: true });
                     variant="ghost"
                     size="icon"
                     v-if="group.mine"
-                    title="Edit"
+                    label="Edit"
                     @click="startEditing(message)"
                   >
                     <Pencil class="size-3.5" />
@@ -2256,7 +2328,12 @@ watch(roomId, load, { immediate: true });
       </div>
 
       <footer class="shrink-0 px-4 pt-1 pb-4">
-        <p class="h-4 text-xs text-muted-foreground" aria-live="polite">
+        <p class="flex h-4 items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+          <Transition name="motion-fade">
+            <span v-if="typingLabel" class="motion-typing" aria-hidden="true">
+              <span /><span /><span />
+            </span>
+          </Transition>
           {{ typingLabel ? `${typingLabel}…` : "" }}
         </p>
 
@@ -2362,9 +2439,14 @@ watch(roomId, load, { immediate: true });
               <Smile class="size-4" />
             </Button>
 
-            <div v-if="choosingEmoji" class="absolute bottom-full left-0 z-20 mb-1">
-              <EmojiPicker v-model="choosingEmoji" @pick="insertEmoji" @gif="attachGif" />
-            </div>
+            <Transition name="motion-pop">
+              <div
+                v-if="choosingEmoji"
+                class="absolute bottom-full left-0 z-20 mb-1 origin-bottom-left"
+              >
+                <EmojiPicker v-model="choosingEmoji" @pick="insertEmoji" @gif="attachGif" />
+              </div>
+            </Transition>
           </div>
 
           <textarea
@@ -2379,6 +2461,7 @@ watch(roomId, load, { immediate: true });
               fitComposer();
             "
             @keydown.enter.exact.prevent="send"
+            @keydown.up="editLastFromComposer"
           />
           <Button
             size="icon"
@@ -2465,21 +2548,25 @@ watch(roomId, load, { immediate: true });
 
     <!-- Both of these leave no trace in the conversation, so the interface has
          to say the thing happened or somebody will do it again. -->
-    <p
-      v-if="scheduled"
-      class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
-      role="status"
-    >
-      {{ $t("room.scheduledForLater") }}
-    </p>
+    <Transition name="motion-toast">
+      <p
+        v-if="scheduled"
+        class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
+        role="status"
+      >
+        {{ $t("room.scheduledForLater") }}
+      </p>
+    </Transition>
 
-    <p
-      v-if="reported"
-      class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
-      role="status"
-    >
-      {{ $t("room.reportedToModerator") }}
-    </p>
+    <Transition name="motion-toast">
+      <p
+        v-if="reported"
+        class="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
+        role="status"
+      >
+        {{ $t("room.reportedToModerator") }}
+      </p>
+    </Transition>
 
     <ForwardDialog
       v-if="forwarding.length"
@@ -2503,14 +2590,16 @@ watch(roomId, load, { immediate: true });
       @choose="(lifetime) => setLifetime(expiring!.id, lifetime)"
     />
 
-    <ThreadPanel
-      v-if="openThreadId && user"
-      :room-id="roomId"
-      :root-id="openThreadId"
-      :self-address="user.address"
-      @close="openThreadId = null"
-      @replied="refreshThreadCounts"
-    />
+    <Transition name="motion-panel">
+      <ThreadPanel
+        v-if="openThreadId && user"
+        :room-id="roomId"
+        :root-id="openThreadId"
+        :self-address="user.address"
+        @close="openThreadId = null"
+        @replied="refreshThreadCounts"
+      />
+    </Transition>
   </div>
 </template>
 
@@ -2539,12 +2628,7 @@ watch(roomId, load, { immediate: true });
   }
 }
 
-/* Somebody who prefers less motion still needs to see which message it is, so
-   the mark is shown and simply does not animate. */
-@media (prefers-reduced-motion: reduce) {
-  :deep(.just-found) {
-    animation: none;
-    background-color: color-mix(in oklab, var(--color-primary) 22%, transparent);
-  }
-}
+/* Somebody who turned motion down still sees which message it is: the mark is
+   shown without fading, by a rule in the motion stylesheet keyed off the
+   preference. */
 </style>
