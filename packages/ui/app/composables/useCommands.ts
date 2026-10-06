@@ -1,7 +1,9 @@
 import type { Component } from "vue";
 import {
+  Braces,
   Flag,
   Keyboard,
+  LifeBuoy,
   LogOut,
   Moon,
   Plus,
@@ -35,7 +37,7 @@ export interface Command {
  * showing, never what is allowed.
  */
 export function useCommands(options: { openShortcuts: () => void; createChannel: () => void }) {
-  const { $localeRoute: localeRoute } = useI18n();
+  const { $ts, $localeRoute: localeRoute } = useI18n();
   const { can, signOut } = useAuth();
   const router = useRouter();
   const theme = useTheme();
@@ -70,6 +72,20 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         icon: Keyboard,
         keywords: "keys help",
         run: options.openShortcuts,
+      },
+      {
+        id: "help",
+        label: $ts("help.title"),
+        icon: LifeBuoy,
+        keywords: "guides documentation docs how manual msaada miongozo",
+        run: () => void router.push(localeRoute({ name: "help" })),
+      },
+      {
+        id: "api-reference",
+        label: $ts("help.apiReference.title"),
+        icon: Braces,
+        keywords: "endpoints routes developers integrating http",
+        run: () => void router.push(localeRoute({ name: "help-api" })),
       },
       {
         id: "theme-dark",

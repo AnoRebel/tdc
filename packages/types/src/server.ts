@@ -79,6 +79,20 @@ export interface ServerInfo {
    * no link: it promises something nobody can deliver.
    */
   recovery?: boolean;
+  /**
+   * Where the operator publishes this server's own policies.
+   *
+   * Absent when neither is set, and each link absent when that one is not. A
+   * client shows nothing in their place — never the templates in the
+   * repository, which are not this server's promises.
+   */
+  legal?: LegalLinks;
+}
+
+/** Links to the policies an operator has published for their server. */
+export interface LegalLinks {
+  privacyPolicyUrl?: string;
+  termsUrl?: string;
 }
 
 /** A way of signing in that this server offers through somebody else. */

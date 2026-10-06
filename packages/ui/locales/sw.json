@@ -1386,5 +1386,113 @@
       "windowAndStartup": "Dirisha na kuanza",
       "updates": "Masasisho"
     }
+  },
+  "help": {
+    "nav": "Msaada",
+    "title": "Msaada",
+    "subtitle": "Miongozo ya kutumia seva hii, kuiendesha, na kujenga juu yake.",
+    "searchLabel": "Tafuta katika miongozo",
+    "searchPlaceholder": "Tafuta katika miongozo",
+    "searching": "Inatafuta katika miongozo…",
+    "searchFailed": "Imeshindwa kutafuta katika miongozo. Jaribu tena.",
+    "noResults": "Hakuna kitu katika miongozo kinacholingana na “{query}”.",
+    "results": "Matokeo",
+    "groups": {
+      "using": "Kuitumia",
+      "usingHint": "Kwa kila mwenye akaunti hapa.",
+      "operators": "Kwa waendeshaji",
+      "operatorsHint": "Kuendesha seva: kuisimika, kuisanidi, kuipandisha toleo.",
+      "developers": "Kwa wasanidi programu",
+      "developersHint": "Kujenga juu ya API, na kuchangia mradi.",
+      "templates": "Violezo vya sera",
+      "templatesHint": "Mianzo ambayo mwendeshaji huirekebisha na kuichapisha. Si sera za seva hii."
+    },
+    "guides": {
+      "usingTdc": {
+        "title": "Kutumia TDC",
+        "description": "Mazungumzo, ujumbe, mafaili, arifa na mipangilio."
+      },
+      "movingFromTelegramAndWhatsapp": {
+        "title": "Kuhamia kutoka Telegram na WhatsApp",
+        "description": "Jinsi kikundi kinavyogeuka kuwa vipindi, na kinachobadilika kwa wanachama wake."
+      },
+      "projects": {
+        "title": "Miradi na masuala",
+        "description": "Kufuatilia kazi iliyokubaliwa katika mazungumzo."
+      },
+      "directory": {
+        "title": "Saraka",
+        "description": "Wasifu, kampuni, maulizo na nani anaona nini."
+      },
+      "hosting": {
+        "title": "Kuendesha seva",
+        "description": "Kusimika seva, TLS, nakala rudufu na kurejesha."
+      },
+      "upgrading": {
+        "title": "Kupandisha toleo",
+        "description": "Kuhama kati ya matoleo, na kurudi nyuma."
+      },
+      "integrating": {
+        "title": "Kuunganisha",
+        "description": "API ya HTTP na muunganisho hai, kwa roboti na programu nyingine."
+      },
+      "webhooksAndApps": {
+        "title": "Webhook na programu",
+        "description": "Kuziarifu mifumo mingine kinachotokea, na programu zenye ruhusa zake zenyewe."
+      },
+      "federationProtocol": {
+        "title": "Itifaki ya shirikisho",
+        "description": "Itifaki ya mawasiliano kati ya seva."
+      },
+      "contributing": {
+        "title": "Kuchangia",
+        "description": "Jinsi mabadiliko yanavyoufikia mradi."
+      },
+      "privacyPolicy": {
+        "title": "Kiolezo cha sera ya faragha",
+        "description": "Kile programu inachohifadhi na kinachotoka nje ya seva."
+      },
+      "termsOfUse": {
+        "title": "Kiolezo cha masharti ya matumizi",
+        "description": "Matumizi yanayokubalika, udhibiti, umiliki na dhima."
+      }
+    },
+    "apiReference": {
+      "title": "Marejeo ya API",
+      "description": "Kila kiungo ambacho seva hii inahudumia, kilichotolewa kutoka njia zake."
+    },
+    "allGuides": "Miongozo yote",
+    "onThisPage": "Katika ukurasa huu",
+    "copy": "Nakili",
+    "copied": "Imenakiliwa",
+    "anchor": "Kiungo cha sehemu hii",
+    "minutes": "Dakika {count} za kusoma",
+    "viewSource": "Tazama chanzo",
+    "notFound": "Hakuna mwongozo katika anwani hii.",
+    "loadFailed": "Mwongozo huu haukuweza kupakiwa. Jaribu tena.",
+    "retry": "Jaribu tena",
+    "notTranslated": "Samahani, mwongozo huu bado haujatafsiriwa kwa Kiswahili, kwa hiyo unaonyeshwa kwa Kiingereza.",
+    "templateNote": "Hiki ni kiolezo ambacho waendeshaji hukirekebisha. Si sera ya seva hii.",
+    "policies": {
+      "title": "Sera za seva hii",
+      "privacy": "Sera ya faragha",
+      "terms": "Masharti ya matumizi",
+      "none": "Mwendeshaji wa seva hii hajachapisha sera ya faragha wala masharti ya matumizi hapa."
+    },
+    "learnMore": "Jifunze zaidi",
+    "api": {
+      "filter": "Chuja viungo",
+      "count": "Viungo {count}",
+      "none": "Hakuna kiungo kinacholingana na “{query}”.",
+      "loadFailed": "Maelezo ya API hayakuweza kupakiwa. Jaribu tena.",
+      "method": "Mbinu",
+      "path": "Njia",
+      "summary": "Kinachofanya",
+      "authentication": "Uthibitishaji",
+      "permission": "Ruhusa",
+      "intro": "Njia, mbinu na kile kila moja inachohitaji, kama seva hii inavyoripoti. Maudhui ya maombi na majibu yameelezwa katika mwongozo wa Kuunganisha.",
+      "openGuide": "Fungua mwongozo wa Kuunganisha",
+      "raw": "JSON ghafi"
+    }
   }
 }

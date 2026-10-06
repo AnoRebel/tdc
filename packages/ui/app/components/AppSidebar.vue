@@ -371,6 +371,15 @@ function conversationName(room: Room): string {
       <ThemeToggle v-model="showAppearance" />
 
       <NuxtLink
+        :to="localeRoute({ name: 'help' })"
+        class="btn btn-ghost size-7 px-0"
+        :aria-label="$ts('help.nav')"
+        :title="$ts('help.nav')"
+      >
+        <Icon name="lucide:circle-help" class="size-3.5" />
+      </NuxtLink>
+
+      <NuxtLink
         :to="localeRoute({ name: 'settings' })"
         class="btn btn-ghost size-7 px-0"
         :aria-label="$ts('nav.settings')"

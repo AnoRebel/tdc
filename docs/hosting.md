@@ -393,6 +393,28 @@ require a deployment.
 
 Every such change is recorded in the audit log.
 
+### Your privacy policy and terms
+
+The repository carries a [privacy policy](privacy-policy.md) and
+[terms of use](terms-of-use.md), and both are templates: what your server keeps,
+for how long, and who answers for it are yours to say. Adapt them, publish them
+somewhere you already publish things — your website, a wiki, a repository — and
+tell the server where:
+
+| Setting                    | What it is                    |
+| -------------------------- | ----------------------------- |
+| `legal.privacy_policy_url` | A link to your privacy policy |
+| `legal.terms_url`          | A link to your terms of use   |
+
+Both are policy, so they are set from the server settings page or
+`PUT /api/admin/settings/legal.terms_url`, and take effect immediately. Every
+client links to them from its help centre, and `GET /api/server` carries them
+under `legal` so a client can show them before anybody has signed in.
+
+Each must be an `http` or `https` link. Leave one empty and the clients show
+nothing for it — never the templates, because a template is not a promise you
+have made.
+
 ### Talking to other servers
 
 Federation is off until you turn it on, and a server does not need it: everything
