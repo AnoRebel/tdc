@@ -661,24 +661,74 @@ What is never translated is what people wrote — messages, channel names, statu
 text, somebody's display name. Those are shown as they were typed, in whatever
 language they were typed in.
 
+### Motion, density and shortcuts
+
+The interface moves a little when something changes: a dialog grows into place,
+a new message rises in, a thread panel slides the last few pixels open, a card
+glides to its new column on a board, an unread count pops when it appears. Every
+one of those is short — nothing takes longer than a quarter of a second — and
+nothing waits for it: whatever is appearing can be used from its first frame.
+
+You decide how much of that you want, under **Motion**:
+
+- **Follow my device** — the default. If your operating system is set to reduce
+  motion, you get _Reduced_; otherwise _Full_. It keeps following your system
+  while TDC is open.
+- **Full** — things fade, rise and slide into place.
+- **Reduced** — things still fade, so you can see that something changed, but
+  nothing slides, grows or bounces, and decorative loops (a shimmering
+  placeholder, the dots that say somebody is typing) stay still.
+- **Off** — nothing moves at all; every change happens at once.
+
+**Density** makes everything slightly smaller, so more of a conversation fits on
+the screen. **Keyboard shortcuts** can be switched off entirely if you keep
+setting them off by accident; `Esc` and `Ctrl K` keep working either way.
+
+All three apply the moment you choose them and are kept **in this browser** (or
+this desktop app) rather than on your account — you may want motion on a big
+screen and not on your phone. Find them in the command palette (`Ctrl K`, then
+"Motion and keyboard preferences"), behind **More preferences** in the shortcut
+list, and in settings.
+
 ### The keyboard
 
-| Keys              | What it does                                 |
-| ----------------- | -------------------------------------------- |
-| `Ctrl K`          | Search messages, channels and people         |
-| `?`               | Show the shortcut list                       |
-| `Ctrl Shift K`    | Switch channel                               |
-| `Alt ↑` / `Alt ↓` | Previous and next channel                    |
-| `C`               | Write a message                              |
-| `T`               | Open the thread on the last message          |
-| `Esc`             | Close what is open, or leave the message box |
+Press `?` for the full list, grouped by where each shortcut works.
 
-On a Mac, `Ctrl` here is the command key.
+| Keys                          | What it does                                        |
+| ----------------------------- | --------------------------------------------------- |
+| `Ctrl K`                      | Search messages, channels and people                |
+| `?` or `Ctrl /`               | Show the shortcut list                              |
+| `Esc`                         | Close what is open, or leave the text box           |
+| `[`                           | Show or hide the sidebar                            |
+| `Ctrl Shift K`                | Switch conversation                                 |
+| `Alt ↑` / `Alt ↓`             | Previous and next channel                           |
+| `Alt Shift ↑` / `Alt Shift ↓` | Previous and next conversation with unread messages |
+| `G` then `H`                  | Go to conversations                                 |
+| `G` then `P`                  | Go to projects                                      |
+| `G` then `I`                  | Go to my issues                                     |
+| `G` then `B`                  | Go to the board of the project you are in           |
+| `G` then `D`                  | Go to the directory                                 |
+| `G` then `S`                  | Go to settings                                      |
+| `C`                           | Write a message                                     |
+| `E`, or `↑` in an empty box   | Edit your last message                              |
+| `T`                           | Reply in a thread to the last message               |
+| `R`                           | React to the last message                           |
+| `M`                           | Mark as read and jump to the newest message         |
+| `N`                           | File a new issue, in a project                      |
 
-The unmodified shortcuts do nothing while you are typing — a shortcut that stole
-a letter mid-sentence would cost more trust than every shortcut is worth.
-Shortcuts carrying a modifier work anywhere, because nobody types `Ctrl K` into
-a sentence.
+On a board, every card has a move handle. Focus it and press `Enter` or `Space`
+to pick the card up, `←` and `→` to choose a column, and `Enter` to put it down
+(`Esc` leaves it where it was). `Shift ←` and `Shift →` on the handle move a card
+one column straight away.
+
+On a Mac, `Ctrl` here is the command key, `Alt` is option.
+
+The single-key shortcuts do nothing while you are typing — a shortcut that stole
+a letter mid-sentence would cost more trust than every shortcut is worth — and
+nothing reaches past an open dialog into the screen behind it. Shortcuts
+carrying a modifier work anywhere, because nobody types `Ctrl K` into a
+sentence. None of them use a key your browser or the desktop app's menu already
+claims.
 
 The list under `?` is generated from what the application actually binds, so it
 cannot drift from the real behaviour.
