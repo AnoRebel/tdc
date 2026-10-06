@@ -60,3 +60,4 @@ playwright-report/
 # translations that matter live in packages/ui/locales; these are empty files
 # the module writes for routes it finds, and regenerate on every build.
 apps/web/locales/
+apps/desktop/frontend/locales/

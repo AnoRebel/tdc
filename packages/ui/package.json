@@ -33,6 +33,7 @@
     "vitest": "catalog:testing"
   },
   "scripts": {
+    "lint": "eslint app/pages app/middleware app/plugins app/components/integrations",
     "test": "vitest run"
   }
 }

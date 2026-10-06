@@ -83,7 +83,7 @@
     "build:server": "cd server && go build -o ../bin/tdc-server ./cmd/tdc-server",
     "build:desktop": "cd apps/desktop && wails3 task build",
     "typecheck": "bun run --filter=@tdc/web --filter=@tdc/types --filter=@tdc/desktop-frontend typecheck",
-    "lint": "bun run --filter=@tdc/web --filter=@tdc/types --filter=@tdc/desktop-frontend lint",
+    "lint": "bun run --filter=@tdc/web --filter=@tdc/types --filter=@tdc/desktop-frontend --filter=@tdc/ui lint",
     "lint:fix": "bun run --filter=@tdc/web --filter=@tdc/types lint:fix",
     "lint:go": "cd server && golangci-lint run",
     "format": "prettier --write \"**/*.{ts,tsx,vue,js,json,md}\"",

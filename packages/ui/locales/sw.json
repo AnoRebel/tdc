@@ -1372,6 +1372,21 @@
       "wholeProject": "Mradi mzima, wiki mbili zilizopita"
     }
   },
+  "desktop": {
+    "settings": {
+      "title": "Kompyuta hii",
+      "hint": "Mipangilio ya usakinishaji huu wa TDC, si ya akaunti yako.",
+      "server": "Seva",
+      "switchServer": "Badilisha seva",
+      "notifications": "Arifa za mfumo",
+      "notificationsOn": "Zimewashwa. Ujumbe mpya huonekana kama arifa za mfumo, hata TDC ikiwa kwenye trei.",
+      "notificationsOff": "Zimezimwa. Ziwashe ili upate habari za ujumbe mpya TDC ikiwa kwenye trei.",
+      "turnOnNotifications": "Washa",
+      "notificationsRefused": "Mfumo wako haukuziruhusu. Unaweza kubadilisha hilo kwenye mipangilio yake ya arifa.",
+      "windowAndStartup": "Dirisha na kuanza",
+      "updates": "Masasisho"
+    }
+  },
   "interface": {
     "title": "Mwendo na kibodi",
     "command": "Mapendeleo ya mwendo na kibodi",

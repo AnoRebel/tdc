@@ -52,6 +52,7 @@ interface AuditEntry {
 }
 
 const api = useApi();
+const download = useDownload();
 
 const entries = ref<AuditEntry[]>([]);
 const error = ref<string | null>(null);
@@ -69,13 +70,23 @@ try {
 }
 
 /*
- * Where the export lives.
+ * The whole log, saved as a file.
  *
- * A plain link rather than a fetch: the browser streams it straight to a file,
- * where fetching would hold the whole log in memory to hand it back — which is
- * the thing the newline-delimited format exists to avoid.
+ * Through the client's own download rather than a link built here: the web
+ * client still hands the browser a plain link, which streams straight to disk
+ * — the thing the newline-delimited format exists for — while the desktop
+ * client, whose session the webview cannot carry, fetches through Go instead.
  */
-const exportUrl = computed(() => `${useRuntimeConfig().public.apiBase}/api/admin/audit/export`);
+const exportFailed = ref(false);
+
+async function exportLog() {
+  exportFailed.value = false;
+  try {
+    await download("/api/admin/audit/export", "audit-log.ndjson");
+  } catch {
+    exportFailed.value = true;
+  }
+}
 
 function when(value: string): string {
   return fully(value);
@@ -99,11 +110,19 @@ function when(value: string): string {
 
       <!-- The whole log, not the page above it. Kept beside the listing
            because an operator who wants a copy is usually looking at it. -->
-      <a v-if="!error" :href="exportUrl" download="audit-log.ndjson" class="btn btn-outline">
+      <button v-if="!error" type="button" class="btn btn-outline" @click="exportLog">
         <Download class="size-3.5" />
         {{ $t("admin.export") }}
-      </a>
+      </button>
     </header>
+
+    <p
+      v-if="exportFailed"
+      class="mx-4 mt-4 max-w-4xl rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+      role="alert"
+    >
+      {{ $t("error.couldNotReach") }}
+    </p>
 
     <div class="max-w-4xl px-4 py-6">
       <div

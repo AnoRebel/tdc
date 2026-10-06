@@ -9,6 +9,16 @@ Everything a person reads and types comes from `packages/ui`, the shared Nuxt
 layer. Only how bytes reach the server differs between the two clients, so
 they cannot drift apart by accident.
 
+That includes every screen. The pages live in `packages/ui/app/pages`, and this
+client keeps only what is genuinely its own: the server picker, the appearance
+and updates screens, and its sign-in page, which offers the keychain and hands a
+provider's sign-in to the system browser. A page an application defines at the
+same path wins over the layer's, which is how both clients keep their own
+sign-in. The settings page's device-specific section works the same way: it
+renders `DeviceSettings`, which the layer ships empty and each client replaces
+with its own — push notifications on the web, and here the server, system
+notifications, the window and updates.
+
 ## Building it
 
 You need [Go](https://go.dev) 1.27, [Bun](https://bun.sh), and the Wails CLI:

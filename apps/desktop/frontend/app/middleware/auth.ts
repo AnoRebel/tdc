@@ -21,7 +21,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
    * Calling it after awaiting the current server threw "no API client has been
    * provided" — from a client that had provided one perfectly well.
    */
-  const { signedIn, ready, refresh } = useAuth();
+  const { signedIn, ready, refresh, setupStatus } = useAuth();
 
   // No server chosen yet — that is the first thing to fix, before any thought
   // of a session.
@@ -37,6 +37,18 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   if (signedIn.value) return;
+
+  /*
+   * A server nobody has set up yet has no account to sign in to, so its first
+   * visitor goes to setup — the web does the same. Guarded because the server
+   * may be unreachable, and then signing in is the page that explains it.
+   */
+  try {
+    const status = await setupStatus();
+    if (status.setupRequired) return navigateTo(localeRoute({ name: "setup" }));
+  } catch {
+    // Unknown, so on to signing in.
+  }
 
   return navigateTo(localeRoute({ name: "signin", query: { next: to.fullPath } }));
 });

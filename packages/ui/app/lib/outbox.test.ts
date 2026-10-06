@@ -4,6 +4,7 @@ import {
   afterFailure,
   afterSending,
   afterUnsending,
+  belongsTo,
   maxAttempts,
   readFailure,
   sendOrder,
@@ -209,5 +210,31 @@ describe("withdrawing a message", () => {
 
     expect(stillWaiting(after, "first")).toBe(true);
     expect(stillWaiting(after, "second")).toBe(false);
+  });
+});
+
+/*
+ * A queue outlives a change of server or of account — the desktop client
+ * switches server without reloading, and a browser can sign somebody else in.
+ * A room's identifier means nothing on another server, and a message is its
+ * author's: sent anywhere else it would be refused and lost, or posted as the
+ * wrong person.
+ */
+describe("whose queue it is", () => {
+  const amina = queued({ clientToken: "a", author: "amina@one.example" });
+  const baraka = queued({ clientToken: "b", author: "baraka@two.example" });
+  const older = queued({ clientToken: "c" });
+
+  it("sends a message only as the person, on the server, it was written for", () => {
+    expect(belongsTo([amina, baraka], "amina@one.example")).toEqual([amina]);
+    expect(belongsTo([amina, baraka], "amina@two.example")).toEqual([]);
+  });
+
+  it("keeps the rest waiting rather than dropping it", () => {
+    expect(belongsTo([amina, baraka], undefined)).toEqual([]);
+  });
+
+  it("still sends what was queued before authors were recorded", () => {
+    expect(belongsTo([older, baraka], "amina@one.example")).toEqual([older]);
   });
 });

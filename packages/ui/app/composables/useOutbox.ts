@@ -2,6 +2,7 @@ import {
   afterFailure,
   afterSending,
   afterUnsending,
+  belongsTo,
   readFailure,
   sendOrder,
   stillWaiting,
@@ -26,6 +27,9 @@ const storageKey = "tdc.outbox";
  */
 export function useOutbox() {
   const queue = useState<Queued[]>("outbox", () => []);
+  const { user } = useAuth();
+  /** The signed-in person's part of the queue: the rest waits for them. */
+  const mine = () => belongsTo(queue.value, user.value?.address);
 
   /** Reads what was left behind by an earlier visit. */
   function restore() {
@@ -74,7 +78,7 @@ export function useOutbox() {
   function holdIfUnsent(message: Omit<Queued, "composedAt" | "attempts">, cause: unknown): boolean {
     if (readFailure(cause) !== "unreachable") return false;
 
-    hold({ ...message, composedAt: Date.now(), attempts: 0 });
+    hold({ ...message, composedAt: Date.now(), attempts: 0, author: user.value?.address });
     return true;
   }
 
@@ -112,7 +116,7 @@ export function useOutbox() {
 
   /** What is waiting for one conversation, oldest first. */
   function waitingIn(roomId: string): Queued[] {
-    return sendOrder(queue.value.filter((message) => message.roomId === roomId));
+    return sendOrder(mine().filter((message) => message.roomId === roomId));
   }
 
   /**
@@ -123,7 +127,7 @@ export function useOutbox() {
    * the network settled on.
    */
   async function flush(send: (message: Queued) => Promise<void>) {
-    for (const message of sendOrder(queue.value)) {
+    for (const message of sendOrder(mine())) {
       /*
        * Asked again, immediately before sending.
        *

@@ -47,8 +47,6 @@ async function load() {
   }
 }
 
-await load();
-
 function saved(updated: Company) {
   company.value = updated;
   editing.value = false;
@@ -110,6 +108,10 @@ const invite = useForm({
     }
   },
 });
+
+// Last, so the form above is made while there is still a component instance
+// for it to register its hooks with.
+await load();
 </script>
 
 <template>

@@ -24,6 +24,19 @@ export interface Queued {
   composedAt: number;
   /** How many times sending has been tried and failed. */
   attempts: number;
+  /**
+   * Who wrote it, as user@server. A room's identifier means nothing on
+   * another server, and a message is its author's to send, so a queue held
+   * across a change of server or account sends each message only as the person
+   * on the server it was written for. Absent on messages queued before this
+   * was recorded, which go as they always did.
+   */
+  author?: string;
+}
+
+/** What in the queue is the given author's to send. */
+export function belongsTo(queue: Queued[], author: string | undefined): Queued[] {
+  return queue.filter((message) => !message.author || message.author === author);
 }
 
 /*

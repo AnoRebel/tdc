@@ -178,7 +178,7 @@ describe("what the shared layer may depend on", () => {
      * `use*`: the point of this check is to catch a name no one provides, and a
      * blanket exception for the VueUse prefix would let those through too.
      */
-    const vueuse = new Set(["useDebounceFn", "useThrottleFn", "useEventListener"]);
+    const vueuse = new Set(["useDebounceFn", "useThrottleFn", "useEventListener", "useClipboard"]);
 
     const missing = new Set<string>();
     for (const { contents } of sources()) {
@@ -212,15 +212,31 @@ describe("what the shared layer may depend on", () => {
    * would have left a hole in the desktop one's footer.
    */
   it("ships every component its own files render", () => {
+    /*
+     * Each component by its file name, and by the name Nuxt actually registers
+     * it under: the layer's components use pathPrefix, so projects/StateBadge.vue
+     * is <ProjectsStateBadge> to a page that renders it. A file whose name
+     * already starts with its directory's is not prefixed twice.
+     */
     const own = new Set<string>();
-    const walkComponents = (directory: string) => {
+    const pascal = (segment: string) =>
+      segment
+        .split(/[-_]/)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join("");
+    const walkComponents = (directory: string, prefix: string) => {
       if (!existsSync(directory)) return;
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
-        if (entry.isDirectory()) walkComponents(join(directory, entry.name));
-        else if (entry.name.endsWith(".vue")) own.add(entry.name.replace(/\.vue$/, ""));
+        if (entry.isDirectory()) {
+          walkComponents(join(directory, entry.name), prefix + pascal(entry.name));
+        } else if (entry.name.endsWith(".vue")) {
+          const name = entry.name.replace(/\.vue$/, "");
+          own.add(name);
+          if (prefix) own.add(name.startsWith(prefix) ? name : prefix + name);
+        }
       }
     };
-    walkComponents(join(LAYER, "app", "components"));
+    walkComponents(join(LAYER, "app", "components"), "");
 
     /*
      * Components the layer registers globally from a plugin, rather than as a
