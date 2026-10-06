@@ -21,26 +21,35 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [ ] 2.2 The built-in forwarding unit (Pion), off unless enabled, one peer connection per participant, simulcast layers per receiver; a call moves to it when it passes the mesh limit; verify a six-person call works with the unit on and is refused past the mesh limit with it off
 - [ ] **MILESTONE 2** — Demonstrate a six-person call through the forwarding unit and a four-person mesh call without it. Tag `v1.50.0-dev`.
 
-## 3. Phase 3 — Screens, presentations and recording
+## 3. Phase 3 — Invites and links
 
-- [ ] 3.1 Screen, window or tab sharing in a call (with tab audio where offered), shown to everybody; absent where the platform cannot
-- [ ] 3.2 Presenting: one presenter at a time, held by the server, on everybody's main stage; handed over, stopped, or cleared by a conversation moderator; verify a second person cannot present over the first
-- [ ] 3.3 `calls.recording` setting (off) and `call.record` permission (granted to nobody by default); verify recording is refused with either missing
-- [ ] 3.4 Starting a recording records `call.recording_started` in the room's log and the audit log and sets the call's recording state before the recorder's client begins; every participant is told, an indicator stays up, and somebody joining is told before their media starts; verify a recording cannot begin without the event and the state reaching the others
-- [ ] 3.5 Device-side recording (stage and mixed audio, MediaRecorder); on stop the file is saved to the conversation as an attachment through the ordinary path (limits, scanning, retention), or offered as a download when larger than the server accepts; `call.recording_stopped` recorded, including when the recorder leaves or drops
-- [ ] **MILESTONE 3** — Demonstrate: one person presents a browser tab, another records with everybody told, the recording appears in the conversation, and the conversation and audit log show who recorded and when. Tag `v1.51.0-dev`.
+- [ ] 3.1 Ringing: invite people who may join, every device of theirs rings (across nodes), accept joins and decline tells the caller, a missed call leaves a notification; rate-limited per caller; verify somebody who may not join is not rung and is listed back
+- [ ] 3.2 `call.link` permission (granted to nobody by default) and `call_links` with hashed tokens, public or protected, passcode and/or lobby, expiry, use limit, revocation, all audited; verify an expired, used-up or revoked link refuses
+- [ ] 3.3 The link page and joining by link as a call participant who is not a room member; verify every room route still refuses them and they see nothing of the conversation but its name and who is in the call
+- [ ] 3.4 Protected links: constant-time passcode check with failures limited per link and per address and recorded; a lobby that people in the call admit from; verify a wrong passcode past the limit is refused even with the right one
+- [ ] 3.5 Guests (`calls.guests`, off by default): a pass valid for one call only, a chosen name and a guest label, expiring with their leaving or the call's end; verify a guest pass opens nothing but that call's routes and connection
+- [ ] **MILESTONE 3** — Demonstrate: a direct call rings on two devices and is answered on one; a protected link with a lobby admits a signed-in person from elsewhere on the server and, with guests allowed, a guest without an account, neither of whom can see the conversation. Tag `v1.51.0-dev`.
 
-## 4. Phase 4 — Constrained networks and every client
+## 4. Phase 4 — Screens, presentations and recording
 
-- [ ] 4.1 Degrade video then audio as bandwidth falls, never the call first; the client says what it changed
-- [ ] 4.2 Warn before starting or joining on a connection reported as metered
-- [ ] 4.3 Desktop: Windows, macOS (usage descriptions) and Linux (WebKitGTK with GStreamer WebRTC, declared in the packages) verified; a desktop that cannot call says why
-- [ ] 4.4 Keyboard shortcuts and motion preferences honoured by the call interface
-- [ ] **MILESTONE 4** — Demonstrate a call that steps down to audio on a throttled connection and recovers, and a call between the web client and the desktop client. Tag `v1.52.0-dev`.
+- [ ] 4.1 Screen, window or tab sharing in a call (with tab audio where offered), shown to everybody; absent where the platform cannot
+- [ ] 4.2 Presenting: one presenter at a time, held by the server, on everybody's main stage; handed over, stopped, or cleared by a conversation moderator; verify a second person cannot present over the first
+- [ ] 4.3 `calls.recording` setting (off) and `call.record` permission (granted to nobody by default); verify recording is refused with either missing
+- [ ] 4.4 Starting a recording records `call.recording_started` in the room's log and the audit log and sets the call's recording state before the recorder's client begins; every participant is told, an indicator stays up, and somebody joining is told before their media starts; verify a recording cannot begin without the event and the state reaching the others
+- [ ] 4.5 Device-side recording (stage and mixed audio, MediaRecorder); on stop the file is saved to the conversation as an attachment through the ordinary path (limits, scanning, retention), or offered as a download when larger than the server accepts; `call.recording_stopped` recorded, including when the recorder leaves or drops
+- [ ] **MILESTONE 4** — Demonstrate: one person presents a browser tab, another records with everybody told, the recording appears in the conversation, and the conversation and audit log show who recorded and when. Tag `v1.52.0-dev`.
 
-## 5. Phase 5 — Ready to run
+## 5. Phase 5 — Constrained networks and every client
 
-- [ ] 5.1 Hosting guide: enabling calls, the relay (ports, secret), the forwarding unit (ports, what it can see), limits, and recording (what it is and is not)
-- [ ] 5.2 User guide: starting, joining, controls, what others can see
-- [ ] 5.3 Browser checks for two-person calls (fake media devices) in Chromium and Firefox, WebKit in CI
-- [ ] **MILESTONE 5** — A stranger following the hosting guide enables calling with a relay and holds a call. Tag `v1.53.0-dev`.
+- [ ] 5.1 Degrade video then audio as bandwidth falls, never the call first; the client says what it changed
+- [ ] 5.2 Warn before starting or joining on a connection reported as metered
+- [ ] 5.3 Desktop: Windows, macOS (usage descriptions) and Linux (WebKitGTK with GStreamer WebRTC, declared in the packages) verified; a desktop that cannot call says why
+- [ ] 5.4 Keyboard shortcuts and motion preferences honoured by the call interface
+- [ ] **MILESTONE 5** — Demonstrate a call that steps down to audio on a throttled connection and recovers, and a call between the web client and the desktop client. Tag `v1.53.0-dev`.
+
+## 6. Phase 6 — Ready to run
+
+- [ ] 6.1 Hosting guide: enabling calls, the relay (ports, secret), the forwarding unit (ports, what it can see), limits, and recording (what it is and is not)
+- [ ] 6.2 User guide: starting, joining, controls, what others can see
+- [ ] 6.3 Browser checks for two-person calls (fake media devices) in Chromium and Firefox, WebKit in CI
+- [ ] **MILESTONE 6** — A stranger following the hosting guide enables calling with a relay and holds a call. Tag `v1.54.0-dev`.

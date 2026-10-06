@@ -38,6 +38,22 @@ A shared `useCall` composable owns the peer connections and media; `CallPanel.vu
 
 WebView2 (Windows) and WKWebView (macOS, with the camera and microphone usage descriptions in Info.plist) support WebRTC; WebKitGTK does when built with it and with GStreamer's WebRTC plugins present, which the Linux packages declare as dependencies. Each is verified, and a desktop that cannot place calls says why instead of failing silently.
 
+### Invites
+
+`POST /api/rooms/:id/call/invite` with the people to ring (defaulting to everybody else in a direct conversation). Each must be somebody who may join; others are skipped and listed back. A `call.ring` frame reaches every device of each invitee, through the broker's private path for other nodes, carrying who is calling and from where; accepting is joining, declining tells the caller. Nobody answering within the ring time leaves a notification of reason `missed_call`. Ringing is rate-limited per caller so it cannot be used to pester.
+
+### Links
+
+`call_links`: an unguessable token (stored hashed, like API tokens), the room, who made it, `mode` public|protected, an optional passcode hash, whether a lobby admits, expiry, use limit, uses, revoked. Making one takes `call.link` in the conversation; it is audited, as is revoking.
+
+Opening `/call/<token>` shows the conversation's name and who is in the call — nothing else of the conversation — and asks for a name if the person is not signed in. Joining:
+
+- **Public:** straight in, subject to the call's participant limit.
+- **Protected by passcode:** the passcode checked in constant time; failures counted per link and per address and refused past a limit, recorded in the audit log.
+- **Protected by lobby:** the person waits; everybody in the call sees them and anybody may admit or turn them away; nobody in the call means nobody to admit them, which the waiting person is told.
+
+A person who joins by link is a *call participant* and not a room member: the signalling, ICE and state routes accept them for that call only, and every room route still refuses them. A guest (no account) is given a pass — a token that authenticates the live connection and the call routes for that call alone, expiring when they leave or the call ends — and is shown with their chosen name and a guest label. Guests exist only where `calls.guests` is on; with it off, a link asks people to sign in. Recording notices reach guests like anybody else.
+
 ### Screen sharing and presenting
 
 `getDisplayMedia` gives a screen, window or tab track, added to every peer connection as a second video track (in the forwarding unit, one more track to forward). The call's live state gains `presenter`: one person at a time; setting it is a request to the server, which refuses a second presenter until the first stops and lets a conversation moderator clear it. Clients show the presenter's screen on the main stage and everybody else as a strip. Where a webview has no `getDisplayMedia`, the share control is absent rather than broken.

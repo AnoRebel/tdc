@@ -39,7 +39,7 @@ Starting or joining a call MUST require the same authorization as posting in tha
 
 #### Scenario: Non-member cannot join
 
-- **WHEN** a user who is not a member of the conversation attempts to join its call
+- **WHEN** a user who is not a member of the conversation attempts to join its call without a call link
 - **THEN** the request is denied
 
 #### Scenario: Calling permission is separable
@@ -141,6 +141,32 @@ Users MUST be warned before a call is started on a connection the client identif
 
 - **WHEN** a user starts or joins a call on a connection reported as metered
 - **THEN** they are warned about data use before media begins
+
+### Requirement: Invites and call links
+
+Participants SHALL be able to ring people who may join a call, and a person holding the permission to do so MUST be able to make a link to a conversation's call that is either public or protected by a passcode, a lobby, or both.
+
+Joining through a link MUST admit a person to the call only, never to the conversation, its history or its member list. People without an account MAY join through a link only where the operator has allowed guests, and a guest MUST be identified to everybody in the call as a guest.
+
+#### Scenario: Ringing reaches every device
+
+- **WHEN** a participant rings somebody who may join the call
+- **THEN** each of that person's signed-in devices shows the incoming call, and an unanswered call leaves a missed-call notification
+
+#### Scenario: A link admits to the call and nothing else
+
+- **WHEN** somebody joins a call through a link
+- **THEN** they take part in the call and can read nothing of the conversation beyond its name and who is in the call
+
+#### Scenario: A protected link holds a stranger back
+
+- **WHEN** a person opens a protected link without the passcode, or while nobody in the call has admitted them
+- **THEN** they are not admitted, and repeated wrong passcodes are refused past a limit and recorded
+
+#### Scenario: Links can be withdrawn
+
+- **WHEN** a link has expired, been used up or been revoked
+- **THEN** it admits nobody
 
 ### Requirement: Screen sharing and presentations
 
