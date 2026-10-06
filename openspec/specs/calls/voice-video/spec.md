@@ -168,6 +168,31 @@ Joining through a link MUST admit a person to the call only, never to the conver
 - **WHEN** a link has expired, been used up or been revoked
 - **THEN** it admits nobody
 
+### Requirement: Who may call whom
+
+Each person SHALL be able to choose who may ring them or start a call with them — from their own server: everybody, people they share a conversation with, or nobody; and separately whether people on connected servers may — and the server MUST enforce that choice on every ring and every call started at them. An operator MUST be able to refuse calls from connected servers altogether, and that refusal MUST prevail over any person's choice.
+
+A refused call MUST NOT tell the caller which setting refused it.
+
+#### Scenario: A person who takes calls only from people they know
+
+- **WHEN** somebody who shares no conversation with a person rings them, and that person accepts calls only from people they share a conversation with
+- **THEN** the ring is refused and the person is not disturbed
+
+#### Scenario: The operator's refusal is final
+
+- **WHEN** the server does not accept calls from connected servers
+- **THEN** no call from another server reaches anybody here, whatever their own setting
+
+### Requirement: Incoming calls do not take over the screen
+
+An incoming call SHALL be shown as a small window the person can move, which does not prevent them using the rest of the application, offering to answer by voice, answer with video, or decline. It MUST ring on each of the person's signed-in devices and stop on all of them when answered or declined on one.
+
+#### Scenario: Answering on one device
+
+- **WHEN** a person answers an incoming call on one device
+- **THEN** it stops ringing on their others
+
 ### Requirement: Screen sharing and presentations
 
 Participants SHALL be able to share a screen, window or browser tab in a call, and one participant at a time MUST be able to present, putting their shared screen before everybody in the call.
