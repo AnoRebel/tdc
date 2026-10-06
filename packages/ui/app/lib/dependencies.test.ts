@@ -1,5 +1,5 @@
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -12,23 +12,62 @@ import { describe, expect, it } from "vitest";
  * that renders nothing with no error, which is the most expensive kind of
  * failure to find.
  *
- * Bun's isolated layout puts every resolved version under node_modules/.bun,
- * so counting the directories counts the copies.
+ * Counted over what the application can reach — the web and desktop clients
+ * and the packages they share — rather than over everything installed. The
+ * documentation site (apps/docs) is a separate application built on its own
+ * component library, which brings its own table; that copy never meets these.
  */
 
-const MODULES = join(import.meta.dirname, "..", "..", "..", "..", "node_modules", ".bun");
+const ROOT = join(import.meta.dirname, "..", "..", "..", "..");
+const APPLICATION = ["apps/web", "apps/desktop/frontend", "packages/ui", "packages/types"];
 
-/** Every version of a package that the workspace resolved. */
+/**
+ * Every package the application's workspaces resolve, directly or through
+ * another package. Bun's isolated layout links a package's dependencies beside
+ * it, in the node_modules directory that holds it, so following those links
+ * from each workspace walks the whole tree it can load.
+ */
+function reachable(): Map<string, Set<string>> {
+  const versions = new Map<string, Set<string>>();
+  const visited = new Set<string>();
+  const queue = APPLICATION.map((workspace) => join(ROOT, workspace, "node_modules"));
+
+  while (queue.length) {
+    const modules = queue.pop()!;
+    if (visited.has(modules) || !existsSync(modules)) continue;
+    visited.add(modules);
+
+    for (const entry of readdirSync(modules)) {
+      if (entry.startsWith(".")) continue;
+      const names = entry.startsWith("@")
+        ? readdirSync(join(modules, entry)).map((name) => `${entry}/${name}`)
+        : [entry];
+
+      for (const name of names) {
+        let directory: string;
+        try {
+          directory = realpathSync(join(modules, name));
+        } catch {
+          continue;
+        }
+        const manifest = join(directory, "package.json");
+        if (!existsSync(manifest)) continue;
+        const { version } = JSON.parse(readFileSync(manifest, "utf8")) as { version?: string };
+        if (!versions.has(name)) versions.set(name, new Set());
+        if (version) versions.get(name)!.add(version);
+        // Its dependencies are its siblings.
+        queue.push(name.includes("/") ? dirname(dirname(directory)) : dirname(directory));
+      }
+    }
+  }
+  return versions;
+}
+
+const tree = reachable();
+
+/** Every version of a package the application can load. */
 function versionsOf(name: string): string[] {
-  const prefix = `${name.replace("/", "+")}@`;
-
-  return (
-    readdirSync(MODULES)
-      .filter((entry) => entry.startsWith(prefix))
-      // A directory name carries the version and sometimes a hash of the peers
-      // it was resolved against; the version is what matters here.
-      .map((entry) => entry.slice(prefix.length).split("+")[0]!)
-  );
+  return [...(tree.get(name) ?? [])];
 }
 
 describe("packages that must exist once", () => {
@@ -67,10 +106,6 @@ describe("packages that must exist once", () => {
    * VueUse: it resolves 15 alongside 14, and 14 brings its own Vue. The
    * catalog is held at 14 for that reason, and should move only once reka-ui
    * accepts 15.
-   *
-   * Note that this counts directories, which bun does not prune. A version
-   * that has genuinely gone can linger on disk from a previous install, so
-   * confirm a failure against a clean node_modules before chasing it.
    */
   it("resolves one copy of Vue", () => {
     const versions = versionsOf("vue");
