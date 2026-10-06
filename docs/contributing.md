@@ -359,6 +359,62 @@ translation is harder to spot than an obviously untranslated one.
 `bun run --filter=@tdc/web translations` counts what is still written inline. It
 reports rather than fails — the number going down is the point.
 
+## The documentation site
+
+The guides in `docs/` are published as a site as well as shown in the
+application's help centre: [tdc.anorebel.net](https://tdc.anorebel.net) for
+`main`, `beta.tdc.anorebel.net` for `beta` and `dev.tdc.anorebel.net` for
+`dev`, with a switcher in the header to move between them. The site is
+`apps/docs`, built with Docus, and it reads `docs/` directly — there is no
+copy, so a guide is edited in one place whichever way it is edited.
+
+**Editing.** Three ways, all ending in a commit to the branch whose version you
+were reading:
+
+- in your editor, in a pull request like any other change;
+- with **Edit on GitHub** on a page, which opens GitHub's editor on that
+  version's branch;
+- with **Edit in Studio**, where a deployment has Studio switched on: sign in
+  with GitHub, edit the page in place, and publish. Studio commits as you, so
+  it needs your write access to the repository, and on the `dev` site it
+  commits to `dev`.
+
+Whichever way, a guide stays plain GitHub-flavoured markdown, because the
+help centre renders it with a markdown parser that knows nothing of the site.
+Studio's editor is configured not to offer components, styled text or media.
+It does save a page's title and description as front matter at the top of the
+file; the help centre skips front matter, so that is harmless, and a test fails
+if a guide ever contains a component block.
+
+A guide appears on the site as soon as it is in `docs/`. Where it sits in the
+sidebar, and its short name, come from the help centre's own list in
+`packages/ui/app/lib/guides.ts` and the English translations — add a guide
+there and both places pick it up. Links between guides (`hosting.md#tls`) work
+on the site as they do in the application and on GitHub, and a link to another
+file in the repository opens it on the version's own branch.
+
+**Running it locally.** `bun run dev:docs` serves it on port 9003 and reloads
+when a guide changes; `bun run build:docs` is the production build CI runs.
+The version it presents is `DOCS_VERSION` (default `dev`).
+
+**How it is deployed.** The same app three times, each built from its own
+branch with `apps/docs/Dockerfile` and the repository root as build context,
+and each told which branch it is with the build argument `DOCS_VERSION`. The
+container listens on port 3000 and is configured at runtime:
+
+| Variable                                                 | What it is                                                                                                                                         |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NUXT_PUBLIC_DOCS_VERSIONS`                              | Where each version lives, as JSON: `[{"version":"main","label":"Stable","url":"https://tdc.anorebel.net"}, …]`. Defaults to the three hosts above. |
+| `STUDIO_GITHUB_CLIENT_ID`, `STUDIO_GITHUB_CLIENT_SECRET` | A GitHub OAuth app for this deployment. Leave both unset and Studio is off.                                                                        |
+| `NUXT_STUDIO_AUTH_SESSION_SECRET`                        | At least 32 random characters (`openssl rand -hex 32`). Required when Studio is on; the server refuses to start without it.                        |
+| `STUDIO_GITHUB_MODERATORS`                               | Optional: the GitHub email addresses allowed to sign in, comma-separated.                                                                          |
+
+Each GitHub OAuth app's callback URL is the deployment's address followed by
+`/__nuxt_studio/auth/github`. Studio asks for the `repo` scope, because the
+repository is private: that lets the signed-in editor's token read and write
+every repository they can, for as long as the session lasts, which is worth
+knowing before signing in.
+
 ## What a good pull request looks like
 
 **Say why, not only what.** The diff already says what changed.
