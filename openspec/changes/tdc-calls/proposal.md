@@ -14,15 +14,18 @@ This change implements `calls/voice-video` in full, as an optional capability, o
 - **Degrading rather than dropping.** Bandwidth estimates step video down, then off, before audio; the client says what it did.
 - **Clients.** The web and desktop clients share the call interface through the shared layer. The desktop webviews' media support differs by platform and is verified on each.
 
-**Out of scope:** recording (the spec requires none unless an operator enables it; this change builds none, so no media is retained by construction); calls in rooms shared with other servers (a federated room shows that calls are available to its home server's members only); screen sharing (a later change; the transport built here carries it).
+- **Screen sharing and presentations.** Anybody in a call may share a screen, a window or a browser tab (with its audio where the platform offers it). Presenting puts one person's shared screen on everybody's main stage; one presenter at a time, handed over or stopped by them or by a moderator of the conversation.
+- **Recording, saved to the conversation.** Off unless the operator enables it, and then only by somebody holding the new `call.record` permission in that conversation. Recording happens on the recorder's own device — the call's audio and the stage composed into one file in the browser — so no call media passes through or is retained by the server for it. Before recording begins every participant is told, and an indicator stays on screen for everybody while it lasts, including people who join later (who are told before their own media starts). When it stops, the file is saved to the conversation as an attachment through the ordinary attachment path — size limits, scanning and retention apply — or offered as a download where it is larger than the server accepts. Starting and stopping are in the conversation's log and the audit log.
+
+**Out of scope:** recording on the server (it would need the server to see media it otherwise never does); calls in rooms shared with other servers (a federated room shows that calls are available to its home server's members only).
 
 ## Capabilities
 
 ### Modified Capabilities
 
-- `calls/voice-video`: specified-but-unimplemented to implemented, except recording, which stays absent.
+- `calls/voice-video`: specified-but-unimplemented to implemented, with screen sharing, presentations and device-side recording added to its requirements.
 - `platform/server-config`: the calling switch, relay settings, mesh size and participant limit.
-- `identity/authorization`: `call.start` and `call.join` enforced.
+- `identity/authorization`: `call.start` and `call.join` enforced; `call.record` added.
 
 ## Impact
 

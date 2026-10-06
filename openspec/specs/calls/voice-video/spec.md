@@ -142,6 +142,20 @@ Users MUST be warned before a call is started on a connection the client identif
 - **WHEN** a user starts or joins a call on a connection reported as metered
 - **THEN** they are warned about data use before media begins
 
+### Requirement: Screen sharing and presentations
+
+Participants SHALL be able to share a screen, window or browser tab in a call, and one participant at a time MUST be able to present, putting their shared screen before everybody in the call.
+
+#### Scenario: One presenter at a time
+
+- **WHEN** a participant is presenting and another tries to present
+- **THEN** the second is refused until the first stops or a moderator of the conversation clears the presentation
+
+#### Scenario: Sharing is absent where unsupported
+
+- **WHEN** a client's platform cannot capture a screen
+- **THEN** the client does not offer sharing rather than offering it and failing
+
 ### Requirement: Privacy and recording
 
 The server SHALL NOT record calls unless recording is explicitly enabled by the operator, and where enabled, every participant MUST be informed before recording begins.
@@ -150,6 +164,21 @@ The server SHALL NOT record calls unless recording is explicitly enabled by the 
 
 - **WHEN** calling is enabled without recording being configured
 - **THEN** no call media is retained
+
+#### Scenario: Recording needs its own permission
+
+- **WHEN** recording is enabled and a participant without permission to record attempts it
+- **THEN** the attempt is refused, naming the permission
+
+#### Scenario: A recording is kept with the conversation
+
+- **WHEN** a recording ends
+- **THEN** it is saved to the conversation like any attachment, under the same limits and retention, or offered to the recorder as a download when it is larger than the server accepts
+
+#### Scenario: Somebody joining is told first
+
+- **WHEN** a person joins a call that is being recorded
+- **THEN** they are told before their own audio or video is sent
 
 #### Scenario: Recording is disclosed
 

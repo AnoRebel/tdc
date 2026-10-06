@@ -21,17 +21,26 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [ ] 2.2 The built-in forwarding unit (Pion), off unless enabled, one peer connection per participant, simulcast layers per receiver; a call moves to it when it passes the mesh limit; verify a six-person call works with the unit on and is refused past the mesh limit with it off
 - [ ] **MILESTONE 2** — Demonstrate a six-person call through the forwarding unit and a four-person mesh call without it. Tag `v1.50.0-dev`.
 
-## 3. Phase 3 — Constrained networks and every client
+## 3. Phase 3 — Screens, presentations and recording
 
-- [ ] 3.1 Degrade video then audio as bandwidth falls, never the call first; the client says what it changed
-- [ ] 3.2 Warn before starting or joining on a connection reported as metered
-- [ ] 3.3 Desktop: Windows, macOS (usage descriptions) and Linux (WebKitGTK with GStreamer WebRTC, declared in the packages) verified; a desktop that cannot call says why
-- [ ] 3.4 Keyboard shortcuts and motion preferences honoured by the call interface
-- [ ] **MILESTONE 3** — Demonstrate a call that steps down to audio on a throttled connection and recovers, and a call between the web client and the desktop client. Tag `v1.51.0-dev`.
+- [ ] 3.1 Screen, window or tab sharing in a call (with tab audio where offered), shown to everybody; absent where the platform cannot
+- [ ] 3.2 Presenting: one presenter at a time, held by the server, on everybody's main stage; handed over, stopped, or cleared by a conversation moderator; verify a second person cannot present over the first
+- [ ] 3.3 `calls.recording` setting (off) and `call.record` permission (granted to nobody by default); verify recording is refused with either missing
+- [ ] 3.4 Starting a recording records `call.recording_started` in the room's log and the audit log and sets the call's recording state before the recorder's client begins; every participant is told, an indicator stays up, and somebody joining is told before their media starts; verify a recording cannot begin without the event and the state reaching the others
+- [ ] 3.5 Device-side recording (stage and mixed audio, MediaRecorder); on stop the file is saved to the conversation as an attachment through the ordinary path (limits, scanning, retention), or offered as a download when larger than the server accepts; `call.recording_stopped` recorded, including when the recorder leaves or drops
+- [ ] **MILESTONE 3** — Demonstrate: one person presents a browser tab, another records with everybody told, the recording appears in the conversation, and the conversation and audit log show who recorded and when. Tag `v1.51.0-dev`.
 
-## 4. Phase 4 — Ready to run
+## 4. Phase 4 — Constrained networks and every client
 
-- [ ] 4.1 Hosting guide: enabling calls, the relay (ports, secret), the forwarding unit (ports, what it can see), limits
-- [ ] 4.2 User guide: starting, joining, controls, what others can see
-- [ ] 4.3 Browser checks for two-person calls (fake media devices) in Chromium and Firefox, WebKit in CI
-- [ ] **MILESTONE 4** — A stranger following the hosting guide enables calling with a relay and holds a call. Tag `v1.52.0-dev`.
+- [ ] 4.1 Degrade video then audio as bandwidth falls, never the call first; the client says what it changed
+- [ ] 4.2 Warn before starting or joining on a connection reported as metered
+- [ ] 4.3 Desktop: Windows, macOS (usage descriptions) and Linux (WebKitGTK with GStreamer WebRTC, declared in the packages) verified; a desktop that cannot call says why
+- [ ] 4.4 Keyboard shortcuts and motion preferences honoured by the call interface
+- [ ] **MILESTONE 4** — Demonstrate a call that steps down to audio on a throttled connection and recovers, and a call between the web client and the desktop client. Tag `v1.52.0-dev`.
+
+## 5. Phase 5 — Ready to run
+
+- [ ] 5.1 Hosting guide: enabling calls, the relay (ports, secret), the forwarding unit (ports, what it can see), limits, and recording (what it is and is not)
+- [ ] 5.2 User guide: starting, joining, controls, what others can see
+- [ ] 5.3 Browser checks for two-person calls (fake media devices) in Chromium and Firefox, WebKit in CI
+- [ ] **MILESTONE 5** — A stranger following the hosting guide enables calling with a relay and holds a call. Tag `v1.53.0-dev`.

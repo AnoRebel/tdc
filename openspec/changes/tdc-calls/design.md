@@ -38,8 +38,24 @@ A shared `useCall` composable owns the peer connections and media; `CallPanel.vu
 
 WebView2 (Windows) and WKWebView (macOS, with the camera and microphone usage descriptions in Info.plist) support WebRTC; WebKitGTK does when built with it and with GStreamer's WebRTC plugins present, which the Linux packages declare as dependencies. Each is verified, and a desktop that cannot place calls says why instead of failing silently.
 
+### Screen sharing and presenting
+
+`getDisplayMedia` gives a screen, window or tab track, added to every peer connection as a second video track (in the forwarding unit, one more track to forward). The call's live state gains `presenter`: one person at a time; setting it is a request to the server, which refuses a second presenter until the first stops and lets a conversation moderator clear it. Clients show the presenter's screen on the main stage and everybody else as a strip. Where a webview has no `getDisplayMedia`, the share control is absent rather than broken.
+
+### Recording on the recorder's device
+
+The recorder's client composes what it receives — the stage onto a canvas, every participant's audio into one Web Audio destination — and records it with `MediaRecorder` (WebM; MP4 where that is all the platform offers). The server's part is permission and disclosure, not media:
+
+- `calls.recording` setting, off by default; `call.record` permission, granted to nobody by default (a moderator's).
+- Starting is a request; the server records `call.recording_started` in the room's log and the audit log, sets `recording` on the call's state, and only then does the recorder's client begin. Every participant's client shows the notice and keeps an indicator up; a person joining a call being recorded is shown that before their own media starts, and may leave instead.
+- Stopping (or the recorder leaving, or their connection dropping — the sweep handles that) records `call.recording_stopped`. The file is uploaded as an attachment to the conversation through the existing upload path, so the attachment limit, scanning and retention all apply; a file over the limit is offered as a download instead, and the client says so.
+
+*Why not record on the server?* Mesh calls never pass media through the server, and the spec's privacy requirement is easiest to keep by not changing that. A server-side recorder would need the forwarding unit for every recorded call and would hold everybody's media in the clear.
+
 ## Risks / Trade-offs
 
 - **SFU sees media** unencrypted in the server process (end-to-end encryption through insertable streams is not universally available in webviews). Stated in the hosting guide; mesh calls never pass media through the server.
 - **No relay, no call for some people.** Stated, and diagnosed in the client.
 - **WebKitGTK variance** across distributions. Verified on the supported Linux builds; the rest are told why calls are unavailable.
+- **A recording is only as good as the recorder's connection**: what they did not receive is not in it. Stated in the user guide.
+- **A participant can always record their own screen with other software.** The recording feature is about doing it openly, with notice and a record; it cannot prevent what it does not control, and the user guide says so.
