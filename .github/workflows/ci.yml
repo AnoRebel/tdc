@@ -80,6 +80,30 @@ jobs:
         run: bun run budget
         working-directory: apps/web
 
+  # The public documentation site. Built on every branch because each branch is
+  # its own published version of the docs, and a guide edited through Studio
+  # lands on whichever branch that version is — dev included.
+  docs:
+    name: Documentation site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The content layer indexes the guides with node:sqlite, which the
+      # runner's default Node may predate.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build:docs
+
   accessibility:
     name: Browsers
     runs-on: ubuntu-latest
@@ -755,6 +779,7 @@ jobs:
     needs:
       [
         web,
+        docs,
         accessibility,
         server,
         desktop,
