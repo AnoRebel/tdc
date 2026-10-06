@@ -10,7 +10,6 @@ import {
   ChevronDown,
   GripVertical,
 } from "lucide-vue-next";
-import { useDraggable, useLocalStorage, useWindowSize } from "@vueuse/core";
 import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
@@ -24,20 +23,12 @@ import { Button } from "#layers/ui/app/components/ui/button";
  * stays on top of other windows: the whole call where the platform can put a
  * document there, the main video where it can only do that.
  *
- * It also holds the live connection the call's negotiation travels on, open
- * only while there is a call, so nobody pays for a second connection otherwise.
  */
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 const c = useCall();
 
-const live = useLiveConnection({
-  onEvent: () => {},
-  onResync: () => {},
-  onCallState: (state) => c.onState(state),
-  onCallSignal: (signal) => void c.onSignal(signal),
-});
-c.setSignaller((call, to, body) => live.signal(call, to, body));
+// The call's negotiation travels on the call host's connection.
 
 const roomName = ref("");
 watch(
@@ -95,71 +86,25 @@ async function pictureInPicture() {
 
 const inCall = computed(() => c.joined.value);
 
-/*
- * Moving it out of the way.
- *
- * The docked window and the minimized bar can be dragged by their grip and put
- * anywhere on the screen, kept inside it when the window shrinks, and
- * remembered on this device. From the keyboard the grip moves it with the
- * arrow keys. Until somebody moves it, it sits in the bottom-right corner.
- */
+// A direct conversation has no name worth showing; the people in it are.
+const { user: me } = useAuth();
+const title = computed(() => {
+  const others = (c.call.value?.participants ?? [])
+    .filter((each) => each.userId !== me.value?.id)
+    .map((each) => each.username);
+  if (roomName.value && !roomName.value.includes(",")) return roomName.value;
+  return others.length ? others.join(", ") : roomName.value || $ts("calls.inProgress");
+});
+
+// The docked window and the minimized bar go wherever somebody puts them.
 const floating = useTemplateRef<HTMLElement>("floating");
 const grip = useTemplateRef<HTMLElement>("grip");
-const placed = useLocalStorage<{ x: number; y: number } | null>("tdc.call.position", null, {
-  serializer: {
-    read: (raw) => (raw ? JSON.parse(raw) : null),
-    write: (value) => JSON.stringify(value),
-  },
-});
-const { width: viewportWidth, height: viewportHeight } = useWindowSize();
-
-function clamped(x: number, y: number) {
-  const box = floating.value?.getBoundingClientRect();
-  const w = box?.width ?? 240;
-  const h = box?.height ?? 48;
-  return {
-    x: Math.min(Math.max(8, x), Math.max(8, viewportWidth.value - w - 8)),
-    y: Math.min(Math.max(8, y), Math.max(8, viewportHeight.value - h - 8)),
-  };
-}
-
-const { isDragging } = useDraggable(floating, {
-  handle: grip,
-  preventDefault: true,
-  onStart: () => {
-    const box = floating.value?.getBoundingClientRect();
-    if (box && !placed.value) placed.value = { x: box.left, y: box.top };
-  },
-  onMove: (position) => {
-    placed.value = clamped(position.x, position.y);
-  },
-});
-
-// A window made smaller must not leave the call off-screen.
-watch([viewportWidth, viewportHeight], () => {
-  if (placed.value) placed.value = clamped(placed.value.x, placed.value.y);
-});
-
-function nudge(event: KeyboardEvent) {
-  const step = event.shiftKey ? 64 : 16;
-  const moves: Record<string, [number, number]> = {
-    ArrowLeft: [-step, 0],
-    ArrowRight: [step, 0],
-    ArrowUp: [0, -step],
-    ArrowDown: [0, step],
-  };
-  const move = moves[event.key];
-  if (!move) return;
-  event.preventDefault();
-  const box = floating.value?.getBoundingClientRect();
-  const from = placed.value ?? { x: box?.left ?? 0, y: box?.top ?? 0 };
-  placed.value = clamped(from.x + move[0], from.y + move[1]);
-}
-
-const floatingStyle = computed(() =>
-  placed.value ? { left: `${placed.value.x}px`, top: `${placed.value.y}px` } : undefined,
-);
-const floatingCorner = computed(() => (placed.value ? "" : "right-4 bottom-4"));
+const {
+  isDragging,
+  nudge,
+  style: floatingStyle,
+  corner: floatingCorner,
+} = useMovable(floating, grip, "call", "right-4 bottom-4");
 </script>
 
 <template>
@@ -199,7 +144,7 @@ const floatingCorner = computed(() => (placed.value ? "" : "right-4 bottom-4"));
         :to="localeRoute({ name: 'rooms-id', params: { id: c.roomId.value } })"
         class="max-w-40 truncate text-xs font-medium hover:underline"
       >
-        {{ roomName || $t("calls.inProgress") }}
+        {{ title }}
       </NuxtLink>
       <span class="text-xs text-muted-foreground">
         {{ $t("calls.people", { count: c.call.value?.participants.length ?? 1 }) }}
@@ -249,7 +194,7 @@ const floatingCorner = computed(() => (placed.value ? "" : "right-4 bottom-4"));
           :to="localeRoute({ name: 'rooms-id', params: { id: c.roomId.value } })"
           class="min-w-0 flex-1 truncate text-xs font-medium hover:underline"
         >
-          {{ roomName || $t("calls.inProgress") }}
+          {{ title }}
         </NuxtLink>
         <Button
           v-if="pipAvailable"
@@ -316,7 +261,7 @@ const floatingCorner = computed(() => (placed.value ? "" : "right-4 bottom-4"));
           :to="localeRoute({ name: 'rooms-id', params: { id: c.roomId.value } })"
           class="min-w-0 flex-1 truncate text-xs font-medium hover:underline"
         >
-          {{ roomName || $t("calls.inProgress") }}
+          {{ title }}
         </NuxtLink>
         <Button
           v-if="pipAvailable"

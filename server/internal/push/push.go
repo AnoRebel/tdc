@@ -84,6 +84,9 @@ type Payload struct {
 	Room string `json:"room,omitempty"`
 	// Event names the message, so opening it can land on the right one.
 	Event string `json:"event,omitempty"`
+	// Call marks a ring, which a device already showing the application
+	// rings for itself, and which ends when the call stops ringing.
+	Call string `json:"call,omitempty"`
 }
 
 // Service sends push notifications.

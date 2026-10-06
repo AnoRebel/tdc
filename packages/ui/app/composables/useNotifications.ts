@@ -125,6 +125,8 @@ export function describeNotification(notification: Notification): string {
       return `Your webhook “${notification.detail ?? ""}” was turned off after repeated failures`;
     case "assigned":
       return `${who} assigned you ${notification.detail ?? ""}`.trim();
+    case "missed_call":
+      return `You missed a call from ${who}`;
     default:
       return `${who} did something`;
   }

@@ -404,6 +404,11 @@ type privacyRequest struct {
 	ShowsPresence *bool `json:"showsPresence,omitempty"`
 	ShowsStatus   *bool `json:"showsStatus,omitempty"`
 	ShowsLastSeen *bool `json:"showsLastSeen,omitempty"`
+
+	// Calls is who may ring this person: "anyone", "shared" or "nobody".
+	// CallsFromOtherServers is whether people on connected servers may.
+	Calls                 string `json:"calls,omitempty"`
+	CallsFromOtherServers *bool  `json:"callsFromOtherServers,omitempty"`
 }
 
 // handleSetPrivacy records who may open a conversation with somebody, and what
@@ -423,6 +428,23 @@ func (s *Server) handleSetPrivacy(c *echo.Context) error {
 		if errors.Is(err, moderation.ErrUnknownPolicy) {
 			return echo.NewHTTPError(http.StatusBadRequest,
 				`direct messages must be "anyone", "shared" or "nobody"`)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	if request.Calls != "" || request.CallsFromOtherServers != nil {
+		policy := s.moderation.CallPolicyFor(ctx, user.ID)
+		if request.Calls != "" {
+			policy.FromThisServer = moderation.DirectMessagePolicy(request.Calls)
+		}
+		if request.CallsFromOtherServers != nil {
+			policy.FromOtherServers = *request.CallsFromOtherServers
+		}
+		err := s.moderation.SetCallPolicy(ctx, user.ID, policy)
+		if errors.Is(err, moderation.ErrUnknownPolicy) {
+			return echo.NewHTTPError(http.StatusBadRequest, `calls must be "anyone", "shared" or "nobody"`)
 		}
 		if err != nil {
 			return err
@@ -465,8 +487,11 @@ func (s *Server) handleGetPrivacy(c *echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
 
+	calls := s.moderation.CallPolicyFor(ctx, user.ID)
 	response := privacyRequest{
-		DirectMessages: string(s.moderation.DirectMessagePolicyFor(ctx, user.ID)),
+		DirectMessages:        string(s.moderation.DirectMessagePolicyFor(ctx, user.ID)),
+		Calls:                 string(calls.FromThisServer),
+		CallsFromOtherServers: &calls.FromOtherServers,
 	}
 
 	// Their own settings, so nothing is withheld here: this is the screen on

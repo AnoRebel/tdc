@@ -175,3 +175,24 @@ func TestWithoutANotifierNothingHappens(t *testing.T) {
 	bridge := NewLiveBridge(New(), func(string, ...any) bool { return true }, nil)
 	bridge.notify(messageFrame("someone@example.test", "Hello", nil))
 }
+
+// Somebody calling is announced, by name, and leads to the conversation.
+func TestARingIsAnnounced(t *testing.T) {
+	bridge, spy := bridgeWith(t, "me@example.test")
+	raw, _ := json.Marshal(map[string]any{
+		"type": "call.ring", "roomId": "room-7",
+		"payload": map[string]any{
+			"call": "call-1", "roomId": "room-7", "roomName": "standup", "kind": "channel",
+			"from": map[string]any{"userId": "u1", "username": "amina", "address": "amina@example.test"},
+		},
+	})
+	bridge.notify(raw)
+
+	if spy.count() != 1 {
+		t.Fatalf("a ring raised %d banners, want 1", spy.count())
+	}
+	shown := spy.shown[0]
+	if shown.title != "amina is calling" || shown.body != "In #standup" || shown.target.Room != "room-7" {
+		t.Errorf("the ring's banner reads %+v", shown)
+	}
+}

@@ -101,11 +101,12 @@ type AuditEntry struct {
 }
 
 type Call struct {
-	ID        uuid.UUID
-	RoomID    uuid.UUID
-	StartedBy *uuid.UUID
-	StartedAt time.Time
-	EndedAt   *time.Time
+	ID           uuid.UUID
+	RoomID       uuid.UUID
+	StartedBy    *uuid.UUID
+	StartedAt    time.Time
+	EndedAt      *time.Time
+	StartedEvent *string
 }
 
 type CallParticipant struct {
@@ -908,12 +909,14 @@ type UserPresence struct {
 }
 
 type UserPrivacy struct {
-	UserID         uuid.UUID
-	DirectMessages string
-	UpdatedAt      time.Time
-	ShowsPresence  bool
-	ShowsStatus    bool
-	ShowsLastSeen  bool
+	UserID                uuid.UUID
+	DirectMessages        string
+	UpdatedAt             time.Time
+	ShowsPresence         bool
+	ShowsStatus           bool
+	ShowsLastSeen         bool
+	Calls                 string
+	CallsFromOtherServers bool
 }
 
 type UserRole struct {

@@ -193,6 +193,22 @@ An incoming call SHALL be shown as a small window the person can move, which doe
 - **WHEN** a person answers an incoming call on one device
 - **THEN** it stops ringing on their others
 
+### Requirement: More than one call
+
+A person SHALL be able to be rung by several people at once and choose among them, to answer or place a call while in another — holding the first, so that nothing they send reaches it — and to switch between their calls, and to merge a held call into the active one as a conference. People merged in from another conversation MUST take part in the call only, seeing nothing of the conversation it belongs to, and MUST be asked before they are moved.
+
+Declining a call, or ending one to take another, SHALL offer to send the caller a short message.
+
+#### Scenario: A call arrives during a call
+
+- **WHEN** a person in a call is rung by somebody else
+- **THEN** they are told, and may decline, hold the current call and answer, end it and answer, or merge the caller into it
+
+#### Scenario: Holding sends nothing
+
+- **WHEN** a call is on hold
+- **THEN** nothing the person sends reaches it, and its participants see them as holding
+
 ### Requirement: Screen sharing and presentations
 
 Participants SHALL be able to share a screen, window or browser tab in a call, and one participant at a time MUST be able to present, putting their shared screen before everybody in the call.

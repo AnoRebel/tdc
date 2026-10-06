@@ -156,7 +156,11 @@ export type LiveFrameType =
   | "private"
   // Another participant's call negotiation, and who is in a call.
   | "call.signal"
-  | "call.state";
+  | "call.state"
+  // Somebody is ringing you; stop ringing; somebody you rang declined.
+  | "call.ring"
+  | "call.ring_ended"
+  | "call.declined";
 
 /** One frame from the live connection. */
 export interface LiveFrame {
@@ -418,7 +422,9 @@ export type NotificationReason =
   // An outgoing webhook of yours was turned off after failing repeatedly.
   | "webhook_disabled"
   // Somebody made you responsible for an issue; detail names it.
-  | "assigned";
+  | "assigned"
+  // Somebody rang you into a call you did not answer.
+  | "missed_call";
 
 /** One thing somebody has been told about. */
 export interface Notification {
@@ -537,4 +543,8 @@ export interface DisclosureSettings {
 /** Somebody's own privacy settings, as the settings screen reads them. */
 export interface PrivacySettings extends DisclosureSettings {
   directMessages: DirectMessagePolicy;
+  /** Who may ring this person, on servers that offer calls. */
+  calls: DirectMessagePolicy;
+  /** Whether people on connected servers may ring this person. */
+  callsFromOtherServers: boolean;
 }

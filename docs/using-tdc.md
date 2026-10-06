@@ -681,6 +681,41 @@ video**. Your browser asks for your microphone (and camera) the first time;
 nothing is sent until you allow it, and nobody is told you have joined until
 then either.
 
+**Ringing people.** Starting a call in a direct conversation rings the other
+person; **Start a video call** does the same with your camera on. In a channel,
+the bell in the call window (**Ring people**) lets you ring particular members
+into it. A ring reaches every device the person is signed in on, and stops on
+all of them when they answer on one. If they decline, you see that for a
+moment; if nobody answers within 45 seconds, they get a missed-call
+notification. Somebody whose settings do not let you ring them is simply not
+rung — you are not told why.
+
+**Being rung.** An incoming call appears as a small window at the edge of the
+screen, never over what you are doing; drag it anywhere, or move it from the
+keyboard by its grip. It stays while you move between pages, and offers
+**Answer**, **Video** (answer with your camera on) and **Decline**. Several
+calls at once are listed together, newest first, each with its own buttons.
+If you are already in a call, the window says so and offers **End & answer**:
+the current call ends and the new one joins. **Silence** stops the sound
+without declining. When the browser is in the background or closed, a ring
+arrives as a notification, where you have allowed notifications; the desktop
+application shows a banner, even when closed to the tray.
+
+You can switch between voice and video at any time: answer by voice or with
+video, and turn your camera on or off during the call.
+
+**Who may call you** is in **Settings → Privacy**: anybody on this server,
+only people you share a conversation with, or nobody — you can still join calls
+yourself. A separate switch decides whether people on connected servers may
+ring you, where your server allows that at all.
+
+**How it sounds** is in **Settings → Ringing**, kept on each device and, in
+the desktop application, for each server separately: turn the ringer off,
+choose a tone, add your own (an audio file under 400 KB), give particular
+people their own tone by address (`name@server`), and, on phones whose browser
+supports it, vibrate for incoming calls. The incoming window has a ringer
+switch too.
+
 **While you are in it.** The call sits in a small window in the corner, so you
 can carry on reading, writing, opening projects — anywhere in the application —
 without leaving it. From that window you can:
@@ -970,7 +1005,7 @@ So that nothing above is read as implying more than it says:
   managed through the API rather than a screen, so an administrator setting up
   a moderator is doing it with a tool rather than a form.
 - **More of calls.** Calls between a few people work, on servers that switch
-  them on (see [Calls](#calls)). Ringing people, links to a call, sharing a
+  them on (see [Calls](#calls)), and ringing people into them. Links to a call, sharing a
   screen, recording, and calls of more than a handful of people are still to
   come.
 - **Message formatting.** No bold, italic, lists or code blocks in a message.

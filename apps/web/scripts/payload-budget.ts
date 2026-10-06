@@ -46,8 +46,13 @@ const BUDGETS = {
    * holds — the sidebar's entries, the notification kinds, the chat room's
    * link from a message to its issue — and none was one import to move. The
    * room left is about one more feature's worth, on purpose.
+   *
+   * And to 222 for calls, which every page must be able to receive: the live
+   * connection's ring handling and the hook that loads the call host. The
+   * call window, the incoming-call window and everything that places a call
+   * load only on servers that offer calls, after the page.
    */
-  blocking: 218,
+  blocking: 222,
   prefetched: 90,
 };
 

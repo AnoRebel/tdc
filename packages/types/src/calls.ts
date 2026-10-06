@@ -29,3 +29,19 @@ export interface CallSignal {
   from: string;
   signal: { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null };
 }
+
+/** Somebody ringing you into a call. */
+export interface CallRing {
+  call: string;
+  roomId: string;
+  roomName: string;
+  kind: "channel" | "direct" | "disposable";
+  from: { userId: string; username: string; address: string };
+}
+
+/** Somebody you rang declined. */
+export interface CallDeclined {
+  call: string;
+  userId: string;
+  username: string;
+}

@@ -142,6 +142,26 @@ const directMessageOptions = [
   },
 ];
 
+// Who may ring this person: the same three answers, said about calls.
+const callOptions = [
+  {
+    value: "anyone" as const,
+    label: $t("settings.calls.anyone"),
+    detail: $t("settings.calls.anyoneHint"),
+  },
+  {
+    value: "shared" as const,
+    label: $t("settings.calls.shared"),
+    detail: $t("settings.calls.sharedHint"),
+  },
+  {
+    value: "nobody" as const,
+    label: $t("settings.calls.nobody"),
+    detail: $t("settings.calls.nobodyHint"),
+  },
+];
+const { offers: serverOffers } = useServerInfo();
+
 /*
  * The three details a member list may carry beyond a name.
  *
@@ -468,6 +488,13 @@ function deviceName(userAgent: string): string {
            server can send mail; it draws nothing where it cannot. -->
       <DigestPreferences />
 
+      <!-- How calls ring on this device, where the server offers calls. -->
+      <section v-if="serverOffers('calls')" class="space-y-2">
+        <h2 class="text-sm font-semibold">{{ $t("calls.ringtones") }}</h2>
+        <p class="text-xs text-muted-foreground">{{ $t("calls.ringtonesHint") }}</p>
+        <CallRingtones />
+      </section>
+
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <Compass class="size-4" />
@@ -511,6 +538,55 @@ function deviceName(userAgent: string): string {
             </span>
           </label>
         </div>
+
+        <!-- Who may ring you, where the server offers calls. Ringing is the
+             more intrusive way of reaching somebody, so it has its own say. -->
+        <template v-if="serverOffers('calls')">
+          <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.calls.title") }}</h3>
+          <p class="mt-1 text-xs text-muted-foreground">{{ $t("settings.calls.hint") }}</p>
+          <div class="mt-3 space-y-1" data-call-privacy>
+            <label
+              v-for="option in callOptions"
+              :key="option.value"
+              class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+            >
+              <input
+                type="radio"
+                name="call-privacy"
+                :value="option.value"
+                :checked="personal.calls.value === option.value"
+                class="mt-0.5 cursor-pointer accent-primary"
+                @change="personal.setCalls({ calls: option.value })"
+              />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium">{{ option.label }}</span>
+                <span class="block text-xs text-muted-foreground">{{ option.detail }}</span>
+              </span>
+            </label>
+            <label
+              class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+            >
+              <input
+                type="checkbox"
+                class="mt-0.5 cursor-pointer accent-primary"
+                :checked="personal.callsFromOtherServers.value"
+                @change="
+                  personal.setCalls({
+                    callsFromOtherServers: !personal.callsFromOtherServers.value,
+                  })
+                "
+              />
+              <span class="min-w-0">
+                <span class="block text-sm font-medium">{{
+                  $t("settings.calls.otherServers")
+                }}</span>
+                <span class="block text-xs text-muted-foreground">
+                  {{ $t("settings.calls.otherServersHint") }}
+                </span>
+              </span>
+            </label>
+          </div>
+        </template>
 
         <!-- What a member list says about you. Your name and address are not
              here because they are how a message is attributed and a

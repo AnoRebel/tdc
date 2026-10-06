@@ -1,4 +1,4 @@
-import type { Call, CallSignal, IceConfiguration } from "@tdc/types";
+import type { Call, CallDeclined, CallRing, CallSignal, IceConfiguration } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { createGlobalState } from "@vueuse/core";
 
@@ -63,6 +63,11 @@ export const useCall = createGlobalState(() => {
   const local = shallowRef<MediaStream | null>(null);
   /** What each other participant is sending, by their user id. */
   const remote = shallowReactive(new Map<string, MediaStream>());
+
+  /** People ringing us now, newest last. */
+  const incoming = ref<CallRing[]>([]);
+  /** The last person who declined our ring, for a moment's notice. */
+  const declined = ref<CallDeclined | null>(null);
 
   const peers = new Map<string, Peer>();
   /*
@@ -166,7 +171,7 @@ export const useCall = createGlobalState(() => {
    * The microphone (and camera, if asked) first: nothing is sent, and nobody is
    * told we are in the call, until the person has granted it.
    */
-  async function join(room: string, withVideo: boolean) {
+  async function join(room: string, withVideo: boolean, options: { ring?: boolean } = {}) {
     if (joining.value) return;
     if (joined.value) {
       if (roomId.value === room) return;
@@ -201,6 +206,8 @@ export const useCall = createGlobalState(() => {
       const waiting = early;
       early = [];
       for (const signal of waiting) await onSignal(signal);
+      incoming.value = incoming.value.filter((ring) => ring.roomId !== room);
+      if (options.ring) await ring();
     } catch (cause) {
       stopLocal();
       early = [];
@@ -277,6 +284,51 @@ export const useCall = createGlobalState(() => {
     }
   }
 
+  /**
+   * Rings people into the call we are in: the given people, or everybody else
+   * in a direct conversation. Who could not be rung is not said, by design.
+   */
+  async function ring(users: string[] = []) {
+    if (!joined.value || !roomId.value) return;
+    try {
+      await api.post(`/api/rooms/${roomId.value}/call/ring`, { users });
+    } catch {
+      // Ringing is a courtesy; the call goes on without it.
+    }
+  }
+
+  function onRing(incomingRing: CallRing) {
+    if (joined.value && call.value?.id === incomingRing.call) return;
+    if (incoming.value.some((each) => each.call === incomingRing.call)) return;
+    incoming.value = [...incoming.value, incomingRing];
+  }
+
+  function onRingEnded(callId: string) {
+    incoming.value = incoming.value.filter((each) => each.call !== callId);
+  }
+
+  function onDeclined(notice: CallDeclined) {
+    if (notice.call !== call.value?.id) return;
+    declined.value = notice;
+    setTimeout(() => {
+      if (declined.value === notice) declined.value = null;
+    }, 5000);
+  }
+
+  async function answer(incomingRing: CallRing, withVideo: boolean) {
+    onRingEnded(incomingRing.call);
+    await join(incomingRing.roomId, withVideo);
+  }
+
+  async function decline(incomingRing: CallRing) {
+    onRingEnded(incomingRing.call);
+    try {
+      await api.post(`/api/rooms/${incomingRing.roomId}/call/decline`);
+    } catch {
+      // The ring ends by itself; declining only says so sooner.
+    }
+  }
+
   /** Who is in the call changed. */
   function onState(state: Call) {
     if (!joined.value || state.roomId !== roomId.value) return;
@@ -338,5 +390,13 @@ export const useCall = createGlobalState(() => {
     toggleCamera,
     onState,
     onSignal,
+    incoming,
+    declined,
+    ring,
+    answer,
+    decline,
+    onRing,
+    onRingEnded,
+    onDeclined,
   };
 });

@@ -241,6 +241,11 @@ func (b *LiveBridge) notify(data []byte) {
 		return
 	}
 
+	if frame.Type == "call.ring" {
+		b.announceRing(data)
+		return
+	}
+
 	if frame.Type != "event" || frame.Payload.Type != "message.sent" {
 		return
 	}
@@ -269,5 +274,43 @@ func (b *LiveBridge) notify(data []byte) {
 		Server:  server,
 		Room:    frame.RoomID,
 		Message: frame.Payload.ID,
+	})
+}
+
+/*
+announceRing raises a banner for somebody calling.
+
+The call itself rings in the window, which may be hidden behind others or
+closed to the tray; the banner is what reaches somebody then, and pressing it
+brings them to the conversation, where the call can be answered.
+*/
+func (b *LiveBridge) announceRing(data []byte) {
+	var ring struct {
+		RoomID  string `json:"roomId"`
+		Payload struct {
+			RoomName string `json:"roomName"`
+			Kind     string `json:"kind"`
+			From     struct {
+				Username string `json:"username"`
+				Address  string `json:"address"`
+			} `json:"from"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal(data, &ring); err != nil || ring.Payload.From.Username == "" {
+		return
+	}
+
+	where := "A direct call"
+	if ring.Payload.Kind != "direct" && ring.Payload.RoomName != "" {
+		where = "In #" + ring.Payload.RoomName
+	}
+
+	b.service.mu.RLock()
+	server := b.service.current
+	b.service.mu.RUnlock()
+
+	_ = b.notifier.Show(ring.Payload.From.Username+" is calling", where, Target{
+		Server: server,
+		Room:   ring.RoomID,
 	})
 }

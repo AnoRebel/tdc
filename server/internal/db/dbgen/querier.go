@@ -68,6 +68,7 @@ type Querier interface {
 	// a moderator extending a ban means the new terms, not an error.
 	BanFromChannel(ctx context.Context, arg BanFromChannelParams) error
 	BlockUser(ctx context.Context, arg BlockUserParams) error
+	CallByID(ctx context.Context, id uuid.UUID) (Call, error)
 	// The room of an open call somebody is in now; no row if they are not in it.
 	CallRoomOfParticipant(ctx context.Context, arg CallRoomOfParticipantParams) (uuid.UUID, error)
 	// Everything still waiting for a subscription that has been turned off.
@@ -365,6 +366,7 @@ type Querier interface {
 	// The application an account acts for, if it acts for one.
 	GetApplicationByAccount(ctx context.Context, accountID *uuid.UUID) (Application, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
+	GetCallPolicy(ctx context.Context, userID uuid.UUID) (GetCallPolicyRow, error)
 	// For the company's own administrators, whatever its visibility.
 	GetCompanyBySlug(ctx context.Context, slug string) (CompanyProfile, error)
 	GetCompanyMembership(ctx context.Context, arg GetCompanyMembershipParams) (CompanyMember, error)
@@ -1049,6 +1051,8 @@ type Querier interface {
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
 	SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int64, error)
+	SetCallPolicy(ctx context.Context, arg SetCallPolicyParams) error
+	SetCallStartedEvent(ctx context.Context, arg SetCallStartedEventParams) error
 	// After a project's zone changes: the same days, at different instants.
 	SetCycleInstants(ctx context.Context, arg SetCycleInstantsParams) error
 	SetDirectMessagePolicy(ctx context.Context, arg SetDirectMessagePolicyParams) error

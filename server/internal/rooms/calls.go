@@ -143,6 +143,11 @@ func (s *Service) JoinCall(
 		if err != nil {
 			return Call{}, nil, err
 		}
+		if err := s.store.SetCallStartedEvent(ctx, dbgen.SetCallStartedEventParams{
+			ID: current.ID, StartedEvent: &event.ID,
+		}); err != nil {
+			return Call{}, nil, fmt.Errorf("record call start: %w", err)
+		}
 		startedEvent = &event
 	}
 
@@ -255,4 +260,13 @@ func (s *Service) SweepCalls(ctx context.Context) ([]SweptCall, []dbgen.Event, e
 type SweptCall struct {
 	CallID uuid.UUID
 	RoomID uuid.UUID
+}
+
+// CallRecord returns a call, open or not, by its identifier.
+func (s *Service) CallRecord(ctx context.Context, callID uuid.UUID) (dbgen.Call, error) {
+	call, err := s.store.CallByID(ctx, callID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return dbgen.Call{}, ErrNoCall
+	}
+	return call, err
 }

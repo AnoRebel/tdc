@@ -125,3 +125,12 @@ SELECT EXISTS (
     JOIN rooms r ON r.id = a.room_id
     WHERE a.user_id = $1 AND b.user_id = $2 AND r.kind <> 'direct'
 );
+
+-- name: SetCallPolicy :exec
+INSERT INTO user_privacy (user_id, calls, calls_from_other_servers, updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (user_id) DO UPDATE
+SET calls = EXCLUDED.calls, calls_from_other_servers = EXCLUDED.calls_from_other_servers, updated_at = now();
+
+-- name: GetCallPolicy :one
+SELECT calls, calls_from_other_servers FROM user_privacy WHERE user_id = $1;

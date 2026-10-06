@@ -76,6 +76,22 @@ func (q *Queries) DeleteLapsedBans(ctx context.Context) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const getCallPolicy = `-- name: GetCallPolicy :one
+SELECT calls, calls_from_other_servers FROM user_privacy WHERE user_id = $1
+`
+
+type GetCallPolicyRow struct {
+	Calls                 string
+	CallsFromOtherServers bool
+}
+
+func (q *Queries) GetCallPolicy(ctx context.Context, userID uuid.UUID) (GetCallPolicyRow, error) {
+	row := q.db.QueryRow(ctx, getCallPolicy, userID)
+	var i GetCallPolicyRow
+	err := row.Scan(&i.Calls, &i.CallsFromOtherServers)
+	return i, err
+}
+
 const getDirectMessagePolicy = `-- name: GetDirectMessagePolicy :one
 SELECT direct_messages FROM user_privacy WHERE user_id = $1
 `
@@ -436,6 +452,24 @@ func (q *Queries) RestrictPosting(ctx context.Context, arg RestrictPostingParams
 		&i.LiftedBy,
 	)
 	return i, err
+}
+
+const setCallPolicy = `-- name: SetCallPolicy :exec
+INSERT INTO user_privacy (user_id, calls, calls_from_other_servers, updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (user_id) DO UPDATE
+SET calls = EXCLUDED.calls, calls_from_other_servers = EXCLUDED.calls_from_other_servers, updated_at = now()
+`
+
+type SetCallPolicyParams struct {
+	UserID                uuid.UUID
+	Calls                 string
+	CallsFromOtherServers bool
+}
+
+func (q *Queries) SetCallPolicy(ctx context.Context, arg SetCallPolicyParams) error {
+	_, err := q.db.Exec(ctx, setCallPolicy, arg.UserID, arg.Calls, arg.CallsFromOtherServers)
+	return err
 }
 
 const setDirectMessagePolicy = `-- name: SetDirectMessagePolicy :exec

@@ -15,11 +15,10 @@ import { Input } from "#layers/ui/app/components/ui/input";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 
-// The call window, loaded only once somebody is in a call (or joining one), so
-// nobody downloads it who never calls. useCall names this same state.
+// Calls, on servers that offer them: rings arrive and calls go on wherever
+// somebody is. Loaded after the page, never part of the first download.
 const { offers: offersCapability } = useServerInfo();
-const callRoom = useState<string | null>("call.room", () => null);
-const callOn = computed(() => offersCapability("calls") && Boolean(callRoom.value));
+const callsOffered = computed(() => offersCapability("calls"));
 
 /*
  * lastSeenRoomsKey holds the conversations somebody is in.
@@ -598,7 +597,7 @@ provide("openSearch", () => {
     </main>
 
     <!-- A call goes on whatever page somebody moves to. -->
-    <LazyCallWindow v-if="callOn" />
+    <LazyCallHost v-if="callsOffered" />
 
     <SearchPalette
       v-model="searching"

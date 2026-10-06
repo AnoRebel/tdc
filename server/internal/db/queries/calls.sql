@@ -50,3 +50,9 @@ WHERE c.id = p.call_id AND c.ended_at IS NULL AND p.left_at IS NULL
   AND NOT EXISTS (
       SELECT 1 FROM user_presence up WHERE up.user_id = p.user_id AND up.connections > 0)
 RETURNING p.call_id, p.user_id, c.room_id;
+
+-- name: SetCallStartedEvent :exec
+UPDATE calls SET started_event = $2 WHERE id = $1;
+
+-- name: CallByID :one
+SELECT * FROM calls WHERE id = $1;

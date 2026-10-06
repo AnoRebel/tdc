@@ -19,6 +19,8 @@ export function usePersonalModeration() {
 
   const blocked = ref<BlockedPerson[]>([]);
   const directMessages = ref<DirectMessagePolicy>("anyone");
+  const calls = ref<DirectMessagePolicy>("anyone");
+  const callsFromOtherServers = ref(true);
 
   /**
    * What a member list may say about this person.
@@ -41,6 +43,8 @@ export function usePersonalModeration() {
       ]);
       blocked.value = people;
       directMessages.value = privacy.directMessages;
+      calls.value = privacy.calls ?? "anyone";
+      callsFromOtherServers.value = privacy.callsFromOtherServers ?? true;
       disclosure.value = {
         showsPresence: privacy.showsPresence,
         showsStatus: privacy.showsStatus,
@@ -75,6 +79,24 @@ export function usePersonalModeration() {
     }
   }
 
+  /** Who may ring this person, and whether people on other servers may. */
+  async function setCalls(change: {
+    calls?: DirectMessagePolicy;
+    callsFromOtherServers?: boolean;
+  }) {
+    const before = { calls: calls.value, callsFromOtherServers: callsFromOtherServers.value };
+    if (change.calls) calls.value = change.calls;
+    if (change.callsFromOtherServers !== undefined) {
+      callsFromOtherServers.value = change.callsFromOtherServers;
+    }
+    try {
+      await api.put("/api/me/privacy", change);
+    } catch {
+      calls.value = before.calls;
+      callsFromOtherServers.value = before.callsFromOtherServers;
+    }
+  }
+
   /**
    * Changes one disclosure setting, leaving the other two alone.
    *
@@ -98,11 +120,14 @@ export function usePersonalModeration() {
   return {
     blocked,
     directMessages,
+    calls,
+    callsFromOtherServers,
     disclosure,
     refresh,
     block,
     unblock,
     setDirectMessages,
+    setCalls,
     setDisclosure,
   };
 }

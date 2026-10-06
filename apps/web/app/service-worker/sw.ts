@@ -142,6 +142,8 @@ interface PushPayload {
   body?: string;
   room?: string;
   event?: string;
+  /** Set when somebody is calling. */
+  call?: string;
 }
 
 /*
@@ -182,6 +184,11 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "TDC";
   const body = payload.body || "Something happened";
 
+  if (payload.call) {
+    event.waitUntil(ringing(payload, title, body));
+    return;
+  }
+
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
@@ -199,6 +206,27 @@ self.addEventListener("push", (event) => {
     }),
   );
 });
+
+/*
+ * Somebody calling.
+ *
+ * A window already showing the application rings by itself, from its live
+ * connection, so nothing is shown then; browsers allow a silent push while one
+ * of the site's windows is visible. Otherwise the notification stays until it
+ * is acted on, and the application closes it when the ring ends.
+ */
+async function ringing(payload: PushPayload, title: string, body: string) {
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  if (windows.some((each) => each.visibilityState === "visible")) return;
+  await self.registration.showNotification(title, {
+    body,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: `call:${payload.call}`,
+    requireInteraction: true,
+    data: { room: payload.room },
+  });
+}
 
 /*
  * Activating a notification goes to the conversation it is about.

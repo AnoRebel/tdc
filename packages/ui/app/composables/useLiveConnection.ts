@@ -1,4 +1,12 @@
-import type { Call, CallSignal, LiveEventPayload, LiveFrame, PrivateReply } from "@tdc/types";
+import type {
+  Call,
+  CallDeclined,
+  CallRing,
+  CallSignal,
+  LiveEventPayload,
+  LiveFrame,
+  PrivateReply,
+} from "@tdc/types";
 
 /**
  * The live connection to a TDC server.
@@ -29,6 +37,11 @@ interface LiveHandlers {
   onCallState?: (call: Call) => void;
   /** Called with another participant's call negotiation. */
   onCallSignal?: (signal: CallSignal) => void;
+  /** Called when somebody rings this person, and when their ringing should stop. */
+  onCallRing?: (ring: CallRing) => void;
+  onCallRingEnded?: (call: string) => void;
+  /** Called when somebody this person rang declined. */
+  onCallDeclined?: (declined: CallDeclined) => void;
 }
 
 // Backoff bounds. The first retry is quick, because most disconnections are
@@ -176,6 +189,22 @@ export function useLiveConnection(handlers: LiveHandlers) {
 
       case "call.signal": {
         if (frame.payload) handlers.onCallSignal?.(frame.payload as unknown as CallSignal);
+        break;
+      }
+
+      case "call.ring": {
+        if (frame.payload) handlers.onCallRing?.(frame.payload as unknown as CallRing);
+        break;
+      }
+
+      case "call.ring_ended": {
+        const ended = frame.payload as unknown as { call?: string } | undefined;
+        if (ended?.call) handlers.onCallRingEnded?.(ended.call);
+        break;
+      }
+
+      case "call.declined": {
+        if (frame.payload) handlers.onCallDeclined?.(frame.payload as unknown as CallDeclined);
         break;
       }
 

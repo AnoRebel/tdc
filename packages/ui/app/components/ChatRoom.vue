@@ -48,6 +48,7 @@ import {
   Trash2,
   X,
   UserX,
+  Video,
 } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Bubble } from "#layers/ui/app/components/ui/bubble";
@@ -1887,9 +1888,20 @@ watch(roomId, load, { immediate: true });
             :label="$ts('calls.start')"
             :title="$ts('calls.start')"
             :disabled="calling.joining.value"
-            @click="calling.join(roomId, false)"
+            @click="calling.join(roomId, false, { ring: room?.kind === 'direct' })"
           >
             <Phone class="size-3.5" />
+          </Button>
+          <Button
+            v-if="callable && !roomCall && !inThisCall"
+            variant="ghost"
+            size="icon"
+            :label="$ts('calls.startVideo')"
+            :title="$ts('calls.startVideo')"
+            :disabled="calling.joining.value"
+            @click="calling.join(roomId, true, { ring: room?.kind === 'direct' })"
+          >
+            <Video class="size-3.5" />
           </Button>
 
           <ChannelSettings :room="room" :events="messages" @changed="room = $event" />

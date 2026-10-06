@@ -879,7 +879,14 @@ with WebRTC and GStreamer's WebRTC plugins being installed. Picture-in-picture
 of the whole call needs a Chromium-based browser; others put the main video
 there instead.
 
-**Not yet:** ringing people, links to a call, screen sharing and recording;
+**Ringing.** People can ring each other into calls; a ring reaches every
+device of the person rung, by the live connection, and by web push where the
+server has push configured, so a browser in the background still rings.
+Ringing is limited to ten rings per person every five minutes. Each person
+decides who may ring them; whether people on connected servers may ring anybody
+here is the server's decision first.
+
+**Not yet:** links to a call, screen sharing and recording;
 calls in conversations shared with other servers; and calls of more than a few
 people through a forwarding unit.
 

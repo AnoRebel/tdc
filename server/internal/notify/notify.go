@@ -55,6 +55,8 @@ const (
 	ReasonForward Reason = "forward"
 	// ReasonPin is something you wrote being pinned.
 	ReasonPin Reason = "pin"
+	// ReasonMissedCall is a call somebody was rung into and did not answer.
+	ReasonMissedCall Reason = "missed_call"
 )
 
 // Preference is the setting that applies to one conversation.

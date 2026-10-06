@@ -421,3 +421,65 @@ func (s *Service) MayDirectMessage(ctx context.Context, from, to uuid.UUID) bool
 		return true
 	}
 }
+
+/*
+CallPolicy is who may ring somebody or start a call with them: the same three
+answers as direct messages, and separately whether people on other servers may.
+*/
+type CallPolicy struct {
+	FromThisServer   DirectMessagePolicy
+	FromOtherServers bool
+}
+
+// SetCallPolicy records who may call somebody.
+func (s *Service) SetCallPolicy(ctx context.Context, userID uuid.UUID, policy CallPolicy) error {
+	switch policy.FromThisServer {
+	case DirectAnyone, DirectShared, DirectNobody:
+	default:
+		return ErrUnknownPolicy
+	}
+	if err := s.queries.SetCallPolicy(ctx, dbgen.SetCallPolicyParams{
+		UserID: userID, Calls: string(policy.FromThisServer), CallsFromOtherServers: policy.FromOtherServers,
+	}); err != nil {
+		return fmt.Errorf("moderation: setting a call policy: %w", err)
+	}
+	return nil
+}
+
+// CallPolicyFor reads somebody's setting, defaulting to open as direct
+// messages do.
+func (s *Service) CallPolicyFor(ctx context.Context, userID uuid.UUID) CallPolicy {
+	row, err := s.queries.GetCallPolicy(ctx, userID)
+	if err != nil {
+		return CallPolicy{FromThisServer: DirectAnyone, FromOtherServers: true}
+	}
+	return CallPolicy{FromThisServer: DirectMessagePolicy(row.Calls), FromOtherServers: row.CallsFromOtherServers}
+}
+
+/*
+MayCall reports whether one person on this server may ring another.
+
+Only yes or no, for the reason MayDirectMessage gives: which rule refused is
+itself something the caller must not learn. A block is checked first.
+*/
+func (s *Service) MayCall(ctx context.Context, from, to uuid.UUID) bool {
+	if from == to {
+		return false
+	}
+	if s.HasBlocked(ctx, to, from) {
+		return false
+	}
+	switch s.CallPolicyFor(ctx, to).FromThisServer {
+	case DirectNobody:
+		return false
+	case DirectShared:
+		shared, err := s.queries.SharesAChannel(ctx, dbgen.SharesAChannelParams{UserID: from, UserID_2: to})
+		if err != nil {
+			s.log.Warn("cannot check a shared channel", "error", err)
+			return false
+		}
+		return shared
+	default:
+		return true
+	}
+}

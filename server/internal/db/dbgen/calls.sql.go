@@ -12,6 +12,24 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+const callByID = `-- name: CallByID :one
+SELECT id, room_id, started_by, started_at, ended_at, started_event FROM calls WHERE id = $1
+`
+
+func (q *Queries) CallByID(ctx context.Context, id uuid.UUID) (Call, error) {
+	row := q.db.QueryRow(ctx, callByID, id)
+	var i Call
+	err := row.Scan(
+		&i.ID,
+		&i.RoomID,
+		&i.StartedBy,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.StartedEvent,
+	)
+	return i, err
+}
+
 const callRoomOfParticipant = `-- name: CallRoomOfParticipant :one
 SELECT c.room_id FROM call_participants p JOIN calls c ON c.id = p.call_id
 WHERE p.call_id = $1 AND p.user_id = $2 AND p.left_at IS NULL AND c.ended_at IS NULL
@@ -34,7 +52,7 @@ const endCallIfEmpty = `-- name: EndCallIfEmpty :one
 UPDATE calls SET ended_at = NOW()
 WHERE id = $1 AND ended_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM call_participants WHERE call_id = $1 AND left_at IS NULL)
-RETURNING id, room_id, started_by, started_at, ended_at
+RETURNING id, room_id, started_by, started_at, ended_at, started_event
 `
 
 // Ends a call nobody is in any more, returning it if this ended it.
@@ -47,6 +65,7 @@ func (q *Queries) EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error
 		&i.StartedBy,
 		&i.StartedAt,
 		&i.EndedAt,
+		&i.StartedEvent,
 	)
 	return i, err
 }
@@ -173,7 +192,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 }
 
 const openCallInRoom = `-- name: OpenCallInRoom :one
-SELECT id, room_id, started_by, started_at, ended_at FROM calls WHERE room_id = $1 AND ended_at IS NULL
+SELECT id, room_id, started_by, started_at, ended_at, started_event FROM calls WHERE room_id = $1 AND ended_at IS NULL
 `
 
 func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, error) {
@@ -185,6 +204,7 @@ func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, e
 		&i.StartedBy,
 		&i.StartedAt,
 		&i.EndedAt,
+		&i.StartedEvent,
 	)
 	return i, err
 }
@@ -214,10 +234,24 @@ func (q *Queries) SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int
 	return result.RowsAffected(), nil
 }
 
+const setCallStartedEvent = `-- name: SetCallStartedEvent :exec
+UPDATE calls SET started_event = $2 WHERE id = $1
+`
+
+type SetCallStartedEventParams struct {
+	ID           uuid.UUID
+	StartedEvent *string
+}
+
+func (q *Queries) SetCallStartedEvent(ctx context.Context, arg SetCallStartedEventParams) error {
+	_, err := q.db.Exec(ctx, setCallStartedEvent, arg.ID, arg.StartedEvent)
+	return err
+}
+
 const startCall = `-- name: StartCall :one
 INSERT INTO calls (id, room_id, started_by) VALUES ($1, $2, $3)
 ON CONFLICT (room_id) WHERE ended_at IS NULL DO NOTHING
-RETURNING id, room_id, started_by, started_at, ended_at
+RETURNING id, room_id, started_by, started_at, ended_at, started_event
 `
 
 type StartCallParams struct {
@@ -237,6 +271,7 @@ func (q *Queries) StartCall(ctx context.Context, arg StartCallParams) (Call, err
 		&i.StartedBy,
 		&i.StartedAt,
 		&i.EndedAt,
+		&i.StartedEvent,
 	)
 	return i, err
 }

@@ -51,6 +51,14 @@ const (
 	FrameCallSignal = "call.signal"
 	// FrameCallState says who is in a call and what each is sending.
 	FrameCallState = "call.state"
+	// FrameCallRing tells somebody they are being called.
+	FrameCallRing = "call.ring"
+	// FrameCallRingEnded tells somebody's devices to stop ringing: they
+	// answered on one, declined, or nobody is calling any more.
+	FrameCallRingEnded = "call.ring_ended"
+	// FrameCallDeclined tells the people in a call that somebody they rang
+	// declined.
+	FrameCallDeclined = "call.declined"
 )
 
 // Connection is one client's live connection.
