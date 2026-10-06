@@ -70,6 +70,7 @@ var EventTypes = []string{
 	string(events.TypeRoomRenamed),
 	string(events.TypeRoomArchived),
 	string(events.TypeRoomRestored),
+	string(events.TypeRoomVisibilityChanged),
 }
 
 // MaxLabelLength bounds a subscription's label.

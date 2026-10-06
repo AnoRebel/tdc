@@ -329,6 +329,43 @@ A private room a caller cannot see answers 404 rather than 403, throughout. A
 non-member cannot distinguish "forbidden" from "does not exist", which is the
 point.
 
+### Looking after a channel
+
+Each of these needs its permission in the channel the path names — granted
+there, or for the whole server — and the caller must be a member:
+
+| Route                                   | Permission              | Does                                          |
+| --------------------------------------- | ----------------------- | --------------------------------------------- |
+| `PATCH /api/rooms/:id`                  | `channel.rename`        | `{"name"?, "topic"?}`; absent leaves it as is |
+| `PUT /api/rooms/:id/visibility`         | `channel.rename`        | `{"visibility": "public" \| "private"}`       |
+| `POST /api/rooms/:id/archive`           | `channel.archive`       | Archive: history kept, posting refused        |
+| `DELETE /api/rooms/:id/archive`         | `channel.archive`       | Restore                                       |
+| `DELETE /api/rooms/:id/members/:userId` | `channel.member.remove` | Take somebody out; not a ban                  |
+| `GET /api/rooms/:id/administration`     | —                       | Which of the above the caller may do here     |
+
+Each answers 200 with the room as it now is, except removal, which answers 204.
+Making a channel **public** additionally needs `channel.rename` for the whole
+server, since it opens the channel's entire history to everybody; a grant for
+the one channel is refused with 403. Asking for what is already so succeeds and
+records nothing.
+
+Each change becomes an event in the channel — `room.renamed`,
+`room.visibility_changed`, `room.archived`, `room.restored`, `member.removed` —
+delivered live like any other, and an audit entry. The person removed is sent
+their `member.removed` event on their own connections, since they are no
+longer among the channel's members by the time it is delivered.
+
+A direct conversation, a project's stream, an issue's discussion and a channel
+another server owns answer **409** to all of these, as does renaming or
+changing the visibility of an archived channel, and changing the visibility of
+a channel shared with other servers. A name is at most 80 characters and a
+topic 500; longer answers 400.
+
+`PATCH /api/rooms/:id/messages/:eventId` edits somebody else's message for a
+caller holding `message.edit.any` in that channel. The edit is the caller's
+event, its content carries `"byModerator": true`, and a deleted message cannot
+be edited.
+
 ### Reading a timeline
 
 ```sh
@@ -1263,18 +1300,18 @@ A history entry is an event from the project's stream, as recorded: `type`
 The endpoints under `/api/admin` each name the permission that governs them, and
 each is enforced on the server. Of most use to an integration:
 
-| Endpoint                           | Permission          | What it is                              |
-| ---------------------------------- | ------------------- | --------------------------------------- |
-| `GET /api/admin/settings`          | `server.configure`  | Runtime policy and its values           |
-| `PUT /api/admin/settings/:key`     | `server.configure`  | Change one                              |
-| `GET /api/admin/features`          | `server.configure`  | Feature toggles                         |
-| `PUT /api/admin/features/:feature` | `server.configure`  | Turn one on or off                      |
-| `GET /api/admin/usage`             | `server.configure`  | Usage against limits                    |
-| `GET /api/admin/configuration`     | `server.configure`  | Startup configuration, secrets redacted |
-| `GET /api/admin/audit`             | `server.audit.read` | A page of the audit log                 |
-| `GET /api/admin/audit/export`      | `server.audit.read` | The whole log, newline-delimited JSON   |
-| `GET /api/admin/users`             | `user.suspend`      | Accounts on this server                 |
-| `POST /api/admin/invitations`      | `user.invite`       | Issue an invitation to the server       |
+| Endpoint                           | Permission                        | What it is                                                    |
+| ---------------------------------- | --------------------------------- | ------------------------------------------------------------- |
+| `GET /api/admin/settings`          | `server.configure`                | Runtime policy and its values                                 |
+| `PUT /api/admin/settings/:key`     | `server.configure`                | Change one                                                    |
+| `GET /api/admin/features`          | `server.configure`                | Feature toggles                                               |
+| `PUT /api/admin/features/:feature` | `server.configure`                | Turn one on or off                                            |
+| `GET /api/admin/usage`             | `server.configure`                | Usage against limits                                          |
+| `GET /api/admin/configuration`     | `server.configure`                | Startup configuration, secrets redacted                       |
+| `GET /api/admin/audit`             | `server.audit.read`               | A page of the audit log                                       |
+| `GET /api/admin/audit/export`      | `server.audit.read`               | The whole log, newline-delimited JSON                         |
+| `GET /api/admin/users`             | `user.read.all` or `user.suspend` | Every account on this server, paged with `limit` and `offset` |
+| `POST /api/admin/invitations`      | `user.invite`                     | Issue an invitation to the server                             |
 
 Reading the audit log takes its own permission, separate from the ones that let
 somebody change things — so that being able to act is not the same as being able

@@ -55,7 +55,7 @@ var documentation = map[string]entry{
 	"GET /api/admin/settings":                               {Summary: "List settings", Authentication: "session or token", Permission: "server.configure"},
 	"PUT /api/admin/settings/:key":                          {Summary: "Set setting", Authentication: "session or token", Permission: "server.configure"},
 	"GET /api/admin/usage":                                  {Summary: "Usage", Authentication: "session or token", Permission: "server.configure"},
-	"GET /api/admin/users":                                  {Summary: "List people", Authentication: "session or token", Permission: "user.suspend"},
+	"GET /api/admin/users":                                  {Summary: "List every account", Authentication: "session or token", Permission: "user.read.all or user.suspend"},
 	"DELETE /api/admin/users/:id/suspend":                   {Summary: "Lift suspension", Authentication: "session or token", Permission: "user.suspend"},
 	"POST /api/admin/users/:id/suspend":                     {Summary: "Suspend user", Authentication: "session or token", Permission: "user.suspend"},
 	"GET /api/attachments/:id":                              {Summary: "Download attachment", Authentication: "session or token"},

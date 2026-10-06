@@ -537,7 +537,11 @@ func (s *Server) handleEditMessage(c *echo.Context) error {
 		return err
 	}
 
-	event, err := s.rooms.EditMessage(ctx, roomID, user.ID, eventIDParam(c), filtered.Body)
+	// Editing somebody else's message needs the moderation permission, in this
+	// channel; the service enforces authorship when it is absent.
+	moderator := currentPermissions(c).AllowsChannel(authz.PermMessageEditAny, roomID).Allowed
+
+	event, err := s.rooms.EditMessageAs(ctx, roomID, user.ID, eventIDParam(c), filtered.Body, moderator)
 	if err != nil {
 		return roomError(err)
 	}
@@ -545,6 +549,23 @@ func (s *Server) handleEditMessage(c *echo.Context) error {
 	if filtered.Flagged {
 		s.flagForReview(c, roomID, event.ID,
 			s.rooms.UserAddress(user.Username), filtered.Matched, filtered.Body)
+	}
+
+	/*
+		Recorded when it was a moderator's doing, as a deletion is, and for the
+		same reason: changing what somebody is shown to have said is an exercise
+		of authority, and correcting your own typo is not. Neither text goes in
+		the entry — the log is read by people the conversation was not for.
+		Read from the event the service wrote, which knows whose message it was.
+	*/
+	var edit struct {
+		Replaces    string `json:"replaces"`
+		ByModerator bool   `json:"byModerator"`
+	}
+	_ = json.Unmarshal(event.Content, &edit)
+	if edit.ByModerator {
+		s.recordModeration(c, user, audit.ActionMessageEdited, "event", edit.Replaces,
+			map[string]any{"room": roomID.String()})
 	}
 
 	s.publishEvent(ctx, event)

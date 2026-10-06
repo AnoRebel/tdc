@@ -174,6 +174,39 @@ func requirePermission(permission authz.Permission) echo.MiddlewareFunc {
 }
 
 /*
+requireAnyPermission refuses a request whose author holds none of several
+permissions at server scope.
+
+For a route two different jobs need: the list of every account is what somebody
+who may read every account reads, and also where somebody who suspends accounts
+finds the one to suspend. The refusal names the first, which is the one that is
+about the route itself.
+*/
+func requireAnyPermission(first authz.Permission, others ...authz.Permission) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			if _, ok := currentUser(c); !ok {
+				return echo.NewHTTPError(http.StatusUnauthorized, "authentication is required")
+			}
+
+			permissions := currentPermissions(c)
+			decision := permissions.AllowsServer(first)
+			for _, other := range others {
+				if decision.Allowed {
+					break
+				}
+				decision = permissions.AllowsServer(other)
+			}
+			if !decision.Allowed {
+				return echo.NewHTTPError(http.StatusForbidden,
+					permissions.AllowsServer(first).Error())
+			}
+			return next(c)
+		}
+	}
+}
+
+/*
 requireChannelPermission refuses a request whose author lacks a permission in
 the channel the route names.
 

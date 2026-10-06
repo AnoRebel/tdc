@@ -503,9 +503,10 @@ func (s *Server) routes() {
 		requirePermission(authz.PermUserInvite),
 		s.requireFeature(settings.FeatureInvitations))
 
-	// Who is on this server, so suspension has somewhere to be done from.
+	// Who is on this server: every account, for whoever may read every
+	// account, and the place suspension is done from.
 	admin.GET("/users", s.handleListPeople,
-		requirePermission(authz.PermUserSuspend))
+		requireAnyPermission(authz.PermUserViewAll, authz.PermUserSuspend))
 
 	// Suspension, which is server-wide where a ban is confined to a channel.
 	admin.POST("/users/:id/suspend", s.handleSuspendUser,

@@ -88,7 +88,16 @@ API. That is deliberate — a refusal that distinguished the two would confirm
 that the channel is there.
 
 Channels can be archived, which keeps all the history readable and refuses new
-messages, and restored, which resumes posting. Nothing is lost either way.
+messages, and restored, which resumes posting. Nothing is lost either way. An
+archived channel says so beside its name, for everybody in it.
+
+Whoever looks after a channel finds its settings behind the gear in the
+channel's header — its name and topic, whether it is public or private,
+archiving and restoring, and who is in it. The gear appears only for somebody
+who may change something there, and each part of the settings only for what
+they may change. Every change appears in the channel as it happens, for
+everybody who has it open. A direct conversation has no such settings: it
+belongs to the people in it.
 
 Creating a channel takes a permission. On most servers ordinary members have it;
 on some the operator keeps it.
@@ -577,14 +586,25 @@ them.** Reports are rate limited, for the obvious reason.
 
 ### What moderators can do
 
-Remove a message. Remove a channel. Suspend an account, which invalidates its
-sessions immediately. Restrict somebody from posting, temporarily or
-permanently. Ban somebody from one channel, which is confined to that channel
-and leaves their other memberships alone.
+Remove a message, or edit one — an edit by a moderator is shown as theirs, not
+the author's, and marked as a moderator's. Suspend an account, which
+invalidates its sessions immediately. Restrict somebody from posting,
+temporarily or permanently. Ban somebody from one channel, which is confined to
+that channel and leaves their other memberships alone.
+
+Look after a channel: rename it or change its topic, archive and restore it,
+make it private, and take somebody out of it. Each is its own permission, and
+each can be given for one channel alone, so a channel can have keepers who have
+no say anywhere else. Making a channel **public** needs that permission for the
+whole server, because it opens everything ever said in the channel to everybody
+on it — the settings ask before doing it. Taking somebody out of a channel is
+not a ban: their client is told at once and stops receiving the channel, and
+they can join a public channel again whenever they like; a private one needs an
+invitation, as it did the first time.
 
 Everything on that list is recorded in the audit log, with its reason and its
-duration, and everything on it is reversible. Temporary restrictions expire by
-themselves rather than needing somebody to remember.
+duration where it has one, and everything on it is reversible. Temporary
+restrictions expire by themselves rather than needing somebody to remember.
 
 Your operator may also have a word filter configured, which can flag a message
 for a human, mask the word, or block the message outright. It is off unless

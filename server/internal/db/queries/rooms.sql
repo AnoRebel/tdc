@@ -38,6 +38,11 @@ UPDATE rooms SET name = $2, topic = $3, updated_at = NOW()
 WHERE id = $1
 RETURNING *;
 
+-- name: SetRoomVisibility :one
+UPDATE rooms SET visibility = $2, updated_at = NOW()
+WHERE id = $1
+RETURNING *;
+
 -- name: ArchiveRoom :exec
 UPDATE rooms SET archived_at = NOW(), archived_by = $2, updated_at = NOW()
 WHERE id = $1 AND archived_at IS NULL;

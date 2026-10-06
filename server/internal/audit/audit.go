@@ -143,6 +143,26 @@ const (
 	*/
 	ActionMessageRemoved Action = "message.removed"
 
+	// ActionMessageEdited records a moderator changing somebody else's
+	// message, which is the same exercise of authority as removing it and
+	// needs the same trail. An author's own edits are not recorded.
+	ActionMessageEdited Action = "message.edited_by_moderator"
+
+	/*
+		Administering a channel.
+
+		Each is a decision somebody may later want to find: who renamed the
+		channel they were looking for, who made a private channel public — and
+		so its whole history readable by everybody — and who took a person out
+		of a conversation. The visibility entry carries both values, so it
+		reads as a change rather than a state.
+	*/
+	ActionChannelRenamed           Action = "channel.renamed"
+	ActionChannelVisibilityChanged Action = "channel.visibility.changed"
+	ActionChannelArchived          Action = "channel.archived"
+	ActionChannelRestored          Action = "channel.restored"
+	ActionChannelMemberRemoved     Action = "channel.member.removed"
+
 	/*
 		ActionWithheldDetailsViewed records a moderator seeing what somebody
 		chose not to show.
