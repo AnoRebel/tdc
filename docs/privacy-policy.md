@@ -387,8 +387,9 @@ can press. Honouring a request to see or delete someone's data is something the
 operator does by hand, against the database. If you cannot or will not do that,
 say so plainly rather than promising a right you will not deliver.
 
-There is also no password reset built in. An account that loses its password
-needs you.
+A forgotten password can be reset by email only by somebody who confirmed an
+email address, on a server that sends mail. Anybody else who loses their
+password needs you.
 
 **If you ask to be erased.** The operator can run an erasure, and this is
 exactly what it does — worth reading before anybody promises more than it

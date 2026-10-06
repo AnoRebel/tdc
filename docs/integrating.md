@@ -33,13 +33,14 @@ with no credential cannot read it.
 `/api/version` answers the identity of the build:
 
 ```json
-{ "version": "0.1.0", "protocolVersion": "0" }
+{ "version": "0.1.0", "protocolVersion": "tdc/1", "apiVersion": "1" }
 ```
 
 `commit` and `buildTime` appear too when the binary was built by the release
-workflow; a development build omits them. `protocolVersion` moves independently
-of `version`, because the software can be released many times without the wire
-protocol changing.
+workflow; a development build omits them. `protocolVersion` is the federation
+protocol and `apiVersion` the client API (see [Versions](#versions)); both move
+independently of `version`, because the software can be released many times
+without either changing.
 
 `/api/server` is what a client reads before it offers anybody a sign-in box —
 what the server is called, what it can do, and what it wants clients to do:
@@ -50,7 +51,7 @@ what the server is called, what it can do, and what it wants clients to do:
   "description": "A Tanzania Developers Community server",
   "canonicalAddress": "localhost:8080",
   "version": "0.1.0",
-  "protocolVersions": [],
+  "protocolVersions": ["tdc/1"],
   "capabilities": ["attachments", "invitations", "public-directory", "scheduled-messages"],
   "defaultLanguage": "en",
   "obscureSensitiveMedia": true,
@@ -65,8 +66,8 @@ that will be refused, not merely a control a client could hide. A feature that
 also needs something configured, such as GIF search needing a provider, appears
 only when both hold.
 
-`protocolVersions` is always empty. Federation is not implemented, so there is
-no wire protocol to advertise a version of.
+`protocolVersions` lists the federation protocols this server speaks, newest
+first, and is empty on a server whose operator has not switched federation on.
 
 One surprise worth knowing: on a server whose visibility is set to private, or
 limited to peers you are not among, `/api/server` answers **404**, not 403. A
@@ -182,6 +183,30 @@ to do when it needs to act continuously as a distinct identity rather than on
 somebody's behalf. Sessions last 30 days by default
 (`server.session_lifetime`) and are renewed by use.
 
+### Other ways in
+
+Every way of signing in ends in the same session token. The others are made
+for people at a browser rather than for programs, and `/api/server` says which
+a server offers (`signInProviders`, `passkeys`, `recovery`):
+
+- **A sign-in provider** (OAuth 2.0 / OpenID Connect, such as GitHub or
+  Google, as the operator configured): `GET /api/auth/oauth/:provider/start`
+  sends the browser to the provider, which returns it to
+  `/api/auth/oauth/callback`; a first sign-in finishes at
+  `POST /api/auth/oauth/finish`.
+- **A passkey**: `POST /api/auth/passkey/signin/begin` returns WebAuthn options
+  for the browser, and `POST /api/auth/passkey/signin/finish` takes the
+  browser's answer. Passkeys are added under `/api/me/passkeys`.
+- **A second step**, where the account has one: sign-in answers with a ticket
+  instead of a token, redeemed at `POST /api/auth/second-factor` with a code,
+  or by passkey or emailed code under `/api/auth/second-factor/…`.
+- **Recovering a forgotten password**: `POST /api/auth/recover` with the email
+  address sends a link to a confirmed address, and always answers the same
+  way, so it cannot be used to learn who has an account;
+  `POST /api/auth/recover/redeem` sets the new password.
+
+The bodies of each are in [the OpenAPI document](#describing-the-api).
+
 ### Signing out
 
 ```sh
@@ -224,29 +249,54 @@ add `"invitation":"<code or token>"`; under `domain`, the email must be in an
 admitted domain. A refusal under policy is 403, and a server at its account
 limit refuses cleanly before creating anything.
 
-## What is not here
+## Versions
 
-Worth stating plainly, so that nobody builds against it:
+The API is served under `/api/v1/…`, and under `/api/…` as well. Every
+response from either carries a `TDC-API-Version` header naming the version that
+answered.
 
-- **No OAuth2, and no passkeys.** Password and session token are the whole of
-  authentication today.
-- **No account recovery.** There is no password-reset endpoint. An account that
-  has lost its password is an administrator's problem, not the holder's.
-- **No federation.** Addresses name a home server and events are signed, but
-  nothing crosses a server boundary. `protocolVersions` is empty for this
-  reason.
-- **No OpenAPI document.** `GET /api/description` returns a machine-readable
-  list of every endpoint — method, path, parameters, what a caller must carry
-  and which permission it needs — generated from the routing table, so it
-  describes what the server serves rather than what somebody wrote down. It is
-  deliberately not OpenAPI: a schema claiming to describe request and response
-  bodies would mean inferring shapes that are not there, and a schema that is
-  confidently wrong about a body is worse than none, because somebody generates
-  a client from it and finds out at runtime. For bodies, this guide is the
-  description.
-- **No API versioning.** Paths are `/api/…` with no version segment. The
-  protocol version in `/api/version` is the thing to check compatibility
-  against.
+- **Pin `/api/v1`** in anything you build. When a release changes something a
+  client relies on — removes a field, changes what a status means — the change
+  ships as `/api/v2`, both are served for at least one release, and the
+  release notes say what moved.
+- **`/api/…` follows the newest version.** The web and desktop clients use it,
+  because they ship with the server and change with it.
+- Adding a field, an endpoint or an optional parameter is not a new version.
+  Write clients that ignore fields they do not know.
+- A version the server does not serve answers 404 with a message naming the
+  one it does.
+
+## Describing the API
+
+Two documents describe every endpoint, and both are generated by the server
+from its own routing table, so they describe what it serves rather than what
+somebody wrote down. Neither needs a credential.
+
+**`GET /api/openapi.json`** is an OpenAPI 3.1 document: every path under
+`/api/v1`, its parameters, what a caller must carry and which permission it
+needs (as `x-tdc-permission`), and the request and response bodies. The bodies
+are the Go types the handlers actually bind and write, found by reading the
+handlers, so a schema cannot claim a shape the server does not use. Generate a
+client from it:
+
+```sh
+curl -o tdc-openapi.json https://your-server/api/openapi.json
+npx openapi-typescript tdc-openapi.json -o tdc-api.d.ts
+```
+
+Two things it is honest about:
+
+- **Request bodies list no required fields.** The server accepts a body with
+  fields missing and treats them as empty; which absences a particular
+  endpoint refuses is decided by that endpoint and stated in its error. Send
+  what this guide shows.
+- **A few operations have no body schema**: the live connection, which is a
+  WebSocket described under [The live connection](#the-live-connection), and responses
+  streamed as files. They say so instead of inventing one.
+
+**`GET /api/description`** is a smaller list of the same endpoints — method,
+path, parameters, authentication and permission — for anyone who wants that
+without OpenAPI.
 
 ## Errors
 

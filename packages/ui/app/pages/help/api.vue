@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookOpen, CircleAlert, Filter } from "lucide-vue-next";
+import { BookOpen, CircleAlert, FileJson, Filter } from "lucide-vue-next";
 /**
  * The API, as this server describes it.
  *
@@ -37,6 +37,8 @@ interface Description {
 }
 
 const api = useApi();
+// The OpenAPI document is on the server, which is elsewhere in the desktop app.
+const mediaBase = useMediaBase();
 const description = ref<Description | null>(null);
 const failed = ref(false);
 const filter = ref("");
@@ -102,6 +104,15 @@ function methodClass(method: string): string {
         <BookOpen class="size-3.5" aria-hidden="true" />
         <span class="max-sm:sr-only">{{ $t("help.api.openGuide") }}</span>
       </NuxtLink>
+      <a
+        :href="`${mediaBase}/api/openapi.json`"
+        target="_blank"
+        rel="noopener"
+        class="btn btn-ghost h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+      >
+        <FileJson class="size-3.5" aria-hidden="true" />
+        <span class="max-sm:sr-only">{{ $t("help.api.openapi") }}</span>
+      </a>
     </HelpHeader>
 
     <div class="mx-auto max-w-6xl px-4 pt-8 pb-24 md:px-8">

@@ -95,6 +95,7 @@ var applicationRoutes = map[string]bool{
 	"GET /api/version":                 true,
 	"GET /api/health":                  true,
 	"GET /api/description":             true,
+	"GET /api/openapi.json":            true,
 }
 
 /*

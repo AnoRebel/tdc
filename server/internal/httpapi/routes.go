@@ -31,6 +31,7 @@ func (s *Server) routes() {
 		should not have to hold a credential to find out what it could ask for.
 	*/
 	s.echo.GET("/api/description", s.handleDescription)
+	s.echo.GET("/api/openapi.json", s.handleOpenAPI)
 	s.echo.GET("/api/version", s.handleVersion)
 	s.echo.GET("/api/server", s.handleServerInfo)
 
@@ -808,8 +809,9 @@ func (s *Server) handleServerInfo(c *echo.Context) error {
 		Description:      s.config.ServerDescription,
 		CanonicalAddress: s.config.CanonicalAddress,
 		Version:          buildinfo.Version,
-		// Federation is not implemented, so no protocol version is advertised.
-		ProtocolVersions: []string{},
+		// The federation protocols this server speaks, newest first, or none
+		// where the operator has not switched federation on.
+		ProtocolVersions: s.protocolVersions(c),
 		// Optional capabilities are advertised as they are built, so a client
 		// adapts to what this server actually offers rather than presenting a
 		// control that cannot work.
@@ -902,4 +904,13 @@ func (s *Server) signInProviders() []oauth.Offered {
 		return nil
 	}
 	return s.oauth.Offered()
+}
+
+// protocolVersions are the federation protocols advertised to a caller: the
+// ones this build speaks, while federation is on, and none while it is off.
+func (s *Server) protocolVersions(c *echo.Context) []string {
+	if !s.federationEnabled(c) {
+		return []string{}
+	}
+	return federation.SupportedVersions()
 }

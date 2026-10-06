@@ -93,19 +93,22 @@ one of anybody who can configure the server, and `everybody` of everyone.
 
 `administrators` is the setting most servers want. Requiring one of a whole
 community that has not been warned is a community locked out on a Tuesday
-morning, and there is no password reset to rescue them — see below.
+morning, and a password reset only rescues people who confirmed an email
+address — see below.
 
-### Understand that there is no password reset
+### Understand what password recovery needs
 
 This is the single most important thing to know before inviting anybody.
 
-TDC as shipped has no account recovery: no reset email, no self-service recovery
-for a forgotten password. An account that loses its password needs an
-administrator to intervene against the database. Somebody who loses both their
-authenticator app and their recovery codes needs the same.
+TDC resets a forgotten password by email, and only for somebody who has
+confirmed an email address — on a server that can send mail. Somebody who
+never gave an address, or never confirmed it, or whose server sends no mail,
+has no way back in on their own: an administrator has to intervene. Somebody
+who loses both their authenticator app and their recovery codes needs the same.
 
-Tell people this when you invite them, in the same message as the invitation.
-"Choose a password you will keep, and keep it somewhere" is advice that costs
+Configure mail (see the hosting guide) before inviting anybody, and tell people
+in the invitation itself to confirm their email address from their settings.
+"Confirm your address, and keep your password somewhere" is advice that costs
 nothing to give and a great deal to omit.
 
 ## How accounts get created
@@ -329,10 +332,11 @@ pasted into a message is a wall of unformatted text. Markdown _is_ rendered for
 attached text files, so a snippet attached as a file arrives looking right —
 which is the workaround, and it is a worse workaround than a code fence.
 
-**No federation.** Servers do not exchange messages. Your community's
-conversations are with people on your own server and nowhere else. The groundwork
-exists — every address names a home server and every event is signed — but
-nothing crosses a server boundary today.
+**Federation is opt-in, and young.** Servers can connect and share
+conversations, so people on different servers can talk — but only once both
+operators have switched federation on and connected the two. A community
+running alone has conversations with people on its own server and nowhere
+else.
 
 **No native mobile app in any store.** The mobile experience is the web
 application installed to the home screen: its own icon, no browser furniture, and
@@ -515,7 +519,8 @@ result before you invite anybody, not after somebody asks.
 
 **What members should be told up front**, because these are the things that
 surprise people later: there is no data export, deleting an account does not
-delete its messages, and there is no password reset.
+delete its messages, and a forgotten password can only be reset by somebody who
+confirmed an email address.
 
 ## What members need
 

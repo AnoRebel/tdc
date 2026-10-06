@@ -16,6 +16,7 @@ for whoever needs the description later.
 */
 var documentation = map[string]entry{
 	"GET /api/description":                                  {Summary: "Describe this API", Authentication: "none"},
+	"GET /api/openapi.json":                                 {Summary: "Describe this API as an OpenAPI document", Authentication: "none"},
 	"POST /api/federation/version":                          {Summary: "Agree a federation protocol version", Authentication: "none"},
 	"POST /api/federation/ping":                             {Summary: "Signed federation ping", Authentication: "federation signature"},
 	"GET /api/federation/rooms/:slug/events":                {Summary: "Read a federated room's events", Authentication: "federation signature"},

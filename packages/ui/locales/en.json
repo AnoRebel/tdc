@@ -1532,7 +1532,8 @@
       "permission": "Permission",
       "intro": "Paths, methods and what each needs, as this server reports them. Request and response bodies are described in the Integrating guide.",
       "openGuide": "Open the Integrating guide",
-      "raw": "Raw JSON"
+      "raw": "Raw JSON",
+      "openapi": "OpenAPI document"
     }
   },
   "channelAdmin": {

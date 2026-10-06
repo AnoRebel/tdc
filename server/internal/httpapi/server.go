@@ -338,7 +338,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 
 	s.http = &http.Server{
 		Addr:              cfg.Address,
-		Handler:           e,
+		Handler:           versioned(e),
 		ReadTimeout:       cfg.ReadTimeout,
 		ReadHeaderTimeout: cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
@@ -350,7 +350,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 }
 
 // Handler exposes the router, so tests can drive it without a listener.
-func (s *Server) Handler() http.Handler { return s.echo }
+func (s *Server) Handler() http.Handler { return versioned(s.echo) }
 
 // Run listens until ctx is cancelled, then shuts down gracefully, allowing
 // in-flight requests up to ShutdownTimeout to finish.

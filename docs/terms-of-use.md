@@ -49,8 +49,9 @@ organisation, an invitation, a verified email domain. If your server is open to
 anybody, say that.]`
 
 You are responsible for what happens under your account. Keep your password.
-**There is no password reset in this software** — an account that loses its
-password needs the operator, and `[SAY WHETHER YOU WILL RESTORE ONE AND HOW YOU
+**A forgotten password can be reset only by email, and only if you have
+confirmed an email address** — otherwise an account that loses its password
+needs the operator, and `[SAY WHETHER YOU WILL RESTORE ONE AND HOW YOU
 WILL CONFIRM WHO SOMEBODY IS]`.
 
 You may hold one account `[/ more than one account]`. Do not impersonate anybody

@@ -1532,7 +1532,8 @@
       "permission": "Ruhusa",
       "intro": "Njia, mbinu na kile kila moja inachohitaji, kama seva hii inavyoripoti. Maudhui ya maombi na majibu yameelezwa katika mwongozo wa Kuunganisha.",
       "openGuide": "Fungua mwongozo wa Kuunganisha",
-      "raw": "JSON ghafi"
+      "raw": "JSON ghafi",
+      "openapi": "Hati ya OpenAPI"
     }
   },
   "channelAdmin": {
