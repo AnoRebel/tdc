@@ -352,6 +352,10 @@ func (s *Server) routes() {
 	me.GET("/notifications/count", s.handleNotificationCount)
 	me.POST("/notifications/:id/read", s.handleMarkNotificationRead)
 	me.PUT("/preferences/notifications", s.handleSetNotificationPreference)
+	// A periodic summary by mail instead of interruptions. Both routes answer
+	// 404 on a server that cannot send one, as a disabled feature does.
+	me.GET("/preferences/digest", s.handleGetDigest, s.requireDigests)
+	me.PUT("/preferences/digest", s.handleSetDigest, s.requireDigests)
 
 	// Search. A GET, so a search is shareable and bookmarkable: the term is
 	// the caller's own words about their own conversations.
@@ -766,6 +770,12 @@ func (s *Server) capabilities(ctx context.Context) []string {
 			}
 		case settings.FeatureLinkPreviews:
 			if s.unfurl == nil || !s.unfurl.Enabled() {
+				continue
+			}
+		case settings.FeatureNotificationDigests:
+			// A summary is a mail, and a server with no mail server cannot
+			// send one however the toggle is set.
+			if s.mail == nil || !s.mail.Configured() {
 				continue
 			}
 		}

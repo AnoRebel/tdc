@@ -326,6 +326,34 @@
     "unreadCount": "{count} hazijasomwa",
     "upToDate": "Umepata yote mapya."
   },
+  "digests": {
+    "title": "Muhtasari kwa barua pepe",
+    "hint": "Badala ya kukatizwa, pokea barua pepe moja inayoorodhesha yasiyosomwa. Inaeleza ni wapi na kiasi gani, kamwe si kilichosemwa.",
+    "howOften": "Mara ngapi",
+    "off": "Zima — nijulishe mambo yanapotokea",
+    "daily": "Kila siku",
+    "weekly": "Kila wiki",
+    "timeOfDay": "Wakati wa siku",
+    "day": "Siku",
+    "inZone": "Nyakati ziko katika {zone}.",
+    "useThisDevice": "Tumia saa za eneo za kifaa hiki ({zone})",
+    "next": "Muhtasari ujao: {when}",
+    "lastSent": "Ulitumwa mwisho {when}",
+    "needsAddress": "Muhtasari hutumwa tu kwa anwani ya barua pepe uliyoithibitisha. Thibitisha moja hapo juu ili kuuwasha.",
+    "replacesPush": "Hili likiwa limewashwa, vifaa vyako havitajulishwa. Kila kitu bado kitaonekana kwenye orodha yako ya arifa.",
+    "saving": "Inahifadhi…",
+    "couldNotLoad": "Imeshindikana kusoma mpangilio wako wa muhtasari.",
+    "couldNotSave": "Imeshindikana kuhifadhi mpangilio wako wa muhtasari.",
+    "weekday": {
+      "sunday": "Jumapili",
+      "monday": "Jumatatu",
+      "tuesday": "Jumanne",
+      "wednesday": "Jumatano",
+      "thursday": "Alhamisi",
+      "friday": "Ijumaa",
+      "saturday": "Jumamosi"
+    }
+  },
   "settings": {
     "title": "Mipangilio",
     "status": "Hali",

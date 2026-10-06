@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -132,6 +133,18 @@ type Service struct {
 	// still gets notifications, in the application, where they have always
 	// been.
 	pushing Pushing
+
+	/*
+		Both optional, and both about whether a notification reaches a device
+		rather than whether it is raised: what is held back here is still
+		stored, still counted and still in the list.
+
+		batchWindow is how long after telling somebody about a conversation
+		the server holds back from pushing about it again. digestChosen says
+		whether somebody has asked for a summary instead of interruptions.
+	*/
+	batchWindow  func(ctx context.Context) time.Duration
+	digestChosen func(ctx context.Context, userID uuid.UUID) bool
 }
 
 /*
@@ -200,6 +213,70 @@ about delivery does not have to construct one.
 func (s *Service) WithPush(pushing Pushing) *Service {
 	s.pushing = pushing
 	return s
+}
+
+/*
+WithBatching gathers a burst in one conversation into one push.
+
+The window is read on every notification rather than once, because it is the
+operator's to change while the server runs. Separate from NewService for the
+reason the others are: a caller that does not care still gets a working
+service, which pushes every notification it raises.
+*/
+func (s *Service) WithBatching(window func(ctx context.Context) time.Duration) *Service {
+	s.batchWindow = window
+	return s
+}
+
+/*
+WithDigests holds back pushes for somebody who has chosen a summary instead.
+
+The function answers for one person at the moment of asking, and should answer
+no whenever a summary could not actually reach them — a server whose mail has
+since been switched off must go back to interrupting people rather than
+leaving them with neither.
+*/
+func (s *Service) WithDigests(chosen func(ctx context.Context, userID uuid.UUID) bool) *Service {
+	s.digestChosen = chosen
+	return s
+}
+
+/*
+heldBack reports whether a notification that has been raised should stay in the
+list rather than reaching somebody's devices.
+
+Two reasons. They asked for a summary instead of interruptions, which is what
+choosing one means. Or this is a burst: they were told about this conversation
+moments ago and have not read it since, so the conversation's entry in their
+list already stands for this message too, and a second push says nothing the
+first did not.
+*/
+func (s *Service) heldBack(ctx context.Context, userID, roomID uuid.UUID, eventID string) bool {
+	if s.digestChosen != nil && s.digestChosen(ctx, userID) {
+		return true
+	}
+
+	if s.batchWindow == nil {
+		return false
+	}
+	window := s.batchWindow(ctx)
+	if window <= 0 {
+		return false
+	}
+
+	recent, err := s.queries.RecentlyNotifiedInRoom(ctx, dbgen.RecentlyNotifiedInRoomParams{
+		UserID:        userID,
+		RoomID:        roomID,
+		EventID:       eventID,
+		WindowSeconds: window.Seconds(),
+	})
+	if err != nil {
+		// Pushing when unsure. A second push about a busy channel is a
+		// nuisance; a mention that never arrived is a failure.
+		s.log.Debug("cannot tell whether a notification is part of a burst", "error", err)
+		return false
+	}
+	return recent
 }
 
 /*
@@ -355,7 +432,7 @@ func (s *Service) forMessage(
 			looking at a channel should not have their phone light up about
 			the message they are reading, and that rule lives here.
 		*/
-		if s.pushing != nil {
+		if s.pushing != nil && !s.heldBack(ctx, member.ID, event.RoomID, event.ID) {
 			delivery := about
 			delivery.Body = body
 			delivery.RoomID = event.RoomID
@@ -729,4 +806,15 @@ func (s *Service) AboutRoom(
 // while they are already reading the message.
 func SuppressedForTest(s *Service, ctx context.Context, userID, roomID uuid.UUID) bool {
 	return s.suppressed(ctx, userID, roomID)
+}
+
+/*
+Muted reports whether somebody has silenced a conversation.
+
+Exported for the summary, which asks at send time rather than relying on what
+was true when each notification was raised: muting a channel on Tuesday should
+keep it out of Wednesday's summary, including what arrived on Monday.
+*/
+func (s *Service) Muted(ctx context.Context, userID, roomID uuid.UUID) bool {
+	return s.preferenceFor(ctx, userID, roomID).Muted
 }

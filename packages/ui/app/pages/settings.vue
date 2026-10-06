@@ -464,6 +464,10 @@ function deviceName(userAgent: string): string {
            the desktop. Each client supplies its own; see DeviceSettings. -->
       <DeviceSettings />
 
+      <!-- A summary by email instead of a push per conversation, where the
+           server can send mail; it draws nothing where it cannot. -->
+      <DigestPreferences />
+
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <Compass class="size-4" />

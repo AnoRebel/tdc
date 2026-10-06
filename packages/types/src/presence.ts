@@ -6,13 +6,20 @@
 export type PresenceState = "online" | "offline";
 
 /** What one person's presence looks like to another. */
+/**
+ * One person's presence, as somebody else sees it.
+ *
+ * Each detail is absent when that person has chosen not to disclose it, which
+ * is different from offline: an absent state is no answer, not "offline".
+ * Your own presence always carries all three.
+ */
 export interface Presence {
   userId: string;
-  state: PresenceState;
+  state?: PresenceState;
   /** The operator-configured status the person has chosen. */
-  status: string;
+  status?: string;
   statusText?: string;
-  lastSeenAt: string;
+  lastSeenAt?: string;
 }
 
 /** A status an operator has made available. */

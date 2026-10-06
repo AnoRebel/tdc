@@ -108,6 +108,8 @@ var documentation = map[string]entry{
 	"PUT /api/me/pins/:id":                                  {Summary: "Pin room", Authentication: "session or token"},
 	"GET /api/me/preferences/appearance":                    {Summary: "Get appearance", Authentication: "session or token"},
 	"PUT /api/me/preferences/appearance":                    {Summary: "Set appearance", Authentication: "session or token"},
+	"GET /api/me/preferences/digest":                        {Summary: "Get emailed summary setting", Authentication: "session or token"},
+	"PUT /api/me/preferences/digest":                        {Summary: "Set emailed summary setting", Authentication: "session or token"},
 	"GET /api/me/preferences/hide-push-content":             {Summary: "Get hide push content", Authentication: "session or token"},
 	"PUT /api/me/preferences/hide-push-content":             {Summary: "Set hide push content", Authentication: "session or token"},
 	"PUT /api/me/preferences/link-previews":                 {Summary: "Set preview preference", Authentication: "session or token"},

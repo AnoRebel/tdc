@@ -133,8 +133,9 @@ prevent.
 
 ## Reporting a security problem
 
-Please do not open a public issue for a vulnerability. Email the maintainer
-directly, and give a reasonable window for a fix before disclosing it.
+Please do not open a public issue for a vulnerability. Report it privately
+through GitHub's private vulnerability reporting, as [SECURITY.md](SECURITY.md)
+describes, along with what to expect afterwards and when you may disclose.
 
 Security fixes are prioritised over everything else, and credit is given
 unless you would rather it were not.

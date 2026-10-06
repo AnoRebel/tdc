@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import {
+  account,
   fitsThePhone,
   founderWithDirectory,
   existing,
@@ -20,11 +21,14 @@ import {
  * phones at once and through nothing but the interface: each joins the server,
  * the developer makes a profile anyone can find, the client finds it by skill
  * and place and sends an enquiry, the developer takes it up and proposes, both
- * accept, and both export the same agreement.
+ * accept, and both export the same agreement. Then the work: the developer
+ * tracks it in a private project, starts it and says it is done, and the
+ * client confirms — each phone following the other's changes as they happen —
+ * while a colleague in that project learns nothing of the engagement.
  *
  * The other directory specs set their scenes over the API so that each checks
- * one thing; this one sets up nothing, because what it checks is that the
- * steps a person would take connect.
+ * one thing; this one sets up nothing but the project, because what it checks
+ * is that the steps a person would take connect.
  */
 
 onlyInDirectoryProjects();
@@ -46,11 +50,13 @@ async function join(page: Page, request: APIRequestContext, username: string) {
   if (await tour.count()) await page.keyboard.press("Escape");
 }
 
-test("two people go from a profile to an exported agreement through the interface", async ({
+test("two people go from a profile to finished, tracked work through the interface", async ({
   page,
   request,
   browser,
 }) => {
+  // The whole journey, twice the length of any other directory check.
+  test.setTimeout(240_000);
   await founderWithDirectory(request);
   const subject = `Mobile money checkout ${Date.now().toString(36)}`;
   const place = `Dodoma${Date.now().toString(36)}`;
@@ -159,5 +165,87 @@ test("two people go from a profile to an exported agreement through the interfac
   );
   await fitsThePhone(page);
   await fitsThePhone(client);
+
+  /*
+   * The developer tracks the agreed work in a project of theirs. The project
+   * is made over the API — projects have journeys of their own, and this one
+   * is about the link — and it is private, with somebody in it who is no
+   * party to the engagement.
+   */
+  const key = `TRK${Date.now().toString(36).slice(-5)}`.toUpperCase();
+  const made = await request.post("/api/projects", {
+    headers: asDeveloper,
+    data: { key, name: `Checkout ${key}`, visibility: "private" },
+  });
+  expect(made.status(), await made.text()).toBe(201);
+  const asColleague = await account(request, people.closed);
+  const added = await request.put(`/api/projects/${key}/members/${people.closed}`, {
+    headers: asDeveloper,
+    data: { role: "member" },
+  });
+  expect(added.ok(), await added.text()).toBeTruthy();
+
+  // Reloaded, because the page lists the projects it may link to as it opens.
+  await page.reload();
+  const tracking = page.locator("[data-engagement-project]");
+  await tracking.getByRole("combobox", { name: "Track the work in" }).click();
+  await page.getByRole("option", { name: new RegExp(key) }).click();
+  await tracking.getByRole("button", { name: "Link", exact: true }).click();
+  await expect(tracking).toContainText(`${key} · Checkout ${key}`);
+
+  // The client is in no such project, and is not told its name.
+  await client.reload();
+  await expect(client.locator("[data-engagement-state]")).toHaveText("Agreement");
+  await expect(client.getByText(key)).toHaveCount(0);
+
+  // The work starts, the developer says it is done, and it waits on the client,
+  // whose phone follows without being reloaded.
+  await page.getByRole("button", { name: "Start the work" }).click();
+  await expect(page.locator("[data-engagement-state]")).toHaveText("Work under way");
+  await expect(client.locator("[data-engagement-state]")).toHaveText("Work under way", {
+    timeout: 15_000,
+  });
+  await page
+    .getByRole("button", { name: `The work is complete: ask ${people.client} to confirm` })
+    .click();
+  await expect(page.locator("[data-engagement-state]")).toHaveText(
+    "Completion awaiting confirmation",
+  );
+  await expect(client.getByText(`${people.developer} says the work is complete`)).toBeVisible({
+    timeout: 15_000,
+  });
+  await client.getByRole("button", { name: "Confirm the work is complete" }).click();
+  await expect(client.locator("[data-engagement-state]")).toHaveText("Completed");
+  await expect(page.locator("[data-engagement-state]")).toHaveText("Completed", {
+    timeout: 15_000,
+  });
+
+  // The project leads its members back to the engagement — the developer, who
+  // is a party to it.
+  await page.goto(`/projects/${key}`);
+  await expect(page.getByText("Your engagements tracked here")).toBeVisible();
+  // Exactly: the sidebar also lists the enquiry's conversation, by a similar name.
+  await expect(page.getByRole("link", { name: subject, exact: true })).toBeVisible();
+
+  // A colleague in the same project sees the project as any member does, and
+  // nothing of the engagement: not on the page, not from the API behind it.
+  const colleaguesPhone = await secondPhone(browser);
+  const colleague = await colleaguesPhone.newPage();
+  await signInAs(colleague, people.closed);
+  await colleague.goto(`/projects/${key}`);
+  await expect(colleague.getByRole("heading", { name: `Checkout ${key}` })).toBeVisible();
+  await expect(colleague.getByText("Your engagements tracked here")).toHaveCount(0);
+  await expect(colleague.getByText(subject)).toHaveCount(0);
+  const linked = await request.get(`/api/directory/projects/${key}/engagements`, {
+    headers: asColleague,
+  });
+  expect(await linked.json()).toEqual([]);
+  const engagementId = engagementPath.split("/").pop();
+  const opened = await request.get(`/api/directory/engagements/${engagementId}`, {
+    headers: asColleague,
+  });
+  expect(opened.status()).toBe(404);
+
+  await colleaguesPhone.close();
   await clientsPhone.close();
 });

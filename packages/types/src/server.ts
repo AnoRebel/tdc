@@ -170,7 +170,10 @@ export type Capability =
   | "attachments"
   // The developer and company directory, enquiries and engagements. Off
   // unless an operator turns it on.
-  | "directory";
+  | "directory"
+  // Emailed summaries of missed activity, for people who choose them. Absent
+  // on a server that cannot send mail, whatever its toggle says.
+  | "notification-digests";
 
 /** Health of a running server, for operators and uptime checks. */
 export interface HealthStatus {

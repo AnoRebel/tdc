@@ -298,6 +298,13 @@ settings. Then a notification says only that something arrived.
 
 `[This server has push notifications ON / OFF.]`
 
+**Only if you choose it — emailed summaries.** If you ask for a daily or weekly
+summary of what you missed, we store how often, the hour, the day and your time
+zone, and send the summary to the email address you have confirmed, through the
+mail server this server's operator uses. A summary names the channels where
+something went unread and counts it; it never contains what anybody wrote. It is
+off until you turn it on, and turning it off stops it.
+
 **Only if enabled — object storage.** If the operator stores attachments in an
 S3-compatible object store rather than on the server's own disk, your uploaded
 files are held by that provider.
