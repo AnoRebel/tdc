@@ -181,6 +181,19 @@ export function siteHref(href: string, branch: string): string | null {
   }
 }
 
+/**
+ * Where a screenshot written in a guide is served on the site.
+ *
+ * The guides name them relative to docs/ (images/projects/board.webp), which
+ * is right on a repository page and wrong under a page's own address —
+ * /projects/images/… — so they are served from /images and named from there.
+ * Anything else is left as written.
+ */
+export function siteImage(url: string): string {
+  const path = url.replace(/^(?:\.\.?\/)+/, "");
+  return path.startsWith("images/") ? `/${path}` : url;
+}
+
 interface MdastNode {
   type: string;
   url?: string;
@@ -188,7 +201,8 @@ interface MdastNode {
 }
 
 /**
- * A remark plugin applying siteHref to every link as written.
+ * A remark plugin applying siteHref to every link as written, and siteImage
+ * to every image.
  *
  * It has to see the link before Nuxt Content does: Content turns "hosting.md"
  * into "hosting" and "../SECURITY.md" into "../security", after which a guide,
@@ -200,6 +214,7 @@ export function remarkGuideLinks(options: { branch: string }) {
     if (!children) return;
     for (let index = 0; index < children.length; index++) {
       const child = children[index]!;
+      if (child.type === "image" && child.url !== undefined) child.url = siteImage(child.url);
       if ((child.type === "link" || child.type === "definition") && child.url !== undefined) {
         const href = siteHref(child.url, options.branch);
         if (href === null && child.type === "link") {

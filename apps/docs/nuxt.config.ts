@@ -122,6 +122,12 @@ export default defineNuxtConfig({
         baseURL: "/brand",
         maxAge: 60 * 60 * 24 * 7,
       },
+      // The guides' screenshots, from docs/ where the guides name them.
+      {
+        dir: fileURLToPath(new URL("../../docs/images", import.meta.url)),
+        baseURL: "/images",
+        maxAge: 60 * 60 * 24,
+      },
     ],
   },
 

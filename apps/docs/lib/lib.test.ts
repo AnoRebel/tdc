@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { prepareGuide, remarkGuideLinks, siteHref, type ParsedBody } from "./guides";
+import { prepareGuide, remarkGuideLinks, siteHref, siteImage, type ParsedBody } from "./guides";
 import { redirectStudioRequest } from "./studio-paths";
 
 describe("links in a guide, on the site", () => {
@@ -40,6 +40,25 @@ describe("links in a guide, on the site", () => {
     const paragraph = tree.children[0]!.children as { type: string; url?: string }[];
     expect(paragraph[0]).toMatchObject({ type: "link", url: "/upgrading#rolling-back" });
     expect(paragraph[1]).toMatchObject({ type: "text", value: "words" });
+  });
+});
+
+describe("screenshots in a guide, on the site", () => {
+  it("are served from /images, wherever the page is", () => {
+    expect(siteImage("images/projects/board.webp")).toBe("/images/projects/board.webp");
+    expect(siteImage("../images/projects/board.webp")).toBe("/images/projects/board.webp");
+    expect(siteImage("https://example.com/a.png")).toBe("https://example.com/a.png");
+  });
+
+  it("are rewritten by the same plugin as the links", () => {
+    const tree = {
+      type: "root",
+      children: [
+        { type: "paragraph", children: [{ type: "image", url: "images/hosting/admin.webp" }] },
+      ],
+    };
+    remarkGuideLinks({ branch: "dev" })(tree);
+    expect(tree.children[0]!.children[0]).toMatchObject({ url: "/images/hosting/admin.webp" });
   });
 });
 

@@ -1,3 +1,4 @@
+import type { GuideImage } from "#layers/ui/app/lib/guide-render";
 import { guideFor } from "#layers/ui/app/lib/guides";
 
 /**
@@ -20,6 +21,33 @@ const translated = import.meta.glob<string>("../../../../docs/*/*.md", {
   query: "?raw",
   import: "default",
 });
+
+/*
+ * The guides' screenshots, by their sizes.
+ *
+ * The images themselves are files the layer's configuration copies to
+ * /guide-images, each fetched only when the reader scrolls to it. What is
+ * here is docs/images/sizes.json, which apps/web/scripts/docs-screenshots.ts
+ * writes beside them: it says which exist, and how much room each needs, so
+ * the page can hold its place before it arrives. Globbed rather than
+ * imported, so a checkout without screenshots still builds.
+ */
+const sizeFiles = import.meta.glob<Record<string, [number, number]>>(
+  "../../../../docs/images/sizes.json",
+  { import: "default", eager: true },
+);
+const sizes = Object.values(sizeFiles)[0] ?? {};
+
+/**
+ * A screenshot a guide refers to, by the path it is written with
+ * (images/projects/board.webp, or ../images/… from a translation), or
+ * undefined for one that does not exist, which the page shows as its text.
+ */
+export function guideImage(src: string): GuideImage | undefined {
+  const name = src.replace(/^(?:\.\.?\/)+/, "").replace(/^images\//, "");
+  const size = sizes[name];
+  return size ? { url: `/guide-images/${name}`, width: size[0], height: size[1] } : undefined;
+}
 
 function loaderFor(slug: string, locale?: string) {
   const match = (path: string) =>
