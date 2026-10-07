@@ -339,9 +339,60 @@ loses a message somebody was waiting for, so the safe direction here is to
 notify.
 */
 func (s *Service) SuppressesNotifications(ctx context.Context, userID uuid.UUID) bool {
-	presence, err := s.Of(ctx, userID)
+	/*
+		Their own status, not what others are shown of it.
+
+		Appearing offline withholds the status from everybody else, and Of
+		reports what everybody else sees — so asking Of made "busy" stop
+		suppressing anything the moment somebody also chose to appear offline.
+		Hiding a choice from others does not undo it.
+	*/
+	own, err := s.Own(ctx, userID)
 	if err != nil {
 		return false
 	}
-	return presence.SuppressesNotifications
+	definition, err := s.store.GetServerStatus(ctx, own.Status)
+	if err != nil {
+		return false
+	}
+	return definition.SuppressesNotifications
+}
+
+// OwnStatus is what somebody has chosen, as they themselves see it.
+type OwnStatus struct {
+	Status     string
+	StatusText string
+	// ExpiresAt is when the status reverts on its own, or nil if it does not.
+	ExpiresAt *time.Time
+	// Invisible reports whether they appear offline while connected.
+	Invisible bool
+}
+
+/*
+Own returns somebody's status as they set it.
+
+Not Of, which answers for everybody else and so withholds the status of
+somebody appearing offline: the person who chose both is entitled to see both.
+A status that has lapsed is reported as the default, as Of does, so the person
+is never shown a choice that no longer applies.
+*/
+func (s *Service) Own(ctx context.Context, userID uuid.UUID) (OwnStatus, error) {
+	record, err := s.store.GetPresence(ctx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return OwnStatus{Status: "available"}, nil
+	}
+	if err != nil {
+		return OwnStatus{}, fmt.Errorf("read presence: %w", err)
+	}
+
+	own := OwnStatus{
+		Status:     record.Status,
+		StatusText: record.StatusText,
+		ExpiresAt:  record.StatusExpiresAt,
+		Invisible:  record.Invisible,
+	}
+	if record.StatusExpiresAt != nil && time.Now().After(*record.StatusExpiresAt) {
+		own = OwnStatus{Status: "available", Invisible: record.Invisible}
+	}
+	return own, nil
 }

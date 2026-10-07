@@ -352,6 +352,9 @@ func (s *Server) routes() {
 	me.GET("/notifications", s.handleListNotifications)
 	me.GET("/notifications/count", s.handleNotificationCount)
 	me.POST("/notifications/:id/read", s.handleMarkNotificationRead)
+	// Read back as well as set, so a client can show which conversations are
+	// muted rather than only offering to mute them.
+	me.GET("/preferences/notifications", s.handleGetNotificationPreferences)
 	me.PUT("/preferences/notifications", s.handleSetNotificationPreference)
 	// A periodic summary by mail instead of interruptions. Both routes answer
 	// 404 on a server that cannot send one, as a disabled feature does.
@@ -380,8 +383,11 @@ func (s *Server) routes() {
 	s.echo.PUT("/api/me/pins/:id", s.handlePinRoom, requireAuthentication)
 	s.echo.DELETE("/api/me/pins/:id", s.handleUnpinRoom, requireAuthentication)
 
-	// Scheduled messages a person has outstanding, and cancelling one.
+	// Scheduled messages a person has outstanding: changing one, sending it
+	// now rather than later, and cancelling it.
 	s.echo.GET("/api/me/scheduled", s.handleListScheduled, requireAuthentication)
+	s.echo.PATCH("/api/me/scheduled/:id", s.handleChangeScheduled, requireAuthentication)
+	s.echo.POST("/api/me/scheduled/:id/send", s.handleSendScheduledNow, requireAuthentication)
 	s.echo.DELETE("/api/me/scheduled/:id", s.handleCancelScheduled, requireAuthentication)
 
 	// Reporting abuse. Filing is open to anybody signed in — requiring
@@ -462,6 +468,7 @@ func (s *Server) routes() {
 
 	// Presence and unread state for the signed-in person.
 	me.GET("/unread", s.handleUnreadCounts)
+	me.GET("/status", s.handleGetStatus)
 	me.PUT("/status", s.handleSetStatus)
 	s.echo.GET("/api/statuses", s.handleListStatuses, requireAuthentication)
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 var (
@@ -185,37 +186,117 @@ func (s *Service) DeliverDue(
 
 	sent := 0
 	for _, row := range due {
-		event, err := s.deliver(ctx, row, delivery)
-		if err != nil {
-			// Recorded rather than retried forever. The sender can see why.
-			if markErr := s.store.MarkScheduledMessageFailed(ctx,
-				dbgen.MarkScheduledMessageFailedParams{
-					ID:           row.ID,
-					FailedReason: err.Error(),
-				}); markErr != nil {
-				log.Error("cannot record a failed scheduled message",
-					"id", row.ID, "error", markErr)
-			}
-			log.Warn("a scheduled message could not be sent", "id", row.ID, "error", err)
-			continue
+		if _, err := s.sendClaimed(ctx, row, delivery, log); err == nil {
+			sent++
 		}
-
-		if err := s.store.MarkScheduledMessageSent(ctx, dbgen.MarkScheduledMessageSentParams{
-			ID:          row.ID,
-			SentEventID: &event.ID,
-		}); err != nil {
-			// The message is out. Failing to record that is worth logging
-			// loudly, since a pass after the claim expires would send it again.
-			log.Error("a scheduled message was sent but not recorded as sent",
-				"id", row.ID, "eventId", event.ID, "error", err)
-		}
-		if delivery.Sent != nil {
-			delivery.Sent(ctx, event, row)
-		}
-		sent++
 	}
 
 	return sent, nil
+}
+
+// sendClaimed sends one message this server has claimed, and records how it went.
+func (s *Service) sendClaimed(
+	ctx context.Context,
+	row dbgen.ScheduledMessage,
+	delivery ScheduledDelivery,
+	log *slog.Logger,
+) (dbgen.Event, error) {
+	event, err := s.deliver(ctx, row, delivery)
+	if err != nil {
+		// Recorded rather than retried forever. The sender can see why.
+		if markErr := s.store.MarkScheduledMessageFailed(ctx,
+			dbgen.MarkScheduledMessageFailedParams{
+				ID:           row.ID,
+				FailedReason: err.Error(),
+			}); markErr != nil {
+			log.Error("cannot record a failed scheduled message",
+				"id", row.ID, "error", markErr)
+		}
+		log.Warn("a scheduled message could not be sent", "id", row.ID, "error", err)
+		return dbgen.Event{}, err
+	}
+
+	if err := s.store.MarkScheduledMessageSent(ctx, dbgen.MarkScheduledMessageSentParams{
+		ID:          row.ID,
+		SentEventID: &event.ID,
+	}); err != nil {
+		// The message is out. Failing to record that is worth logging
+		// loudly, since a pass after the claim expires would send it again.
+		log.Error("a scheduled message was sent but not recorded as sent",
+			"id", row.ID, "eventId", event.ID, "error", err)
+	}
+	if delivery.Sent != nil {
+		delivery.Sent(ctx, event, row)
+	}
+	return event, nil
+}
+
+/*
+ChangeScheduled rewords or moves a message that has not been sent.
+
+The same rules as scheduling it in the first place — the time far enough ahead
+and not too far — and the same scope as cancelling it: only the sender's, and
+not while a delivery pass is sending it. A nil body or time leaves that part as
+it was.
+*/
+func (s *Service) ChangeScheduled(
+	ctx context.Context,
+	id, senderID uuid.UUID,
+	body *string,
+	sendAt *time.Time,
+) (ScheduledMessage, error) {
+	if sendAt != nil {
+		now := time.Now()
+		if sendAt.Before(now.Add(minLead)) {
+			return ScheduledMessage{}, ErrScheduledInThePast
+		}
+		if sendAt.After(now.Add(maxLead)) {
+			return ScheduledMessage{}, ErrScheduledTooFar
+		}
+	}
+
+	row, err := s.store.ChangeScheduledMessage(ctx, dbgen.ChangeScheduledMessageParams{
+		ID:       id,
+		SenderID: senderID,
+		Body:     body,
+		SendAt:   sendAt,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ScheduledMessage{}, ErrNoSuchScheduledMessage
+	}
+	if err != nil {
+		return ScheduledMessage{}, fmt.Errorf("change a scheduled message: %w", err)
+	}
+	return scheduledOf(row), nil
+}
+
+/*
+SendScheduledNow sends a message its author has decided not to wait for.
+
+Claimed first, as a delivery pass claims, so the two cannot both send it; then
+sent exactly as a pass would send it, so it passes the same checks and is
+followed by the same delivery. A refusal at send time — a ban, a withdrawn
+permission — is recorded against the message, as it would have been an hour
+later, and returned so the author is told now.
+*/
+func (s *Service) SendScheduledNow(
+	ctx context.Context,
+	id, senderID uuid.UUID,
+	delivery ScheduledDelivery,
+	log *slog.Logger,
+) (dbgen.Event, error) {
+	row, err := s.store.ClaimScheduledMessage(ctx, dbgen.ClaimScheduledMessageParams{
+		ID:       id,
+		SenderID: senderID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return dbgen.Event{}, ErrNoSuchScheduledMessage
+	}
+	if err != nil {
+		return dbgen.Event{}, fmt.Errorf("claim a scheduled message: %w", err)
+	}
+
+	return s.sendClaimed(ctx, row, delivery, log)
 }
 
 /*

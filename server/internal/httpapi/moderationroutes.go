@@ -409,6 +409,11 @@ type privacyRequest struct {
 	// CallsFromOtherServers is whether people on connected servers may.
 	Calls                 string `json:"calls,omitempty"`
 	CallsFromOtherServers *bool  `json:"callsFromOtherServers,omitempty"`
+
+	// SendsTypingIndication is whether others are shown that this person is
+	// writing. Turned off, the server records nothing when a client announces
+	// typing, so no client can show it.
+	SendsTypingIndication *bool `json:"sendsTypingIndication,omitempty"`
 }
 
 // handleSetPrivacy records who may open a conversation with somebody, and what
@@ -447,6 +452,15 @@ func (s *Server) handleSetPrivacy(c *echo.Context) error {
 			return echo.NewHTTPError(http.StatusBadRequest, `calls must be "anyone", "shared" or "nobody"`)
 		}
 		if err != nil {
+			return err
+		}
+	}
+
+	if request.SendsTypingIndication != nil {
+		if s.presence == nil {
+			return echo.NewHTTPError(http.StatusNotFound, "this server does not track presence")
+		}
+		if err := s.presence.SetTypingPreference(ctx, user.ID, *request.SendsTypingIndication); err != nil {
 			return err
 		}
 	}
@@ -507,6 +521,7 @@ func (s *Server) handleGetPrivacy(c *echo.Context) error {
 	response.ShowsPresence = &disclosure.Presence
 	response.ShowsStatus = &disclosure.Status
 	response.ShowsLastSeen = &disclosure.LastSeen
+	response.SendsTypingIndication = &user.SendsTypingIndication
 
 	return c.JSON(http.StatusOK, response)
 }
