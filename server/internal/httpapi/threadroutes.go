@@ -93,6 +93,9 @@ type openDirectRequest struct {
 	// UserIDs of the other participants. The caller is included
 	// automatically, so a client cannot open a conversation it is not in.
 	UserIDs []string `json:"userIds"`
+	// Usernames name participants where a client has a name and not an id,
+	// as on a directory profile.
+	Usernames []string `json:"usernames"`
 }
 
 func (s *Server) handleOpenDirect(c *echo.Context) error {
@@ -116,6 +119,15 @@ func (s *Server) handleOpenDirect(c *echo.Context) error {
 			return echo.NewHTTPError(http.StatusNotFound, "no such person")
 		}
 		participants = append(participants, id)
+	}
+	for _, name := range request.Usernames {
+		other, err := s.identity.UserByUsername(ctx, name)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusNotFound, "no such person")
+		}
+		if other.ID != user.ID {
+			participants = append(participants, other.ID)
+		}
 	}
 
 	if len(participants) < 2 {

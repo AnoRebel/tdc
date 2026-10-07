@@ -51,6 +51,7 @@ const picking = ref(false);
       <VideoOff v-else class="size-4" />
     </Button>
     <Button
+      v-if="!(c.roomId.value && c.guestOf.value.includes(c.roomId.value))"
       variant="ghost"
       size="icon"
       :label="$ts('calls.ringPeople')"

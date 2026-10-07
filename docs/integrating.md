@@ -1098,6 +1098,51 @@ followed: a 3xx is your receiver's answer, recorded as a failure. An operator
 whose receivers genuinely live beside the server turns on
 `integrations.allow_private_addresses`; see the hosting guide.
 
+## Calls
+
+Where the operator has switched calls on (`capabilities` includes `calls`), any
+channel or direct conversation can hold one voice or video call. Media goes
+directly between the participants over WebRTC; the server records who is in
+the call and relays their negotiation, and never carries the media itself.
+
+| Request                                          | What it does                                                                                                |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `GET /api/calls/ice`                             | STUN and TURN servers to connect through, with short-lived TURN credentials                                 |
+| `GET /api/rooms/:id/call`                        | The call in progress in a conversation, and who is in it                                                    |
+| `POST /api/rooms/:id/call`                       | Join it, starting one if there is none — `{"audio": true, "video": false}`                                  |
+| `PATCH /api/rooms/:id/call`                      | Say what you are sending, and whether you are holding the call — `{"audio", "video", "held"}`               |
+| `DELETE /api/rooms/:id/call`                     | Leave                                                                                                       |
+| `POST /api/rooms/:id/call/ring`                  | Ring people into it — `{"users": [ids]}`; empty rings everybody else in a direct conversation               |
+| `POST /api/rooms/:id/call/decline`               | Decline a ring, optionally with `{"message": "…"}` for the caller                                           |
+| `POST /api/rooms/:id/call/invite`                | Merge: invite the people of another call you are in, `{"users": [ids]}`                                     |
+| `GET`/`POST`/`PATCH`/`DELETE /api/calls/:callId` | The same, by the call's own identifier — how somebody merged in, who is not in the conversation, reaches it |
+
+Starting needs `call.start` and joining `call.join`. Ringing answers who was
+rung and only a count of who was not: whether somebody accepts calls from you is
+theirs, and the reason is never disclosed. Rings are limited per caller.
+
+**On the live connection**, a call sends these frames:
+
+- `call.state` — the call as it now stands, whenever somebody joins, leaves or
+  changes what they send.
+- `call.ring` — somebody is calling you: the call, the conversation, who is
+  calling, and `conference: true` when it is an invitation into a merged call,
+  which names nothing of the conversation.
+- `call.ring_ended` — stop ringing: answered on another device, declined, or
+  given up after 45 seconds (which leaves a `missed_call` notification).
+- `call.declined` — somebody you rang declined, with their message if any.
+- `call.signal` — another participant's WebRTC negotiation for you.
+
+Negotiation is sent on the same connection:
+
+```json
+{ "action": "signal", "call": "<call id>", "to": "<user id>", "signal": { "description": { … } } }
+```
+
+`signal` carries either a session `description` or an ICE `candidate`, and is
+checked on every frame: both people must be in that call now and allowed to
+take part, or it is dropped.
+
 ## Search
 
 Two endpoints, both taking the search text as `q`:

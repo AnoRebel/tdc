@@ -140,3 +140,18 @@ func TestDecliningTellsTheCall(t *testing.T) {
 	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call/decline",
 		map[string]any{"message": strings.Repeat("a", 281)}, baraka, http.StatusBadRequest)
 }
+
+// A conversation opened by name is the same one opened by id: calling somebody
+// from their profile lands where the two already talk.
+func TestADirectConversationOpensByUsername(t *testing.T) {
+	handler, _, _, amina, baraka := withCalls(t)
+	byID := decode(t, mustCall(t, handler, http.MethodPost, "/api/direct",
+		map[string]any{"userIds": []string{accountID(t, handler, baraka)}}, amina, http.StatusOK))
+	byName := decode(t, mustCall(t, handler, http.MethodPost, "/api/direct",
+		map[string]any{"usernames": []string{"baraka"}}, amina, http.StatusOK))
+	if byID["id"] != byName["id"] {
+		t.Errorf("opening by name made a second conversation: %v and %v", byID["id"], byName["id"])
+	}
+	mustCall(t, handler, http.MethodPost, "/api/direct",
+		map[string]any{"usernames": []string{"nobody-here"}}, amina, http.StatusNotFound)
+}

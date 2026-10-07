@@ -57,3 +57,19 @@ UPDATE calls SET started_event = $2 WHERE id = $1;
 
 -- name: CallByID :one
 SELECT * FROM calls WHERE id = $1;
+
+-- name: InviteToCall :exec
+INSERT INTO call_invites (call_id, user_id, invited_by) VALUES ($1, $2, $3)
+ON CONFLICT (call_id, user_id) DO NOTHING;
+
+-- name: IsInvitedToCall :one
+SELECT EXISTS (SELECT 1 FROM call_invites WHERE call_id = $1 AND user_id = $2);
+
+-- name: ShareAnOpenCall :one
+-- Whether two people are in the same open call now.
+SELECT EXISTS (
+    SELECT 1 FROM call_participants a
+    JOIN call_participants b ON b.call_id = a.call_id
+    JOIN calls c ON c.id = a.call_id
+    WHERE a.user_id = $1 AND b.user_id = $2
+      AND a.left_at IS NULL AND b.left_at IS NULL AND c.ended_at IS NULL);

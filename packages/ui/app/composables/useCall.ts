@@ -65,6 +65,12 @@ export const useCall = createGlobalState(() => {
   const calls = ref<Record<string, Call>>({});
   /** The conversations whose calls we are holding. */
   const holding = ref<string[]>([]);
+  /**
+   * The conversations whose calls we were let into without being in the
+   * conversation — merged in by somebody. Their calls are reached by the
+   * call's own address, and nothing offers to open the conversation.
+   */
+  const guestOf = ref<string[]>([]);
   /** The call shown. */
   const call = computed<Call | null>(
     () => (roomId.value ? calls.value[roomId.value] : null) ?? null,
@@ -131,6 +137,14 @@ export const useCall = createGlobalState(() => {
   /** Whether a conversation's call is the one being talked in. */
   function live(room: string): boolean {
     return room === roomId.value && !holding.value.includes(room);
+  }
+
+  /** Where a conversation's call is reached: by the conversation, or as a guest by the call. */
+  function callPath(room: string): string {
+    const current = calls.value[room];
+    return current && guestOf.value.includes(room)
+      ? `/api/calls/${current.id}`
+      : `/api/rooms/${room}/call`;
   }
 
   /** Whether we are in a conversation's call, talking or holding. */
@@ -230,7 +244,7 @@ export const useCall = createGlobalState(() => {
   async function report(room: string | null = roomId.value) {
     if (!room || !calls.value[room]) return;
     try {
-      const state = await api.patch<Call>(`/api/rooms/${room}/call`, {
+      const state = await api.patch<Call>(callPath(room), {
         audio: microphone.value,
         video: camera.value,
         held: holding.value.includes(room),
@@ -274,7 +288,7 @@ export const useCall = createGlobalState(() => {
   async function join(
     room: string,
     withVideo: boolean,
-    options: { ring?: boolean; endCurrent?: boolean } = {},
+    options: { ring?: boolean; endCurrent?: boolean; asGuestOf?: string } = {},
   ) {
     if (joining.value) return;
     if (calls.value[room]) {
@@ -301,10 +315,11 @@ export const useCall = createGlobalState(() => {
       iceServers = (await api.get<IceConfiguration>("/api/calls/ice")).iceServers;
       if (options.endCurrent && roomId.value) await leave(roomId.value, { keepMedia: true });
       else await holdCurrent();
-      const started = await api.post<Call>(`/api/rooms/${room}/call`, {
-        audio: microphone.value,
-        video: camera.value,
-      });
+      const started = await api.post<Call>(
+        options.asGuestOf ? `/api/calls/${options.asGuestOf}` : `/api/rooms/${room}/call`,
+        { audio: microphone.value, video: camera.value },
+      );
+      if (options.asGuestOf) guestOf.value = [...guestOf.value, room];
       calls.value = { ...calls.value, [room]: started };
       roomId.value = room;
       holding.value = holding.value.filter((each) => each !== room);
@@ -376,6 +391,7 @@ export const useCall = createGlobalState(() => {
    */
   async function leave(room: string | null = roomId.value, options: { keepMedia?: boolean } = {}) {
     if (!room || !calls.value[room]) return;
+    const path = callPath(room);
     for (const other of [...(peers.get(room)?.keys() ?? [])]) closePeer(room, other);
     peers.delete(room);
     remotes.delete(room);
@@ -383,6 +399,7 @@ export const useCall = createGlobalState(() => {
     delete rest[room];
     calls.value = rest;
     holding.value = holding.value.filter((each) => each !== room);
+    guestOf.value = guestOf.value.filter((each) => each !== room);
     if (roomId.value === room) {
       const next = Object.keys(rest).at(-1) ?? null;
       roomId.value = next;
@@ -390,7 +407,7 @@ export const useCall = createGlobalState(() => {
     }
     if (!Object.keys(rest).length && !options.keepMedia) stopLocal();
     try {
-      await api.delete(`/api/rooms/${room}/call`);
+      await api.delete(path);
     } catch {
       // The server takes us out by itself once the connection is gone.
     }
@@ -455,13 +472,31 @@ export const useCall = createGlobalState(() => {
     options: { endCurrent?: boolean; farewell?: string } = {},
   ) {
     onRingEnded(incomingRing.call);
-    if (options.farewell && roomId.value) await say(roomId.value, options.farewell);
-    await join(incomingRing.roomId, withVideo, { endCurrent: options.endCurrent });
+    if (options.farewell && roomId.value && !guestOf.value.includes(roomId.value)) {
+      await say(roomId.value, options.farewell);
+    }
+    // Being merged: the calls shared with whoever merges are the ones being
+    // merged, and are left once in the conference rather than held.
+    const merged = incomingRing.conference
+      ? Object.values(calls.value)
+          .filter((each) => each.participants.some((p) => p.userId === incomingRing.from.userId))
+          .map((each) => each.roomId)
+      : [];
+    await join(incomingRing.roomId, withVideo, {
+      endCurrent: options.endCurrent,
+      asGuestOf: incomingRing.conference ? incomingRing.call : undefined,
+    });
+    if (calls.value[incomingRing.roomId]) {
+      for (const room of merged) await leave(room, { keepMedia: true });
+    }
   }
 
   /** Declines somebody calling, with a few words for them if given. */
   async function decline(incomingRing: CallRing, message = "") {
     onRingEnded(incomingRing.call);
+    // An invitation into somebody else's conversation's call has nowhere to
+    // post words and nobody to tell; it is simply not taken.
+    if (incomingRing.conference) return;
     try {
       await api.post(`/api/rooms/${incomingRing.roomId}/call/decline`, {
         message: message.trim(),
@@ -470,6 +505,52 @@ export const useCall = createGlobalState(() => {
       // The ring ends by itself; declining only says so sooner.
     }
     await say(incomingRing.roomId, message);
+  }
+
+  /** Whether a held call can be merged into the one being talked in. */
+  function canMerge(held: string): boolean {
+    const active = roomId.value;
+    return Boolean(
+      active &&
+      held !== active &&
+      live(active) &&
+      calls.value[held] &&
+      !guestOf.value.includes(active),
+    );
+  }
+
+  /**
+   * Merges a held call into the one being talked in: its people are invited,
+   * and the held call is left once they have all arrived — or after a minute,
+   * for whoever has not.
+   */
+  async function merge(held: string) {
+    const active = roomId.value;
+    if (!active || !canMerge(held)) return;
+    const me = user.value?.id;
+    const people = (calls.value[held]?.participants ?? [])
+      .map((each) => each.userId)
+      .filter((id) => id !== me);
+    try {
+      await api.post(`/api/rooms/${active}/call/invite`, { users: people });
+    } catch {
+      error.value = "unreachable";
+      return;
+    }
+    const arrived = () =>
+      people.every((id) => calls.value[active]?.participants.some((each) => each.userId === id));
+    const stop = watch(
+      () => calls.value[active]?.participants,
+      () => {
+        if (arrived()) finish();
+      },
+    );
+    const timer = setTimeout(() => finish(), 60_000);
+    function finish() {
+      stop();
+      clearTimeout(timer);
+      if (calls.value[held]) void leave(held, { keepMedia: true });
+    }
   }
 
   /** Who is in a call changed. */
@@ -533,6 +614,9 @@ export const useCall = createGlobalState(() => {
     metered,
     supported,
     isIn,
+    guestOf,
+    canMerge,
+    merge,
     join,
     switchTo,
     hold: holdCurrent,

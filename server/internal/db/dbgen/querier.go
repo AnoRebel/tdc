@@ -482,11 +482,13 @@ type Querier interface {
 	// Asks somebody to be listed. Does nothing if they already are, or were
 	// already asked: inviting twice is not a second question.
 	InviteCompanyMember(ctx context.Context, arg InviteCompanyMemberParams) (int64, error)
+	InviteToCall(ctx context.Context, arg InviteToCallParams) error
 	// Asked before joining and before posting.
 	//
 	// The expiry is evaluated here rather than by a sweep, so a temporary ban
 	// lifts at its moment rather than whenever a background job next runs.
 	IsBannedFromChannel(ctx context.Context, arg IsBannedFromChannelParams) (bool, error)
+	IsInvitedToCall(ctx context.Context, arg IsInvitedToCallParams) (bool, error)
 	// A restriction on this channel, or one on the whole server.
 	//
 	// Both are checked in one query: asking twice would mean two round trips on
@@ -1108,6 +1110,8 @@ type Querier interface {
 	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
 	SetTourProgress(ctx context.Context, arg SetTourProgressParams) error
 	SetTypingPreference(ctx context.Context, arg SetTypingPreferenceParams) error
+	// Whether two people are in the same open call now.
+	ShareAnOpenCall(ctx context.Context, arg ShareAnOpenCallParams) (bool, error)
 	// Whether two people are in any channel together, for the 'shared' policy.
 	//
 	// Direct conversations are excluded: two people already in a direct

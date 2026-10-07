@@ -1722,6 +1722,13 @@
     "farewell": {
       "other": "Sorry, I have to take another call.",
       "back": "Have to go, I'll call back shortly."
-    }
+    },
+    "callPerson": "Call {name}",
+    "videoCallPerson": "Video call {name}",
+    "couldNotCall": "Could not start the call.",
+    "conferenceInvite": "invites you to join a conference call",
+    "merge": "Merge",
+    "mergeHint": "Bring these people into the call you are in, as a conference. They join only if they accept, and see nothing of this conversation.",
+    "joinConference": "Join"
   }
 }

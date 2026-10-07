@@ -70,6 +70,38 @@ func (q *Queries) EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error
 	return i, err
 }
 
+const inviteToCall = `-- name: InviteToCall :exec
+INSERT INTO call_invites (call_id, user_id, invited_by) VALUES ($1, $2, $3)
+ON CONFLICT (call_id, user_id) DO NOTHING
+`
+
+type InviteToCallParams struct {
+	CallID    uuid.UUID
+	UserID    uuid.UUID
+	InvitedBy *uuid.UUID
+}
+
+func (q *Queries) InviteToCall(ctx context.Context, arg InviteToCallParams) error {
+	_, err := q.db.Exec(ctx, inviteToCall, arg.CallID, arg.UserID, arg.InvitedBy)
+	return err
+}
+
+const isInvitedToCall = `-- name: IsInvitedToCall :one
+SELECT EXISTS (SELECT 1 FROM call_invites WHERE call_id = $1 AND user_id = $2)
+`
+
+type IsInvitedToCallParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) IsInvitedToCall(ctx context.Context, arg IsInvitedToCallParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isInvitedToCall, arg.CallID, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const joinCall = `-- name: JoinCall :exec
 INSERT INTO call_participants (call_id, user_id, audio, video)
 VALUES ($1, $2, $3, $4)
@@ -251,6 +283,28 @@ type SetCallStartedEventParams struct {
 func (q *Queries) SetCallStartedEvent(ctx context.Context, arg SetCallStartedEventParams) error {
 	_, err := q.db.Exec(ctx, setCallStartedEvent, arg.ID, arg.StartedEvent)
 	return err
+}
+
+const shareAnOpenCall = `-- name: ShareAnOpenCall :one
+SELECT EXISTS (
+    SELECT 1 FROM call_participants a
+    JOIN call_participants b ON b.call_id = a.call_id
+    JOIN calls c ON c.id = a.call_id
+    WHERE a.user_id = $1 AND b.user_id = $2
+      AND a.left_at IS NULL AND b.left_at IS NULL AND c.ended_at IS NULL)
+`
+
+type ShareAnOpenCallParams struct {
+	UserID   uuid.UUID
+	UserID_2 uuid.UUID
+}
+
+// Whether two people are in the same open call now.
+func (q *Queries) ShareAnOpenCall(ctx context.Context, arg ShareAnOpenCallParams) (bool, error) {
+	row := q.db.QueryRow(ctx, shareAnOpenCall, arg.UserID, arg.UserID_2)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const startCall = `-- name: StartCall :one

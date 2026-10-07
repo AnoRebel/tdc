@@ -447,6 +447,7 @@ const others = computed(() => members.value.filter((member) => member.id !== use
                   {{ member.address }}
                 </span>
               </span>
+              <CallPerson :user-id="member.id" :name="member.displayName || member.username" />
               <Button
                 variant="danger"
                 size="icon"

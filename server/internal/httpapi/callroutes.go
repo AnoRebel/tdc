@@ -42,6 +42,15 @@ func init() {
 		calls.DELETE("", s.handleLeaveCall)
 		calls.POST("/ring", s.handleRing)
 		calls.POST("/decline", s.handleDeclineRing)
+		calls.POST("/invite", s.handleInviteToCall)
+
+		// One call by its identifier, for the people let into it without being
+		// in its conversation as well as for its members.
+		byID := s.echo.Group("/api/calls/:callId", requireAuthentication, s.requireFeature(settings.FeatureCalls))
+		byID.GET("", s.handleCallByID)
+		byID.POST("", s.handleJoinCallByID)
+		byID.PATCH("", s.handleCallMediaByID)
+		byID.DELETE("", s.handleLeaveCallByID)
 
 		s.echo.GET("/api/calls/ice", s.handleICEServers,
 			requireAuthentication, s.requireFeature(settings.FeatureCalls))
@@ -49,6 +58,11 @@ func init() {
 
 	documentRoutes(map[string]entry{
 		"GET /api/rooms/:id/call":          {Summary: "The call in progress in a conversation", Authentication: "session or token", Permission: "channel.read"},
+		"POST /api/rooms/:id/call/invite":  {Summary: "Invite the people of another call you are in into this one", Authentication: "session or token"},
+		"GET /api/calls/:callId":           {Summary: "A call you are in, or are invited into", Authentication: "session or token"},
+		"POST /api/calls/:callId":          {Summary: "Join a call you were invited into", Authentication: "session or token", Permission: "call.join"},
+		"PATCH /api/calls/:callId":         {Summary: "Say what you are sending in a call", Authentication: "session or token"},
+		"DELETE /api/calls/:callId":        {Summary: "Leave a call", Authentication: "session or token"},
 		"POST /api/rooms/:id/call":         {Summary: "Join a conversation's call, starting one if none is in progress", Authentication: "session or token", Permission: "call.start or call.join"},
 		"PATCH /api/rooms/:id/call":        {Summary: "Say whether you are sending audio and video", Authentication: "session or token"},
 		"DELETE /api/rooms/:id/call":       {Summary: "Leave a conversation's call", Authentication: "session or token"},
@@ -397,7 +411,10 @@ type ringFrame struct {
 	RoomID   string `json:"roomId"`
 	RoomName string `json:"roomName"`
 	Kind     string `json:"kind"`
-	From     struct {
+	// Conference marks an invitation into a call merged with another; the
+	// person invited is not in its conversation and is told nothing of it.
+	Conference bool `json:"conference,omitempty"`
+	From       struct {
 		UserID   string `json:"userId"`
 		Username string `json:"username"`
 		Address  string `json:"address"`
@@ -588,6 +605,150 @@ func (s *Server) handleDeclineRing(c *echo.Context) error {
 	for _, participant := range call.Participants {
 		here := s.hub.SendToUser(participant.UserID, frame)
 		s.whisperElsewhere(ctx, participant.UserID, frame, here)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+/*
+handleInviteToCall merges the people of another call into this one.
+
+The caller must be in this call, and each person invited must be in another
+call with the caller now; anybody else is skipped and only counted, as with
+ringing. Each invitee is rung with a conference invitation that names who is
+inviting and nothing of the conversation, which stays closed to them.
+*/
+func (s *Server) handleInviteToCall(c *echo.Context) error {
+	ctx := c.Request().Context()
+	caller, _ := currentUser(c)
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+	var request ringRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	call, err := s.rooms.OpenCall(ctx, roomID, caller.ID)
+	if err != nil {
+		return callError(err)
+	}
+	if s.limiter != nil {
+		decision, err := s.limiter.Allow(ctx, "call.ring:"+caller.ID.String(), ringsPerCaller)
+		if err == nil && !decision.Allowed {
+			return echo.NewHTTPError(http.StatusTooManyRequests, "you have rung a lot of people just now; try again shortly")
+		}
+	}
+
+	var wanted []uuid.UUID
+	for _, raw := range request.Users {
+		id, err := uuid.Parse(raw)
+		if err != nil || id == caller.ID {
+			continue
+		}
+		if s.moderation != nil && !s.moderation.MayCall(ctx, caller.ID, id) {
+			continue
+		}
+		wanted = append(wanted, id)
+	}
+	invited, err := s.rooms.InviteToCall(ctx, call.ID, caller.ID, wanted)
+	if err != nil {
+		return callError(err)
+	}
+
+	frame := ringFrame{Call: call.ID.String(), RoomID: roomID.String(), Kind: "conference", Conference: true}
+	frame.From.UserID = caller.ID.String()
+	frame.From.Username = caller.Username
+	frame.From.Address = s.rooms.UserAddress(caller.Username)
+	payload, _ := json.Marshal(frame)
+	names := []string{}
+	for _, target := range invited {
+		ring := realtime.Frame{Type: realtime.FrameCallRing, Payload: payload}
+		here := s.hub.SendToUser(target, ring)
+		s.whisperElsewhere(ctx, target, ring, here)
+		names = append(names, target.String())
+	}
+	return c.JSON(http.StatusOK, map[string]any{"invited": names, "notInvited": len(request.Users) - len(names)})
+}
+
+// callByID reads the call a route names, for somebody entitled to it.
+func (s *Server) callByID(c *echo.Context) (rooms.Call, error) {
+	user, _ := currentUser(c)
+	callID, err := uuid.Parse(c.Param("callId"))
+	if err != nil {
+		return rooms.Call{}, echo.NewHTTPError(http.StatusNotFound, "there is no call here")
+	}
+	call, _, err := s.rooms.CallFor(c.Request().Context(), callID, user.ID)
+	if err != nil {
+		return rooms.Call{}, callError(err)
+	}
+	return call, nil
+}
+
+func (s *Server) handleCallByID(c *echo.Context) error {
+	call, err := s.callByID(c)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, s.callViewOf(call.RoomID, call.ID, call.StartedAt, call.Participants))
+}
+
+func (s *Server) handleJoinCallByID(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	call, err := s.callByID(c)
+	if err != nil {
+		return err
+	}
+	if decision := currentPermissions(c).AllowsChannel(authz.PermCallJoin, call.RoomID); !decision.Allowed {
+		return echo.NewHTTPError(http.StatusForbidden, decision.Error())
+	}
+	var request callMediaRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	limit := int(s.settings.Int(ctx, settings.CallsMaxParticipants))
+	joined, err := s.rooms.JoinInvited(ctx, call.ID, user.ID, request.Audio, request.Video, limit)
+	if err != nil {
+		return callError(err)
+	}
+	s.endRinging(ctx, user.ID, call.ID)
+	view := s.callViewOf(joined.RoomID, joined.ID, joined.StartedAt, joined.Participants)
+	s.broadcastCallState(ctx, view)
+	return c.JSON(http.StatusOK, view)
+}
+
+func (s *Server) handleCallMediaByID(c *echo.Context) error {
+	user, _ := currentUser(c)
+	call, err := s.callByID(c)
+	if err != nil {
+		return err
+	}
+	var request callMediaRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	if err := s.rooms.SetCallMedia(c.Request().Context(), call.ID, user.ID, request.Audio, request.Video, request.Held); err != nil {
+		return callError(err)
+	}
+	return s.respondWithCallState(c, call.RoomID, call)
+}
+
+func (s *Server) handleLeaveCallByID(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	call, err := s.callByID(c)
+	if err != nil {
+		return err
+	}
+	ended, err := s.rooms.LeaveCall(ctx, call.ID, user.ID)
+	if err != nil {
+		return callError(err)
+	}
+	if ended != nil {
+		s.publishEvent(ctx, *ended)
+	}
+	if _, err := s.announceCall(ctx, call.RoomID, call); err != nil {
+		s.log.Warn("could not announce a call somebody left", "error", err)
 	}
 	return c.NoContent(http.StatusNoContent)
 }

@@ -37,7 +37,12 @@ export interface CallRing {
   call: string;
   roomId: string;
   roomName: string;
-  kind: "channel" | "direct" | "disposable";
+  kind: "channel" | "direct" | "disposable" | "conference";
+  /**
+   * An invitation into a call merged with another: the person invited is not
+   * in its conversation, and `roomName` is empty.
+   */
+  conference?: boolean;
   from: { userId: string; username: string; address: string };
 }
 

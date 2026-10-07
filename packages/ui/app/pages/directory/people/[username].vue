@@ -79,6 +79,11 @@ const sentEnquiry = ref(false);
 
       <DirectoryProfileCard v-else-if="profile" :profile="profile">
         <template #actions>
+          <CallPerson
+            v-if="!isMe"
+            :username="profile.username"
+            :name="profile.displayName || profile.username"
+          />
           <p v-if="isMe" class="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
             {{ $t("directory.profile.thisIsYou") }}
             <NuxtLink

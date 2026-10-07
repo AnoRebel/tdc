@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { Call } from "@tdc/types";
-import { ArrowLeftRight, PhoneOff } from "lucide-vue-next";
+import { ArrowLeftRight, Merge, PhoneOff } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
 
 /**
  * The other calls somebody is in, held while they talk in this one: who is in
- * each, and a switch to it. Switching holds the call they are in now.
+ * each, a switch to it, and a merge of its people into the call they are in
+ * now — which makes it a conference. Switching holds the call they are in now.
  */
 
 const { $t, $ts } = useI18n();
@@ -32,6 +33,17 @@ function who(call: Call) {
         <span class="font-medium">{{ who(each) }}</span>
         <span class="text-muted-foreground"> · {{ $t("calls.onHold") }}</span>
       </span>
+      <Button
+        v-if="c.canMerge(each.roomId)"
+        variant="ghost"
+        size="small"
+        class="h-6 px-2"
+        :title="$ts('calls.mergeHint')"
+        @click="c.merge(each.roomId)"
+      >
+        <Merge class="size-3" aria-hidden="true" />
+        {{ $t("calls.merge") }}
+      </Button>
       <Button variant="ghost" size="small" class="h-6 px-2" @click="c.switchTo(each.roomId)">
         <ArrowLeftRight class="size-3" aria-hidden="true" />
         {{ $t("calls.switch") }}

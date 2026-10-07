@@ -35,7 +35,7 @@ watch(
   () => c.roomId.value,
   async (room) => {
     roomName.value = "";
-    if (!room) return;
+    if (!room || c.guestOf.value.includes(room)) return;
     try {
       roomName.value = (await useRooms().get(room)).name;
     } catch {
@@ -85,6 +85,8 @@ async function pictureInPicture() {
 }
 
 const inCall = computed(() => c.joined.value);
+// Let into this call by a merge: its conversation is not theirs to open.
+const guest = computed(() => Boolean(c.roomId.value && c.guestOf.value.includes(c.roomId.value)));
 
 // A direct conversation has no name worth showing; the people in it are.
 const { user: me } = useAuth();
@@ -141,12 +143,13 @@ const {
       </span>
       <span class="size-2 animate-pulse rounded-full bg-success" aria-hidden="true" />
       <NuxtLink
-        v-if="c.roomId.value"
+        v-if="c.roomId.value && !guest"
         :to="localeRoute({ name: 'rooms-id', params: { id: c.roomId.value } })"
         class="max-w-40 truncate text-xs font-medium hover:underline"
       >
         {{ title }}
       </NuxtLink>
+      <span v-else class="max-w-40 truncate text-xs font-medium">{{ title }}</span>
       <span class="text-xs text-muted-foreground">
         {{
           c.onHold.value
@@ -202,12 +205,13 @@ const {
       <header class="flex items-center gap-1 px-1">
         <span class="size-2 rounded-full bg-success" aria-hidden="true" />
         <NuxtLink
-          v-if="c.roomId.value"
+          v-if="c.roomId.value && !guest"
           :to="localeRoute({ name: 'rooms-id', params: { id: c.roomId.value } })"
           class="min-w-0 flex-1 truncate text-xs font-medium hover:underline"
         >
           {{ title }}
         </NuxtLink>
+        <span v-else class="min-w-0 flex-1 truncate text-xs font-medium">{{ title }}</span>
         <Button
           v-if="pipAvailable"
           variant="ghost"
@@ -270,12 +274,13 @@ const {
         </span>
         <span class="size-2 rounded-full bg-success" aria-hidden="true" />
         <NuxtLink
-          v-if="c.roomId.value"
+          v-if="c.roomId.value && !guest"
           :to="localeRoute({ name: 'rooms-id', params: { id: c.roomId.value } })"
           class="min-w-0 flex-1 truncate text-xs font-medium hover:underline"
         >
           {{ title }}
         </NuxtLink>
+        <span v-else class="min-w-0 flex-1 truncate text-xs font-medium">{{ title }}</span>
         <Button
           v-if="pipAvailable"
           variant="ghost"

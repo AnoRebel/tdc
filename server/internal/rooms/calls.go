@@ -113,27 +113,8 @@ func (s *Service) JoinCall(
 		return Call{}, nil, fmt.Errorf("open call: %w", err)
 	}
 
-	present, err := s.store.ListCallParticipants(ctx, current.ID)
-	if err != nil {
-		return Call{}, nil, fmt.Errorf("read call participants: %w", err)
-	}
-	others := 0
-	for _, participant := range present {
-		if participant.UserID != userID {
-			others++
-		}
-	}
-	// ponytail: checked then joined without a lock, so two people joining at
-	// once can take a call one over its limit; a row lock on the call when
-	// that ever matters.
-	if others >= maxParticipants {
-		return Call{}, nil, ErrCallFull
-	}
-
-	if err := s.store.JoinCall(ctx, dbgen.JoinCallParams{
-		CallID: current.ID, UserID: userID, Audio: audio, Video: video,
-	}); err != nil {
-		return Call{}, nil, fmt.Errorf("join call: %w", err)
+	if err := s.enter(ctx, current.ID, userID, audio, video, maxParticipants); err != nil {
+		return Call{}, nil, err
 	}
 
 	var startedEvent *dbgen.Event
@@ -270,4 +251,107 @@ func (s *Service) CallRecord(ctx context.Context, callID uuid.UUID) (dbgen.Call,
 		return dbgen.Call{}, ErrNoCall
 	}
 	return call, err
+}
+
+// enter puts somebody in an open call, if it has room for them.
+func (s *Service) enter(ctx context.Context, callID, userID uuid.UUID, audio, video bool, maxParticipants int) error {
+	present, err := s.store.ListCallParticipants(ctx, callID)
+	if err != nil {
+		return fmt.Errorf("read call participants: %w", err)
+	}
+	others := 0
+	for _, participant := range present {
+		if participant.UserID != userID {
+			others++
+		}
+	}
+	// ponytail: checked then joined without a lock, so two people joining at
+	// once can take a call one over its limit; a row lock on the call when
+	// that ever matters.
+	if others >= maxParticipants {
+		return ErrCallFull
+	}
+	if err := s.store.JoinCall(ctx, dbgen.JoinCallParams{
+		CallID: callID, UserID: userID, Audio: audio, Video: video,
+	}); err != nil {
+		return fmt.Errorf("join call: %w", err)
+	}
+	return nil
+}
+
+/*
+InviteToCall lets people into one call who are not in its conversation.
+
+Only somebody in the call may invite, and only people they are in another call
+with now — the people of a call being merged into this one. It is a merge, not
+a way to reach anybody at all; who may be rung is still each invitee's to say,
+and the HTTP layer checks that.
+*/
+func (s *Service) InviteToCall(ctx context.Context, callID, inviter uuid.UUID, invitees []uuid.UUID) ([]uuid.UUID, error) {
+	if _, in := s.CallRoomOf(ctx, callID, inviter); !in {
+		return nil, ErrNoCall
+	}
+	var invited []uuid.UUID
+	for _, invitee := range invitees {
+		if invitee == inviter {
+			continue
+		}
+		shared, err := s.store.ShareAnOpenCall(ctx, dbgen.ShareAnOpenCallParams{UserID: inviter, UserID_2: invitee})
+		if err != nil {
+			return invited, fmt.Errorf("check shared call: %w", err)
+		}
+		if !shared {
+			continue
+		}
+		if err := s.store.InviteToCall(ctx, dbgen.InviteToCallParams{
+			CallID: callID, UserID: invitee, InvitedBy: &inviter,
+		}); err != nil {
+			return invited, fmt.Errorf("invite to call: %w", err)
+		}
+		invited = append(invited, invitee)
+	}
+	return invited, nil
+}
+
+/*
+CallFor returns an open call by its identifier to somebody entitled to it: a
+member of its conversation, somebody in it, or somebody invited into it.
+*/
+func (s *Service) CallFor(ctx context.Context, callID, userID uuid.UUID) (Call, bool, error) {
+	record, err := s.CallRecord(ctx, callID)
+	if err != nil {
+		return Call{}, false, err
+	}
+	if record.EndedAt != nil {
+		return Call{}, false, ErrNoCall
+	}
+	guest := false
+	if _, err := s.RequireMembership(ctx, record.RoomID, userID); err != nil {
+		_, in := s.CallRoomOf(ctx, callID, userID)
+		invited, inviteErr := s.store.IsInvitedToCall(ctx, dbgen.IsInvitedToCallParams{CallID: callID, UserID: userID})
+		if inviteErr != nil {
+			return Call{}, false, fmt.Errorf("check call invite: %w", inviteErr)
+		}
+		if !in && !invited {
+			return Call{}, false, ErrNoCall
+		}
+		guest = true
+	}
+	call, err := s.openCall(ctx, record.RoomID)
+	if err != nil || call.ID != callID {
+		return Call{}, false, ErrNoCall
+	}
+	return call, guest, nil
+}
+
+// JoinInvited puts somebody invited into a call into it.
+func (s *Service) JoinInvited(ctx context.Context, callID, userID uuid.UUID, audio, video bool, maxParticipants int) (Call, error) {
+	call, _, err := s.CallFor(ctx, callID, userID)
+	if err != nil {
+		return Call{}, err
+	}
+	if err := s.enter(ctx, callID, userID, audio, video, maxParticipants); err != nil {
+		return Call{}, err
+	}
+	return s.openCall(ctx, call.RoomID)
 }

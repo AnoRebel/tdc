@@ -82,8 +82,11 @@ function declineSaying(ring: CallRing, words: string) {
 /** Words for the people of the call being ended to take another. */
 const farewell = ref("");
 const farewells = computed(() => [$ts("calls.farewell.other"), $ts("calls.farewell.back")]);
-const busy = computed(() => c.joined.value);
+// In a call, with a ring that would hold or end it; an invitation to be merged
+// asks neither.
+const busy = computed(() => c.joined.value && props.rings.some((ring) => !ring.conference));
 function where(ring: CallRing) {
+  if (ring.conference) return $ts("calls.conferenceInvite");
   return ring.kind === "direct" ? $ts("calls.directCall") : `#${ring.roomName}`;
 }
 </script>
@@ -169,7 +172,10 @@ function where(ring: CallRing) {
           <Avatar :name="ring.from.username" size="md" class="ring-pulse" />
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-semibold">{{ ring.from.username }}</p>
-            <p class="truncate text-xs text-muted-foreground">
+            <p v-if="ring.conference" class="text-xs text-muted-foreground">
+              {{ where(ring) }}
+            </p>
+            <p v-else class="truncate text-xs text-muted-foreground">
               {{ $t("calls.isCalling") }} · {{ where(ring) }}
             </p>
           </div>
@@ -197,6 +203,7 @@ function where(ring: CallRing) {
             {{ $t("calls.decline") }}
           </Button>
           <Button
+            v-if="!ring.conference"
             variant="ghost"
             size="icon"
             class="size-8 shrink-0"
@@ -207,7 +214,13 @@ function where(ring: CallRing) {
           >
             <MessageSquare class="size-3.5" />
           </Button>
-          <div v-if="busy" class="flex basis-full gap-1.5">
+          <!-- Being merged: the call shared with whoever merges is left for
+               the conference, so there is nothing to hold or end. -->
+          <Button v-if="ring.conference" size="small" class="flex-1" @click="c.answer(ring, false)">
+            <Mic class="size-3.5" aria-hidden="true" />
+            {{ $t("calls.joinConference") }}
+          </Button>
+          <div v-else-if="busy" class="flex basis-full gap-1.5">
             <Button variant="outline" size="small" class="flex-1" @click="c.answer(ring, false)">
               <Pause class="size-3.5" aria-hidden="true" />
               {{ $t("calls.holdAndAnswer") }}

@@ -1722,6 +1722,13 @@
     "farewell": {
       "other": "Samahani, lazima nipokee simu nyingine.",
       "back": "Lazima niondoke, nitapiga tena punde."
-    }
+    },
+    "callPerson": "Mpigie {name}",
+    "videoCallPerson": "Mpigie {name} kwa video",
+    "couldNotCall": "Imeshindwa kuanzisha simu.",
+    "conferenceInvite": "anakualika ujiunge na simu ya pamoja",
+    "merge": "Unganisha",
+    "mergeHint": "Walete watu hawa kwenye simu uliyopo, iwe simu ya pamoja. Wanajiunga tu wakikubali, na hawaoni chochote cha mazungumzo haya.",
+    "joinConference": "Jiunge"
   }
 }

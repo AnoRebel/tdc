@@ -231,8 +231,8 @@ export function useRooms() {
   }
 
   /** Opens the conversation with these people, or returns the existing one. */
-  function openDirect(userIds: string[]): Promise<Room> {
-    return api.post<Room>("/api/direct", { userIds });
+  function openDirect(userIds: string[], usernames: string[] = []): Promise<Room> {
+    return api.post<Room>("/api/direct", { userIds, usernames });
   }
 
   function listDirect(): Promise<Room[]> {

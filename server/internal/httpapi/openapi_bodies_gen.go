@@ -39,6 +39,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/calls/:callId": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/directory/companies/:slug": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -342,6 +347,11 @@ var routeBodies = map[string]routeBodySet{
 		Query: []string{"token"},
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"GET /api/calls/:callId": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
 		},
 	},
 	"GET /api/calls/ice": {
@@ -874,6 +884,12 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[eventTypesView]()},
 		},
 	},
+	"PATCH /api/calls/:callId": {
+		Request: reflect.TypeFor[callMediaRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
+		},
+	},
 	"PATCH /api/issues/:ref": {
 		Request: reflect.TypeFor[struct {
 			Title       *string "json:\"title\""
@@ -1114,6 +1130,12 @@ var routeBodies = map[string]routeBodySet{
 	"POST /api/auth/signout": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
+		},
+	},
+	"POST /api/calls/:callId": {
+		Request: reflect.TypeFor[callMediaRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
 		},
 	},
 	"POST /api/direct": {
@@ -1494,6 +1516,12 @@ var routeBodies = map[string]routeBodySet{
 		}](),
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
+		},
+	},
+	"POST /api/rooms/:id/call/invite": {
+		Request: reflect.TypeFor[ringRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
 	"POST /api/rooms/:id/call/ring": {

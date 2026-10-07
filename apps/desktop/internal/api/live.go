@@ -301,7 +301,11 @@ func (b *LiveBridge) announceRing(data []byte) {
 	}
 
 	where := "A direct call"
-	if ring.Payload.Kind != "direct" && ring.Payload.RoomName != "" {
+	switch {
+	case ring.Payload.Kind == "conference":
+		// Somebody merging calls; the conversation is not theirs to see.
+		where = "Invites you to join a conference call"
+	case ring.Payload.Kind != "direct" && ring.Payload.RoomName != "":
 		where = "In #" + ring.Payload.RoomName
 	}
 

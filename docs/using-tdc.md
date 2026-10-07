@@ -721,6 +721,16 @@ button to leave them. **Hold** in the call controls holds the call you are in,
 and **Resume** brings it back. Joining another conversation's call while in one
 holds the first rather than ending it.
 
+**Merging calls into a conference.** With one call held and another going,
+**Merge** on the held call invites its people into the call you are in. Each of
+them is asked first, and joins only by accepting; once they have, the held call
+ends. People merged in take part in the call and nothing else: they cannot open
+its conversation, read its messages or see who else is in it beyond the call.
+
+**Calling from a profile.** The phone and camera buttons on somebody's
+directory profile, and beside people in a channel's member list, open your
+direct conversation with them — or the one you already have — and ring them.
+
 **Who may call you** is in **Settings → Privacy**: anybody on this server,
 only people you share a conversation with, or nobody — you can still join calls
 yourself. A separate switch decides whether people on connected servers may

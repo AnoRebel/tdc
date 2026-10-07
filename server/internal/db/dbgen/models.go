@@ -109,6 +109,13 @@ type Call struct {
 	StartedEvent *string
 }
 
+type CallInvite struct {
+	CallID    uuid.UUID
+	UserID    uuid.UUID
+	InvitedBy *uuid.UUID
+	CreatedAt time.Time
+}
+
 type CallParticipant struct {
 	CallID   uuid.UUID
 	UserID   uuid.UUID

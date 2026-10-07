@@ -196,3 +196,20 @@ func TestARingIsAnnounced(t *testing.T) {
 		t.Errorf("the ring's banner reads %+v", shown)
 	}
 }
+
+// An invitation into a merged call names who invites, and nothing of the
+// conversation the call belongs to.
+func TestAConferenceInvitationIsAnnounced(t *testing.T) {
+	bridge, spy := bridgeWith(t, "me@example.test")
+	raw, _ := json.Marshal(map[string]any{
+		"type": "call.ring",
+		"payload": map[string]any{
+			"call": "call-2", "roomId": "room-9", "kind": "conference", "conference": true,
+			"from": map[string]any{"userId": "u1", "username": "amina", "address": "amina@example.test"},
+		},
+	})
+	bridge.notify(raw)
+	if spy.count() != 1 || spy.shown[0].body != "Invites you to join a conference call" {
+		t.Errorf("the conference invitation's banner reads %+v", spy.shown)
+	}
+}
