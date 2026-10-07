@@ -53,6 +53,8 @@ A profile can say:
 Everything is optional. A profile with nothing but a visibility setting is a
 valid profile.
 
+![Editing your directory profile: who can find you (Anyone, Members or Only you), Take enquiries through my profile, and the headline, location, experience and about fields](images/directory/profile.webp)
+
 ### Who sees what
 
 Each profile has three visibility settings, each one of:
@@ -200,6 +202,8 @@ hidden from you is not found by searching for their town, because finding them
 that way would tell you where they are. A filter on a hidden detail never
 matches, rather than matching and hiding the result.
 
+![The directory searched for the Flutter skill: name, skill, location and company fields, Available for work only, and the matching profiles with their headlines, locations and skills](images/directory/search.webp)
+
 Results come **twenty to a page**, and there is no way to ask for more at once.
 Paging stops after twenty-five pages however many profiles match. Searching and
 opening profiles are also **rate limited** — thirty a minute for somebody
@@ -212,10 +216,14 @@ the directory. It finds people by name and address as it always has, returns
 nothing a directory profile says, and describes somebody with a profile exactly
 as it describes somebody without one.
 
+![A profile as somebody else sees it: name, address, headline and location, available for work until a date, skills, about, experience and the company the person is listed by](images/directory/person.webp)
+
 ## Enquiries
 
 An enquiry is the first contact a client makes with somebody through their
 profile: a subject, and a message saying what the work is.
+
+![Enquiries received: one from Baraka Mwakyusa waiting for an answer, with Take it up, Decline and Open the conversation](images/directory/enquiries.webp)
 
 **Whether you take enquiries is your profile's setting, not your direct-message
 setting.** The two are separate decisions and neither changes the other:
@@ -304,6 +312,8 @@ Open the engagement's **Proposal** tab and either of you can write one: **what
 the work is**, **when** — in your own words, such as "six weeks from
 agreement" — and a list of **deliverables, each with a price**. The total is
 added up by the server, not typed.
+
+![An engagement's Proposal tab: version 1 with the work, when, three deliverables priced in TZS and the total, a request from the client to change the timeline, and Send a new version](images/directory/engagement.webp)
 
 The other person can then **accept** it, **decline** it, or **ask for a change
 to one part of it**: the work, the timeline, the currency, or a single
@@ -398,6 +408,8 @@ first administrator, and administrators may change it, invite people, and remove
 them. A company always keeps at least one administrator; the last one deletes
 the company rather than leaving it.
 
+![A company's page with its description, location and the people listed by it](images/directory/company.webp)
+
 **A company can ask; only you can accept.** Inviting somebody lists nobody: the
 invitation appears on the invitee's own profile page, and until they accept, the
 company page does not show them and their profile does not mention the company.
@@ -439,6 +451,8 @@ skills under **Directory → Review**. For each one:
   becomes another name for it, so the next person to type it lands in the right
   place.
 - **Reject** — with a reason. It leaves every profile it was on.
+
+![Directory review: two proposed skills, each with Approve, Merge into another and Reject, and below them a box to open a profile and verify its claims](images/directory/review.webp)
 
 Each decision is written to the audit log as `directory.skill.approved`,
 `directory.skill.merged` or `directory.skill.rejected`, naming the reviewer and

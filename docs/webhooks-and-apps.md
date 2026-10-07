@@ -15,6 +15,8 @@ An outgoing webhook sends a channel's events to an endpoint you choose, as they
 happen. It belongs to the person who makes it: it can only be made for a channel
 they can read, and it stops delivering the moment they cannot.
 
+![Outgoing webhooks in Settings → Integrations: an active webhook on the golang channel with its endpoint and events, and the form for a new one with a label, a channel, an endpoint and the events to send](images/webhooks-and-apps/outgoing.webp)
+
 ### Subscribing
 
 <!-- demo: subscribe -->
@@ -199,6 +201,8 @@ no longer read the channel. An attempt's `outcome` is `delivered`, `failed`, or
 it answering at all. `response` is the first kilobyte of what it said. History
 is kept for thirty days (`integrations.delivery_history_days`).
 
+![An outgoing webhook's delivery history: each delivery's time, event, attempt, outcome, the status the receiver answered and how long it took](images/webhooks-and-apps/deliveries.webp)
+
 ### Limits, and what exceeding them looks like
 
 Each subscription is sent at most **120 deliveries a minute**
@@ -252,6 +256,8 @@ through — a build server announcing results, an alerting tool reporting a disk
 filling up. It needs nothing but the address: no account, no token, no
 signature. That is what makes it easy to connect anything to, and why it is
 built on the assumption that the address will leak.
+
+![Incoming webhooks in Settings → Integrations: a channel to choose and the webhooks already made for it](images/webhooks-and-apps/incoming.webp)
 
 ### Making one
 
@@ -376,6 +382,8 @@ Installing one takes two steps, and they may be two people: somebody registers
 it, saying what it needs; somebody holding `server.applications.manage` —
 administrators, by default — approves it, having been shown exactly that. Both
 are in **Settings → Applications**, and both are in the audit log.
+
+![Settings → Applications: an approved Deploy bot with its purpose, its one permission, the channel it acts in and what it sends off the server, and below it the form to register another](images/webhooks-and-apps/applications.webp)
 
 ### Registering
 
@@ -503,6 +511,8 @@ by the server from who sent it, never from anything in the request. Clients show
 its name with a **Bot** mark beside it, in words, so nobody reads a program's
 message as a person's; a person's message can neither claim the mark nor shed
 it.
+
+![A channel holding a message from Build server marked Webhook, and one from Deploy bot marked Bot that asks whether to deploy, with Deploy, Not yet and See the changes buttons](images/using-tdc/program-messages.webp)
 
 **It is moderated as anybody is.** Its account is an ordinary account —
 `accountId` in `GET /api/admin/applications/{id}` — and every moderation action

@@ -16,6 +16,8 @@ How you get one depends on your server's registration policy. It may be open to
 anybody, restricted to people holding an invitation, restricted to particular
 email domains, or closed entirely, in which case the operator makes accounts.
 
+![The sign-in page: a username or email and a password, a Sign in button, and a Create one link for somebody without an account](images/using-tdc/sign-in.webp)
+
 If you were sent an invitation, it is either a link or a short code, and either
 one is entered during registration. An invitation may expire, may be usable a
 limited number of times, and may be bound to one email address so that
@@ -68,6 +70,8 @@ Every device you sign in on is a session, and you can see all of them: when each
 was created, when it was last used, and which one you are looking at. Any of
 them can be revoked, which signs that device out immediately.
 
+![Signed-in devices in settings, listing one session marked This device with when it was created](images/using-tdc/sessions.webp)
+
 Ending a session asks first and says what will happen, because signing a device
 out is not something to do by accident.
 
@@ -80,6 +84,8 @@ you want if you are changing it because you think somebody else has it.
 
 A channel is a named conversation. It may be **public**, which anybody on the
 server can find and join, or **private**, which only its members can see.
+
+![The golang channel open beside the sidebar, which lists channels and direct messages with unread counts; messages show reactions and a 4 replies link](images/using-tdc/channel.webp)
 
 A private channel is genuinely invisible rather than merely locked. Somebody who
 is not a member cannot tell the difference between a channel they are not
@@ -99,6 +105,8 @@ they may change. Every change appears in the channel as it happens, for
 everybody who has it open. A direct conversation has no such settings: it
 belongs to the people in it.
 
+![Settings for the General channel: its name and topic, Make private, Archive, and the list of members each with a Remove button](images/using-tdc/channel-settings.webp)
+
 Creating a channel takes a permission. On most servers ordinary members have it;
 on some the operator keeps it.
 
@@ -107,6 +115,8 @@ on some the operator keeps it.
 A direct conversation is between you and one other person. Start one by finding
 them in the search box — `Ctrl K` — and choosing them; there is no separate "new
 message" button.
+
+![A direct conversation between Neema and Amani, with their messages on either side](images/using-tdc/direct-message.webp)
 
 The server can hold a conversation between several people, and the API accepts
 it, but no control in either client opens one yet. Group direct messages are in
@@ -132,6 +142,8 @@ in.
 
 The conversation shows how many replies each thread has, so you can see what is
 worth opening without opening it.
+
+![A thread open in a panel beside the golang channel, showing the original question and four replies](images/using-tdc/thread.webp)
 
 ### Disposable chats
 
@@ -169,6 +181,8 @@ can then make the original disappear is the specific problem this avoids.
 Right-clicking a message opens these, and so does a long press on a touch
 screen. Everything in that menu is reachable another way too: a context menu is
 a shortcut, never the only route to something.
+
+![The menu opened by right-clicking a message: Copy text, Reply in thread, Forward, Pin to channel, Select, Create an issue from this, Expire this message, Report, Block and Ban](images/using-tdc/message-menu.webp)
 
 ### Writing now and sending later
 
@@ -261,6 +275,8 @@ conversation. The marking is the server's, not the program's, so a program
 cannot leave it off and pretend to be somebody. You can reply to, react to,
 report and (if you moderate) remove these messages exactly as anybody else's.
 
+![Two messages from programs in the nuxt channel: one from Build server marked Webhook with a See the build link, and one from Deploy bot marked Bot with Deploy, Not yet and See the changes buttons](images/using-tdc/program-messages.webp)
+
 ### Links
 
 Message text is plain text. Links, addresses and phone numbers in it are
@@ -282,6 +298,8 @@ off, the server makes no outbound request for your links.
 Files are uploaded to the conversation and then sent with a message, which is
 why a refused upload costs you nothing but the upload and a message that fails
 to send does not lose the file.
+
+![An image sent in the General channel with a short caption, shown inline in the conversation with a reaction under it](images/using-tdc/files.webp)
 
 While a file is uploading you see real progress — the actual transfer, not an
 animation — and you can cancel it, or retry without choosing the file again. The
@@ -327,6 +345,8 @@ Separately from that, you can set a status: **Available**, **Busy**, **Away** or
 are seeded when a server is created and there is no interface for changing the
 list, so in practice they are what every server has.
 
+![The Status setting with four choices: Available, Busy, Away and Appear offline](images/using-tdc/status.webp)
+
 The server supports giving a status an expiry so that it reverts by itself, and
 supports appearing offline while connected, but neither has a control in the
 clients yet.
@@ -351,6 +371,8 @@ The three details past that are yours, under Settings → Privacy:
 
 All three are shown by default, and each is a separate choice: hiding when you
 were last here does not hide whether you are online now.
+
+![Privacy settings: who may start a conversation with you, who may call you, and three switches for whether you are online, your status, and when you were last here](images/using-tdc/privacy.webp)
 
 **A detail you turn off is left out of what the server sends**, rather than sent
 and hidden by the application. This is the difference that matters: a detail
@@ -395,6 +417,8 @@ You are notified about direct messages and mentions of you, about reactions,
 replies and forwards of your messages, and about a message being pinned or
 somebody joining. A reply notifies whoever started the thread. Never your own
 actions.
+
+![The notification list opened from the bell at the bottom of the sidebar, with one entry per conversation](images/using-tdc/notifications.webp)
 
 Some things happen without being asked for, because they are what make
 notifications bearable:
@@ -450,6 +474,8 @@ a thread you were not part of is not implemented.
 
 One box searches messages, channels and people together, rather than making you
 choose first and search three times.
+
+![The search box with meetup typed in, listing matching channels and then matching messages with the word highlighted](images/using-tdc/search.webp)
 
 Results are ordered by recency with the matching part highlighted. Typing
 partial words works — searching for the beginning of a word finds it.
@@ -526,6 +552,8 @@ short version:
 Two people who have never met: Amani, a developer, and Baraka, who needs work
 done. Each has an account on the server (**Create one** on the sign-in page)
 and the operator has switched the directory on.
+
+![Amani's directory profile as Baraka sees it: headline, location, available for work, skills, about, experience and the company he is listed by](images/directory/person.webp)
 
 **Amani makes a profile.**
 
@@ -681,6 +709,8 @@ video**. Your browser asks for your microphone (and camera) the first time;
 nothing is sent until you allow it, and nobody is told you have joined until
 then either.
 
+![A voice call in the General channel: a bar across the top says you are in the call with neema and juma, and a small call window in the corner shows both people with mute, camera, ring, hold and Leave](images/using-tdc/call.webp)
+
 **Ringing people.** Starting a call in a direct conversation rings the other
 person; **Start a video call** does the same with your camera on. In a channel,
 the bell in the call window (**Ring people**) lets you ring particular members
@@ -794,6 +824,8 @@ the next cycle or leaves it — never deletes it.
 configuring its states, filing and moving issues, cycles and milestones, and who
 may do what.
 
+![A project's board with columns To do, In progress, In review and Done, each holding issue cards with labels, priority and who is assigned](images/projects/board.webp)
+
 ## Making it yours
 
 ### Appearance
@@ -804,10 +836,14 @@ independently of the palette — pick a colour and the application derives a
 readable shade for light and for dark rather than accepting or refusing what you
 picked. A colour that cannot be made readable is refused.
 
+![Appearance settings: Follow my device, Light or Dark, the Cool and Warm palettes, and the accent colour](images/using-tdc/appearance.webp)
+
 **Your choice is stored on your account**, so it follows you to another browser
 or to the desktop client rather than living in one browser's storage. Your
 operator sets the server's default, and clearing your own choice returns you to
 it.
+
+![The golang channel in the dark theme](images/using-tdc/dark.webp)
 
 ### Language
 
@@ -852,6 +888,8 @@ list, and in settings.
 ### The keyboard
 
 Press `?` for the full list, grouped by where each shortcut works.
+
+![The keyboard shortcut list, grouped under Everywhere and Getting around, each with its keys](images/using-tdc/shortcuts.webp)
 
 | Keys                          | What it does                                        |
 | ----------------------------- | --------------------------------------------------- |
@@ -905,6 +943,8 @@ one. One tour exists today.
 
 The web application installs to a home screen and behaves as an app: its own
 icon, no browser furniture, notifications with the browser closed.
+
+![The nuxt channel on a phone: the conversation fills the screen, with the sidebar behind the menu button and the message box at the bottom](images/using-tdc/phone.webp)
 
 It tolerates being offline. A message you compose with no connection is queued
 and sent when one returns — or reported as failed, rather than silently
