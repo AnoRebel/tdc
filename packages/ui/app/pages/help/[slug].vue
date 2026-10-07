@@ -65,7 +65,7 @@ async function load() {
 
   state.value = { status: "loading" };
   try {
-    const [{ loadGuide }, { renderGuide }] = await Promise.all([
+    const [{ loadGuide, guideImage }, { renderGuide }] = await Promise.all([
       import("#layers/ui/app/lib/guide-content"),
       import("#layers/ui/app/lib/guide-render"),
     ]);
@@ -76,10 +76,11 @@ async function load() {
       return;
     }
 
-    const rendered = renderGuide(content.source, {
-      copy: $ts("help.copy"),
-      anchor: $ts("help.anchor"),
-    });
+    const rendered = renderGuide(
+      content.source,
+      { copy: $ts("help.copy"), anchor: $ts("help.anchor") },
+      guideImage,
+    );
     const words = content.source.split(/\s+/).length;
     state.value = {
       status: "ready",
@@ -418,6 +419,10 @@ const sourceUrl = computed(() => `${SOURCE_REPOSITORY}docs/${slug.value}.md`);
 }
 .guide :deep(blockquote) {
   @apply border-l-2 border-primary/40 pl-4 text-muted-foreground;
+}
+/* Screenshots: never wider than the text, and framed so a white one has an edge. */
+.guide :deep(img) {
+  @apply my-6 block h-auto max-w-full rounded-lg border bg-muted;
 }
 .guide :deep(hr) {
   @apply my-10 border-border;

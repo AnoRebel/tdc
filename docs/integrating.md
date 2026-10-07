@@ -16,6 +16,8 @@ uploads, which are `multipart/form-data`, and file downloads, which are the
 file. There is one live connection, a WebSocket at `/api/live`, carrying
 everything that happens while a client is connected.
 
+![The API reference in the help centre, listing the endpoints this server offers by area](images/integrating/api-reference.webp)
+
 Three endpoints need no credential, because a client needs them before it can
 sign in and an uptime check holds no credential:
 
@@ -1066,6 +1068,8 @@ exactly what it will hold, restricted to the channels they choose, and visible
 to everybody on the server. Its credential is a bearer token used exactly as
 those above are. Registering, approval, what it may call, rotation and removal
 are in [Webhooks and applications](webhooks-and-apps.md#applications).
+
+![Installed applications, as anybody on the server sees them: Deploy bot, what it is for, its permission, when it was approved, how many channels it acts in, and what it sends off the server](images/integrating/installed-applications.webp)
 
 ### Sending yourself a test delivery
 

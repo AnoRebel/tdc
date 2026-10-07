@@ -415,6 +415,50 @@ repository is private: that lets the signed-in editor's token read and write
 every repository they can, for as long as the session lasts, which is worth
 knowing before signing in.
 
+## Screenshots in the guides
+
+The pictures in the guides are made by a script rather than by hand, so that
+after a change to the interface every one of them can be made again:
+
+```sh
+docker compose up -d database
+bun run --cwd apps/web docs:screenshots
+```
+
+It builds the server and the application, starts the server on an empty
+database of its own (`tdc_docs_screenshots`), fills it with a made-up developer
+community — people, channels and conversations, a project with issues, directory
+profiles, a webhook and a bot — and photographs each screen a guide describes,
+in a light theme at 1280 × 800 (390 × 844 for the phone). The images are written
+to `docs/images/<guide>/<name>.webp`, with their sizes in
+`docs/images/sizes.json`, and the database is dropped afterwards. `git diff
+--stat docs/images` then shows which pictures changed; look at them before
+committing.
+
+- `--skip-build` reuses the last builds; `--only=projects` or
+  `--only=projects/board` takes one guide's pictures, or one picture.
+- `--serve` seeds and then leaves the server running to look around in, until
+  Ctrl-C; `--attach`, from a second terminal, photographs that server without
+  seeding again — the quick loop while working on one picture.
+- `TDC_DOCS_POSTGRES` names another Postgres server, `TDC_DOCS_PORT` another
+  port (8131 and the one after it).
+
+Each picture is an entry in `apps/web/scripts/docs-shots.ts` — what to open and
+what to press — and the community it shows is `apps/web/scripts/docs-seed.ts`.
+Nothing in it is real, and it is made through the API, as a person would make
+it. A guide shows a picture with plain markdown, after the paragraph it
+illustrates:
+
+```md
+![The board, with a column for each state and a card for each issue](images/projects/board.webp)
+```
+
+The words in the brackets are what somebody who cannot see the picture reads
+instead, so they say what the picture shows rather than naming it. A test checks
+that every picture a guide names exists, has such a description, and has its
+real size recorded. The help centre loads each picture only when it is scrolled
+to, and the documentation site serves `docs/images` at `/images`.
+
 ## What a good pull request looks like
 
 **Say why, not only what.** The diff already says what changed.

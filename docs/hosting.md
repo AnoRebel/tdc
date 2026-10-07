@@ -90,6 +90,8 @@ to find them one at a time. Secrets are redacted wherever configuration is
 displayed, so a database URL shows its host and database name and not its
 password.
 
+![How this server was started: a read-only table of each configuration setting, its value, and whether it came from the environment or is the default, with secrets marked redacted](images/hosting/configuration.webp)
+
 The settings an operator is most likely to touch:
 
 | Setting                    | Default              | What it does                                         |
@@ -452,6 +454,8 @@ require a deployment.
 
 Every such change is recorded in the audit log.
 
+![Server settings: what the server holds against its limits, then each capability it offers with a switch, those changed from the default marked changed](images/hosting/server-settings.webp)
+
 ### Your privacy policy and terms
 
 The repository carries a [privacy policy](privacy-policy.md) and
@@ -533,6 +537,8 @@ Three settings, and a block beats everything.
 The blocklist is consulted whatever the mode is. Blocking a server is you
 saying "not this one", and it would be a trap for that to quietly stop meaning
 anything because you later switched to `open`.
+
+![The Other servers settings: allowed and blocked servers, whether federation is enabled, and the mode, set to any server that proves who it is](images/hosting/federation.webp)
 
 Blocking stops traffic **both ways**, immediately, with no restart: requests
 from that server are refused before their signature is even examined, and
@@ -1069,6 +1075,8 @@ every change to runtime policy. Reading it takes its own permission, separate
 from the ones that let somebody change things, so that being able to act is not
 the same as being able to read who acted. `/api/admin/audit/export` takes the
 whole thing as newline-delimited JSON.
+
+![The audit log: when, who, what action and on what, most recent first, with an Export button](images/hosting/audit.webp)
 
 ### What it can carry
 

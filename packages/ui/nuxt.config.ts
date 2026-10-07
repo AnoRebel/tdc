@@ -53,6 +53,19 @@ export default defineNuxtConfig({
    */
   css: [`${here}app/assets/css/main.css`],
 
+  /*
+   * The guides' screenshots, copied from docs/images into what each client
+   * serves (the web build, and the desktop's embedded dist) as plain files
+   * under /guide-images. Files rather than imports: an imported asset's
+   * address is worked out by a runtime helper the first load would then have
+   * to carry, and these are only ever wanted on the help pages. The service
+   * worker's precache leaves .webp out, so installing the application does
+   * not download them either.
+   */
+  nitro: {
+    publicAssets: [{ dir: `${here}../../docs/images`, baseURL: "/guide-images" }],
+  },
+
   app: {
     head: {
       meta: [

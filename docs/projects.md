@@ -73,6 +73,8 @@ and whether it is public or private. Starting a project needs the
 `project.create` permission, which the role every account holds grants by
 default.
 
+![The Projects page listing three projects, each with its key, name and description, and a New project button](images/projects/projects.webp)
+
 ## States
 
 An issue is always in exactly one **state**. A project's states are its
@@ -92,6 +94,8 @@ state that no longer exists. A project always keeps at least one state.
 **New issue** on a project's issue list asks for a title and, optionally, a
 description. The issue starts in the project's first state and takes the next
 number: numbers are never reused, so `WEB-12` can only ever mean one issue.
+
+![A project's issue list: filters for words, state, label and order, then a table of issues with their keys, titles, labels, state, priority, assignees and when each changed](images/projects/issues.webp)
 
 On the issue's own page, `/issues/WEB-12`:
 
@@ -116,6 +120,8 @@ behind it cannot be reached through the room endpoints either.
 The history shows the names things had at the time. An issue moved into _Doing_
 that was later renamed _In progress_ still reads "moved to Doing", because that
 is what happened.
+
+![An issue's page: its title and description, where it came from, its history of changes, the fields for state, assignees, labels, priority, cycle, milestone and relationships, and its discussion on the right](images/projects/issue.webp)
 
 ## Tracking: who, what kind, how urgent, and what depends on what
 
@@ -154,6 +160,8 @@ right in the order the project's settings give them — the columns _are_ the
 states, so adding or reordering a state changes the board. Each column shows
 how many issues it holds and the first twenty of them, most urgent first;
 **Show more** at the bottom of a column fetches the next twenty.
+
+![The board, its columns To do, In progress, In review and Done, with filters above and each card showing an issue's key, title, labels, priority and assignee](images/projects/board.webp)
 
 Above the columns, a board can be narrowed to one label, one priority, or one
 person's issues; every column then holds only what matches, and its count says
@@ -215,6 +223,8 @@ below them anything said in a discussion that matched. A search is part of the
 page's address, so it can be shared as a link — and each person opening it sees
 what they may see, not what its author saw.
 
+![Search issues: fields for words, state, label, who it is assigned to and whether it is finished, with five matching issues below and the matched words highlighted](images/projects/search.webp)
+
 A project's own issue list has the same search above it, limited to that
 project, and an issue's discussion has a search of its own beside it, which
 anybody who can see the issue may use without ever having taken part.
@@ -241,6 +251,8 @@ person, or a search across every project. **Views** on a project's list or
 board shows the views of that project and **Save view** keeps what is on the
 screen; a search across projects is saved from the search page, and **Views**
 in the sidebar lists those.
+
+![The Views menu on a project's issue list, showing two shared views, one a list and one a board](images/projects/views.webp)
 
 What a view keeps is the question, never the answer — the filters, by name.
 Opening it asks again, as whoever opened it. So a view can be shared: tick
@@ -270,6 +282,8 @@ project), `filter` and `shared`. `filter` holds `q`, `state`, `label`,
 Tick issues in a project's list and a bar appears above it: choose a change —
 add or remove a label, move to a state, set a priority, assign or unassign
 somebody — and **Apply to selected**.
+
+![Three issues ticked on the issue list, and above them a bar saying 3 selected, with a change to make, its value, and Apply to selected](images/projects/bulk.webp)
 
 Each issue is decided on its own, exactly as if it had been changed alone: its
 own permission check, its own entry in its own history. So a batch can come
@@ -324,6 +338,8 @@ overlap, so the one under way is always one; they need not be back to back.
 The board opens on the cycle under way when there is one, and can be narrowed to
 any cycle, or to the issues in none.
 
+![The Cycles tab: an October sprint under way with one of seven issues done, and an upcoming November sprint](images/projects/cycles.webp)
+
 An issue is put into a cycle from its own page, from a card on the board (the
 calendar button beside it), or many at once from the list with **Put in cycle**.
 Each move is recorded in the issue's history.
@@ -354,6 +370,8 @@ launch — with a day to aim for if you want one. An issue counts towards one
 milestone at most, set from its own page or from a board card. A milestone shows
 its issues, how many are done, and which cycles they are in: what it spans.
 
+![The Milestones tab listing a milestone with its target day and how much of it is done](images/projects/milestones.webp)
+
 The day is advisory. Once it is over in the project's calendar with work still
 unfinished, the milestone shows **Overdue** — and that is all. No issue in it
 is moved, closed or changed because of it.
@@ -382,6 +400,8 @@ the board takes `cycle` — an id, or `none`.
 over the last two weeks, each cycle, and each milestone — and the same figures
 sit above the board for the cycle or project it shows, and on each cycle's and
 milestone's own page.
+
+![The Progress tab: the whole project's last two weeks charted, then each cycle with its own count of what is done](images/projects/progress.webp)
 
 Every figure is **counted when it is shown**, from the issues' states as they
 are; nothing keeps a running total that could drift from them. So a card moved
@@ -435,6 +455,8 @@ granted on a channel, and none of the channel permissions on a project.
 
 A refusal says which permission would have allowed the action.
 
+![A project's Settings: its states in order with which one means done, its labels, and its priority scale](images/projects/settings.webp)
+
 Commenting on an issue has no permission of its own: it is posting in the
 issue's discussion, which is governed like posting in any conversation.
 
@@ -469,6 +491,8 @@ When a conversation agrees that something needs doing, open the message's menu
 — right-click, or press and hold on a phone — and choose **Create an issue from
 this**. Pick the project; the title and description start as the message's
 first line and the rest of it, and are yours to change before filing.
+
+![Create an issue from this message: the project, a title taken from the message, a description, and Link it to this message ticked](images/projects/message-to-issue.webp)
 
 The issue keeps a **link** to the message, not a copy of it. On the issue's
 page, **Where this came from** shows the message as it reads in its

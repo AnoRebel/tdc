@@ -18,6 +18,8 @@ takes one of four values. It changes while the server runs, so it is not a
 decision that has to be right for ever — but it should be deliberate before the
 first invitation goes out, because the wrong default is discovered by strangers.
 
+![The Who may join section of the server settings, with the policy set to Only with an invitation and a box for the email domains the domain policy allows](images/moving-from-telegram-and-whatsapp/registration.webp)
+
 | Policy       | Who may register                                     |
 | ------------ | ---------------------------------------------------- |
 | `open`       | Anybody who finds the server                         |
@@ -124,6 +126,8 @@ binding to one email address so that forwarding it achieves nothing. Revoking
 one takes effect immediately, which is the only withdrawal that means anything:
 somebody already holding a link cannot be un-sent it.
 
+![Invitations on the People page: one bound to an email address and used 0 of 1 times, one for anybody with the link used 0 of 40 times, each with Withdraw, and an Invite button](images/moving-from-telegram-and-whatsapp/invitations.webp)
+
 An invitation admits somebody to the server, or to a single channel and nothing
 else. They are separate things.
 
@@ -205,6 +209,8 @@ matters.
 and replies live in a panel beside the conversation rather than in the main
 timeline, so a long argument does not bury everything else. The conversation
 shows how many replies each thread has.
+
+![A thread open in a panel beside the channel, the original question at the top and four replies under it](images/using-tdc/thread.webp)
 
 A thread inherits its channel's permissions and visibility, so there is no way
 to make a thread more open than the channel around it.
@@ -461,6 +467,8 @@ arrive rather than as they ask.
 Resist making one channel per topic on day one; most of those should be threads,
 and a server with thirty empty channels is harder to join than one with four busy
 ones.
+
+![A member's sidebar on a small community: a handful of channels with unread counts, a private organisers channel, and channels they have not joined under Browse](images/moving-from-telegram-and-whatsapp/channels.webp)
 
 ### Pick a cut-over date and name it
 

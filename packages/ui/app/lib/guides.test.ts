@@ -26,6 +26,71 @@ describe("the guide catalogue", () => {
   });
 });
 
+/** A WebP file's width and height, read from its header. */
+function webpSize(file: Buffer): [number, number] {
+  const chunk = file.toString("ascii", 12, 16);
+  if (chunk === "VP8 ") return [file.readUInt16LE(26) & 0x3fff, file.readUInt16LE(28) & 0x3fff];
+  if (chunk === "VP8L") {
+    const bits = file.readUInt32LE(21);
+    return [(bits & 0x3fff) + 1, ((bits >> 14) & 0x3fff) + 1];
+  }
+  if (chunk === "VP8X") return [file.readUIntLE(24, 3) + 1, file.readUIntLE(27, 3) + 1];
+  throw new Error(`not a WebP file (${chunk})`);
+}
+
+describe("screenshots in the guides", () => {
+  const images = GUIDES.flatMap((guide) =>
+    [
+      ...readFileSync(join(DOCS, `${guide.slug}.md`), "utf8").matchAll(
+        /!\[([^\]]*)\]\(([^)\s]+)\)/g,
+      ),
+    ].map(([, alt, src]) => ({ guide: guide.slug, alt: alt!, src: src! })),
+  );
+  const sizes = JSON.parse(readFileSync(join(DOCS, "images", "sizes.json"), "utf8")) as Record<
+    string,
+    [number, number]
+  >;
+
+  it("exist, and say what they show to somebody who cannot see them", () => {
+    expect(images.length).toBeGreaterThan(0);
+    for (const { guide, alt, src } of images) {
+      expect(src, guide).toMatch(/^images\/[a-z0-9-]+\/[a-z0-9-]+\.webp$/);
+      expect(existsSync(join(DOCS, src)), src).toBe(true);
+      expect(alt.trim().length, `alt text for ${src}`).toBeGreaterThan(10);
+    }
+  });
+
+  /*
+   * The help centre reserves each image's space from sizes.json before the
+   * file arrives; a size that has drifted from the file is a page that jumps.
+   */
+  it("have their real sizes recorded", () => {
+    for (const { src } of images) {
+      const name = src.slice("images/".length);
+      expect(sizes[name], name).toEqual(webpSize(readFileSync(join(DOCS, src))));
+    }
+  });
+
+  it("are drawn lazily at their size, and a missing one is its description", () => {
+    const lookup = (src: string) =>
+      src === "images/a/b.webp" ? { url: "/_nuxt/b.webp", width: 1280, height: 800 } : undefined;
+    const rendered = renderGuide(
+      "![The board, by state](images/a/b.webp)\n\n![Nothing](images/a/gone.webp)",
+      labels,
+      lookup,
+    );
+    const page = document.createElement("div");
+    page.innerHTML = rendered.html;
+    const image = page.querySelector("img")!;
+    expect(image.getAttribute("src")).toBe("/_nuxt/b.webp");
+    expect(image.getAttribute("alt")).toBe("The board, by state");
+    expect(image.getAttribute("loading")).toBe("lazy");
+    expect([image.getAttribute("width"), image.getAttribute("height")]).toEqual(["1280", "800"]);
+    expect(page.querySelectorAll("img")).toHaveLength(1);
+    expect(page.textContent).toContain("Nothing");
+  });
+});
+
 describe("anchors", () => {
   it("are made the way a repository page makes them", () => {
     const slug = createSlugger();

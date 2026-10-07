@@ -49,6 +49,16 @@ export interface RenderLabels {
   anchor: string;
 }
 
+/** A screenshot, where the build put it, and its size when that is known. */
+export interface GuideImage {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
+/** Finds the screenshot an image in a guide names, or nothing. */
+export type ImageLookup = (src: string) => GuideImage | undefined;
+
 /**
  * The prefix on every heading's id in the page.
  *
@@ -73,7 +83,11 @@ export function withoutFrontMatter(source: string): string {
   return source.replace(/^﻿?---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, "");
 }
 
-export function renderGuide(source: string, labels: RenderLabels): RenderedGuide {
+export function renderGuide(
+  source: string,
+  labels: RenderLabels,
+  images: ImageLookup = () => undefined,
+): RenderedGuide {
   const parser = new Marked({ gfm: true, async: false });
   const tokens = parser.lexer(withoutFrontMatter(source));
 
@@ -135,11 +149,22 @@ export function renderGuide(source: string, labels: RenderLabels): RenderedGuide
         }
       },
 
-      // Images in a guide are relative to a repository page, not to the
-      // application, and loading one from elsewhere is not something a help
-      // page needs to do. The description stands in for it.
-      image({ text }) {
-        return escapeHtml(text);
+      /*
+       * A screenshot from docs/images, at the address the build gave it.
+       * Anything else — an image from elsewhere, or one that is missing — is
+       * not something a help page needs to load, and its description stands
+       * in for it. Lazy, and sized where the size is known, so a long guide
+       * fetches only what is scrolled to and nothing jumps when it arrives.
+       */
+      image({ href, text }) {
+        const found = images(href);
+        if (!found) return escapeHtml(text);
+        const size =
+          found.width && found.height ? ` width="${found.width}" height="${found.height}"` : "";
+        return (
+          `<img src="${escapeAttribute(found.url)}" alt="${escapeAttribute(text)}"${size}` +
+          ` loading="lazy" decoding="async">`
+        );
       },
 
       html({ text }) {
@@ -242,19 +267,10 @@ function sanitise(html: string): string {
   return DOMPurify.sanitize(html, {
     // Set deliberately alongside rel="noopener", which is the mitigation for
     // the tab-nabbing DOMPurify strips target to prevent.
-    ADD_ATTR: ["target"],
-    FORBID_TAGS: [
-      "style",
-      "script",
-      "iframe",
-      "object",
-      "embed",
-      "form",
-      "input",
-      "img",
-      "svg",
-      "math",
-    ],
+    ADD_ATTR: ["target", "loading", "decoding"],
+    // img is allowed only because the image renderer above is the one thing
+    // that can produce it: a guide's own <img> is escaped as text before here.
+    FORBID_TAGS: ["style", "script", "iframe", "object", "embed", "form", "input", "svg", "math"],
     FORBID_ATTR: ["style"],
   });
 }
