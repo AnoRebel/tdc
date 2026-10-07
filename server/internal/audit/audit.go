@@ -192,6 +192,9 @@ const (
 	ActionRoleDeleted  Action = "role.deleted"
 	ActionRoleAssigned Action = "role.assigned"
 	ActionRoleRemoved  Action = "role.removed"
+	// A role renamed or described differently, with both names when the name
+	// changed: a role renamed is one somebody may no longer recognise.
+	ActionRoleUpdated Action = "role.updated"
 	/*
 		A permission granted to or withdrawn from a role.
 

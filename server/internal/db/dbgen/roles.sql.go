@@ -55,6 +55,45 @@ func (q *Queries) CountUsersWithPermission(ctx context.Context, permission strin
 	return count, err
 }
 
+const countUsersWithPermissionOutsideRole = `-- name: CountUsersWithPermissionOutsideRole :one
+SELECT COUNT(DISTINCT user_roles.user_id)
+FROM user_roles
+JOIN role_permissions ON role_permissions.role_id = user_roles.role_id
+WHERE role_permissions.permission = $1
+  AND role_permissions.scope_id IS NULL
+  AND role_permissions.granted = TRUE
+  AND user_roles.user_id NOT IN (
+      SELECT holders.user_id FROM user_roles AS holders
+      WHERE holders.role_id = $2
+  )
+  AND user_roles.user_id NOT IN (
+      SELECT inner_roles.user_id
+      FROM user_roles AS inner_roles
+      JOIN role_permissions AS denials ON denials.role_id = inner_roles.role_id
+      WHERE denials.permission = $1
+        AND denials.scope_id IS NULL
+        AND denials.granted = FALSE
+  )
+`
+
+type CountUsersWithPermissionOutsideRoleParams struct {
+	Permission string
+	RoleID     uuid.UUID
+}
+
+// How many people would still hold a permission at server scope if one role
+// stopped conferring it — withdrawn from the role, denied on it, or the role
+// deleted. Everybody holding that role is left out whatever else they hold: a
+// denial on a role reaches every holder, and a withdrawal from a role two
+// administrators share takes it from both. Counting them in, as the plain
+// count does, let a role every administrator shared be emptied.
+func (q *Queries) CountUsersWithPermissionOutsideRole(ctx context.Context, arg CountUsersWithPermissionOutsideRoleParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countUsersWithPermissionOutsideRole, arg.Permission, arg.RoleID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createRole = `-- name: CreateRole :one
 INSERT INTO roles (id, name, description, built_in)
 VALUES ($1, $2, $3, $4)
@@ -132,6 +171,110 @@ func (q *Queries) GetRoleByName(ctx context.Context, name string) (Role, error) 
 	return i, err
 }
 
+const listAllRolePermissions = `-- name: ListAllRolePermissions :many
+SELECT role_permissions.role_id, role_permissions.permission, role_permissions.scope_id,
+       role_permissions.granted,
+       (projects.id IS NOT NULL)::boolean AS in_project,
+       COALESCE(projects.name, rooms.name, '')::text AS scope_name
+FROM role_permissions
+LEFT JOIN projects ON projects.id = role_permissions.scope_id
+LEFT JOIN rooms ON rooms.id = role_permissions.scope_id
+ORDER BY role_permissions.permission
+`
+
+type ListAllRolePermissionsRow struct {
+	RoleID     uuid.UUID
+	Permission string
+	ScopeID    *uuid.UUID
+	Granted    bool
+	InProject  bool
+	ScopeName  string
+}
+
+// Every entry on every role, with the name of the channel or project a scoped
+// one applies to. A project is also a room, so the project is looked for
+// first. An entry whose channel has gone keeps an empty name.
+func (q *Queries) ListAllRolePermissions(ctx context.Context) ([]ListAllRolePermissionsRow, error) {
+	rows, err := q.db.Query(ctx, listAllRolePermissions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAllRolePermissionsRow{}
+	for rows.Next() {
+		var i ListAllRolePermissionsRow
+		if err := rows.Scan(
+			&i.RoleID,
+			&i.Permission,
+			&i.ScopeID,
+			&i.Granted,
+			&i.InProject,
+			&i.ScopeName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGrantSourcesForUser = `-- name: ListGrantSourcesForUser :many
+SELECT roles.id AS role_id, roles.name AS role_name,
+       role_permissions.permission, role_permissions.scope_id, role_permissions.granted,
+       (roles.built_in AND roles.name = $1::text)::boolean AS baseline
+FROM role_permissions
+JOIN user_roles ON user_roles.role_id = role_permissions.role_id
+JOIN roles ON roles.id = role_permissions.role_id
+WHERE user_roles.user_id = $2
+ORDER BY roles.name, role_permissions.permission
+`
+
+type ListGrantSourcesForUserParams struct {
+	BaselineRole string
+	UserID       uuid.UUID
+}
+
+type ListGrantSourcesForUserRow struct {
+	RoleID     uuid.UUID
+	RoleName   string
+	Permission string
+	ScopeID    *uuid.UUID
+	Granted    bool
+	Baseline   bool
+}
+
+// Every entry behind what somebody may do, with the role it comes from, for an
+// administrator asking why.
+func (q *Queries) ListGrantSourcesForUser(ctx context.Context, arg ListGrantSourcesForUserParams) ([]ListGrantSourcesForUserRow, error) {
+	rows, err := q.db.Query(ctx, listGrantSourcesForUser, arg.BaselineRole, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListGrantSourcesForUserRow{}
+	for rows.Next() {
+		var i ListGrantSourcesForUserRow
+		if err := rows.Scan(
+			&i.RoleID,
+			&i.RoleName,
+			&i.Permission,
+			&i.ScopeID,
+			&i.Granted,
+			&i.Baseline,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGrantsForUser = `-- name: ListGrantsForUser :many
 SELECT role_permissions.permission, role_permissions.scope_id, role_permissions.granted,
        (roles.built_in AND roles.name = $1::text)::boolean AS baseline
@@ -173,6 +316,48 @@ func (q *Queries) ListGrantsForUser(ctx context.Context, arg ListGrantsForUserPa
 			&i.Granted,
 			&i.Baseline,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRoleMembers = `-- name: ListRoleMembers :many
+SELECT users.id, users.username, users.display_name
+FROM user_roles
+JOIN users ON users.id = user_roles.user_id
+WHERE user_roles.role_id = $1
+ORDER BY users.username_folded
+LIMIT $2
+`
+
+type ListRoleMembersParams struct {
+	RoleID uuid.UUID
+	Limit  int32
+}
+
+type ListRoleMembersRow struct {
+	ID          uuid.UUID
+	Username    string
+	DisplayName string
+}
+
+// Who holds a role, by name. Bounded: on a large server the role every account
+// holds is everybody, and a list of everybody is not what a role's page is for.
+func (q *Queries) ListRoleMembers(ctx context.Context, arg ListRoleMembersParams) ([]ListRoleMembersRow, error) {
+	rows, err := q.db.Query(ctx, listRoleMembers, arg.RoleID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRoleMembersRow{}
+	for rows.Next() {
+		var i ListRoleMembersRow
+		if err := rows.Scan(&i.ID, &i.Username, &i.DisplayName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -277,6 +462,49 @@ func (q *Queries) ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]Rol
 	return items, nil
 }
 
+const listRolesWithMemberCounts = `-- name: ListRolesWithMemberCounts :many
+SELECT roles.id, roles.name, roles.description, roles.built_in,
+       (SELECT COUNT(*) FROM user_roles WHERE user_roles.role_id = roles.id)::bigint AS member_count
+FROM roles
+ORDER BY roles.built_in DESC, roles.name
+`
+
+type ListRolesWithMemberCountsRow struct {
+	ID          uuid.UUID
+	Name        string
+	Description string
+	BuiltIn     bool
+	MemberCount int64
+}
+
+// Every role and how many people hold it, for the list an administrator
+// chooses from.
+func (q *Queries) ListRolesWithMemberCounts(ctx context.Context) ([]ListRolesWithMemberCountsRow, error) {
+	rows, err := q.db.Query(ctx, listRolesWithMemberCounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRolesWithMemberCountsRow{}
+	for rows.Next() {
+		var i ListRolesWithMemberCountsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.BuiltIn,
+			&i.MemberCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeRoleFromUser = `-- name: RemoveRoleFromUser :exec
 DELETE FROM user_roles WHERE user_id = $1 AND role_id = $2
 `
@@ -331,4 +559,29 @@ func (q *Queries) SetRolePermission(ctx context.Context, arg SetRolePermissionPa
 		arg.Granted,
 	)
 	return err
+}
+
+const updateRole = `-- name: UpdateRole :one
+UPDATE roles SET name = $2, description = $3 WHERE id = $1
+RETURNING id, name, description, built_in, created_at, updated_at
+`
+
+type UpdateRoleParams struct {
+	ID          uuid.UUID
+	Name        string
+	Description string
+}
+
+func (q *Queries) UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error) {
+	row := q.db.QueryRow(ctx, updateRole, arg.ID, arg.Name, arg.Description)
+	var i Role
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.BuiltIn,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

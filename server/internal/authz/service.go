@@ -125,20 +125,8 @@ func (s *Service) SetRolePermission(
 	// Withdrawing an administrative permission could strand the server, so
 	// check before writing rather than discovering it afterwards.
 	if !granted && channelID == nil && definition.Administrative {
-		if err := s.ensureAdministratorRemains(ctx, permission, roleID); err != nil {
+		if err := s.checkWithdrawal(ctx, roleID, permission, actor, confirmed); err != nil {
 			return err
-		}
-
-		// And could strand the person making the change, which the check above
-		// does not catch: the server stays administered by everybody else.
-		if !confirmed {
-			held, err := s.userHoldsRole(ctx, actor, roleID)
-			if err != nil {
-				return err
-			}
-			if held {
-				return ErrWouldLockYourselfOut
-			}
 		}
 	}
 
@@ -238,12 +226,13 @@ func (s *Service) DeleteRole(ctx context.Context, roleID uuid.UUID) error {
 		return err
 	}
 	if confers {
-		remaining, err := s.administratorCount(ctx)
+		// Deleting the role strips administration from everyone holding it,
+		// so what matters is who holds it some other way.
+		remaining, err := s.administratorsOutside(ctx, roleID)
 		if err != nil {
 			return err
 		}
-		// Deleting the role strips administration from everyone holding it.
-		if remaining <= 1 {
+		if remaining == 0 {
 			return ErrLastAdministrator
 		}
 	}
@@ -254,8 +243,17 @@ func (s *Service) DeleteRole(ctx context.Context, roleID uuid.UUID) error {
 	return nil
 }
 
-// ensureAdministratorRemains refuses a withdrawal that would leave nobody
-// holding an administrative permission.
+/*
+ensureAdministratorRemains refuses a withdrawal or denial that would leave
+nobody holding server administration.
+
+Counted as the people who hold it without holding this role, because the change
+reaches everybody who does: withdrawing it from a role two administrators share
+takes it from both, and denying it on a role an administrator holds for some
+other reason takes it from them too. Counting the role's holders in, as this
+once did, let the only role every administrator held be emptied — and let a
+denial on any other role they held strip them without a question.
+*/
 func (s *Service) ensureAdministratorRemains(ctx context.Context, permission Permission, roleID uuid.UUID) error {
 	if permission != PermServerAdminister {
 		// Only the top-level administration permission is load-bearing for
@@ -263,22 +261,28 @@ func (s *Service) ensureAdministratorRemains(ctx context.Context, permission Per
 		return nil
 	}
 
-	confers, err := s.roleConfersAdministration(ctx, roleID)
+	remaining, err := s.administratorsOutside(ctx, roleID)
 	if err != nil {
 		return err
 	}
-	if !confers {
-		return nil
-	}
-
-	remaining, err := s.administratorCount(ctx)
-	if err != nil {
-		return err
-	}
-	if remaining <= 1 {
+	if remaining == 0 {
 		return ErrLastAdministrator
 	}
 	return nil
+}
+
+// administratorsOutside counts who holds server administration without
+// holding one role.
+func (s *Service) administratorsOutside(ctx context.Context, roleID uuid.UUID) (int64, error) {
+	count, err := s.store.CountUsersWithPermissionOutsideRole(ctx,
+		dbgen.CountUsersWithPermissionOutsideRoleParams{
+			Permission: string(PermServerAdminister),
+			RoleID:     roleID,
+		})
+	if err != nil {
+		return 0, fmt.Errorf("count administrators: %w", err)
+	}
+	return count, nil
 }
 
 func (s *Service) roleConfersAdministration(ctx context.Context, roleID uuid.UUID) (bool, error) {

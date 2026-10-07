@@ -180,6 +180,13 @@ type Querier interface {
 	// denial. The administrator floor uses this to refuse a change that would
 	// leave nobody able to administer the server.
 	CountUsersWithPermission(ctx context.Context, permission string) (int64, error)
+	// How many people would still hold a permission at server scope if one role
+	// stopped conferring it — withdrawn from the role, denied on it, or the role
+	// deleted. Everybody holding that role is left out whatever else they hold: a
+	// denial on a role reaches every holder, and a withdrawal from a role two
+	// administrators share takes it from both. Counting them in, as the plain
+	// count does, let a role every administrator shared be emptied.
+	CountUsersWithPermissionOutsideRole(ctx context.Context, arg CountUsersWithPermissionOutsideRoleParams) (int64, error)
 	CreateAPIToken(ctx context.Context, arg CreateAPITokenParams) (ApiToken, error)
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
 	CreateApplicationToken(ctx context.Context, arg CreateApplicationTokenParams) (CreateApplicationTokenRow, error)
@@ -521,6 +528,10 @@ type Querier interface {
 	ListActionPressesForEvent(ctx context.Context, eventID string) ([]ActionPress, error)
 	// What an event in this room might need delivering to.
 	ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roomID uuid.UUID) ([]WebhookSubscription, error)
+	// Every entry on every role, with the name of the channel or project a scoped
+	// one applies to. A project is also a room, so the project is looked for
+	// first. An entry whose channel has gone keeps an empty name.
+	ListAllRolePermissions(ctx context.Context) ([]ListAllRolePermissionsRow, error)
 	ListApplicationChannels(ctx context.Context, applicationID uuid.UUID) ([]uuid.UUID, error)
 	// An application's recent invocations, newest first, with how the last
 	// attempt at each went.
@@ -566,6 +577,9 @@ type Querier interface {
 	ListEngagementsFor(ctx context.Context, viewer uuid.UUID) ([]Engagement, error)
 	// What an account posted, for removing it with the application it acted for.
 	ListEventIDsBySender(ctx context.Context, senderID *uuid.UUID) ([]ListEventIDsBySenderRow, error)
+	// Every entry behind what somebody may do, with the role it comes from, for an
+	// administrator asking why.
+	ListGrantSourcesForUser(ctx context.Context, arg ListGrantSourcesForUserParams) ([]ListGrantSourcesForUserRow, error)
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	//
@@ -686,9 +700,15 @@ type Querier interface {
 	// state, for showing them.
 	ListRelationsOfIssue(ctx context.Context, issueID uuid.UUID) ([]ListRelationsOfIssueRow, error)
 	ListReportsForRoom(ctx context.Context, arg ListReportsForRoomParams) ([]Report, error)
+	// Who holds a role, by name. Bounded: on a large server the role every account
+	// holds is everybody, and a list of everybody is not what a role's page is for.
+	ListRoleMembers(ctx context.Context, arg ListRoleMembersParams) ([]ListRoleMembersRow, error)
 	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]RolePermission, error)
 	ListRoles(ctx context.Context) ([]Role, error)
 	ListRolesForUser(ctx context.Context, userID uuid.UUID) ([]Role, error)
+	// Every role and how many people hold it, for the list an administrator
+	// chooses from.
+	ListRolesWithMemberCounts(ctx context.Context) ([]ListRolesWithMemberCountsRow, error)
 	// A page of a room's timeline, oldest first within the page.
 	ListRoomEvents(ctx context.Context, arg ListRoomEventsParams) ([]Event, error)
 	// Just the identifiers, for deciding who a live event should reach.
@@ -1191,6 +1211,7 @@ type Querier interface {
 	UpdateProjectLabel(ctx context.Context, arg UpdateProjectLabelParams) (ProjectLabel, error)
 	UpdateProjectPriority(ctx context.Context, arg UpdateProjectPriorityParams) (ProjectPriority, error)
 	UpdateProjectView(ctx context.Context, arg UpdateProjectViewParams) (ProjectView, error)
+	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
 	// A company as a viewer of the given rank may see it, or nothing.

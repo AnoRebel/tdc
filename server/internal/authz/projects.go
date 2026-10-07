@@ -133,9 +133,9 @@ func (p Permissions) AllowsProject(permission Permission, projectID uuid.UUID) D
 	if scope, ok := p.channelScope[projectID]; ok {
 		if granted, present := scope[permission]; present {
 			if granted {
-				return Decision{Allowed: true, Permission: permission, Reason: "granted for this project"}
+				return Decision{Allowed: true, Permission: permission, Reason: "granted for this project", Basis: BasisScope}
 			}
-			return Decision{Allowed: false, Permission: permission, Reason: "denied for this project"}
+			return Decision{Allowed: false, Permission: permission, Reason: "denied for this project", Basis: BasisScope}
 		}
 	}
 	return p.AllowsServer(permission)

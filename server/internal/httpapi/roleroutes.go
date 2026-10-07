@@ -38,23 +38,376 @@ type roleResponse struct {
 	BuiltIn bool `json:"builtIn"`
 }
 
-// handleListRoles is what an administrator sees before changing anything.
+// roleEntryResponse is one thing a role says about one permission.
+type roleEntryResponse struct {
+	Permission string `json:"permission"`
+	// Granted false is an explicit denial. A permission a role says nothing
+	// about has no entry at all.
+	Granted bool `json:"granted"`
+	// Scope is "server", "channel" or "project".
+	Scope string `json:"scope"`
+	// ScopeID and ScopeName name the channel or project a scoped entry is for.
+	// A name left empty is a channel that has since gone.
+	ScopeID   string `json:"scopeId,omitempty"`
+	ScopeName string `json:"scopeName,omitempty"`
+}
+
+// roleSummaryResponse is a role as the list shows it: who holds it, and
+// everything it says.
+type roleSummaryResponse struct {
+	roleResponse
+	MemberCount int64               `json:"memberCount"`
+	Permissions []roleEntryResponse `json:"permissions"`
+}
+
+/*
+handleListRoles is what an administrator sees before changing anything.
+
+Every role with every entry on it, channel ones included, in one answer. A
+server has a handful of roles and each a few dozen entries; a screen that has to
+ask again for each role it shows is slower and no simpler.
+*/
 func (s *Server) handleListRoles(c *echo.Context) error {
-	roles, err := s.authz.ListRoles(c.Request().Context())
+	roles, err := s.authz.RoleSummaries(c.Request().Context())
 	if err != nil {
 		return err
 	}
 
-	listed := make([]roleResponse, 0, len(roles))
+	listed := make([]roleSummaryResponse, 0, len(roles))
 	for _, role := range roles {
-		listed = append(listed, roleResponse{
-			ID:          role.ID.String(),
-			Name:        role.Name,
-			Description: role.Description,
-			BuiltIn:     role.BuiltIn,
+		entries := make([]roleEntryResponse, 0, len(role.Entries))
+		for _, entry := range role.Entries {
+			item := roleEntryResponse{
+				Permission: entry.Permission,
+				Granted:    entry.Granted,
+				Scope:      string(authz.ScopeServer),
+			}
+			if entry.ScopeID != nil {
+				item.Scope = string(authz.ScopeChannel)
+				if entry.InProject {
+					item.Scope = string(authz.ScopeProject)
+				}
+				item.ScopeID = entry.ScopeID.String()
+				item.ScopeName = entry.ScopeName
+			}
+			entries = append(entries, item)
+		}
+		listed = append(listed, roleSummaryResponse{
+			roleResponse: roleResponse{
+				ID:          role.ID.String(),
+				Name:        role.Name,
+				Description: role.Description,
+				BuiltIn:     role.BuiltIn,
+			},
+			MemberCount: role.MemberCount,
+			Permissions: entries,
 		})
 	}
 	return c.JSON(http.StatusOK, listed)
+}
+
+type updateRoleRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// handleUpdateRole renames a role or changes what it says it is for.
+func (s *Server) handleUpdateRole(c *echo.Context) error {
+	ctx := c.Request().Context()
+	actor, _ := currentUser(c)
+
+	roleID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "that is not a role")
+	}
+
+	var request updateRoleRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	before, err := s.queries.GetRoleByID(ctx, roleID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "there is no such role")
+	}
+
+	role, err := s.authz.UpdateRole(ctx, roleID, request.Name, request.Description)
+	switch {
+	case errors.Is(err, authz.ErrRoleNotFound):
+		return echo.NewHTTPError(http.StatusNotFound, "there is no such role")
+	case errors.Is(err, authz.ErrBuiltInName):
+		return echo.NewHTTPError(http.StatusConflict,
+			"the server finds this role by its name, so it keeps it — its description can change")
+	case errors.Is(err, authz.ErrRoleNameTaken):
+		return echo.NewHTTPError(http.StatusConflict, "a role already has that name")
+	case errors.Is(err, authz.ErrInvalidRoleName):
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	case err != nil:
+		return err
+	}
+
+	detail := map[string]any{}
+	if before.Name != role.Name {
+		detail["from"] = before.Name
+		detail["to"] = role.Name
+	}
+	if err := s.audit.Record(ctx, audit.Entry{
+		ActorID:    &actor.ID,
+		ActorLabel: actor.Username,
+		Action:     audit.ActionRoleUpdated,
+		TargetKind: "role",
+		TargetID:   role.ID.String(),
+		Detail:     detail,
+		SourceIP:   requestIP(c),
+		UserAgent:  c.Request().UserAgent(),
+	}); err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, roleResponse{
+		ID:          role.ID.String(),
+		Name:        role.Name,
+		Description: role.Description,
+		BuiltIn:     role.BuiltIn,
+	})
+}
+
+/*
+handleClearRolePermission puts a role back to saying nothing about a
+permission, at server scope or, with ?channel=, in one channel.
+
+The third state beside granting and denying. Withdrawing through the PUT stores
+a denial, which beats every other role's grant; this leaves the question to
+them.
+*/
+func (s *Server) handleClearRolePermission(c *echo.Context) error {
+	ctx := c.Request().Context()
+	actor, _ := currentUser(c)
+
+	roleID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "that is not a role")
+	}
+	permission := c.Param("permission")
+
+	var scope *uuid.UUID
+	if raw := c.QueryParam("channel"); raw != "" {
+		parsed, err := uuid.Parse(raw)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "that is not a channel")
+		}
+		scope = &parsed
+	}
+
+	err = s.authz.ClearRolePermission(ctx, roleID, authz.Permission(permission), scope,
+		actor.ID, c.QueryParam("confirmed") == "true")
+	switch {
+	case errors.Is(err, authz.ErrUnknownPermission):
+		return echo.NewHTTPError(http.StatusBadRequest, "this server has no such permission")
+	case errors.Is(err, authz.ErrLastAdministrator):
+		return echo.NewHTTPError(http.StatusConflict,
+			"this would leave the server with no administrator")
+	case errors.Is(err, authz.ErrWouldLockYourselfOut):
+		return echo.NewHTTPError(http.StatusConflict,
+			"this would remove your own authority; add ?confirmed=true to go ahead")
+	case err != nil:
+		return err
+	}
+
+	detail := map[string]any{"permission": permission, "cleared": true}
+	if scope != nil {
+		detail["channel"] = scope.String()
+	}
+	if err := s.audit.Record(ctx, audit.Entry{
+		ActorID:    &actor.ID,
+		ActorLabel: actor.Username,
+		Action:     audit.ActionRolePermissionChanged,
+		TargetKind: "role",
+		TargetID:   roleID.String(),
+		Detail:     detail,
+		SourceIP:   requestIP(c),
+		UserAgent:  c.Request().UserAgent(),
+	}); err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+// roleMemberResponse is somebody holding a role.
+type roleMemberResponse struct {
+	ID          string `json:"id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+	Address     string `json:"address"`
+}
+
+type roleMembersResponse struct {
+	Members []roleMemberResponse `json:"members"`
+	// Truncated says there are more than were listed, which on the role every
+	// account holds is the ordinary case.
+	Truncated bool `json:"truncated"`
+}
+
+// roleMembersShown is how many holders of a role are listed at most.
+const roleMembersShown = 500
+
+// handleListRoleMembers is who holds a role.
+func (s *Server) handleListRoleMembers(c *echo.Context) error {
+	roleID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "that is not a role")
+	}
+
+	rows, err := s.authz.RoleMembers(c.Request().Context(), roleID, roleMembersShown+1)
+	switch {
+	case errors.Is(err, authz.ErrRoleNotFound):
+		return echo.NewHTTPError(http.StatusNotFound, "there is no such role")
+	case err != nil:
+		return err
+	}
+
+	response := roleMembersResponse{Members: make([]roleMemberResponse, 0, len(rows))}
+	if len(rows) > roleMembersShown {
+		rows = rows[:roleMembersShown]
+		response.Truncated = true
+	}
+	for _, row := range rows {
+		response.Members = append(response.Members, roleMemberResponse{
+			ID:          row.ID.String(),
+			Username:    row.Username,
+			DisplayName: row.DisplayName,
+			Address:     s.rooms.UserAddress(row.Username),
+		})
+	}
+	return c.JSON(http.StatusOK, response)
+}
+
+// permissionSourceResponse is one role's entry behind an answer.
+type permissionSourceResponse struct {
+	RoleID   string `json:"roleId"`
+	RoleName string `json:"roleName"`
+	Granted  bool   `json:"granted"`
+	// Scope is "server", or "channel" for an entry for the channel asked about.
+	Scope string `json:"scope"`
+	// Baseline marks an entry on the role every account holds, which any other
+	// role's entry at the same scope replaces.
+	Baseline bool `json:"baseline"`
+}
+
+type effectivePermissionResponse struct {
+	Name    string `json:"name"`
+	Allowed bool   `json:"allowed"`
+	// Basis is where the answer came from: "administrator", "server", "scope"
+	// for the channel asked about, or "none".
+	Basis   string                     `json:"basis"`
+	Sources []permissionSourceResponse `json:"sources"`
+}
+
+type effectiveRoleResponse struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	BuiltIn bool   `json:"builtIn"`
+}
+
+type effectivePermissionsResponse struct {
+	User        roleMemberResponse            `json:"user"`
+	Roles       []effectiveRoleResponse       `json:"roles"`
+	Permissions []effectivePermissionResponse `json:"permissions"`
+}
+
+/*
+handleExplainUser answers what somebody may do, and why.
+
+Every permission in the catalogue, decided exactly as a request of theirs would
+be — server-wide, or in one channel with ?channel= — with the entries on their
+roles that bear on it. An administrator setting up a moderator asks this to see
+that the role did what they meant, rather than finding out from the moderator.
+
+Their roles as they are now, not as a token of theirs might narrow them: this is
+about the account.
+*/
+func (s *Server) handleExplainUser(c *echo.Context) error {
+	ctx := c.Request().Context()
+
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "that is not an account")
+	}
+	var channel *uuid.UUID
+	if raw := c.QueryParam("channel"); raw != "" {
+		parsed, err := uuid.Parse(raw)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "that is not a channel")
+		}
+		channel = &parsed
+	}
+
+	user, err := s.queries.GetUserByID(ctx, userID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "there is no such account")
+	}
+
+	roles, err := s.authz.RolesFor(ctx, userID)
+	if err != nil {
+		return err
+	}
+	permissions, sources, err := s.authz.Explain(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	response := effectivePermissionsResponse{
+		User: roleMemberResponse{
+			ID:          user.ID.String(),
+			Username:    user.Username,
+			DisplayName: user.DisplayName,
+			Address:     s.rooms.UserAddress(user.Username),
+		},
+		Roles:       make([]effectiveRoleResponse, 0, len(roles)),
+		Permissions: []effectivePermissionResponse{},
+	}
+	for _, role := range roles {
+		response.Roles = append(response.Roles, effectiveRoleResponse{
+			ID: role.ID.String(), Name: role.Name, BuiltIn: role.BuiltIn,
+		})
+	}
+
+	for _, definition := range authz.Catalogue() {
+		decision := permissions.AllowsServer(definition.Name)
+		if channel != nil {
+			decision = permissions.AllowsChannel(definition.Name, *channel)
+		}
+
+		item := effectivePermissionResponse{
+			Name:    string(definition.Name),
+			Allowed: decision.Allowed,
+			Basis:   string(decision.Basis),
+			Sources: []permissionSourceResponse{},
+		}
+		for _, source := range sources {
+			if source.Permission != definition.Name {
+				continue
+			}
+			scope := string(authz.ScopeServer)
+			if source.ChannelID != nil {
+				if channel == nil || *source.ChannelID != *channel {
+					continue
+				}
+				scope = string(authz.ScopeChannel)
+			}
+			item.Sources = append(item.Sources, permissionSourceResponse{
+				RoleID:   source.RoleID.String(),
+				RoleName: source.RoleName,
+				Granted:  source.Granted,
+				Scope:    scope,
+				Baseline: source.Baseline,
+			})
+		}
+		response.Permissions = append(response.Permissions, item)
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 type createRoleRequest struct {
