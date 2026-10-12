@@ -44,6 +44,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/calls/:callId/lobby": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/directory/companies/:slug": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -176,6 +181,11 @@ var routeBodies = map[string]routeBodySet{
 		},
 	},
 	"DELETE /api/rooms/:id/call": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"DELETE /api/rooms/:id/call/links/:linkId": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
 		},
@@ -349,9 +359,19 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
+	"GET /api/call-links/:secret": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callLinkTarget]()},
+		},
+	},
 	"GET /api/calls/:callId": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[callView]()},
+		},
+	},
+	"GET /api/calls/:callId/lobby": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[lobbyView]()},
 		},
 	},
 	"GET /api/calls/ice": {
@@ -766,6 +786,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[callView]()},
 		},
 	},
+	"GET /api/rooms/:id/call/links": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]callLinkView]()},
+		},
+	},
 	"GET /api/rooms/:id/context/:userId": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[contextResponse]()},
@@ -1130,6 +1155,12 @@ var routeBodies = map[string]routeBodySet{
 	"POST /api/auth/signout": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
+		},
+	},
+	"POST /api/call-links/:secret/join": {
+		Request: reflect.TypeFor[useLinkRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[linkUse]()},
 		},
 	},
 	"POST /api/calls/:callId": {
@@ -1522,6 +1553,12 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[ringRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/rooms/:id/call/links": {
+		Request: reflect.TypeFor[callLinkRequest](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[callLinkView]()},
 		},
 	},
 	"POST /api/rooms/:id/call/ring": {

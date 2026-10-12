@@ -240,9 +240,9 @@ it with no administrator at all, and one that would remove the authority of the
 person making it. The second can be overridden — somebody stepping down
 deliberately is a real thing — by repeating the request with `confirmed`.
 
-Thirty-seven of the thirty-nine catalogued permissions are enforced — every one
-that projects and the directory added among them — and the two left,
-`call.start` and `call.join`, are names waiting for calls. `channel.read` and
+All forty catalogued permissions are enforced. Calls take `call.start` and
+`call.join`, which Member holds, and `call.link`, which nobody holds until you
+grant it. `channel.read` and
 `channel.post` are checked per channel, on top of membership, bans and posting
 restrictions, and Member holds both everywhere until you say otherwise.
 
@@ -884,6 +884,13 @@ Windows and macOS support calls; on Linux they depend on WebKitGTK being built
 with WebRTC and GStreamer's WebRTC plugins being installed. Picture-in-picture
 of the whole call needs a Chromium-based browser; others put the main video
 there instead.
+
+**Links to calls.** `call.link` lets somebody make links that admit people
+from elsewhere on the server to a conversation's call without joining the
+conversation. Nobody holds it until you grant it, to a role or in one channel.
+Links are stored hashed; a protected link's passcode is stored as a password
+is, and guessing is limited per address and per link and recorded in the audit
+log.
 
 **Ringing.** People can ring each other into calls; a ring reaches every
 device of the person rung, by the live connection, and by web push where the

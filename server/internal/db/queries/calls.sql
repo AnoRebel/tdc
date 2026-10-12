@@ -73,3 +73,50 @@ SELECT EXISTS (
     JOIN calls c ON c.id = a.call_id
     WHERE a.user_id = $1 AND b.user_id = $2
       AND a.left_at IS NULL AND b.left_at IS NULL AND c.ended_at IS NULL);
+
+-- name: CreateCallLink :one
+INSERT INTO call_links (id, room_id, token_hash, label, passcode_hash, lobby, guests, expires_at, max_uses, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING *;
+
+-- name: CallLinkByHash :one
+SELECT * FROM call_links WHERE token_hash = $1;
+
+-- name: CallLinksInRoom :many
+SELECT * FROM call_links WHERE room_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC;
+
+-- name: RevokeCallLink :execrows
+UPDATE call_links SET revoked_at = NOW() WHERE id = $1 AND room_id = $2 AND revoked_at IS NULL;
+
+-- name: UseCallLink :execrows
+-- Counts a use, refusing one past the limit in the same statement so two
+-- people arriving at once cannot both take the last.
+UPDATE call_links SET uses = uses + 1
+WHERE id = $1 AND revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW())
+  AND (max_uses IS NULL OR uses < max_uses);
+
+-- name: EnterCallLobby :exec
+INSERT INTO call_lobby (call_id, user_id, link_id) VALUES ($1, $2, $3)
+ON CONFLICT (call_id, user_id) DO UPDATE SET requested_at = NOW(), link_id = EXCLUDED.link_id;
+
+-- name: LeaveCallLobby :one
+DELETE FROM call_lobby WHERE call_id = $1 AND user_id = $2 RETURNING link_id;
+
+-- name: CallLobby :many
+SELECT l.user_id, l.requested_at, u.username, u.display_name
+FROM call_lobby l JOIN users u ON u.id = l.user_id
+WHERE l.call_id = $1 ORDER BY l.requested_at;
+
+-- name: CallLinkByID :one
+SELECT * FROM call_links WHERE id = $1;
+
+-- name: RecordCallLinkFailure :one
+-- Counts a wrong passcode, starting a fresh window once the last has passed.
+UPDATE call_links SET
+    passcode_failures = CASE WHEN passcode_failures_from < NOW() - make_interval(secs => sqlc.arg(window_seconds)::float8)
+                             THEN 1 ELSE passcode_failures + 1 END,
+    passcode_failures_from = CASE WHEN passcode_failures_from < NOW() - make_interval(secs => sqlc.arg(window_seconds)::float8)
+                                  THEN NOW() ELSE passcode_failures_from END
+WHERE id = $1
+RETURNING passcode_failures;

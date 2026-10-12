@@ -63,6 +63,7 @@ const (
 	// Calls.
 	PermCallStart Permission = "call.start"
 	PermCallJoin  Permission = "call.join"
+	PermCallLink  Permission = "call.link"
 )
 
 // Definition describes a permission for the catalogue an administrator reads.
@@ -203,6 +204,11 @@ var catalogue = map[Permission]Definition{
 	PermCallJoin: {
 		Name:        PermCallJoin,
 		Description: "Join a voice or video call",
+		Scopes:      []Scope{ScopeServer, ScopeChannel},
+	},
+	PermCallLink: {
+		Name:        PermCallLink,
+		Description: "Make links that let people into a conversation's call without joining the conversation",
 		Scopes:      []Scope{ScopeServer, ScopeChannel},
 	},
 }

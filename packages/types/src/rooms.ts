@@ -160,7 +160,10 @@ export type LiveFrameType =
   // Somebody is ringing you; stop ringing; somebody you rang declined.
   | "call.ring"
   | "call.ring_ended"
-  | "call.declined";
+  | "call.declined"
+  | "call.lobby"
+  | "call.admitted"
+  | "call.turned_away";
 
 /** One frame from the live connection. */
 export interface LiveFrame {

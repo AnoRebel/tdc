@@ -1109,17 +1109,21 @@ channel or direct conversation can hold one voice or video call. Media goes
 directly between the participants over WebRTC; the server records who is in
 the call and relays their negotiation, and never carries the media itself.
 
-| Request                                          | What it does                                                                                                |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `GET /api/calls/ice`                             | STUN and TURN servers to connect through, with short-lived TURN credentials                                 |
-| `GET /api/rooms/:id/call`                        | The call in progress in a conversation, and who is in it                                                    |
-| `POST /api/rooms/:id/call`                       | Join it, starting one if there is none — `{"audio": true, "video": false}`                                  |
-| `PATCH /api/rooms/:id/call`                      | Say what you are sending, and whether you are holding the call — `{"audio", "video", "held"}`               |
-| `DELETE /api/rooms/:id/call`                     | Leave                                                                                                       |
-| `POST /api/rooms/:id/call/ring`                  | Ring people into it — `{"users": [ids]}`; empty rings everybody else in a direct conversation               |
-| `POST /api/rooms/:id/call/decline`               | Decline a ring, optionally with `{"message": "…"}` for the caller                                           |
-| `POST /api/rooms/:id/call/invite`                | Merge: invite the people of another call you are in, `{"users": [ids]}`                                     |
-| `GET`/`POST`/`PATCH`/`DELETE /api/calls/:callId` | The same, by the call's own identifier — how somebody merged in, who is not in the conversation, reaches it |
+| Request                                                                                         | What it does                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/calls/ice`                                                                            | STUN and TURN servers to connect through, with short-lived TURN credentials                                                                                                   |
+| `GET /api/rooms/:id/call`                                                                       | The call in progress in a conversation, and who is in it                                                                                                                      |
+| `POST /api/rooms/:id/call`                                                                      | Join it, starting one if there is none — `{"audio": true, "video": false}`                                                                                                    |
+| `PATCH /api/rooms/:id/call`                                                                     | Say what you are sending, and whether you are holding the call — `{"audio", "video", "held"}`                                                                                 |
+| `DELETE /api/rooms/:id/call`                                                                    | Leave                                                                                                                                                                         |
+| `POST /api/rooms/:id/call/ring`                                                                 | Ring people into it — `{"users": [ids]}`; empty rings everybody else in a direct conversation                                                                                 |
+| `POST /api/rooms/:id/call/decline`                                                              | Decline a ring, optionally with `{"message": "…"}` for the caller                                                                                                             |
+| `POST /api/rooms/:id/call/invite`                                                               | Merge: invite the people of another call you are in, `{"users": [ids]}`                                                                                                       |
+| `GET`/`POST`/`DELETE /api/rooms/:id/call/links[/:linkId]`                                       | List, make (`{label, passcode, lobby, expiresInHours, maxUses}`) and withdraw links to the call; needs `call.link`. The secret is in the answer to making one, and only there |
+| `GET /api/call-links/:secret`                                                                   | What a link leads to — the conversation's name, who is in the call, whether it asks for a passcode or has a lobby. No credential needed                                       |
+| `POST /api/call-links/:secret/join`                                                             | Use a link, with `{"passcode"}` where it has one: answers the call to join, or `waiting: true` in its lobby                                                                   |
+| `GET /api/calls/:callId/lobby`, `POST …/lobby/:userId/admit` or `…/turn-away`, `DELETE …/lobby` | Who is waiting; let them in or turn them away (people in the call who belong to its conversation only); stop waiting                                                          |
+| `GET`/`POST`/`PATCH`/`DELETE /api/calls/:callId`                                                | The same, by the call's own identifier — how somebody merged in, who is not in the conversation, reaches it                                                                   |
 
 Starting needs `call.start` and joining `call.join`. Ringing answers who was
 rung and only a count of who was not: whether somebody accepts calls from you is
@@ -1136,6 +1140,14 @@ theirs, and the reason is never disclosed. Rings are limited per caller.
   given up after 45 seconds (which leaves a `missed_call` notification).
 - `call.declined` — somebody you rang declined, with their message if any.
 - `call.signal` — another participant's WebRTC negotiation for you.
+- `call.lobby` — who is waiting to be let into a call you are in.
+- `call.admitted` / `call.turned_away` — you, waiting in a lobby, were let in
+  or not.
+
+A protected link's passcode is refused from one address after ten tries in
+fifteen minutes, and the link itself refuses every passcode — the right one
+too — after twenty wrong ones in fifteen minutes. Every wrong passcode is in the
+audit log as `call.link.passcode_failed`.
 
 Negotiation is sent on the same connection:
 

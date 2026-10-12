@@ -21,6 +21,9 @@ const live = useLiveConnection({
     window.dispatchEvent(new CustomEvent("tdc:ring-ended", { detail: call }));
   },
   onCallDeclined: (declined) => c.onDeclined(declined),
+  onCallLobby: (lobby) => c.onLobby(lobby),
+  onCallAdmitted: (use) => void c.onAdmitted(use),
+  onCallTurnedAway: (use) => c.onTurnedAway(use),
 });
 c.setSignaller((call, to, body) => live.signal(call, to, body));
 

@@ -60,6 +60,12 @@ func (s *Service) OpenCall(ctx context.Context, roomID, userID uuid.UUID) (Call,
 	return s.openCall(ctx, roomID)
 }
 
+// OpenCallIn returns the call in progress in a room, without asking who wants
+// to know; callers decide what of it to show.
+func (s *Service) OpenCallIn(ctx context.Context, roomID uuid.UUID) (Call, error) {
+	return s.openCall(ctx, roomID)
+}
+
 func (s *Service) openCall(ctx context.Context, roomID uuid.UUID) (Call, error) {
 	call, err := s.store.OpenCallInRoom(ctx, roomID)
 	if errors.Is(err, pgx.ErrNoRows) {

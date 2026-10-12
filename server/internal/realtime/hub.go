@@ -59,6 +59,12 @@ const (
 	// FrameCallDeclined tells the people in a call that somebody they rang
 	// declined.
 	FrameCallDeclined = "call.declined"
+	// FrameCallLobby tells the people in a call who is waiting to be let in.
+	FrameCallLobby = "call.lobby"
+	// FrameCallAdmitted tells somebody waiting in a lobby they were let in.
+	FrameCallAdmitted = "call.admitted"
+	// FrameCallTurnedAway tells somebody waiting in a lobby they were not.
+	FrameCallTurnedAway = "call.turned_away"
 )
 
 // Connection is one client's live connection.

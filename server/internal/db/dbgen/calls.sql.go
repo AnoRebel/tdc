@@ -30,6 +30,138 @@ func (q *Queries) CallByID(ctx context.Context, id uuid.UUID) (Call, error) {
 	return i, err
 }
 
+const callLinkByHash = `-- name: CallLinkByHash :one
+SELECT id, room_id, token_hash, label, passcode_hash, lobby, guests, expires_at, max_uses, uses, created_by, created_at, revoked_at, passcode_failures, passcode_failures_from FROM call_links WHERE token_hash = $1
+`
+
+func (q *Queries) CallLinkByHash(ctx context.Context, tokenHash []byte) (CallLink, error) {
+	row := q.db.QueryRow(ctx, callLinkByHash, tokenHash)
+	var i CallLink
+	err := row.Scan(
+		&i.ID,
+		&i.RoomID,
+		&i.TokenHash,
+		&i.Label,
+		&i.PasscodeHash,
+		&i.Lobby,
+		&i.Guests,
+		&i.ExpiresAt,
+		&i.MaxUses,
+		&i.Uses,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.RevokedAt,
+		&i.PasscodeFailures,
+		&i.PasscodeFailuresFrom,
+	)
+	return i, err
+}
+
+const callLinkByID = `-- name: CallLinkByID :one
+SELECT id, room_id, token_hash, label, passcode_hash, lobby, guests, expires_at, max_uses, uses, created_by, created_at, revoked_at, passcode_failures, passcode_failures_from FROM call_links WHERE id = $1
+`
+
+func (q *Queries) CallLinkByID(ctx context.Context, id uuid.UUID) (CallLink, error) {
+	row := q.db.QueryRow(ctx, callLinkByID, id)
+	var i CallLink
+	err := row.Scan(
+		&i.ID,
+		&i.RoomID,
+		&i.TokenHash,
+		&i.Label,
+		&i.PasscodeHash,
+		&i.Lobby,
+		&i.Guests,
+		&i.ExpiresAt,
+		&i.MaxUses,
+		&i.Uses,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.RevokedAt,
+		&i.PasscodeFailures,
+		&i.PasscodeFailuresFrom,
+	)
+	return i, err
+}
+
+const callLinksInRoom = `-- name: CallLinksInRoom :many
+SELECT id, room_id, token_hash, label, passcode_hash, lobby, guests, expires_at, max_uses, uses, created_by, created_at, revoked_at, passcode_failures, passcode_failures_from FROM call_links WHERE room_id = $1 AND revoked_at IS NULL ORDER BY created_at DESC
+`
+
+func (q *Queries) CallLinksInRoom(ctx context.Context, roomID uuid.UUID) ([]CallLink, error) {
+	rows, err := q.db.Query(ctx, callLinksInRoom, roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CallLink{}
+	for rows.Next() {
+		var i CallLink
+		if err := rows.Scan(
+			&i.ID,
+			&i.RoomID,
+			&i.TokenHash,
+			&i.Label,
+			&i.PasscodeHash,
+			&i.Lobby,
+			&i.Guests,
+			&i.ExpiresAt,
+			&i.MaxUses,
+			&i.Uses,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.RevokedAt,
+			&i.PasscodeFailures,
+			&i.PasscodeFailuresFrom,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const callLobby = `-- name: CallLobby :many
+SELECT l.user_id, l.requested_at, u.username, u.display_name
+FROM call_lobby l JOIN users u ON u.id = l.user_id
+WHERE l.call_id = $1 ORDER BY l.requested_at
+`
+
+type CallLobbyRow struct {
+	UserID      uuid.UUID
+	RequestedAt time.Time
+	Username    string
+	DisplayName string
+}
+
+func (q *Queries) CallLobby(ctx context.Context, callID uuid.UUID) ([]CallLobbyRow, error) {
+	rows, err := q.db.Query(ctx, callLobby, callID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CallLobbyRow{}
+	for rows.Next() {
+		var i CallLobbyRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.RequestedAt,
+			&i.Username,
+			&i.DisplayName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const callRoomOfParticipant = `-- name: CallRoomOfParticipant :one
 SELECT c.room_id FROM call_participants p JOIN calls c ON c.id = p.call_id
 WHERE p.call_id = $1 AND p.user_id = $2 AND p.left_at IS NULL AND c.ended_at IS NULL
@@ -46,6 +178,59 @@ func (q *Queries) CallRoomOfParticipant(ctx context.Context, arg CallRoomOfParti
 	var room_id uuid.UUID
 	err := row.Scan(&room_id)
 	return room_id, err
+}
+
+const createCallLink = `-- name: CreateCallLink :one
+INSERT INTO call_links (id, room_id, token_hash, label, passcode_hash, lobby, guests, expires_at, max_uses, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, room_id, token_hash, label, passcode_hash, lobby, guests, expires_at, max_uses, uses, created_by, created_at, revoked_at, passcode_failures, passcode_failures_from
+`
+
+type CreateCallLinkParams struct {
+	ID           uuid.UUID
+	RoomID       uuid.UUID
+	TokenHash    []byte
+	Label        string
+	PasscodeHash *string
+	Lobby        bool
+	Guests       bool
+	ExpiresAt    *time.Time
+	MaxUses      *int32
+	CreatedBy    *uuid.UUID
+}
+
+func (q *Queries) CreateCallLink(ctx context.Context, arg CreateCallLinkParams) (CallLink, error) {
+	row := q.db.QueryRow(ctx, createCallLink,
+		arg.ID,
+		arg.RoomID,
+		arg.TokenHash,
+		arg.Label,
+		arg.PasscodeHash,
+		arg.Lobby,
+		arg.Guests,
+		arg.ExpiresAt,
+		arg.MaxUses,
+		arg.CreatedBy,
+	)
+	var i CallLink
+	err := row.Scan(
+		&i.ID,
+		&i.RoomID,
+		&i.TokenHash,
+		&i.Label,
+		&i.PasscodeHash,
+		&i.Lobby,
+		&i.Guests,
+		&i.ExpiresAt,
+		&i.MaxUses,
+		&i.Uses,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.RevokedAt,
+		&i.PasscodeFailures,
+		&i.PasscodeFailuresFrom,
+	)
+	return i, err
 }
 
 const endCallIfEmpty = `-- name: EndCallIfEmpty :one
@@ -68,6 +253,22 @@ func (q *Queries) EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error
 		&i.StartedEvent,
 	)
 	return i, err
+}
+
+const enterCallLobby = `-- name: EnterCallLobby :exec
+INSERT INTO call_lobby (call_id, user_id, link_id) VALUES ($1, $2, $3)
+ON CONFLICT (call_id, user_id) DO UPDATE SET requested_at = NOW(), link_id = EXCLUDED.link_id
+`
+
+type EnterCallLobbyParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+	LinkID uuid.UUID
+}
+
+func (q *Queries) EnterCallLobby(ctx context.Context, arg EnterCallLobbyParams) error {
+	_, err := q.db.Exec(ctx, enterCallLobby, arg.CallID, arg.UserID, arg.LinkID)
+	return err
 }
 
 const inviteToCall = `-- name: InviteToCall :exec
@@ -143,6 +344,22 @@ func (q *Queries) LeaveCall(ctx context.Context, arg LeaveCallParams) (int64, er
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const leaveCallLobby = `-- name: LeaveCallLobby :one
+DELETE FROM call_lobby WHERE call_id = $1 AND user_id = $2 RETURNING link_id
+`
+
+type LeaveCallLobbyParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) LeaveCallLobby(ctx context.Context, arg LeaveCallLobbyParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, leaveCallLobby, arg.CallID, arg.UserID)
+	var link_id uuid.UUID
+	err := row.Scan(&link_id)
+	return link_id, err
 }
 
 const leaveCallsOfDisconnected = `-- name: LeaveCallsOfDisconnected :many
@@ -244,6 +461,46 @@ func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, e
 	return i, err
 }
 
+const recordCallLinkFailure = `-- name: RecordCallLinkFailure :one
+UPDATE call_links SET
+    passcode_failures = CASE WHEN passcode_failures_from < NOW() - make_interval(secs => $2::float8)
+                             THEN 1 ELSE passcode_failures + 1 END,
+    passcode_failures_from = CASE WHEN passcode_failures_from < NOW() - make_interval(secs => $2::float8)
+                                  THEN NOW() ELSE passcode_failures_from END
+WHERE id = $1
+RETURNING passcode_failures
+`
+
+type RecordCallLinkFailureParams struct {
+	ID            uuid.UUID
+	WindowSeconds float64
+}
+
+// Counts a wrong passcode, starting a fresh window once the last has passed.
+func (q *Queries) RecordCallLinkFailure(ctx context.Context, arg RecordCallLinkFailureParams) (int32, error) {
+	row := q.db.QueryRow(ctx, recordCallLinkFailure, arg.ID, arg.WindowSeconds)
+	var passcode_failures int32
+	err := row.Scan(&passcode_failures)
+	return passcode_failures, err
+}
+
+const revokeCallLink = `-- name: RevokeCallLink :execrows
+UPDATE call_links SET revoked_at = NOW() WHERE id = $1 AND room_id = $2 AND revoked_at IS NULL
+`
+
+type RevokeCallLinkParams struct {
+	ID     uuid.UUID
+	RoomID uuid.UUID
+}
+
+func (q *Queries) RevokeCallLink(ctx context.Context, arg RevokeCallLinkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeCallLink, arg.ID, arg.RoomID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setCallMedia = `-- name: SetCallMedia :execrows
 UPDATE call_participants SET audio = $3, video = $4, held = $5
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
@@ -333,4 +590,21 @@ func (q *Queries) StartCall(ctx context.Context, arg StartCallParams) (Call, err
 		&i.StartedEvent,
 	)
 	return i, err
+}
+
+const useCallLink = `-- name: UseCallLink :execrows
+UPDATE call_links SET uses = uses + 1
+WHERE id = $1 AND revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW())
+  AND (max_uses IS NULL OR uses < max_uses)
+`
+
+// Counts a use, refusing one past the limit in the same statement so two
+// people arriving at once cannot both take the last.
+func (q *Queries) UseCallLink(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, useCallLink, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

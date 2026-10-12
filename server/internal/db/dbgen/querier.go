@@ -69,6 +69,10 @@ type Querier interface {
 	BanFromChannel(ctx context.Context, arg BanFromChannelParams) error
 	BlockUser(ctx context.Context, arg BlockUserParams) error
 	CallByID(ctx context.Context, id uuid.UUID) (Call, error)
+	CallLinkByHash(ctx context.Context, tokenHash []byte) (CallLink, error)
+	CallLinkByID(ctx context.Context, id uuid.UUID) (CallLink, error)
+	CallLinksInRoom(ctx context.Context, roomID uuid.UUID) ([]CallLink, error)
+	CallLobby(ctx context.Context, callID uuid.UUID) ([]CallLobbyRow, error)
 	// The room of an open call somebody is in now; no row if they are not in it.
 	CallRoomOfParticipant(ctx context.Context, arg CallRoomOfParticipantParams) (uuid.UUID, error)
 	// Everything still waiting for a subscription that has been turned off.
@@ -184,6 +188,7 @@ type Querier interface {
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
 	CreateApplicationToken(ctx context.Context, arg CreateApplicationTokenParams) (CreateApplicationTokenRow, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
+	CreateCallLink(ctx context.Context, arg CreateCallLinkParams) (CallLink, error)
 	CreateCompanyProfile(ctx context.Context, arg CreateCompanyProfileParams) (CompanyProfile, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateCycle(ctx context.Context, arg CreateCycleParams) (Cycle, error)
@@ -300,6 +305,7 @@ type Querier interface {
 	// set once: it is what the authenticator remembers, and changing it would
 	// orphan every passkey already enrolled.
 	EnsureWebauthnHandle(ctx context.Context, arg EnsureWebauthnHandleParams) ([]byte, error)
+	EnterCallLobby(ctx context.Context, arg EnterCallLobbyParams) error
 	EraseAccount(ctx context.Context, id uuid.UUID) error
 	ErasePersonsAuditLabel(ctx context.Context, actorID *uuid.UUID) (int64, error)
 	ErasePersonsAuthorship(ctx context.Context, senderID *uuid.UUID) (int64, error)
@@ -505,6 +511,7 @@ type Querier interface {
 	LatestProposalVersion(ctx context.Context, engagementID uuid.UUID) (ProposalVersion, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
 	LeaveCall(ctx context.Context, arg LeaveCallParams) (int64, error)
+	LeaveCallLobby(ctx context.Context, arg LeaveCallLobbyParams) (uuid.UUID, error)
 	// Takes out of their calls everybody with no live connection left, so a
 	// closed laptop or a lost network does not leave somebody "in" a call forever.
 	LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfDisconnectedRow, error)
@@ -883,6 +890,8 @@ type Querier interface {
 	// name.
 	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
 	RecordApplicationRateLimited(ctx context.Context, id uuid.UUID) error
+	// Counts a wrong passcode, starting a fresh window once the last has passed.
+	RecordCallLinkFailure(ctx context.Context, arg RecordCallLinkFailureParams) (int32, error)
 	RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error)
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
 	RecordIncomingWebhookPost(ctx context.Context, id uuid.UUID) error
@@ -965,6 +974,7 @@ type Querier interface {
 	RevokeAllSessionsForUser(ctx context.Context, userID uuid.UUID) error
 	RevokeApplicationToken(ctx context.Context, arg RevokeApplicationTokenParams) (RevokeApplicationTokenRow, error)
 	RevokeApplicationTokens(ctx context.Context, applicationID *uuid.UUID) error
+	RevokeCallLink(ctx context.Context, arg RevokeCallLinkParams) (int64, error)
 	RevokeIncomingWebhook(ctx context.Context, arg RevokeIncomingWebhookParams) (IncomingWebhook, error)
 	// Revoking is idempotent in effect but recorded once: a second revocation
 	// leaves the first one's timestamp, which is when it actually stopped working.
@@ -1197,6 +1207,9 @@ type Querier interface {
 	UpdateProjectView(ctx context.Context, arg UpdateProjectViewParams) (ProjectView, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
+	// Counts a use, refusing one past the limit in the same statement so two
+	// people arriving at once cannot both take the last.
+	UseCallLink(ctx context.Context, id uuid.UUID) (int64, error)
 	// A company as a viewer of the given rank may see it, or nothing.
 	ViewCompanyProfile(ctx context.Context, arg ViewCompanyProfileParams) (CompanyProfile, error)
 	ViewDirectoryProfile(ctx context.Context, arg ViewDirectoryProfileParams) (ViewDirectoryProfileRow, error)

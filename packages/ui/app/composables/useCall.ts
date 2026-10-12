@@ -1,4 +1,12 @@
-import type { Call, CallDeclined, CallRing, CallSignal, IceConfiguration } from "@tdc/types";
+import type {
+  Call,
+  CallDeclined,
+  CallLinkUse,
+  CallLobby,
+  CallRing,
+  CallSignal,
+  IceConfiguration,
+} from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { createGlobalState } from "@vueuse/core";
 
@@ -97,6 +105,19 @@ export const useCall = createGlobalState(() => {
   const incoming = ref<CallRing[]>([]);
   /** The last person who declined our ring, for a moment's notice. */
   const declined = ref<CallDeclined | null>(null);
+
+  /** Who is waiting to be let into each call we are in, by call. */
+  const lobbies = ref<Record<string, CallLobby["waiting"]>>({});
+  /**
+   * Our own wait in a call's lobby, after using a link that has one: until
+   * somebody in the call lets us in or turns us away.
+   */
+  const waitingIn = ref<{
+    callId: string;
+    roomId: string;
+    video: boolean;
+    outcome: "waiting" | "turned-away";
+  } | null>(null);
 
   /** Each call's connections, by conversation and then by the other person. */
   const peers = new Map<string, Map<string, Peer>>();
@@ -553,6 +574,72 @@ export const useCall = createGlobalState(() => {
     }
   }
 
+  /**
+   * Uses a call link: straight into the call, or into its lobby to wait.
+   * Throws the server's refusal — a wrong passcode, a link that is used up,
+   * a call not started — for the link page to say.
+   */
+  async function joinByLink(secret: string, passcode: string, withVideo: boolean) {
+    const use = await api.post<CallLinkUse>(`/api/call-links/${encodeURIComponent(secret)}/join`, {
+      passcode,
+    });
+    if (use.waiting) {
+      waitingIn.value = {
+        callId: use.callId,
+        roomId: use.roomId,
+        video: withVideo,
+        outcome: "waiting",
+      };
+      return;
+    }
+    await join(use.roomId, withVideo, { asGuestOf: use.callId });
+  }
+
+  /** Gives up waiting in a lobby. */
+  async function stopWaiting() {
+    const waiting = waitingIn.value;
+    waitingIn.value = null;
+    if (!waiting) return;
+    try {
+      await api.delete(`/api/calls/${waiting.callId}/lobby`);
+    } catch {
+      // The lobby forgets us when the call ends anyway.
+    }
+  }
+
+  function onLobby(lobby: CallLobby) {
+    lobbies.value = { ...lobbies.value, [lobby.call]: lobby.waiting };
+  }
+
+  async function onAdmitted(use: CallLinkUse) {
+    const waiting = waitingIn.value;
+    if (!waiting || waiting.callId !== use.callId) return;
+    waitingIn.value = null;
+    await join(use.roomId, waiting.video, { asGuestOf: use.callId });
+  }
+
+  function onTurnedAway(use: CallLinkUse) {
+    if (waitingIn.value?.callId === use.callId) {
+      waitingIn.value = { ...waitingIn.value, outcome: "turned-away" };
+    }
+  }
+
+  /** Lets somebody waiting into the call shown, or turns them away. */
+  async function admit(userId: string, letIn: boolean) {
+    const current = call.value;
+    if (!current) return;
+    const before = lobbies.value[current.id] ?? [];
+    lobbies.value = {
+      ...lobbies.value,
+      [current.id]: before.filter((each) => each.userId !== userId),
+    };
+    try {
+      await api.post(`/api/calls/${current.id}/lobby/${userId}/${letIn ? "admit" : "turn-away"}`);
+    } catch {
+      lobbies.value = { ...lobbies.value, [current.id]: before };
+    }
+  }
+
   /** Who is in a call changed. */
   function onState(state: Call) {
     const mine = calls.value[state.roomId];
@@ -614,6 +701,14 @@ export const useCall = createGlobalState(() => {
     metered,
     supported,
     isIn,
+    lobbies,
+    waitingIn,
+    joinByLink,
+    stopWaiting,
+    onLobby,
+    onAdmitted,
+    onTurnedAway,
+    admit,
     guestOf,
     canMerge,
     merge,

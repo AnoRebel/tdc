@@ -116,6 +116,31 @@ type CallInvite struct {
 	CreatedAt time.Time
 }
 
+type CallLink struct {
+	ID                   uuid.UUID
+	RoomID               uuid.UUID
+	TokenHash            []byte
+	Label                string
+	PasscodeHash         *string
+	Lobby                bool
+	Guests               bool
+	ExpiresAt            *time.Time
+	MaxUses              *int32
+	Uses                 int32
+	CreatedBy            *uuid.UUID
+	CreatedAt            time.Time
+	RevokedAt            *time.Time
+	PasscodeFailures     int32
+	PasscodeFailuresFrom time.Time
+}
+
+type CallLobby struct {
+	CallID      uuid.UUID
+	UserID      uuid.UUID
+	LinkID      uuid.UUID
+	RequestedAt time.Time
+}
+
 type CallParticipant struct {
 	CallID   uuid.UUID
 	UserID   uuid.UUID

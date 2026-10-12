@@ -115,6 +115,7 @@ const {
     <Teleport v-if="pipTarget" :to="pipTarget">
       <div class="flex h-screen flex-col gap-2 p-2">
         <div class="min-h-0 flex-1 overflow-y-auto"><CallTiles compact /></div>
+        <CallLobbyList />
         <CallHeld />
         <CallControls :room-name="roomName" in-picture />
       </div>
@@ -247,6 +248,7 @@ const {
       <div class="min-h-0 flex-1 overflow-y-auto">
         <CallTiles />
       </div>
+      <CallLobbyList />
       <CallHeld />
       <CallControls :room-name="roomName" />
     </div>
@@ -316,6 +318,7 @@ const {
       <div class="min-h-0 flex-1 overflow-y-auto">
         <CallTiles compact />
       </div>
+      <CallLobbyList />
       <CallHeld />
       <CallControls :room-name="roomName" />
     </div>

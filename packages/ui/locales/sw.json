@@ -1729,6 +1729,51 @@
     "conferenceInvite": "anakualika ujiunge na simu ya pamoja",
     "merge": "Unganisha",
     "mergeHint": "Walete watu hawa kwenye simu uliyopo, iwe simu ya pamoja. Wanajiunga tu wakikubali, na hawaoni chochote cha mazungumzo haya.",
-    "joinConference": "Jiunge"
+    "joinConference": "Jiunge",
+    "links": {
+      "title": "Viungo vya simu hii",
+      "label": "Lebo (si lazima)",
+      "lobby": "Waruhusu watu kutoka chumba cha kusubiri",
+      "protect": "Uliza nambari ya siri",
+      "passcode": "Nambari ya siri (angalau herufi 4)",
+      "expires": "Inaisha",
+      "hour": "Baada ya saa moja",
+      "day": "Baada ya siku moja",
+      "week": "Baada ya wiki moja",
+      "never": "Haiishi",
+      "uses": "Matumizi",
+      "unlimited": "Bila kikomo",
+      "make": "Tengeneza kiungo",
+      "madeOnce": "Kinakili sasa — kinaonyeshwa mara moja tu.",
+      "copy": "Nakili kiungo",
+      "copied": "Kimenakiliwa.",
+      "existing": "Viungo vilivyotengenezwa",
+      "untitled": "Kiungo",
+      "used": "kimetumika {count}",
+      "protected": "nambari ya siri",
+      "withLobby": "chumba cha kusubiri",
+      "until": "hadi {when}",
+      "revoke": "Ondoa {name}",
+      "couldNotMake": "Imeshindwa kutengeneza kiungo."
+    },
+    "lobby": {
+      "title": "Wanasubiri kujiunga",
+      "waiting": "{count} wanasubiri kujiunga",
+      "admit": "Mruhusu",
+      "admitWhom": "Mruhusu {name} aingie",
+      "turnAwayWhom": "Mkatalie {name}"
+    },
+    "linkPage": {
+      "title": "Jiunge na simu",
+      "unusable": "Kiungo hiki hakiwezi kutumika",
+      "invited": "Una kiungo cha simu katika",
+      "notStarted": "Simu bado haijaanza. Ukurasa huu utagundua itakapoanza.",
+      "passcode": "Nambari ya siri",
+      "lobbyNote": "Mtu aliye kwenye simu atakuruhusu uingie.",
+      "waiting": "Unasubiri mtu aliye kwenye simu akuruhusu…",
+      "stopWaiting": "Acha kusubiri",
+      "turnedAway": "Hukuruhusiwa kuingia kwenye simu hii.",
+      "inCall": "Uko kwenye simu."
+    }
   }
 }

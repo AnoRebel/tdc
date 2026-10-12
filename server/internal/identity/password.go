@@ -57,6 +57,18 @@ func HashPassword(password string) (string, error) {
 	return hash, nil
 }
 
+// HashPasscode hashes a short shared secret, such as a call link's passcode,
+// the way a password is hashed but without a password's strength rules: it
+// guards one link, its guessing is limited where it is used, and the people
+// sharing it have to be able to say it aloud.
+func HashPasscode(passcode string) (string, error) {
+	hash, err := argon2id.CreateHash(passcode, passwordParams)
+	if err != nil {
+		return "", fmt.Errorf("hash passcode: %w", err)
+	}
+	return hash, nil
+}
+
 // VerifyPassword reports whether the password matches the encoded hash.
 //
 // It always performs the full comparison, so the time taken does not reveal

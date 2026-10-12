@@ -35,6 +35,13 @@ const (
 		before the call runs out of interest.
 	*/
 	CallsMaxParticipants Key = "calls.max_participants"
+
+	/*
+		CallsGuests lets people without an account join a call through a link
+		made to allow them. Off by default: a guest is somebody the server
+		knows nothing about, and an operator should choose to admit them.
+	*/
+	CallsGuests Key = "calls.guests"
 )
 
 func init() {
@@ -51,6 +58,11 @@ func init() {
 			fallback:    "",
 			description: "TURN relays for calls that cannot connect directly, comma-separated (turn:host:3478?transport=udp, turns:host:5349). Needs calls.turn_secret in configuration.",
 			validate:    iceURLs("turn:", "turns:"),
+		},
+		CallsGuests: {
+			fallback:    "false",
+			description: "Whether people without an account may join a call through a link that allows guests.",
+			validate:    boolean,
 		},
 		CallsMaxParticipants: {
 			fallback:    "4",

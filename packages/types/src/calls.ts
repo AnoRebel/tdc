@@ -54,3 +54,42 @@ export interface CallDeclined {
   /** A few words sent with the decline, if any. */
   message?: string;
 }
+
+/** A link to a conversation's call, as the people who manage it see it. */
+export interface CallLink {
+  id: string;
+  label: string;
+  protected: boolean;
+  lobby: boolean;
+  guests: boolean;
+  expiresAt?: string;
+  maxUses?: number;
+  uses: number;
+  createdAt: string;
+  /** Present only in the answer to making the link; it is not kept. */
+  secret?: string;
+}
+
+/** What a call link leads to, as anybody holding it is told. */
+export interface CallLinkTarget {
+  roomName: string;
+  protected: boolean;
+  lobby: boolean;
+  guests: boolean;
+  started: boolean;
+  people: string[];
+}
+
+/** What using a link answers: the call, or that the person is waiting. */
+export interface CallLinkUse {
+  callId: string;
+  roomId: string;
+  waiting: boolean;
+}
+
+/** Who is waiting to be let into a call. */
+export interface CallLobby {
+  call: string;
+  roomId: string;
+  waiting: { userId: string; username: string; displayName: string; since: string }[];
+}

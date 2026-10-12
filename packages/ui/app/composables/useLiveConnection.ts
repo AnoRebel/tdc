@@ -1,6 +1,8 @@
 import type {
   Call,
   CallDeclined,
+  CallLinkUse,
+  CallLobby,
   CallRing,
   CallSignal,
   LiveEventPayload,
@@ -42,6 +44,11 @@ interface LiveHandlers {
   onCallRingEnded?: (call: string) => void;
   /** Called when somebody this person rang declined. */
   onCallDeclined?: (declined: CallDeclined) => void;
+  /** Called with who is waiting to be let into a call this person is in. */
+  onCallLobby?: (lobby: CallLobby) => void;
+  /** Called when this person, waiting in a lobby, is let in or turned away. */
+  onCallAdmitted?: (use: CallLinkUse) => void;
+  onCallTurnedAway?: (use: CallLinkUse) => void;
 }
 
 // Backoff bounds. The first retry is quick, because most disconnections are
@@ -205,6 +212,21 @@ export function useLiveConnection(handlers: LiveHandlers) {
 
       case "call.declined": {
         if (frame.payload) handlers.onCallDeclined?.(frame.payload as unknown as CallDeclined);
+        break;
+      }
+
+      case "call.lobby": {
+        if (frame.payload) handlers.onCallLobby?.(frame.payload as unknown as CallLobby);
+        break;
+      }
+
+      case "call.admitted": {
+        if (frame.payload) handlers.onCallAdmitted?.(frame.payload as unknown as CallLinkUse);
+        break;
+      }
+
+      case "call.turned_away": {
+        if (frame.payload) handlers.onCallTurnedAway?.(frame.payload as unknown as CallLinkUse);
         break;
       }
 

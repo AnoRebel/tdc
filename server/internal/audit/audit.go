@@ -208,6 +208,12 @@ const (
 	// Reading the log is itself audited, so that access to the record is part
 	// of the record.
 	ActionAuditRead Action = "server.audit.read"
+
+	// Call links: who made one, who withdrew it, and every wrong passcode,
+	// which is how somebody guessing at a protected link is noticed.
+	ActionCallLinkCreated        Action = "call.link.created"
+	ActionCallLinkRevoked        Action = "call.link.revoked"
+	ActionCallLinkPasscodeFailed Action = "call.link.passcode_failed"
 )
 
 // Entry describes an action to record.

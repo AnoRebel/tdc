@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { BellRing, Mic, MicOff, Pause, PhoneOff, Play, Video, VideoOff } from "lucide-vue-next";
+import {
+  BellRing,
+  Link2,
+  Mic,
+  MicOff,
+  Pause,
+  PhoneOff,
+  Play,
+  Video,
+  VideoOff,
+} from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
 
 /** Microphone, camera, hold and leave, the same wherever the call is shown. */
@@ -8,6 +18,9 @@ defineProps<{ roomName?: string; inPicture?: boolean }>();
 const { $t, $ts } = useI18n();
 const c = useCall();
 const picking = ref(false);
+const linking = ref(false);
+const { can } = useAuth();
+const guest = computed(() => Boolean(c.roomId.value && c.guestOf.value.includes(c.roomId.value)));
 </script>
 
 <template>
@@ -29,6 +42,7 @@ const picking = ref(false);
     {{ $t("calls.youAreHolding") }}
   </p>
   <CallRingPicker v-if="picking" />
+  <CallLinks v-if="linking" />
   <div class="flex items-center justify-center gap-2">
     <Button
       variant="ghost"
@@ -51,7 +65,18 @@ const picking = ref(false);
       <VideoOff v-else class="size-4" />
     </Button>
     <Button
-      v-if="!(c.roomId.value && c.guestOf.value.includes(c.roomId.value))"
+      v-if="!guest && can('call.link')"
+      variant="ghost"
+      size="icon"
+      :label="$ts('calls.links.title')"
+      :title="$ts('calls.links.title')"
+      :aria-pressed="linking"
+      @click="linking = !linking"
+    >
+      <Link2 class="size-4" />
+    </Button>
+    <Button
+      v-if="!guest"
       variant="ghost"
       size="icon"
       :label="$ts('calls.ringPeople')"

@@ -757,6 +757,16 @@ them is asked first, and joins only by accepting; once they have, the held call
 ends. People merged in take part in the call and nothing else: they cannot open
 its conversation, read its messages or see who else is in it beyond the call.
 
+**Links to a call.** Somebody allowed to (the `call.link` permission, which
+an administrator grants) can make a link to a conversation's call from the
+link button in the call window: with a label, a lobby where people wait until
+somebody in the call lets them in, a passcode, an expiry and a limit on how
+many people it lets in. The link is shown once — copy it then. Whoever opens it
+sees the conversation's name and who is in the call, signs in if they have not,
+and joins the call — only the call: the conversation, its messages and members
+stay closed to them. Links already made are listed below the form, with a
+button to withdraw each. A link to a call that has not started waits for it.
+
 **Calling from a profile.** The phone and camera buttons on somebody's
 directory profile, and beside people in a channel's member list, open your
 direct conversation with them — or the one you already have — and ring them.
