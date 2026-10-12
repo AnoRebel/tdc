@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import { useForm } from "@tanstack/vue-form";
+import type { AnyFieldApi } from "@tanstack/vue-form";
+import * as v from "valibot";
 import type { CallLink } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { Copy, Link2, Trash2 } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
+import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Switch } from "#layers/ui/app/components/ui/switch";
 import { onDayAtTime } from "#layers/ui/app/lib/dates";
@@ -26,14 +30,6 @@ const links = ref<CallLink[]>([]);
 const made = ref<string | null>(null);
 const copied = ref(false);
 const failure = ref<string | null>(null);
-const busy = ref(false);
-
-const label = ref("");
-const protect = ref(false);
-const passcode = ref("");
-const lobby = ref(true);
-const expiry = ref("24");
-const maxUses = ref("");
 
 const room = computed(() => c.roomId.value);
 
@@ -53,29 +49,62 @@ function addressOf(secret: string) {
   return `${base}/call/${secret}`;
 }
 
-async function make() {
-  if (!room.value) return;
-  busy.value = true;
-  failure.value = null;
-  try {
-    const link = await api.post<CallLink>(`/api/rooms/${room.value}/call/links`, {
-      label: label.value,
-      passcode: protect.value ? passcode.value : "",
-      lobby: lobby.value,
-      expiresInHours: Number(expiry.value) || 0,
-      maxUses: Number(maxUses.value) || 0,
-    });
-    made.value = link.secret ? addressOf(link.secret) : null;
-    copied.value = false;
-    label.value = "";
-    passcode.value = "";
-    await load();
-  } catch (cause) {
-    failure.value = isApiError(cause) ? cause.message : $ts("calls.links.couldNotMake");
-  } finally {
-    busy.value = false;
-  }
+/*
+ * What a link is made with. A passcode is asked for only when the link is
+ * protected, and then must be long enough to be worth asking for.
+ */
+const linkRules = v.pipe(
+  v.object({
+    label: v.pipe(v.string(), v.trim(), v.maxLength(80)),
+    protect: v.boolean(),
+    passcode: v.string(),
+    lobby: v.boolean(),
+    expiry: v.string(),
+    maxUses: v.pipe(v.string(), v.regex(/^\d*$/, $ts("calls.links.usesNumber"))),
+  }),
+  v.forward(
+    v.check((link) => !link.protect || link.passcode.length >= 4, $ts("calls.links.passcodeShort")),
+    ["passcode"],
+  ),
+);
+
+function firstError(field: AnyFieldApi): string | undefined {
+  const [issue] = field.state.meta.errors;
+  if (!issue) return undefined;
+  return typeof issue === "string" ? issue : (issue as { message?: string }).message;
 }
+
+const form = useForm({
+  defaultValues: {
+    label: "",
+    protect: false,
+    passcode: "",
+    lobby: true,
+    expiry: "24",
+    maxUses: "",
+  },
+  validators: { onSubmit: linkRules },
+  async onSubmit({ value }) {
+    if (!room.value) return;
+    failure.value = null;
+    try {
+      const link = await api.post<CallLink>(`/api/rooms/${room.value}/call/links`, {
+        label: value.label.trim(),
+        passcode: value.protect ? value.passcode : "",
+        lobby: value.lobby,
+        expiresInHours: Number(value.expiry) || 0,
+        maxUses: Number(value.maxUses) || 0,
+      });
+      made.value = link.secret ? addressOf(link.secret) : null;
+      copied.value = false;
+      form.reset();
+      await load();
+    } catch (cause) {
+      failure.value = isApiError(cause) ? cause.message : $ts("calls.links.couldNotMake");
+    }
+  },
+});
+const protecting = form.useStore((state) => state.values.protect);
 
 async function copy() {
   if (!made.value) return;
@@ -97,56 +126,103 @@ async function revoke(link: CallLink) {
 
 <template>
   <div class="max-h-80 space-y-2 overflow-y-auto rounded-lg border bg-muted/30 p-2 text-xs">
-    <form class="space-y-2" @submit.prevent="make">
-      <Input
-        v-model="label"
-        :label="$ts('calls.links.label')"
-        :placeholder="$ts('calls.links.label')"
-      />
-      <label class="flex items-center justify-between gap-2">
-        <span>{{ $t("calls.links.lobby") }}</span>
-        <Switch v-model="lobby" :label="$ts('calls.links.lobby')" />
-      </label>
-      <label class="flex items-center justify-between gap-2">
-        <span>{{ $t("calls.links.protect") }}</span>
-        <Switch v-model="protect" :label="$ts('calls.links.protect')" />
-      </label>
-      <Input
-        v-if="protect"
-        v-model="passcode"
-        :label="$ts('calls.links.passcode')"
-        :placeholder="$ts('calls.links.passcode')"
-        autocomplete="off"
-      />
+    <form class="space-y-2" @submit.prevent="form.handleSubmit()">
+      <form.Field name="label">
+        <template #default="{ field }">
+          <Field :label="$ts('calls.links.label')" :error="firstError(field)">
+            <template #default="{ id, invalid, describedBy }">
+              <Input
+                :id="id"
+                :model-value="field.state.value"
+                :invalid="invalid"
+                :described-by="describedBy"
+                @update:model-value="field.handleChange($event)"
+                @blur="field.handleBlur"
+              />
+            </template>
+          </Field>
+        </template>
+      </form.Field>
+      <form.Field name="lobby">
+        <template #default="{ field }">
+          <label class="flex items-center justify-between gap-2">
+            <span>{{ $t("calls.links.lobby") }}</span>
+            <Switch
+              :model-value="field.state.value"
+              :label="$ts('calls.links.lobby')"
+              @update:model-value="field.handleChange($event)"
+            />
+          </label>
+        </template>
+      </form.Field>
+      <form.Field name="protect">
+        <template #default="{ field }">
+          <label class="flex items-center justify-between gap-2">
+            <span>{{ $t("calls.links.protect") }}</span>
+            <Switch
+              :model-value="field.state.value"
+              :label="$ts('calls.links.protect')"
+              @update:model-value="field.handleChange($event)"
+            />
+          </label>
+        </template>
+      </form.Field>
+      <form.Field v-if="protecting" name="passcode">
+        <template #default="{ field }">
+          <Field :label="$ts('calls.links.passcode')" :error="firstError(field)">
+            <template #default="{ id, invalid, describedBy }">
+              <Input
+                :id="id"
+                :model-value="field.state.value"
+                autocomplete="off"
+                :invalid="invalid"
+                :described-by="describedBy"
+                @update:model-value="field.handleChange($event)"
+                @blur="field.handleBlur"
+              />
+            </template>
+          </Field>
+        </template>
+      </form.Field>
       <div class="flex gap-2">
-        <label class="flex flex-1 flex-col gap-1">
-          <span class="text-muted-foreground">{{ $t("calls.links.expires") }}</span>
-          <select v-model="expiry" class="h-8 rounded-md border bg-background px-1">
-            <option value="1">{{ $t("calls.links.hour") }}</option>
-            <option value="24">{{ $t("calls.links.day") }}</option>
-            <option value="168">{{ $t("calls.links.week") }}</option>
-            <option value="0">{{ $t("calls.links.never") }}</option>
-          </select>
-        </label>
-        <label class="flex flex-1 flex-col gap-1">
-          <span class="text-muted-foreground">{{ $t("calls.links.uses") }}</span>
-          <input
-            v-model="maxUses"
-            type="number"
-            min="0"
-            inputmode="numeric"
-            class="h-8 rounded-md border bg-background px-2"
-            :placeholder="$ts('calls.links.unlimited')"
-          />
-        </label>
+        <form.Field name="expiry">
+          <template #default="{ field }">
+            <label class="flex flex-1 flex-col gap-1">
+              <span class="text-muted-foreground">{{ $t("calls.links.expires") }}</span>
+              <select
+                :value="field.state.value"
+                class="h-8 rounded-md border bg-background px-1"
+                @change="field.handleChange(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="1">{{ $t("calls.links.hour") }}</option>
+                <option value="24">{{ $t("calls.links.day") }}</option>
+                <option value="168">{{ $t("calls.links.week") }}</option>
+                <option value="0">{{ $t("calls.links.never") }}</option>
+              </select>
+            </label>
+          </template>
+        </form.Field>
+        <form.Field name="maxUses">
+          <template #default="{ field }">
+            <Field class="flex-1" :label="$ts('calls.links.uses')" :error="firstError(field)">
+              <template #default="{ id, invalid, describedBy }">
+                <Input
+                  :id="id"
+                  :model-value="field.state.value"
+                  inputmode="numeric"
+                  :placeholder="$ts('calls.links.unlimited')"
+                  :invalid="invalid"
+                  :described-by="describedBy"
+                  @update:model-value="field.handleChange($event)"
+                  @blur="field.handleBlur"
+                />
+              </template>
+            </Field>
+          </template>
+        </form.Field>
       </div>
       <p v-if="failure" class="text-destructive" role="alert">{{ failure }}</p>
-      <Button
-        type="submit"
-        size="small"
-        class="w-full"
-        :disabled="busy || (protect && passcode.length < 4)"
-      >
+      <Button type="submit" size="small" class="w-full" :disabled="form.state.isSubmitting">
         <Link2 class="size-3.5" aria-hidden="true" />
         {{ $t("calls.links.make") }}
       </Button>

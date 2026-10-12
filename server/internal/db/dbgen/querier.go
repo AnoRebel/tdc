@@ -292,6 +292,10 @@ type Querier interface {
 	DisableWebhookSubscription(ctx context.Context, arg DisableWebhookSubscriptionParams) (WebhookSubscription, error)
 	// Turning it back on starts the count again; what failed before is history.
 	EnableWebhookSubscription(ctx context.Context, arg EnableWebhookSubscriptionParams) (WebhookSubscription, error)
+	// Ends calls nobody has been in for a while: their last person left without
+	// the end being recorded — a tab closed mid-request, a server stopped. The
+	// grace keeps a call being started, whose first person is not in yet, open.
+	EndAbandonedCalls(ctx context.Context) ([]Call, error)
 	// Ends a call nobody is in any more, returning it if this ended it.
 	EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error)
 	EnqueueInvocation(ctx context.Context, arg EnqueueInvocationParams) (WebhookDelivery, error)

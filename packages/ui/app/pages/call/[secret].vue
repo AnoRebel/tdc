@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CallLinkTarget } from "@tdc/types";
 import { isApiError } from "@tdc/types";
+import { useIntervalFn } from "@vueuse/core";
 import { Clock, Lock, Mic, PhoneCall, Users, Video as VideoIcon } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -43,13 +44,13 @@ async function load() {
     unusable.value = isApiError(cause) ? cause.message : $ts("calls.couldNotJoin");
   }
 }
-await load();
-
 // A call that has not started is waited for, without anybody pressing reload.
 const poll = useIntervalFn(() => {
   if (target.value && !target.value.started) void load();
 }, 5000);
 onBeforeUnmount(() => poll.pause());
+
+await load();
 
 async function join(withVideo: boolean) {
   joining.value = true;

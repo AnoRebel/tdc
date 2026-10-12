@@ -1785,7 +1785,9 @@
       "withLobby": "lobby",
       "until": "until {when}",
       "revoke": "Withdraw {name}",
-      "couldNotMake": "Could not make the link."
+      "couldNotMake": "Could not make the link.",
+      "usesNumber": "A whole number, or empty for unlimited.",
+      "passcodeShort": "A passcode needs at least four characters."
     },
     "lobby": {
       "title": "Waiting to join",

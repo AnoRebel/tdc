@@ -210,7 +210,9 @@ func (s *Server) handleCallMedia(c *echo.Context) error {
 }
 
 func (s *Server) handleLeaveCall(c *echo.Context) error {
-	ctx := c.Request().Context()
+	// Leaving finishes even if the caller does not wait for the answer — a
+	// tab closed on the way out — so a call is not left open with nobody in it.
+	ctx := context.WithoutCancel(c.Request().Context())
 	user, _ := currentUser(c)
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -734,7 +736,7 @@ func (s *Server) handleCallMediaByID(c *echo.Context) error {
 }
 
 func (s *Server) handleLeaveCallByID(c *echo.Context) error {
-	ctx := c.Request().Context()
+	ctx := context.WithoutCancel(c.Request().Context())
 	user, _ := currentUser(c)
 	call, err := s.callByID(c)
 	if err != nil {

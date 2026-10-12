@@ -1785,7 +1785,9 @@
       "withLobby": "chumba cha kusubiri",
       "until": "hadi {when}",
       "revoke": "Ondoa {name}",
-      "couldNotMake": "Imeshindwa kutengeneza kiungo."
+      "couldNotMake": "Imeshindwa kutengeneza kiungo.",
+      "usesNumber": "Nambari kamili, au acha wazi kwa bila kikomo.",
+      "passcodeShort": "Nambari ya siri inahitaji angalau herufi nne."
     },
     "lobby": {
       "title": "Wanasubiri kujiunga",

@@ -79,6 +79,12 @@ func TestACallLinkAdmitsToTheCallOnly(t *testing.T) {
 			t.Errorf("somebody let in by a link can read the conversation's %q", path)
 		}
 	}
+
+	// The members leave first and the guest last: the call is still over,
+	// though the guest cannot write in the conversation its end is noted in.
+	mustCall(t, handler, http.MethodDelete, "/api/rooms/"+room+"/call", nil, admin, http.StatusNoContent)
+	mustCall(t, handler, http.MethodDelete, "/api/calls/"+callID, nil, stranger, http.StatusNoContent)
+	mustCall(t, handler, http.MethodGet, "/api/rooms/"+room+"/call", nil, admin, http.StatusNotFound)
 }
 
 // An expired, used-up or revoked link refuses, and the refusals read alike.

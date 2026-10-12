@@ -3,12 +3,17 @@ package httpapi_test
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/AnoRebel/tdc/server/internal/db"
+	"github.com/AnoRebel/tdc/server/internal/dbtest"
 
 	"github.com/coder/websocket"
 )
@@ -276,5 +281,40 @@ func TestHoldingACallIsShownToTheOthers(t *testing.T) {
 		map[string]any{"audio": true}, amina, http.StatusOK))
 	if heldOf(back) != false {
 		t.Errorf("returning to the call still shows it held: %v", back)
+	}
+}
+
+/*
+A call whose last person left without its end being recorded — the tab closed
+while leaving, the server stopped — is ended by the sweep once it has been
+empty a while, rather than staying "in progress" for good.
+*/
+func TestTheSweepEndsAnAbandonedCall(t *testing.T) {
+	handler, _, room, amina, _ := withCalls(t)
+	mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call", map[string]any{"audio": true}, amina, http.StatusOK)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	pool, err := db.Open(ctx, db.Config{URL: dbtest.URL(t, "httpapi")}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("opening the test database: %v", err)
+	}
+	defer pool.Close()
+	// What a request cancelled half-way leaves behind: nobody in it, not ended.
+	if _, err := pool.Exec(ctx, `
+		UPDATE call_participants SET left_at = NOW() WHERE call_id IN (SELECT id FROM calls WHERE room_id = $1);
+		`, room); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE calls SET started_at = NOW() - INTERVAL '5 minutes' WHERE room_id = $1`, room); err != nil {
+		t.Fatal(err)
+	}
+	mustCall(t, handler, http.MethodGet, "/api/rooms/"+room+"/call", nil, amina, http.StatusOK)
+
+	serverOf(handler).SweepCalls(context.Background())
+
+	mustCall(t, handler, http.MethodGet, "/api/rooms/"+room+"/call", nil, amina, http.StatusNotFound)
+	if !slices.Contains(timelineTypes(t, handler, amina, room), "call.ended") {
+		t.Error("an abandoned call the sweep ended was not recorded as ended")
 	}
 }

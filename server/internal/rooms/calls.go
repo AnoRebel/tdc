@@ -165,6 +165,11 @@ func (s *Service) endIfEmpty(ctx context.Context, callID, actorID uuid.UUID) (*d
 	if err != nil {
 		return nil, fmt.Errorf("end call: %w", err)
 	}
+	return s.noteCallEnded(ctx, ended, actorID)
+}
+
+// noteCallEnded writes a call's end into its conversation, with how long it lasted.
+func (s *Service) noteCallEnded(ctx context.Context, ended dbgen.Call, actorID uuid.UUID) (*dbgen.Event, error) {
 	room, err := s.store.GetRoomByID(ctx, ended.RoomID)
 	if err != nil {
 		return nil, fmt.Errorf("read call's room: %w", err)
@@ -240,6 +245,20 @@ func (s *Service) SweepCalls(ctx context.Context) ([]SweptCall, []dbgen.Event, e
 		if event != nil {
 			ended = append(ended, *event)
 		}
+	}
+	abandoned, err := s.store.EndAbandonedCalls(ctx)
+	if err != nil {
+		return changed, ended, fmt.Errorf("end abandoned calls: %w", err)
+	}
+	for _, call := range abandoned {
+		if call.StartedBy == nil {
+			continue
+		}
+		event, err := s.noteCallEnded(ctx, call, *call.StartedBy)
+		if err != nil {
+			return changed, ended, err
+		}
+		ended = append(ended, *event)
 	}
 	return changed, ended, nil
 }

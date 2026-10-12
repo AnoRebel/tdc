@@ -233,6 +233,44 @@ func (q *Queries) CreateCallLink(ctx context.Context, arg CreateCallLinkParams) 
 	return i, err
 }
 
+const endAbandonedCalls = `-- name: EndAbandonedCalls :many
+UPDATE calls c SET ended_at = NOW()
+WHERE c.ended_at IS NULL
+  AND c.started_at < NOW() - INTERVAL '1 minute'
+  AND NOT EXISTS (SELECT 1 FROM call_participants p WHERE p.call_id = c.id AND p.left_at IS NULL)
+RETURNING id, room_id, started_by, started_at, ended_at, started_event
+`
+
+// Ends calls nobody has been in for a while: their last person left without
+// the end being recorded — a tab closed mid-request, a server stopped. The
+// grace keeps a call being started, whose first person is not in yet, open.
+func (q *Queries) EndAbandonedCalls(ctx context.Context) ([]Call, error) {
+	rows, err := q.db.Query(ctx, endAbandonedCalls)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Call{}
+	for rows.Next() {
+		var i Call
+		if err := rows.Scan(
+			&i.ID,
+			&i.RoomID,
+			&i.StartedBy,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.StartedEvent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const endCallIfEmpty = `-- name: EndCallIfEmpty :one
 UPDATE calls SET ended_at = NOW()
 WHERE id = $1 AND ended_at IS NULL

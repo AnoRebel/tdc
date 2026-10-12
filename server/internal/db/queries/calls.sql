@@ -120,3 +120,13 @@ UPDATE call_links SET
                                   THEN NOW() ELSE passcode_failures_from END
 WHERE id = $1
 RETURNING passcode_failures;
+
+-- name: EndAbandonedCalls :many
+-- Ends calls nobody has been in for a while: their last person left without
+-- the end being recorded — a tab closed mid-request, a server stopped. The
+-- grace keeps a call being started, whose first person is not in yet, open.
+UPDATE calls c SET ended_at = NOW()
+WHERE c.ended_at IS NULL
+  AND c.started_at < NOW() - INTERVAL '1 minute'
+  AND NOT EXISTS (SELECT 1 FROM call_participants p WHERE p.call_id = c.id AND p.left_at IS NULL)
+RETURNING *;
