@@ -182,7 +182,9 @@ describe("what the shared layer may depend on", () => {
 
     const missing = new Set<string>();
     for (const { contents } of sources()) {
-      for (const match of contents.matchAll(/\b(use[A-Z][A-Za-z]*)\s*\(/g)) {
+      // A method on an object — form.useSelector() — is that object's, never
+      // an auto-import, so only bare calls are counted.
+      for (const match of contents.matchAll(/(?<![.\w])(use[A-Z][A-Za-z]*)\s*\(/g)) {
         const name = match[1];
         if (!name) continue;
         // Declared in the same file, which several composables do internally.

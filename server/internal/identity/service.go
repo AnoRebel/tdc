@@ -46,6 +46,9 @@ type Store interface {
 type Service struct {
 	store Store
 	log   *slog.Logger
+	// formerNameHold is how long a given-up username stays its old owner's.
+	// See HoldFormerNames.
+	formerNameHold func(context.Context) time.Duration
 }
 
 // NewService builds an identity service over the given store.
@@ -104,8 +107,22 @@ func (s *Service) CreateUser(ctx context.Context, input NewUser) (dbgen.User, er
 	}
 
 	displayName := strings.TrimSpace(input.DisplayName)
+	if err := ValidateDisplayName(displayName); err != nil {
+		return dbgen.User{}, err
+	}
 	if displayName == "" {
 		displayName = username
+	}
+
+	// A name somebody else gave up recently is still theirs. Reported as
+	// taken, which is true, rather than as somebody's old name, which would
+	// say more than the person registering needs to know.
+	held, err := s.UsernameHeld(ctx, NormaliseUsername(username), uuid.Nil)
+	if err != nil {
+		return dbgen.User{}, err
+	}
+	if held {
+		return dbgen.User{}, ErrUsernameTaken
 	}
 
 	params := dbgen.CreateUserParams{

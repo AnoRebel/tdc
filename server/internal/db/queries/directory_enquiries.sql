@@ -18,7 +18,7 @@ SELECT
                      WHERE b.blocker_id = u.id AND b.blocked_id = @sender::uuid))::boolean AS accepts
 FROM users u
 LEFT JOIN directory_profiles p ON p.user_id = u.id
-WHERE u.username_folded = lower(@username::text);
+WHERE u.id = user_named(lower(@username::text));
 
 -- name: CreateEnquiryRoom :one
 -- The private conversation an enquiry opens. A direct room, so everything that

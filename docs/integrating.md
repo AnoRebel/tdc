@@ -251,6 +251,48 @@ add `"invitation":"<code or token>"`; under `domain`, the email must be in an
 admitted domain. A refusal under policy is 403, and a server at its account
 limit refuses cleanly before creating anything.
 
+A display name is at most 64 characters and may not carry control or invisible
+formatting characters, or spell one of the reserved names; a refusal is 400. A
+username somebody else gave up recently is refused as taken (409).
+
+### Changing names
+
+```sh
+# The display name: any session or token. Empty means "show my username".
+curl -X PUT http://localhost:8080/api/me/display-name \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"displayName":"Amina Juma"}'
+
+# Whether the caller may change their username now, and what it will ask.
+curl http://localhost:8080/api/me/username -H "Authorization: Bearer $SESSION"
+
+# Whether a name is free for the caller: {"available":false,"reason":"held",...}
+curl 'http://localhost:8080/api/me/username/availability?username=amina.j' \
+  -H "Authorization: Bearer $SESSION"
+
+# The change itself: a session, never an API token, with the current password.
+curl -X PUT http://localhost:8080/api/me/username \
+  -H "Authorization: Bearer $SESSION" -H 'Content-Type: application/json' \
+  -d '{"username":"amina.j","password":"…"}'
+```
+
+`GET /api/me/username` answers `canChange`, and when it is false a `refusal` of
+`disabled` (the operator does not allow changes), `federated` (the caller is in
+a room another server takes part in, which knows them by address), `waiting`
+(changed too recently; `nextChangeAt` says until when) or `token`. It also gives
+the operator's `intervalDays` and `holdDays`, `confirm` — `password`, or
+`recent-sign-in` for an account with no password, whose session must be under
+15 minutes old (`recentSignInUntil`) — and the caller's `formerUsernames`.
+
+Availability answers `reason` `invalid`, `current`, `taken` or `held`. The
+change answers 200 with the account, 400 for a name that is malformed or already
+the caller's, 403 for a refusal above or a wrong or missing password, 409 for a
+name that is taken or held, and 429 past five attempts an hour. A changed
+account's `GET /api/me` carries `formerAddresses`, so a client can still treat
+messages sent under an old address as the caller's own. Old names keep resolving
+to their last owner wherever a username is looked up — profiles, filters,
+signing in — until somebody else takes them.
+
 ## Versions
 
 The API is served under `/api/v1/…`, and under `/api/…` as well. Every

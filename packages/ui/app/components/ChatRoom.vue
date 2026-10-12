@@ -61,6 +61,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { atTime, onDay } from "#layers/ui/app/lib/dates";
 import { isTyping } from "#layers/ui/app/lib/shortcuts";
+import { isOwnAddress } from "#layers/ui/app/lib/names";
 import IssueFromMessage from "#layers/ui/app/components/projects/IssueFromMessage.vue";
 import IssueLinks from "#layers/ui/app/components/projects/IssueLinks.vue";
 
@@ -313,7 +314,7 @@ const pull = usePullToRefresh(timelineElement, () => load());
 function lastMessage(onlyMine = false) {
   return [...visible.value]
     .reverse()
-    .find((message) => !message.removed && (!onlyMine || message.sender === user.value?.address));
+    .find((message) => !message.removed && (!onlyMine || isOwnAddress(user.value, message.sender)));
 }
 
 /** Opens the reader's own latest message for editing, if there is one. */
@@ -893,7 +894,7 @@ const grouped = computed(() => {
 
     groups.push({
       sender: message.sender,
-      mine: message.sender === user.value?.address,
+      mine: isOwnAddress(user.value, message.sender),
       at: message.sentAt,
       items: [message],
     });

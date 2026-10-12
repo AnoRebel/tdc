@@ -64,6 +64,7 @@ const groupTitles: Record<string, string> = {
   federation: $ts("admin.otherServers"),
   brand: $ts("admin.howThisServerLooks"),
   audit: $ts("moderation.auditLog"),
+  accounts: $ts("names.adminGroup"),
 };
 
 /*
@@ -92,6 +93,10 @@ const choices: Record<string, { value: string; label: string }[]> = {
     { value: "open", label: $ts("admin.anyServerThatProvesWhoItIs") },
     { value: "allowlist", label: $ts("admin.onlyTheServersListedBelow") },
     { value: "blocklist", label: $ts("admin.anyServerExceptThoseListed") },
+  ],
+  "accounts.username_changes": [
+    { value: "true", label: $ts("names.adminChangesAllowed") },
+    { value: "false", label: $ts("names.adminChangesRefused") },
   ],
   "filter.action": [
     { value: "flag", label: $ts("admin.deliverAndShowModerator") },

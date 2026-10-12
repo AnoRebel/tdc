@@ -333,6 +333,10 @@ function deviceName(userAgent: string): string {
         </div>
       </section>
 
+      <!-- What you are called, straight under who you are: the display name
+           and the username that is half of the address above. -->
+      <AccountNames />
+
       <section>
         <h2 class="text-sm font-semibold">{{ $t("settings.status") }}</h2>
         <p class="mt-0.5 text-xs text-muted-foreground">

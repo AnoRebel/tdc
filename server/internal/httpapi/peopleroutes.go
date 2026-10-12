@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -39,6 +40,9 @@ type personResponse struct {
 	// SuspensionNote is why, which is what makes a suspension reviewable by
 	// somebody who did not impose it.
 	SuspensionNote string `json:"suspensionNote,omitempty"`
+	// FormerUsernames are the names this account gave up, newest first, so
+	// an administrator can tell who somebody was before.
+	FormerUsernames []string `json:"formerUsernames,omitempty"`
 }
 
 func (s *Server) handleListPeople(c *echo.Context) error {
@@ -66,9 +70,25 @@ func (s *Server) handleListPeople(c *echo.Context) error {
 		return err
 	}
 
+	// One query for the page's former names, not one per person.
+	ids := make([]uuid.UUID, 0, len(people))
+	for _, person := range people {
+		ids = append(ids, person.ID)
+	}
+	former, err := s.queries.ListFormerUsernamesFor(c.Request().Context(), ids)
+	if err != nil {
+		return err
+	}
+	formerByUser := map[uuid.UUID][]string{}
+	for _, row := range former {
+		formerByUser[row.UserID] = append(formerByUser[row.UserID], row.Username)
+	}
+
 	response := make([]personResponse, 0, len(people))
 	for _, person := range people {
-		response = append(response, s.personResponse(person))
+		item := s.personResponse(person)
+		item.FormerUsernames = formerByUser[person.ID]
+		response = append(response, item)
 	}
 
 	return c.JSON(http.StatusOK, response)

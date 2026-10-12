@@ -419,7 +419,10 @@ func (s *Server) createAccountFromIdentity(
 		username = detail.Username
 	}
 	displayName := request.DisplayName
-	if displayName == "" {
+	// The provider's name only where it would be accepted from a person: a
+	// provider's idea of a name is not ours, and refusing the account over a
+	// name nobody here typed would be refusing it for nothing.
+	if displayName == "" && identity.ValidateDisplayName(detail.DisplayName) == nil {
 		displayName = detail.DisplayName
 	}
 

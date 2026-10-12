@@ -106,7 +106,7 @@ SELECT
     p.updated_at
 FROM users u
 JOIN directory_profiles p ON p.user_id = u.id
-WHERE u.username_folded = lower(@username::text)
+WHERE u.id = user_named(lower(@username::text))
   AND p.profile_rank <= @viewer_rank::smallint
   -- A suspended account is not somebody a client can engage, and listing one
   -- would advertise a person the server has stopped.
@@ -168,4 +168,4 @@ WHERE user_id = @user_id;
 SELECT u.id, u.username
 FROM users u
 JOIN directory_profiles p ON p.user_id = u.id
-WHERE u.username_folded = lower(@username::text);
+WHERE u.id = user_named(lower(@username::text));

@@ -13,6 +13,39 @@ export interface User {
    * later.
    */
   address: string;
+  /**
+   * The addresses this person had before changing their username, newest
+   * first. Only ever told to the person themselves: their old messages carry
+   * the address they were sent under, and are still theirs.
+   */
+  formerAddresses?: string[];
+}
+
+/** Whether somebody may change their username now, and what it will ask. */
+export interface UsernamePolicy {
+  username: string;
+  canChange: boolean;
+  /** Why not, when they may not. */
+  refusal?: "disabled" | "federated" | "waiting" | "token";
+  message?: string;
+  /** When waiting ends. */
+  nextChangeAt?: string;
+  /** Days between changes; 0 is no wait. */
+  intervalDays: number;
+  /** Days a given-up name stays its owner's; 0 releases it at once. */
+  holdDays: number;
+  /** The password, or — for an account without one — a sign-in this recent. */
+  confirm: "password" | "recent-sign-in";
+  recentSignInUntil?: string;
+  formerUsernames: { username: string; changedAt: string }[];
+}
+
+/** Whether a username is free for this person to take. */
+export interface UsernameAvailability {
+  username: string;
+  available: boolean;
+  reason?: "invalid" | "current" | "taken" | "held";
+  message?: string;
 }
 
 /** An authenticated session on one device. */

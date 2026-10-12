@@ -46,7 +46,7 @@ const getDirectoryProfileOwnerByUsername = `-- name: GetDirectoryProfileOwnerByU
 SELECT u.id, u.username
 FROM users u
 JOIN directory_profiles p ON p.user_id = u.id
-WHERE u.username_folded = lower($1::text)
+WHERE u.id = user_named(lower($1::text))
 `
 
 type GetDirectoryProfileOwnerByUsernameRow struct {
@@ -398,7 +398,7 @@ SELECT
     p.updated_at
 FROM users u
 JOIN directory_profiles p ON p.user_id = u.id
-WHERE u.username_folded = lower($3::text)
+WHERE u.id = user_named(lower($3::text))
   AND p.profile_rank <= $1::smallint
   -- A suspended account is not somebody a client can engage, and listing one
   -- would advertise a person the server has stopped.

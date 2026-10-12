@@ -67,6 +67,15 @@ type userResponse struct {
 	// Address is the federated form, user@server, which stays unambiguous once
 	// servers exchange messages.
 	Address string `json:"address"`
+	/*
+		FormerAddresses are the addresses this person had before changing their
+		username, newest first — only ever told to the person themselves.
+
+		Their old messages carry the address they were sent under, signed and
+		unchangeable, and a client comparing only the current address would
+		decide none of them were theirs: no edit, no delete.
+	*/
+	FormerAddresses []string `json:"formerAddresses,omitempty"`
 }
 
 func (s *Server) userResponse(user dbgen.User) userResponse {
@@ -179,6 +188,7 @@ func registrationError(err error) error {
 	case errors.Is(err, identity.ErrEmailTaken):
 		return echo.NewHTTPError(http.StatusConflict, "that email address is already registered")
 	case errors.Is(err, identity.ErrInvalidUsername),
+		errors.Is(err, identity.ErrInvalidDisplayName),
 		errors.Is(err, identity.ErrWeakPassword):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	default:
@@ -383,7 +393,13 @@ func (s *Server) handleCurrentUser(c *echo.Context) error {
 	if !ok {
 		return echo.NewHTTPError(http.StatusUnauthorized, "authentication is required")
 	}
-	return c.JSON(http.StatusOK, s.userResponse(user))
+	response := s.userResponse(user)
+	former, err := s.formerAddresses(c.Request().Context(), user.ID)
+	if err != nil {
+		return err
+	}
+	response.FormerAddresses = former
+	return c.JSON(http.StatusOK, response)
 }
 
 type sessionResponse struct {

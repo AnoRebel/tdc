@@ -6,8 +6,80 @@ RETURNING *;
 -- name: GetUserByID :one
 SELECT * FROM users WHERE id = $1;
 
+-- Whoever a name means: its holder, or the account that most recently gave it
+-- up, so an old link or a saved filter still finds the person it named — and
+-- somebody whose desktop application remembers the name they used to have can
+-- still sign in with it, for as long as nobody else has taken it.
 -- name: GetUserByUsername :one
+SELECT * FROM users WHERE id = user_named($1);
+
+-- Only the account holding the name now: whether a name is free to take.
+-- name: GetUserByCurrentUsername :one
 SELECT * FROM users WHERE username_folded = $1;
+
+-- Serialises everything that hands out or gives up one name, for the length
+-- of a transaction: a rename away from a name and somebody else claiming it
+-- would otherwise each see the other's state from before.
+-- name: LockUsername :exec
+SELECT pg_advisory_xact_lock(hashtext('username:' || @folded::text));
+
+-- name: RenameUser :one
+UPDATE users
+SET username        = @username,
+    username_folded = @username_folded,
+    updated_at      = NOW()
+WHERE id = @id
+RETURNING *;
+
+-- name: RecordFormerUsername :exec
+INSERT INTO username_history (user_id, username, username_folded)
+VALUES (@user_id, @username, @username_folded);
+
+-- When this account last changed its username, if it ever has.
+-- name: LastUsernameChange :one
+SELECT changed_at FROM username_history
+WHERE user_id = $1
+ORDER BY changed_at DESC
+LIMIT 1;
+
+-- Whether somebody else gave this name up recently enough that it is still
+-- theirs to come back to.
+-- name: UsernameHeldByOther :one
+SELECT EXISTS (
+    SELECT 1 FROM username_history
+    WHERE username_folded = @folded
+      AND user_id <> @user_id
+      AND changed_at > @since
+)::boolean;
+
+-- name: ListFormerUsernames :many
+SELECT username, changed_at FROM username_history
+WHERE user_id = $1
+ORDER BY changed_at DESC;
+
+-- Former names for a page of accounts at once, for the administrators' list.
+-- name: ListFormerUsernamesFor :many
+SELECT user_id, username, changed_at FROM username_history
+WHERE user_id = ANY(@user_ids::uuid[])
+ORDER BY changed_at DESC;
+
+/*
+Whether this person is in any conversation another server takes part in: one
+hosted elsewhere, or one hosted here that has peers.
+
+Other servers know a person by their address and nothing else — it is in the
+signed events they hold and the membership they keep — and the protocol has no
+way to say "this address is now that one". A rename would leave them a member
+under a name that no longer exists here.
+*/
+-- name: InFederatedRoom :one
+SELECT EXISTS (
+    SELECT 1 FROM room_members m
+    JOIN rooms r ON r.id = m.room_id
+    WHERE m.user_id = @user_id
+      AND (lower(r.home_server) <> lower(@server_name::text)
+           OR EXISTS (SELECT 1 FROM room_peers p WHERE p.room_id = r.id))
+)::boolean;
 
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE email_folded = $1;

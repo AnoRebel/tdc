@@ -86,7 +86,7 @@ SELECT
                      WHERE b.blocker_id = u.id AND b.blocked_id = $2::uuid))::boolean AS accepts
 FROM users u
 LEFT JOIN directory_profiles p ON p.user_id = u.id
-WHERE u.username_folded = lower($3::text)
+WHERE u.id = user_named(lower($3::text))
 `
 
 type EnquiryRecipientParams struct {
