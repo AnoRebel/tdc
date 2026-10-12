@@ -376,6 +376,9 @@ function deviceName(userAgent: string): string {
       <!-- Draws nothing where the server cannot offer passkeys. -->
       <PasskeyManager />
 
+      <!-- A program's way in without a password, scoped by what it is denied. -->
+      <ApiTokens />
+
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">
           <Monitor class="size-3.5 text-muted-foreground" />

@@ -61,6 +61,27 @@ export interface CurrentPermissions {
 }
 
 /**
+ * A personal API token, as its owner sees it. Never the secret, which exists
+ * only in the response that issued it.
+ */
+export interface ApiToken {
+  id: string;
+  label: string;
+  /** What it was left; everything else the account holds is denied to it. */
+  scope: string[];
+  /** ISO time it stops working; absent when it does not expire. */
+  expires?: string;
+  /** ISO time it was last used; absent when it never has been. */
+  lastUsed?: string;
+  created: string;
+}
+
+/** A token just issued: the one time its secret is sent. */
+export interface IssuedApiToken extends ApiToken {
+  token: string;
+}
+
+/**
  * What signing in through a provider turned out to be.
  *
  * Four of these are answers and four are ways it did not happen. A client shows
