@@ -30,7 +30,24 @@ type Decision struct {
 	Permission Permission
 	// Reason says why, in terms suitable for a log or an error message.
 	Reason string
+	// Basis says where the answer came from, as a word a client can translate
+	// rather than a sentence it would have to parse.
+	Basis Basis
 }
+
+// Basis is where an authorization decision came from.
+type Basis string
+
+const (
+	// BasisAdministrator is an allowance that comes from server.administer.
+	BasisAdministrator Basis = "administrator"
+	// BasisServer is an entry at server scope, granting or denying.
+	BasisServer Basis = "server"
+	// BasisScope is an entry for the one channel or project asked about.
+	BasisScope Basis = "scope"
+	// BasisNone is nothing at all: no role says anything about it.
+	BasisNone Basis = "none"
+)
 
 // Error returns a message naming the permission that would have allowed the
 // action, which is what the specification requires a refusal to state.
@@ -147,12 +164,16 @@ func Resolve(grants []Grant) Permissions {
 // AllowsServer reports whether the actor holds a permission at server scope.
 func (p Permissions) AllowsServer(permission Permission) Decision {
 	if p.serverScope[PermServerAdminister] && !IsExplicitlyDenied(p, permission, nil) {
-		return Decision{Allowed: true, Permission: permission, Reason: "server administrator"}
+		return Decision{Allowed: true, Permission: permission, Reason: "server administrator", Basis: BasisAdministrator}
 	}
-	if p.serverScope[permission] {
-		return Decision{Allowed: true, Permission: permission, Reason: "granted at server scope"}
+	granted, present := p.serverScope[permission]
+	if granted {
+		return Decision{Allowed: true, Permission: permission, Reason: "granted at server scope", Basis: BasisServer}
 	}
-	return Decision{Allowed: false, Permission: permission, Reason: "not granted"}
+	if present {
+		return Decision{Allowed: false, Permission: permission, Reason: "denied at server scope", Basis: BasisServer}
+	}
+	return Decision{Allowed: false, Permission: permission, Reason: "not granted", Basis: BasisNone}
 }
 
 // AllowsChannel reports whether the actor holds a permission in a channel.
@@ -163,9 +184,9 @@ func (p Permissions) AllowsChannel(permission Permission, channelID uuid.UUID) D
 	if scope, ok := p.channelScope[channelID]; ok {
 		if granted, present := scope[permission]; present {
 			if granted {
-				return Decision{Allowed: true, Permission: permission, Reason: "granted for this channel"}
+				return Decision{Allowed: true, Permission: permission, Reason: "granted for this channel", Basis: BasisScope}
 			}
-			return Decision{Allowed: false, Permission: permission, Reason: "denied for this channel"}
+			return Decision{Allowed: false, Permission: permission, Reason: "denied for this channel", Basis: BasisScope}
 		}
 	}
 	return p.AllowsServer(permission)

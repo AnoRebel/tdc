@@ -796,6 +796,31 @@ section](directory.md#moderation) is the guide for all three — what each
 allows, how to approve, merge or reject a skill, how to verify and revoke a
 claim, and the audit entry each leaves.
 
+### Deciding who may do what
+
+Whoever may make roles or hand them out finds **Roles and permissions** under
+Administration in your settings. It lists every role with how many people hold
+it and what it allows. Open one to rename it, describe it, delete it — the
+server keeps `Member` and `Administrator` — or set each permission to
+**Allow**, **Deny** or **Unset**. Beside each choice is what it will mean:
+whether `Member` already gives it to everybody, that a denial wins over every
+other role, or that a role which administers the server already has it. The
+people holding a role are listed underneath, with a search to add somebody.
+
+To see what one person may do, search for them on the roles screen, or open
+**Roles** beside them in the people list. Every permission is listed with the
+role that decided it, across the server or in one channel you pick. Their roles
+can be given and taken away from there too.
+
+A channel's own settings show **Who may do what here** to the same people: what
+each role is allowed or denied in that channel alone. That is how a channel
+gets keepers who have no say anywhere else, and how an announcement channel is
+made. Deny posting to `Member` there, and allow it to the role whoever
+announces holds.
+
+If a change would take away your own authority, you are asked first. One that
+would leave the server with nobody to administer it is refused.
+
 ### Messages from other servers
 
 If your server federates, some messages in a room come from people on other
@@ -1197,13 +1222,10 @@ a dialog that appears for everything is a dialog nobody reads.
 
 So that nothing above is read as implying more than it says:
 
-- **Choosing who may do what, from the interface.** Roles and permissions are
-  managed through the API rather than a screen, so an administrator setting up
-  a moderator is doing it with a tool rather than a form.
 - **More of calls.** Calls between a few people work, on servers that switch
-  them on (see [Calls](#calls)), and ringing people into them. Links to a call, sharing a
-  screen, recording, and calls of more than a handful of people are still to
-  come.
+  them on (see [Calls](#calls)), with ringing, holding, merging into a
+  conference and links. Sharing a screen, recording, calls with people on other
+  servers and calls of more than a handful of people are still to come.
 
 Several capabilities are finished on the server and are waiting only for a
 control in the clients. They are noted where they belong above, and collected

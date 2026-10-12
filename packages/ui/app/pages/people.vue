@@ -4,7 +4,7 @@ import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 
 import { isApiError } from "@tdc/types";
-import { ArrowLeft, Check, Copy, ShieldAlert, UserPlus, UserX } from "lucide-vue-next";
+import { ArrowLeft, Check, Copy, KeyRound, ShieldAlert, UserPlus, UserX } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import type { Person } from "#layers/ui/app/composables/usePeople";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -320,6 +320,18 @@ function when(value: string): string {
                 </span>
               </span>
 
+              <!-- Their roles and what those let them do, for whoever hands
+                   roles out: looking at a person is where somebody expects
+                   to change what that person may do. -->
+              <NuxtLink
+                v-if="can('role.manage') || can('role.assign')"
+                :to="localeRoute({ name: 'roles-people-id', params: { id: person.id } })"
+                class="btn btn-ghost h-7 shrink-0 px-2 text-xs"
+                :aria-label="$ts('roles.rolesOf', { name: person.displayName || person.username })"
+              >
+                <KeyRound class="size-3.5" aria-hidden="true" />
+                {{ $t("roles.roles") }}
+              </NuxtLink>
               <Button
                 variant="ghost"
                 class="h-7 shrink-0 px-2 text-xs"

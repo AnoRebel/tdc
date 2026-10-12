@@ -34,6 +34,12 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/admin/roles/:id/permissions/:permission": {
+		Query: []string{"channel", "confirmed"},
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/admin/users/:id/suspend": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -288,7 +294,12 @@ var routeBodies = map[string]routeBodySet{
 	},
 	"GET /api/admin/roles": {
 		Responses: []responseBody{
-			{Status: 200, Type: reflect.TypeFor[[]roleResponse]()},
+			{Status: 200, Type: reflect.TypeFor[[]roleSummaryResponse]()},
+		},
+	},
+	"GET /api/admin/roles/:id/members": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[roleMembersResponse]()},
 		},
 	},
 	"GET /api/admin/rooms/:id/federation": {
@@ -310,6 +321,12 @@ var routeBodies = map[string]routeBodySet{
 		Query: []string{"limit", "offset"},
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]personResponse]()},
+		},
+	},
+	"GET /api/admin/users/:id/permissions": {
+		Query: []string{"channel"},
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[effectivePermissionsResponse]()},
 		},
 	},
 	"GET /api/applications": {
@@ -918,6 +935,12 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/webhooks/event-types": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[eventTypesView]()},
+		},
+	},
+	"PATCH /api/admin/roles/:id": {
+		Request: reflect.TypeFor[updateRoleRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[roleResponse]()},
 		},
 	},
 	"PATCH /api/calls/:callId": {

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Compass,
   Flag,
+  KeyRound,
   LogOut,
   Monitor,
   Moon,
@@ -685,7 +686,9 @@ function deviceName(userAgent: string): string {
           can('moderation.review') ||
           can('server.configure') ||
           can('user.suspend') ||
-          can('user.invite')
+          can('user.invite') ||
+          can('role.manage') ||
+          can('role.assign')
         "
       >
         <h2 class="text-sm font-semibold">{{ $t("nav.administration") }}</h2>
@@ -705,6 +708,14 @@ function deviceName(userAgent: string): string {
           >
             <Users class="size-3.5" />
             {{ $t("nav.people") }}
+          </NuxtLink>
+          <NuxtLink
+            v-if="can('role.manage') || can('role.assign')"
+            :to="localeRoute({ name: 'roles' })"
+            class="btn btn-outline"
+          >
+            <KeyRound class="size-3.5" />
+            {{ $t("roles.title") }}
           </NuxtLink>
           <NuxtLink
             v-if="can('moderation.review')"
