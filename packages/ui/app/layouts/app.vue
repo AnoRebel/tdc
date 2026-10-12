@@ -243,6 +243,9 @@ const showingInterface = useState("interface.open", () => false);
  * kept — staying mounted is what lets it animate out as well as in.
  */
 const opened = reactive({
+  // The palette too: nobody needs it to see the application, only once they
+  // reach for it, and it is one of the larger things the layout carried.
+  search: false,
   shortcuts: false,
   interface: false,
   newMessage: false,
@@ -253,6 +256,7 @@ const newMessage = useNewMessage();
 const showingStatus = useState("status.open", () => false);
 const showingScheduled = useScheduled().showing;
 watchEffect(() => {
+  if (searching.value) opened.search = true;
   if (showingShortcuts.value) opened.shortcuts = true;
   if (showingInterface.value) opened.interface = true;
   if (newMessage.state.value.open) opened.newMessage = true;
@@ -645,7 +649,8 @@ provide("openSearch", () => {
     <!-- A call goes on whatever page somebody moves to. -->
     <LazyCallHost v-if="callsOffered" />
 
-    <SearchPalette
+    <LazySearchPalette
+      v-if="opened.search"
       v-model="searching"
       @shortcuts="showingShortcuts = true"
       @create-channel="creating = true"

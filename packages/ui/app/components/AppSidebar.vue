@@ -6,8 +6,6 @@ import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { useNow } from "@vueuse/core";
-import { MessageSquareText, Settings, X } from "lucide-vue-next";
-import type { MenuItem } from "#layers/ui/app/components/ContextMenu.vue";
 import { appearOfflineKey } from "#layers/ui/app/composables/useOwnStatus";
 import { arrangeSidebar, showsUnreadBadge } from "#layers/ui/app/lib/sidebar";
 import { presenceDotClass } from "#layers/ui/app/lib/presencedot";
@@ -79,9 +77,9 @@ const conversationMenu = useConversationMenu();
 const rowMenu = useContextMenu();
 const menuFor = ref<Room | null>(null);
 
-function openRowMenu(room: Room, at: { x: number; y: number } | Element) {
+async function openRowMenu(room: Room, at: { x: number; y: number } | Element) {
   menuFor.value = room;
-  const items = conversationMenu.itemsFor(room);
+  const items = await conversationMenu.itemsFor(room);
   if (at instanceof Element) rowMenu.showFrom(at, items);
   else rowMenu.show(at.x, at.y, items);
 }
@@ -114,42 +112,25 @@ const statusLine = computed(() => {
   return parts.join(" · ");
 });
 
-function openUserMenu(event: MouseEvent) {
+async function openUserMenu(event: MouseEvent) {
+  const opener = event.currentTarget as Element;
   const own = ownStatus.own.value;
-  const items: MenuItem[] = ownStatus.statuses.value.map((status, index) => ({
-    label: status.label,
-    choice: "radio" as const,
-    checked:
-      status.key === appearOfflineKey ? own.invisible : !own.invisible && own.status === status.key,
-    section: index === 0 ? $ts("status.showAs") : undefined,
-    action: () => {
-      ownStatus
-        .set({ status: status.key, text: own.statusText })
-        .catch(() => say($ts("status.couldNotSave")));
+  const { userMenuItems } = await import("#layers/ui/app/lib/conversationmenu");
+  const items = userMenuItems({
+    $ts,
+    own,
+    statuses: ownStatus.statuses.value,
+    appearOfflineKey,
+    choose: (status) => {
+      ownStatus.set({ status, text: own.statusText }).catch(() => say($ts("status.couldNotSave")));
     },
-  }));
-  items.push({
-    label: $ts("status.setNote"),
-    icon: MessageSquareText,
-    separated: true,
-    action: () => (statusOpen.value = true),
+    openDialog: () => (statusOpen.value = true),
+    clear: () => {
+      ownStatus.clear().catch(() => say($ts("status.couldNotSave")));
+    },
+    openSettings: () => void router.push(localeRoute({ name: "settings" })),
   });
-  if (own.status !== "available" || own.statusText || own.invisible) {
-    items.push({
-      label: $ts("status.clearNow"),
-      icon: X,
-      action: () => {
-        ownStatus.clear().catch(() => say($ts("status.couldNotSave")));
-      },
-    });
-  }
-  items.push({
-    label: $ts("nav.settings"),
-    icon: Settings,
-    separated: true,
-    action: () => void router.push(localeRoute({ name: "settings" })),
-  });
-  userMenu.showFrom(event.currentTarget as Element, items);
+  userMenu.showFrom(opener, items);
 }
 const { say } = useNotice();
 
@@ -443,6 +424,7 @@ function isCurrent(roomId: string): boolean {
         class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg p-1 text-left transition-colors hover:bg-accent"
         aria-haspopup="menu"
         data-user-menu
+        :title="statusLine ?? undefined"
         :aria-label="
           statusLine ? $ts('status.menuWithStatus', { status: statusLine }) : $ts('status.menu')
         "
@@ -464,7 +446,7 @@ function isCurrent(roomId: string): boolean {
         </span>
       </button>
 
-      <ContextMenu
+      <LazyContextMenu
         v-if="userMenu.open.value"
         :items="userMenu.items.value"
         :x="userMenu.position.value.x"
@@ -472,7 +454,7 @@ function isCurrent(roomId: string): boolean {
         :label="$ts('status.menu')"
         @close="userMenu.close"
       />
-      <ContextMenu
+      <LazyContextMenu
         v-if="rowMenu.open.value"
         :items="rowMenu.items.value"
         :x="rowMenu.position.value.x"

@@ -249,20 +249,20 @@ const earliest = computed(() => new Date(Date.now() + 60_000));
 
               <form.Field name="clearAfter">
                 <template #default="{ field }">
-                  <Field :label="$ts('status.clearAfter')">
+                  <Field
+                    :label="$ts('status.clearAfter')"
+                    :hint="
+                      endsAt(field.state.value)
+                        ? $ts('status.clearsAt', { time: endsAt(field.state.value)! })
+                        : undefined
+                    "
+                  >
                     <template #default="{ id }">
                       <Select
                         :id="id"
                         :model-value="field.state.value"
                         :label="$ts('status.clearAfter')"
-                        :options="
-                          clearOptions.map((option) => ({
-                            ...option,
-                            label: endsAt(option.value)
-                              ? `${option.label} · ${endsAt(option.value)}`
-                              : option.label,
-                          }))
-                        "
+                        :options="clearOptions"
                         @update:model-value="$event !== undefined && field.handleChange($event)"
                       />
                     </template>

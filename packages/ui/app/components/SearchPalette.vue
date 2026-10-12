@@ -74,14 +74,18 @@ watch(entries, () => {
   active.value = 0;
 });
 
-watch(open, async (isOpen) => {
-  if (!isOpen) {
-    clear();
-    return;
-  }
-  await nextTick();
-  field.value?.focus();
-});
+watch(
+  open,
+  async (isOpen) => {
+    if (!isOpen) {
+      clear();
+      return;
+    }
+    await nextTick();
+    field.value?.focus();
+  },
+  { immediate: true },
+);
 
 function onInput(event: Event) {
   search((event.target as HTMLInputElement).value);

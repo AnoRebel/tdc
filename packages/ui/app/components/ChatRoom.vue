@@ -112,9 +112,10 @@ const title = computed(() => {
     : room.value.name;
 });
 
-function openConversationMenu(event: MouseEvent) {
+async function openConversationMenu(event: MouseEvent) {
+  const opener = event.currentTarget as Element;
   if (!room.value) return;
-  contextMenu.showFrom(event.currentTarget as Element, conversationMenu.itemsFor(room.value));
+  contextMenu.showFrom(opener, await conversationMenu.itemsFor(room.value));
 }
 const refreshRooms = inject<() => Promise<void>>("refreshRooms", async () => {});
 
@@ -1217,6 +1218,17 @@ async function loadTyping() {
     // As above.
   }
 }
+
+/*
+ * Asked again every few seconds while the conversation is on screen.
+ *
+ * Typing has no live frame, so without this the indicator only changed when
+ * a message arrived — by which time the person had stopped typing. Not while
+ * the tab is hidden, where nobody is watching for it.
+ */
+useIntervalFn(() => {
+  if (room.value?.member && document.visibilityState === "visible") void loadTyping();
+}, 3000);
 
 /**
  * Records that everything shown has been read.

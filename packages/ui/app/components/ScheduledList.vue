@@ -26,7 +26,7 @@ const props = defineProps<{
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 const { user } = useAuth();
 const router = useRouter();
-const scheduledMessages = useScheduled();
+const scheduledMessages = { ...useScheduled(), ...useScheduledChanges() };
 const { scheduled, showing } = scheduledMessages;
 const { say } = useNotice();
 

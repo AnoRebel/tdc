@@ -30,13 +30,14 @@ const props = withDefaults(
 
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
 
-const cancelButton = ref<HTMLButtonElement | null>(null);
+// A component, not the element: the button inside it is what takes focus.
+const cancelButton = ref<{ $el?: HTMLElement } | null>(null);
 
 // Focus starts on cancel, which is both the safe default and what a plain
 // Enter will therefore activate.
 onMounted(async () => {
   await nextTick();
-  cancelButton.value?.focus();
+  cancelButton.value?.$el?.focus();
   document.body.style.overflow = "hidden";
 });
 
