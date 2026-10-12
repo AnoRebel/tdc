@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import { useForm } from "@tanstack/vue-form";
-import { useLocalStorage, useMediaQuery } from "@vueuse/core";
+import { useIntervalFn, useLocalStorage, useMediaQuery, useWindowFocus } from "@vueuse/core";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
 
@@ -143,6 +143,37 @@ const available = computed(() =>
   rooms.value.filter((room) => !room.member && room.kind !== "direct"),
 );
 
+/*
+ * What this person has chosen for themselves — pins, mutes, their status —
+ * read when the application opens and again whenever its window comes back
+ * into focus, which is when another device's changes are worth catching up
+ * on. Not on every navigation: none of it changes by moving between
+ * conversations. Each keeps its last answer when it cannot get a new one.
+ */
+const pinnedRooms = usePinnedRooms();
+const notificationPreferences = useNotificationPreferences();
+const scheduledMessages = useScheduled();
+const ownStatus = useOwnStatus();
+
+function refreshPersonal() {
+  void pinnedRooms.refresh();
+  void notificationPreferences.refresh();
+  void ownStatus.refresh();
+  void scheduledMessages.refresh();
+}
+refreshPersonal();
+const focused = useWindowFocus();
+watch(focused, (isFocused) => isFocused && refreshPersonal());
+
+/*
+ * Scheduled messages leave the list as they are sent, which happens on the
+ * server's timer rather than in answer to anything here. Looked at again each
+ * minute while there is anything to look at, and not at all otherwise.
+ */
+useIntervalFn(() => {
+  if (scheduledMessages.scheduled.value.length) void scheduledMessages.refresh();
+}, 60_000);
+
 async function refresh() {
   try {
     const [all, conversations, counts] = await Promise.all([
@@ -211,11 +242,24 @@ const showingInterface = useState("interface.open", () => false);
  * Whether each has ever been opened, so it is fetched on first use and then
  * kept — staying mounted is what lets it animate out as well as in.
  */
-const opened = reactive({ shortcuts: false, interface: false });
+const opened = reactive({
+  shortcuts: false,
+  interface: false,
+  newMessage: false,
+  status: false,
+  scheduled: false,
+});
+const newMessage = useNewMessage();
+const showingStatus = useState("status.open", () => false);
+const showingScheduled = useScheduled().showing;
 watchEffect(() => {
   if (showingShortcuts.value) opened.shortcuts = true;
   if (showingInterface.value) opened.interface = true;
+  if (newMessage.state.value.open) opened.newMessage = true;
+  if (showingStatus.value) opened.status = true;
+  if (showingScheduled.value.open) opened.scheduled = true;
 });
+const { notice } = useNotice();
 
 /*
  * Whether the sidebar is put away on a wide screen.
@@ -507,7 +551,9 @@ function moveToUnread(direction: number) {
       ((((current < 0 ? -1 : current) + direction * step) % order.length) + order.length) %
       order.length;
     const room = order[index]!;
-    if (unread.value[room.id]) {
+    // Not into a muted conversation: somebody who silenced it asked not to
+    // be taken there by what arrives in it.
+    if (unread.value[room.id] && !notificationPreferences.of(room.id).muted) {
       void router.push(localeRoute({ name: "rooms-id", params: { id: room.id } }));
       return;
     }
@@ -613,6 +659,23 @@ provide("openSearch", () => {
       @preferences="showingInterface = true"
     />
     <LazyInterfacePreferencesDialog v-if="opened.interface" v-model="showingInterface" />
+    <LazyNewMessageDialog v-if="opened.newMessage" />
+    <LazyStatusDialog v-if="opened.status" v-model="showingStatus" />
+    <LazyScheduledList v-if="opened.scheduled" :rooms="[...joined, ...direct]" />
+
+    <!-- What a menu that has already closed did, or could not do. The live
+         region is always there, so what appears in it is announced. -->
+    <div role="status" class="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2">
+      <Transition name="motion-toast">
+        <p
+          v-if="notice"
+          :key="notice.at"
+          class="rounded-full bg-foreground px-4 py-2 text-xs font-medium whitespace-nowrap text-background shadow-lg"
+        >
+          {{ notice.text }}
+        </p>
+      </Transition>
+    </div>
 
     <!-- Creating a channel is a small, focused task, so it is a slide-over
          rather than a modal that dims the whole application. -->

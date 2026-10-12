@@ -250,7 +250,8 @@
     "actionTaken": "{label} — imejibiwa",
     "actionAlreadyAnswered": "Hilo limeshajibiwa.",
     "actionFailed": "Hilo halikuweza kujibiwa. Jaribu tena.",
-    "editThisMessage": "Hariri ujumbe huu"
+    "editThisMessage": "Hariri ujumbe huu",
+    "loading": "Inapakia"
   },
   "channel": {
     "create": "Kipindi kipya",
@@ -422,7 +423,11 @@
       "nobodyHint": "Hakuna anayeweza kukupigia. Bado unaweza kujiunga na simu mwenyewe.",
       "otherServers": "Watu kwenye seva zilizounganishwa",
       "otherServersHint": "Kama watu kwenye seva zilizounganishwa na hii wanaweza kukupigia, pale seva yako inaporuhusu."
-    }
+    },
+    "couldNotLoad": "Imeshindwa kupakia mipangilio yako.",
+    "couldNotSave": "Badiliko hilo halikuweza kuhifadhiwa. Jaribu tena.",
+    "showsTyping": "Waonyeshe wengine ninapoandika",
+    "showsTypingHint": "Ikizimwa, hakuna anayeona kwamba unaandika, kwenye kifaa chochote."
   },
   "update": {
     "ready": "Toleo jipya lipo tayari.",
@@ -1722,6 +1727,106 @@
     "farewell": {
       "other": "Samahani, lazima nipokee simu nyingine.",
       "back": "Lazima niondoke, nitapiga tena punde."
+    }
+  },
+  "conversation": {
+    "pinned": "Zilizobandikwa",
+    "pin": "Bandika juu",
+    "unpin": "Bandua",
+    "moveUp": "Sogeza juu",
+    "moveDown": "Sogeza chini",
+    "couldNotPin": "Haikuweza kubandikwa. Jaribu tena.",
+    "notifications": "Niarifu kuhusu",
+    "levelAll": "Kila ujumbe mpya",
+    "levelMentions": "Ninapotajwa na majibu kwangu",
+    "levelNone": "Hakuna chochote kutoka hapa",
+    "mute": "Nyamazisha mazungumzo",
+    "muted": "Yamenyamazishwa. Hakuna kitakachokuarifu kutoka hapa.",
+    "unmuted": "Hayajanyamazishwa tena.",
+    "isMuted": "Yamenyamazishwa",
+    "couldNotChangeNotifications": "Arifa hazikuweza kubadilishwa. Jaribu tena.",
+    "addPeople": "Ongeza watu…",
+    "people": "Watu {count}",
+    "options": "Chaguo za mazungumzo",
+    "optionsFor": "Chaguo za {name}"
+  },
+  "newMessage": {
+    "title": "Ujumbe mpya",
+    "addPeopleTitle": "Ongeza watu",
+    "command": "Ujumbe mpya",
+    "to": "Kwa",
+    "placeholder": "Andika jina",
+    "suggestions": "Watu",
+    "remove": "Mwondoe {name}",
+    "nobody": "Hakuna anayelingana na “{query}”.",
+    "addingStartsNew": "Kuongeza watu kunaanzisha mazungumzo mapya yenu nyote. Haya yanabaki kama yalivyo, pamoja na historia yake.",
+    "groupOf": "Mazungumzo ya watu {count}",
+    "enterHint": "Enter huongeza jina; Enter tena huanzisha mazungumzo.",
+    "start": "Anzisha mazungumzo",
+    "cannotOpen": "Mazungumzo hayo hayawezi kufunguliwa.",
+    "couldNotOpen": "Mazungumzo hayakuweza kufunguliwa. Jaribu tena.",
+    "noneYet": "Bado hakuna mazungumzo.",
+    "withOthers": "pamoja na wengine"
+  },
+  "scheduled": {
+    "title": "Ujumbe uliopangwa",
+    "inThisConversation": "Iliyopangwa hapa ({count})",
+    "oneHere": "Ujumbe mmoja umepangwa hapa",
+    "manyHere": "Ujumbe {count} umepangwa hapa",
+    "view": "Tazama",
+    "which": "Ujumbe upi",
+    "here": "Mazungumzo haya",
+    "everywhere": "Yote ({count})",
+    "nothing": "Hakuna kinachosubiri kutumwa.",
+    "inTime": "baada ya {time}",
+    "aConversation": "mazungumzo",
+    "wording": "Ujumbe",
+    "withFiles": "Pamoja na viambatisho {count}",
+    "sendNow": "Tuma sasa",
+    "changeTime": "Badilisha muda",
+    "cancel": "Ghairi ujumbe",
+    "keep": "Ubaki",
+    "cancelTitle": "Ghairi ujumbe huu uliopangwa?",
+    "saved": "Ujumbe umebadilishwa.",
+    "moved": "Muda umebadilishwa.",
+    "sent": "Umetumwa.",
+    "cancelled": "Ujumbe uliopangwa umeghairiwa.",
+    "couldNotChange": "Haikuweza kubadilishwa. Jaribu tena."
+  },
+  "status": {
+    "title": "Weka hali",
+    "command": "Weka hali",
+    "change": "Badilisha hali",
+    "menu": "Hali yako",
+    "menuWithStatus": "Hali yako: {status}",
+    "showAs": "Nionyeshe kama",
+    "setNote": "Weka maelezo au muda…",
+    "clearNow": "Futa hali",
+    "which": "Hali",
+    "holdsNotifications": "Huzuia arifa",
+    "appearOfflineHint": "Wengine wanakuona kama haupo mtandaoni ingawa bado umeunganishwa, na hukatizwi.",
+    "note": "Maelezo",
+    "noteHint": "Maneno machache, kama “nitarudi saa kumi”.",
+    "notePlaceholder": "Unashughulika na nini?",
+    "noteTooLong": "Isizidi herufi 100.",
+    "clearAfter": "Futa baada ya",
+    "pickAFutureTime": "Chagua muda ambao bado haujapita.",
+    "saved": "Hali imewekwa.",
+    "cleared": "Hali imefutwa.",
+    "couldNotSave": "Hali yako haikuweza kubadilishwa. Jaribu tena.",
+    "clear": {
+      "never": "Usifute",
+      "30m": "Dakika 30",
+      "1h": "Saa 1",
+      "4h": "Saa 4",
+      "today": "Leo",
+      "week": "Wiki hii",
+      "custom": "Chagua muda…"
+    },
+    "left": {
+      "minutes": "Zimebaki dakika {count}",
+      "hours": "Zimebaki saa {count}",
+      "days": "Zimebaki siku {count}"
     }
   }
 }

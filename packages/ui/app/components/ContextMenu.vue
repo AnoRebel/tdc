@@ -19,6 +19,20 @@ export interface MenuItem {
   destructive?: boolean;
   /** Absent actions are not rendered; a menu never lists what cannot be done. */
   disabled?: boolean;
+  /**
+   * A choice rather than an action: "radio" for one of several, "check" for
+   * on or off. Announced as such, with whether it is the current one.
+   */
+  choice?: "radio" | "check";
+  checked?: boolean;
+  /** Draws a line above this item, between groups of related actions. */
+  separated?: boolean;
+  /**
+   * Starts a titled group with this item. The title is for the eye; each item
+   * in the group says in its own label what it does, because a screen reader
+   * moving through items does not read headings between them.
+   */
+  section?: string;
   action: () => void;
 }
 
@@ -27,6 +41,8 @@ const props = defineProps<{
   /** Where the menu was asked for, in viewport coordinates. */
   x: number;
   y: number;
+  /** What the menu is about, for a screen reader announcing it. */
+  label?: string;
 }>();
 
 const emit = defineEmits<{ close: [] }>();
@@ -42,6 +58,14 @@ const focused = ref(0);
  * close to everything.
  */
 const position = ref({ left: `${props.x}px`, top: `${props.y}px` });
+
+/*
+ * Focus goes back to whatever opened the menu when it closes, so a keyboard
+ * user who opened it from a button is left on that button rather than at the
+ * top of the page.
+ */
+const opener = import.meta.client ? (document.activeElement as HTMLElement | null) : null;
+onBeforeUnmount(() => opener?.focus?.());
 
 onMounted(async () => {
   await nextTick();
@@ -115,33 +139,68 @@ onBeforeUnmount(() => {
         ref="menu"
         role="menu"
         tabindex="-1"
-        class="animate-in fade-in zoom-in-95 fixed min-w-44 overflow-hidden rounded-lg border bg-surface py-1 shadow-lg duration-100 outline-none"
+        :aria-label="props.label"
+        :aria-activedescendant="`menu-item-${focused}`"
+        class="animate-in fade-in zoom-in-95 fixed max-h-[calc(100dvh-1rem)] min-w-44 overflow-y-auto rounded-lg border bg-surface py-1 shadow-lg duration-100 outline-none"
         :style="position"
         @click.stop
         @keydown.down.prevent="move(1)"
         @keydown.up.prevent="move(-1)"
+        @keydown.home.prevent="focused = 0"
+        @keydown.end.prevent="focused = enabled.length - 1"
         @keydown.enter.prevent="activateFocused"
+        @keydown.space.prevent="activateFocused"
+        @keydown.tab.prevent="emit('close')"
       >
-        <button
-          v-for="(item, index) in enabled"
-          :key="item.label"
-          type="button"
-          role="menuitem"
-          class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
-          :class="[
-            item.destructive ? 'text-destructive' : 'text-foreground',
-            index === focused
-              ? item.destructive
-                ? 'bg-destructive/10'
-                : 'bg-accent'
-              : 'hover:bg-accent',
-          ]"
-          @click="choose(item)"
-          @mouseenter="focused = index"
-        >
-          <component :is="item.icon" v-if="item.icon" class="size-3.5 shrink-0 opacity-70" />
-          {{ item.label }}
-        </button>
+        <template v-for="(item, index) in enabled" :key="item.label">
+          <div
+            v-if="(item.separated || item.section) && index > 0"
+            role="separator"
+            class="my-1 border-t"
+          />
+          <div
+            v-if="item.section"
+            aria-hidden="true"
+            class="px-3 pt-1.5 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
+          >
+            {{ item.section }}
+          </div>
+          <button
+            :id="`menu-item-${index}`"
+            type="button"
+            :role="
+              item.choice === 'radio'
+                ? 'menuitemradio'
+                : item.choice === 'check'
+                  ? 'menuitemcheckbox'
+                  : 'menuitem'
+            "
+            :aria-checked="item.choice ? Boolean(item.checked) : undefined"
+            tabindex="-1"
+            class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
+            :class="[
+              item.destructive ? 'text-destructive' : 'text-foreground',
+              index === focused
+                ? item.destructive
+                  ? 'bg-destructive/10'
+                  : 'bg-accent'
+                : 'hover:bg-accent',
+            ]"
+            @click="choose(item)"
+            @mouseenter="focused = index"
+          >
+            <component :is="item.icon" v-if="item.icon" class="size-3.5 shrink-0 opacity-70" />
+            <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+            <!-- The current choice, marked by shape as well as by the
+                 announcement, so it is not told by colour alone. -->
+            <Icon
+              v-if="item.choice && item.checked"
+              name="lucide:check"
+              class="size-3.5 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+          </button>
+        </template>
       </div>
     </div>
   </Teleport>

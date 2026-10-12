@@ -30,6 +30,37 @@ export interface ServerStatus {
   suppressesNotifications: boolean;
 }
 
+/**
+ * Somebody's own status, as they set it.
+ *
+ * Not what others see: somebody appearing offline is shown to everybody else
+ * with no status at all, and is shown here with both.
+ */
+export interface OwnStatus {
+  status: string;
+  statusText: string;
+  /** When the status reverts on its own, as an ISO time; absent if it does not. */
+  expiresAt?: string;
+  /** Whether this person appears offline while connected. */
+  invisible: boolean;
+}
+
+/** How much somebody wants to hear about a conversation. */
+export type NotificationLevel = "all" | "mentions" | "none";
+
+/** One notification setting: a level, and whether it is silenced outright. */
+export interface NotificationSetting {
+  level: NotificationLevel;
+  muted: boolean;
+}
+
+/** Somebody's default, and each conversation they have set apart from it. */
+export interface NotificationPreferences {
+  default: NotificationSetting;
+  /** Only the conversations with a setting of their own. */
+  rooms: Record<string, NotificationSetting>;
+}
+
 /** Someone currently composing a message. */
 export interface TypingPerson {
   userId: string;

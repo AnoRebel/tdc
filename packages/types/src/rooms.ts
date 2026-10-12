@@ -547,4 +547,6 @@ export interface PrivacySettings extends DisclosureSettings {
   calls: DirectMessagePolicy;
   /** Whether people on connected servers may ring this person. */
   callsFromOtherServers: boolean;
+  /** Whether others are shown that this person is writing. */
+  sendsTypingIndication: boolean;
 }

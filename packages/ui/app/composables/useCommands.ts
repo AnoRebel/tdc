@@ -1,7 +1,10 @@
 import type { Component } from "vue";
 import {
   Braces,
+  CalendarClock,
+  CircleDot,
   Flag,
+  MessageSquarePlus,
   Keyboard,
   LifeBuoy,
   KeyboardOff,
@@ -47,6 +50,9 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
   const router = useRouter();
   const theme = useTheme();
   const { offers } = useServerInfo();
+  const newMessage = useNewMessage();
+  const scheduled = useScheduled();
+  const showingStatus = useState("status.open", () => false);
 
   const commands = computed<Command[]>(() => {
     const available: Command[] = [];
@@ -60,6 +66,35 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         icon: Plus,
         keywords: "create make room",
         run: options.createChannel,
+      });
+    }
+
+    available.push(
+      {
+        id: "new-message",
+        label: $ts("newMessage.command"),
+        icon: MessageSquarePlus,
+        keywords: "direct group dm people conversation write ujumbe",
+        run: () => newMessage.open(),
+      },
+      {
+        id: "status",
+        label: $ts("status.command"),
+        icon: CircleDot,
+        keywords: "away busy offline invisible appear presence note hali",
+        run: () => {
+          showingStatus.value = true;
+        },
+      },
+    );
+
+    if (scheduled.scheduled.value.length) {
+      available.push({
+        id: "scheduled",
+        label: $ts("scheduled.title"),
+        icon: CalendarClock,
+        keywords: "later send queued pending",
+        run: () => scheduled.open(),
       });
     }
 

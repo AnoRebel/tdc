@@ -250,7 +250,8 @@
     "actionTaken": "{label} — answered",
     "actionAlreadyAnswered": "That has already been answered.",
     "actionFailed": "That could not be answered. Try again.",
-    "editThisMessage": "Edit this message"
+    "editThisMessage": "Edit this message",
+    "loading": "Loading"
   },
   "channel": {
     "create": "New channel",
@@ -422,7 +423,11 @@
       "nobodyHint": "Nobody can ring you. You can still join calls yourself.",
       "otherServers": "People on connected servers",
       "otherServersHint": "Whether people on servers this one is connected to may ring you, where your server allows it at all."
-    }
+    },
+    "couldNotLoad": "Could not load your settings.",
+    "couldNotSave": "That change could not be saved. Try again.",
+    "showsTyping": "Show others when I am typing",
+    "showsTypingHint": "Turned off, nobody sees that you are writing, on any device."
   },
   "update": {
     "ready": "A new version is ready.",
@@ -1722,6 +1727,106 @@
     "farewell": {
       "other": "Sorry, I have to take another call.",
       "back": "Have to go, I'll call back shortly."
+    }
+  },
+  "conversation": {
+    "pinned": "Pinned",
+    "pin": "Pin to the top",
+    "unpin": "Unpin",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "couldNotPin": "That could not be pinned. Try again.",
+    "notifications": "Notify me about",
+    "levelAll": "Every new message",
+    "levelMentions": "Mentions and replies to me",
+    "levelNone": "Nothing from here",
+    "mute": "Mute conversation",
+    "muted": "Muted. Nothing here will notify you.",
+    "unmuted": "Unmuted.",
+    "isMuted": "Muted",
+    "couldNotChangeNotifications": "Notifications could not be changed. Try again.",
+    "addPeople": "Add people…",
+    "people": "{count} people",
+    "options": "Conversation options",
+    "optionsFor": "Options for {name}"
+  },
+  "newMessage": {
+    "title": "New message",
+    "addPeopleTitle": "Add people",
+    "command": "New message",
+    "to": "To",
+    "placeholder": "Type a name",
+    "suggestions": "People",
+    "remove": "Remove {name}",
+    "nobody": "Nobody matches “{query}”.",
+    "addingStartsNew": "Adding people starts a new conversation with all of you. This one stays as it is, with its history.",
+    "groupOf": "A conversation between {count} people",
+    "enterHint": "Enter adds a name; Enter again starts the conversation.",
+    "start": "Start conversation",
+    "cannotOpen": "That conversation cannot be opened.",
+    "couldNotOpen": "The conversation could not be opened. Try again.",
+    "noneYet": "No conversations yet.",
+    "withOthers": "with others"
+  },
+  "scheduled": {
+    "title": "Scheduled messages",
+    "inThisConversation": "Scheduled here ({count})",
+    "oneHere": "One message scheduled here",
+    "manyHere": "{count} messages scheduled here",
+    "view": "View",
+    "which": "Which messages",
+    "here": "This conversation",
+    "everywhere": "All ({count})",
+    "nothing": "Nothing is waiting to be sent.",
+    "inTime": "in {time}",
+    "aConversation": "a conversation",
+    "wording": "Message",
+    "withFiles": "With {count} attached",
+    "sendNow": "Send now",
+    "changeTime": "Change time",
+    "cancel": "Cancel message",
+    "keep": "Keep it",
+    "cancelTitle": "Cancel this scheduled message?",
+    "saved": "Message changed.",
+    "moved": "Time changed.",
+    "sent": "Sent.",
+    "cancelled": "Scheduled message cancelled.",
+    "couldNotChange": "That could not be changed. Try again."
+  },
+  "status": {
+    "title": "Set a status",
+    "command": "Set a status",
+    "change": "Change status",
+    "menu": "Your status",
+    "menuWithStatus": "Your status: {status}",
+    "showAs": "Show me as",
+    "setNote": "Set a note or a time…",
+    "clearNow": "Clear status",
+    "which": "Status",
+    "holdsNotifications": "Holds notifications",
+    "appearOfflineHint": "Others see you as offline while you stay connected, and you are not interrupted.",
+    "note": "Note",
+    "noteHint": "A few words, such as “back at four”.",
+    "notePlaceholder": "What are you up to?",
+    "noteTooLong": "Keep it to 100 characters.",
+    "clearAfter": "Clear after",
+    "pickAFutureTime": "Choose a time that has not passed.",
+    "saved": "Status set.",
+    "cleared": "Status cleared.",
+    "couldNotSave": "Your status could not be changed. Try again.",
+    "clear": {
+      "never": "Don’t clear",
+      "30m": "30 minutes",
+      "1h": "1 hour",
+      "4h": "4 hours",
+      "today": "Today",
+      "week": "This week",
+      "custom": "Choose a time…"
+    },
+    "left": {
+      "minutes": "{count} min left",
+      "hours": "{count} h left",
+      "days": "{count} d left"
     }
   }
 }

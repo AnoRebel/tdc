@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ServerStatus, Session } from "@tdc/types";
+import type { Session } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { fully } from "#layers/ui/app/lib/dates";
+import { presenceDotClass } from "#layers/ui/app/lib/presencedot";
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
@@ -191,33 +192,37 @@ const disclosureOptions = [
 onMounted(() => void personal.refresh());
 
 const { user, can, signOut, listSessions, revokeSession } = useAuth();
-const api = useApi();
 const router = useRouter();
 
 const sessions = ref<Session[]>([]);
-const statuses = ref<ServerStatus[]>([]);
-const currentStatus = ref("available");
-const statusText = ref("");
 const error = ref<string | null>(null);
 const busy = ref<string | null>(null);
+
+/*
+ * The status as it stands, and the dialog that changes it — the same one the
+ * sidebar opens, so there is one way of setting a status rather than two that
+ * disagree about what a note or an expiry is.
+ */
+const ownStatus = useOwnStatus();
+const showingStatus = useState("status.open", () => false);
+const typing = useTypingPreference();
 
 async function load() {
   try {
     sessions.value = await listSessions();
-    statuses.value = await api.get<ServerStatus[]>("/api/statuses");
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not load your settings.";
+    error.value = isApiError(cause) ? cause.message : $ts("settings.couldNotLoad");
   }
+  void typing.load();
 }
 
 await load();
 
-async function chooseStatus(key: string) {
-  currentStatus.value = key;
+async function setTyping(sends: boolean) {
   try {
-    await api.put("/api/me/status", { status: key, text: statusText.value });
-  } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not change your status.";
+    await typing.set(sends);
+  } catch {
+    error.value = $ts("settings.couldNotSave");
   }
 }
 
@@ -339,14 +344,22 @@ function deviceName(userAgent: string): string {
           {{ $t("settings.statusHint") }}
         </p>
 
-        <div class="mt-3 flex flex-wrap gap-1.5">
-          <Button
-            v-for="status in statuses"
-            :key="status.key"
-            :variant="currentStatus === status.key ? 'primary' : 'outline'"
-            @click="chooseStatus(status.key)"
-          >
-            {{ status.label }}
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <span class="flex min-w-0 items-center gap-2 text-sm">
+            <span
+              class="size-2.5 shrink-0 rounded-full"
+              :class="presenceDotClass(ownStatus.own.value.status, ownStatus.own.value.invisible)"
+              aria-hidden="true"
+            />
+            <span class="truncate">
+              {{ ownStatus.labelOf(ownStatus.own.value.status) }}
+              <span v-if="ownStatus.own.value.statusText" class="text-muted-foreground">
+                · {{ ownStatus.own.value.statusText }}
+              </span>
+            </span>
+          </span>
+          <Button variant="outline" @click="showingStatus = true">
+            {{ $t("status.change") }}
           </Button>
         </div>
       </section>
@@ -622,6 +635,26 @@ function deviceName(userAgent: string): string {
         <p class="mt-2 text-[0.6875rem] text-muted-foreground">
           {{ $t("settings.moderatorCanSeeDisclosure") }}
         </p>
+
+        <!-- Whether others see you writing. Off, this device stops saying so
+             and the server ignores any device that still does. -->
+        <label
+          class="mt-3 flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+          data-typing-preference
+        >
+          <input
+            type="checkbox"
+            class="mt-0.5 cursor-pointer accent-primary"
+            :checked="typing.sends.value !== false"
+            @change="setTyping(typing.sends.value === false)"
+          />
+          <span class="min-w-0">
+            <span class="block text-sm font-medium">{{ $t("settings.showsTyping") }}</span>
+            <span class="block text-xs text-muted-foreground">{{
+              $t("settings.showsTypingHint")
+            }}</span>
+          </span>
+        </label>
       </section>
 
       <section>

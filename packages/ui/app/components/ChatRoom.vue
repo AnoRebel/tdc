@@ -49,7 +49,11 @@ import {
   X,
   UserX,
   Video,
+  BellOff,
+  CalendarClock,
+  MoreHorizontal,
 } from "lucide-vue-next";
+import { otherParticipants } from "#layers/ui/app/lib/sidebar";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Bubble } from "#layers/ui/app/components/ui/bubble";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
@@ -87,6 +91,31 @@ const route = useRoute();
 
 const { user, can } = useAuth();
 const roomsApi = useRooms();
+
+/*
+ * What the reader has chosen about this conversation for themselves: muted or
+ * not, pinned or not, what is waiting to be sent here. The same menu as the
+ * sidebar's, so the two never offer different things.
+ */
+const conversationMenu = useConversationMenu();
+const notificationPreferences = useNotificationPreferences();
+const scheduledMessages = useScheduled();
+const waitingHere = computed(() => scheduledMessages.inRoom(roomId.value));
+const typingPreference = useTypingPreference();
+void typingPreference.load();
+
+/** Who the conversation is with, for a direct one: everybody but the reader. */
+const title = computed(() => {
+  if (!room.value) return $ts("room.loading");
+  return room.value.kind === "direct"
+    ? otherParticipants(room.value, user.value?.displayName).join(", ")
+    : room.value.name;
+});
+
+function openConversationMenu(event: MouseEvent) {
+  if (!room.value) return;
+  contextMenu.showFrom(event.currentTarget as Element, conversationMenu.itemsFor(room.value));
+}
 const refreshRooms = inject<() => Promise<void>>("refreshRooms", async () => {});
 
 const room = ref<Room | null>(null);
@@ -631,6 +660,7 @@ async function scheduleDraft(sendAt: Date) {
     draft.value = "";
     uploads.clearFinished();
     scheduled.value = true;
+    void scheduledMessages.refresh();
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : "Could not schedule that message.";
   }
@@ -1287,7 +1317,9 @@ function scrollToLatest() {
 // The server expires an indication on its own, so this only has to be sent
 // often enough to keep it alive while someone is actually writing.
 const announceTyping = useThrottleFn(() => {
-  if (room.value?.member) {
+  // Not announced at all by somebody who turned it off, rather than sent and
+  // ignored: what is never sent cannot be shown.
+  if (room.value?.member && typingPreference.sends.value !== false) {
     void roomsApi.startTyping(roomId.value).catch(() => {});
   }
 }, 4000);
@@ -1816,14 +1848,21 @@ watch(roomId, load, { immediate: true });
           <Menu class="size-4" />
         </Button>
 
+        <Avatar v-if="room?.kind === 'direct'" :name="title" size="sm" class="shrink-0" />
         <component
           :is="room?.visibility === 'private' ? Lock : Hash"
+          v-else
           class="size-4 shrink-0 text-muted-foreground"
         />
 
         <div class="min-w-0">
-          <h1 class="truncate text-sm leading-tight font-semibold">
-            {{ room?.name ?? "Loading" }}
+          <h1 class="flex items-center gap-1.5 truncate text-sm leading-tight font-semibold">
+            <span class="truncate">{{ title }}</span>
+            <BellOff
+              v-if="room?.member && notificationPreferences.of(roomId).muted"
+              class="size-3.5 shrink-0 text-muted-foreground"
+              :aria-label="$ts('conversation.isMuted')"
+            />
           </h1>
           <p v-if="room?.topic" class="truncate text-xs leading-tight text-muted-foreground">
             {{ room.topic }}
@@ -1905,6 +1944,21 @@ watch(roomId, load, { immediate: true });
           </Button>
 
           <ChannelSettings :room="room" :events="messages" @changed="room = $event" />
+
+          <!-- The reader's own choices about this conversation: pinning it,
+               how much to hear from it, and what is waiting to be sent. -->
+          <Button
+            v-if="room"
+            variant="ghost"
+            size="icon"
+            aria-haspopup="menu"
+            data-conversation-menu
+            :label="$ts('conversation.optionsFor', { name: title })"
+            :title="$ts('conversation.options')"
+            @click="openConversationMenu"
+          >
+            <MoreHorizontal class="size-3.5" />
+          </Button>
 
           <!-- Only for whoever moderates: a ban that can only be issued is a
                ban nobody reverses, so the way back in lives beside it. -->
@@ -2401,6 +2455,30 @@ watch(roomId, load, { immediate: true });
           </Transition>
           {{ typingLabel ? `${typingLabel}…` : "" }}
         </p>
+
+        <!-- What the reader has written here and not yet sent, so a message
+             scheduled for tomorrow is not forgotten and written again. -->
+        <Transition name="motion-fade">
+          <button
+            v-if="room?.member && waitingHere.length"
+            type="button"
+            class="mb-1.5 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-muted/40 px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted"
+            data-scheduled-here
+            @click="scheduledMessages.open(roomId)"
+          >
+            <CalendarClock class="size-3.5 shrink-0" aria-hidden="true" />
+            <span class="truncate">
+              {{
+                waitingHere.length === 1
+                  ? $t("scheduled.oneHere")
+                  : $t("scheduled.manyHere", { count: waitingHere.length })
+              }}
+            </span>
+            <span class="ml-auto shrink-0 font-medium text-foreground">{{
+              $t("scheduled.view")
+            }}</span>
+          </button>
+        </Transition>
 
         <UploadTray
           v-if="room?.member"

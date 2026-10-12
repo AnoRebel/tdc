@@ -33,10 +33,13 @@ const contentId = `sidebar-section-${props.id}`;
 
 <template>
   <section>
-    <h2>
+    <!-- An action beside the heading — "new message" beside the direct
+         messages — sits outside the heading's own button, so each is one
+         control with one name. -->
+    <h2 class="flex items-center">
       <button
         type="button"
-        class="motion-row flex w-full items-center gap-1 rounded-sm px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase hover:text-foreground"
+        class="motion-row flex min-w-0 flex-1 items-center gap-1 rounded-sm px-2 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase hover:text-foreground"
         :aria-expanded="open"
         :aria-controls="contentId"
         @click="toggle"
@@ -49,6 +52,7 @@ const contentId = `sidebar-section-${props.id}`;
         />
         <span class="truncate">{{ title }}</span>
       </button>
+      <slot name="action" />
     </h2>
     <Transition name="motion-collapse">
       <div v-show="open" :id="contentId">
