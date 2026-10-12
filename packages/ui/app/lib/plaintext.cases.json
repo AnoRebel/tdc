@@ -1,0 +1,82 @@
+[
+  {
+    "name": "plain text is untouched",
+    "source": "habari, @amina — see #general",
+    "plain": "habari, @amina — see #general"
+  },
+  {
+    "name": "bold, italic and strikethrough lose their markers",
+    "source": "**bold** __bold__ *it* _it_ ~~gone~~",
+    "plain": "bold bold it it gone"
+  },
+  { "name": "nested emphasis", "source": "**bold _and italic_**", "plain": "bold and italic" },
+  {
+    "name": "snake_case survives",
+    "source": "set my_var_name and 2 * 3 * 4",
+    "plain": "set my_var_name and 2 * 3 * 4"
+  },
+  {
+    "name": "inline code keeps its contents verbatim",
+    "source": "run `go test ./...` and `**not bold**`",
+    "plain": "run go test ./... and **not bold**"
+  },
+  { "name": "a code span holding a backtick", "source": "`` a`b ``", "plain": "a`b" },
+  { "name": "an unclosed backtick is text", "source": "it's `odd", "plain": "it's `odd" },
+  {
+    "name": "a fenced block keeps its lines and loses its fences",
+    "source": "look:\n```go\nfunc main() {\n\t**x**\n}\n```\ndone",
+    "plain": "look:\nfunc main() {\n\t**x**\n}\ndone"
+  },
+  { "name": "a tilde fence", "source": "~~~\ncode\n~~~", "plain": "code" },
+  {
+    "name": "an unclosed fence runs to the end",
+    "source": "```\nstill code *x*",
+    "plain": "still code *x*"
+  },
+  {
+    "name": "a link keeps its address",
+    "source": "read [the guide](https://tdc.or.tz/docs) first",
+    "plain": "read the guide (https://tdc.or.tz/docs) first"
+  },
+  {
+    "name": "a link whose text is its address",
+    "source": "[https://tdc.or.tz](https://tdc.or.tz)",
+    "plain": "https://tdc.or.tz"
+  },
+  {
+    "name": "an image is its description and address",
+    "source": "![diagram](https://tdc.or.tz/a.png)",
+    "plain": "diagram (https://tdc.or.tz/a.png)"
+  },
+  {
+    "name": "a quote loses its marker",
+    "source": "> quoted\n>> deeper",
+    "plain": "quoted\ndeeper"
+  },
+  {
+    "name": "a heading loses its marker",
+    "source": "## Release notes ##\nbody",
+    "plain": "Release notes\nbody"
+  },
+  {
+    "name": "a hash with no space is not a heading",
+    "source": "#general is busy",
+    "plain": "#general is busy"
+  },
+  {
+    "name": "bullets read as dashes",
+    "source": "* one\n+ two\n- three\n1. four",
+    "plain": "- one\n- two\n- three\n1. four"
+  },
+  {
+    "name": "escaped markers stay as the characters",
+    "source": "\\*not italic\\* and \\_nor this\\_",
+    "plain": "*not italic* and _nor this_"
+  },
+  { "name": "neighbouring emphasis", "source": "_a_ _b_ *c* *d*", "plain": "a b c d" },
+  {
+    "name": "a lone asterisk or underscore is text",
+    "source": "5 * 3 and a _ b",
+    "plain": "5 * 3 and a _ b"
+  }
+]

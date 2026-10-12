@@ -28,7 +28,13 @@ export function isTyping(event: KeyboardEvent): boolean {
 }
 
 /** Where a shortcut belongs, which is how the reference groups them. */
-export const SHORTCUT_GROUPS = ["everywhere", "navigation", "conversation", "projects"] as const;
+export const SHORTCUT_GROUPS = [
+  "everywhere",
+  "navigation",
+  "conversation",
+  "formatting",
+  "projects",
+] as const;
 export type ShortcutGroup = (typeof SHORTCUT_GROUPS)[number];
 
 /**
@@ -87,11 +93,12 @@ export interface ShortcutDefinition {
  *
  * Chosen to stay clear of what the browser and the operating system already
  * claim. Ctrl and Command are only ever used with K (which the desktop menu
- * also carries) and with "/" (likewise); everything else is a plain key, an
+ * also carries) and with "/" (likewise) — apart from the message box's own
+ * formatting keys, further down; everything else is a plain key, an
  * Alt-arrow, or a "g then…" sequence, none of which a browser binds. In
- * particular nothing here touches Ctrl-N, -T, -W, -L, -B, -H, -Q, -comma or
+ * particular nothing here touches Ctrl-N, -T, -W, -L, -H, -Q, -comma or
  * Alt-left/right, which are a new window, a tab, closing it, the address bar,
- * bookmarks, history or hiding the desktop window, quitting, settings, and
+ * history or hiding the desktop window, quitting, settings, and
  * back and forward.
  */
 export const SHORTCUTS: ShortcutDefinition[] = [
@@ -164,6 +171,52 @@ export const SHORTCUTS: ShortcutDefinition[] = [
   { id: "thread", group: "conversation", bindings: [{ chord: { key: "t" } }] },
   { id: "react", group: "conversation", bindings: [{ chord: { key: "r" } }] },
   { id: "markRead", group: "conversation", bindings: [{ chord: { key: "m" } }] },
+
+  /*
+   * Formatting, in the message box only, around whatever is selected.
+   *
+   * Ctrl-B and Ctrl-I are what every editor binds, and the browser's own
+   * meanings for them — bookmarks, page information — give way to a page
+   * that handles them while somebody is typing. They are the exception to the
+   * rule above, and a deliberate one: bound only inside the message box, where
+   * the browser's meaning is never what somebody writing wanted.
+   */
+  {
+    id: "formatBold",
+    group: "formatting",
+    bindings: [{ chord: { key: "b", command: true } }],
+    local: true,
+  },
+  {
+    id: "formatItalic",
+    group: "formatting",
+    bindings: [{ chord: { key: "i", command: true } }],
+    local: true,
+  },
+  {
+    id: "formatStrikethrough",
+    group: "formatting",
+    bindings: [{ chord: { key: "x", command: true, shift: true } }],
+    local: true,
+  },
+  {
+    id: "formatCode",
+    group: "formatting",
+    bindings: [{ chord: { key: "e", command: true } }],
+    local: true,
+  },
+  {
+    id: "formatCodeBlock",
+    group: "formatting",
+    bindings: [{ chord: { key: "c", command: true, shift: true } }],
+    local: true,
+  },
+  {
+    id: "newLineInMessage",
+    group: "formatting",
+    bindings: [{ chord: { key: "Enter", shift: true } }],
+    local: true,
+  },
 
   { id: "newIssue", group: "projects", bindings: [{ chord: { key: "n" } }] },
   {

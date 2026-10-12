@@ -325,11 +325,30 @@ describe("describing the shortcuts", () => {
    * purpose, as the same actions the menu performs.
    */
   it("binds the command modifier only where the desktop menu means the same thing", () => {
-    const commanded = SHORTCUTS.flatMap((shortcut) =>
-      shortcut.bindings.flatMap((binding) =>
-        "chord" in binding && binding.chord.command ? [binding.chord.key.toLowerCase()] : [],
-      ),
+    const commanded = SHORTCUTS.filter((shortcut) => shortcut.group !== "formatting").flatMap(
+      (shortcut) =>
+        shortcut.bindings.flatMap((binding) =>
+          "chord" in binding && binding.chord.command ? [binding.chord.key.toLowerCase()] : [],
+        ),
     );
     expect(new Set(commanded)).toEqual(new Set(["k", "/"]));
+  });
+
+  /*
+   * The formatting keys are bound only inside the message box, and none of
+   * them may be one the desktop menu answers to — N, Q, K, H, "/" and "," —
+   * or the menu and the message box would both act on one press.
+   */
+  it("keeps the formatting keys inside the message box and off the menu's keys", () => {
+    const formatting = SHORTCUTS.filter((shortcut) => shortcut.group === "formatting");
+    expect(formatting.length).toBeGreaterThan(0);
+    for (const shortcut of formatting) {
+      expect(shortcut.local, shortcut.id).toBe(true);
+      for (const binding of shortcut.bindings) {
+        if ("chord" in binding && binding.chord.command) {
+          expect(["n", "q", "k", "h", "/", ","]).not.toContain(binding.chord.key.toLowerCase());
+        }
+      }
+    }
   });
 });

@@ -27,6 +27,7 @@ import {
   EyeOff,
   Timer,
   FileText,
+  Type as TypeIcon,
   Flag,
   Forward,
   Globe,
@@ -58,9 +59,15 @@ import { Separator } from "#layers/ui/app/components/ui/separator";
 import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
-import { Input } from "#layers/ui/app/components/ui/input";
 import { atTime, onDay } from "#layers/ui/app/lib/dates";
-import { isTyping } from "#layers/ui/app/lib/shortcuts";
+import { SHORTCUTS, isTyping, matchesChord } from "#layers/ui/app/lib/shortcuts";
+import {
+  applyFormat,
+  insideOpenFence,
+  plainText,
+  type Format,
+} from "#layers/ui/app/lib/formatting";
+import { isMac } from "#layers/ui/app/lib/platform";
 import { isOwnAddress } from "#layers/ui/app/lib/names";
 import IssueFromMessage from "#layers/ui/app/components/projects/IssueFromMessage.vue";
 import IssueLinks from "#layers/ui/app/components/projects/IssueLinks.vue";
@@ -548,6 +555,96 @@ async function pickWith(accept: string) {
   await nextTick();
   filePicker.value?.click();
 }
+
+/*
+ * Formatting in the composer.
+ *
+ * The message box stays a plain text box: formatting is the Markdown people
+ * type, and these only save typing it. A shortcut or a toolbar button wraps
+ * the selection in markers, or takes them off again if it is already wrapped.
+ */
+const FORMAT_KEYS: [string, Format][] = [
+  ["formatBold", "bold"],
+  ["formatItalic", "italic"],
+  ["formatStrikethrough", "strikethrough"],
+  ["formatCode", "code"],
+  ["formatCodeBlock", "codeBlock"],
+];
+
+/** Which format a keystroke asks for, if any. */
+function formatFor(event: KeyboardEvent): Format | null {
+  const mac = isMac();
+  for (const [id, format] of FORMAT_KEYS) {
+    const shortcut = SHORTCUTS.find((candidate) => candidate.id === id);
+    const pressed = shortcut?.bindings.some(
+      (binding) => "chord" in binding && matchesChord(binding.chord, event, mac),
+    );
+    if (pressed) return format;
+  }
+  return null;
+}
+
+/** Wraps the selection in a text box and keeps what was wrapped selected. */
+function formatField(element: HTMLTextAreaElement | null, model: Ref<string>, format: Format) {
+  if (!element) return;
+  const next = applyFormat(
+    { text: model.value, start: element.selectionStart, end: element.selectionEnd },
+    format,
+  );
+  model.value = next.text;
+  void nextTick(() => {
+    element.focus();
+    element.setSelectionRange(next.start, next.end);
+    fitComposer();
+  });
+}
+
+/**
+ * The keys a message box answers to: the formatting shortcuts, and Enter.
+ *
+ * Enter sends and Shift-Enter starts a new line, as before — except inside a
+ * code block that has been opened and not yet closed, where Enter is a new
+ * line too. Somebody typing code wants lines, and half a code block is never
+ * what they meant to send; typing the closing fence makes Enter send again.
+ * Nothing happens while an input method is composing a character, whose
+ * Enter is confirming the character rather than sending.
+ */
+function messageKeys(
+  event: KeyboardEvent,
+  element: HTMLTextAreaElement | null,
+  model: Ref<string>,
+  submit: () => void,
+) {
+  if (event.isComposing) return;
+
+  const format = formatFor(event);
+  if (format) {
+    event.preventDefault();
+    formatField(element, model, format);
+    return;
+  }
+
+  if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
+    return;
+  }
+  const cursor = element?.selectionStart ?? model.value.length;
+  if (insideOpenFence(model.value, cursor)) return;
+
+  event.preventDefault();
+  submit();
+}
+
+const editField = ref<HTMLTextAreaElement | null>(null);
+
+/*
+ * Bound from the template, where refs arrive unwrapped: these hand over the
+ * refs themselves, so the text written back is the box's own.
+ */
+const composerKeys = (event: KeyboardEvent) =>
+  messageKeys(event, composer.value, draft, () => void send());
+const editKeys = (event: KeyboardEvent, id: string) =>
+  messageKeys(event, editField.value, editDraft, () => void saveEdit(id));
+const formatComposer = (format: Format) => formatField(composer.value, draft, format);
 
 /** Puts an emoji where the cursor is, rather than at the end. */
 function insertEmoji(emoji: string) {
@@ -1965,7 +2062,7 @@ watch(roomId, load, { immediate: true });
                   {{ shortName(item.message.sender) }}
                 </span>
                 <span class="block truncate text-xs text-muted-foreground">
-                  {{ bodyOf(item.message) }}
+                  {{ plainText(bodyOf(item.message)) }}
                 </span>
               </span>
             </button>
@@ -2196,12 +2293,19 @@ watch(roomId, load, { immediate: true });
                            not what. There is no visible label to point at —
                            the box replaces the message in place — so the name
                            is carried on the control itself. -->
-                      <Input
-                        class="h-8"
-                        :aria-label="$ts('room.editThisMessage')"
+                      <!-- Several lines, because a message may have them: a
+                           single-line field silently joins them, which turns
+                           a code block into one long line. Enter saves,
+                           Shift-Enter starts a line, as in the composer. -->
+                      <textarea
+                        ref="editField"
                         v-model="editDraft"
-                        @keydown.esc="editing = null"
+                        class="block w-full min-w-64 resize-y rounded-md border border-current/30 bg-transparent px-2 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-current/40"
+                        :rows="Math.min(10, editDraft.split('\n').length)"
+                        :aria-label="$ts('room.editThisMessage')"
                         autofocus
+                        @keydown.esc="editing = null"
+                        @keydown="editKeys($event, message.id)"
                       />
                       <!-- Not dimmed at all.
                            
@@ -2375,7 +2479,7 @@ watch(roomId, load, { immediate: true });
                   <Button
                     variant="ghost"
                     class="size-7 shrink-0 p-0 opacity-0 transition-opacity group-hover/waiting:opacity-100 focus-visible:opacity-100"
-                    :label="`Do not send: ${message.body}`"
+                    :label="`Do not send: ${plainText(message.body)}`"
                     @click="unsendWaiting(message.clientToken)"
                   >
                     <X class="size-3.5" />
@@ -2410,6 +2514,11 @@ watch(roomId, load, { immediate: true });
           @retry="retryUpload"
           @dismiss="uploads.remove"
           @caption="captionAttachment"
+        />
+
+        <FormattingToolbar
+          v-if="room?.member && !room.archived && interfacePreferences.formattingToolbar.value"
+          @format="formatComposer"
         />
 
         <form
@@ -2515,6 +2624,30 @@ watch(roomId, load, { immediate: true });
             </Transition>
           </div>
 
+          <Button
+            variant="ghost"
+            size="icon"
+            class="shrink-0"
+            :disabled="room.archived"
+            :aria-pressed="interfacePreferences.formattingToolbar.value"
+            :label="
+              interfacePreferences.formattingToolbar.value
+                ? $ts('room.formatting.hideToolbar')
+                : $ts('room.formatting.showToolbar')
+            "
+            :title="
+              interfacePreferences.formattingToolbar.value
+                ? $ts('room.formatting.hideToolbar')
+                : $ts('room.formatting.showToolbar')
+            "
+            @click="
+              interfacePreferences.formattingToolbar.value =
+                !interfacePreferences.formattingToolbar.value
+            "
+          >
+            <TypeIcon class="size-4" />
+          </Button>
+
           <textarea
             ref="composer"
             v-model="draft"
@@ -2526,7 +2659,7 @@ watch(roomId, load, { immediate: true });
               announceTyping();
               fitComposer();
             "
-            @keydown.enter.exact.prevent="send"
+            @keydown="composerKeys"
             @keydown.up="editLastFromComposer"
           />
           <Button
@@ -2575,7 +2708,7 @@ watch(roomId, load, { immediate: true });
     <ConfirmDialog
       v-if="pendingDelete"
       title="Delete this message?"
-      :detail="pendingDelete.body"
+      :detail="plainText(pendingDelete.body)"
       confirm-label="Delete"
       @cancel="pendingDelete = null"
       @confirm="remove(pendingDelete.id)"
@@ -2644,7 +2777,7 @@ watch(roomId, load, { immediate: true });
 
     <ReportDialog
       v-if="reporting"
-      :body="reporting.body"
+      :body="plainText(reporting.body)"
       @cancel="reporting = null"
       @report="submitReport"
     />

@@ -10,6 +10,7 @@ import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Select } from "#layers/ui/app/components/ui/select";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
+import { plainText } from "#layers/ui/app/lib/formatting";
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
@@ -43,7 +44,9 @@ onMounted(async () => {
 });
 
 const [firstLine = "", ...rest] = props.message.body.trim().split("\n");
-const title = firstLine.length > 200 ? `${firstLine.slice(0, 197)}…` : firstLine;
+// A title is a line of text: the first line loses its formatting markers.
+const plainFirst = plainText(firstLine);
+const title = plainFirst.length > 200 ? `${plainFirst.slice(0, 197)}…` : plainFirst;
 const description = (firstLine.length > 200 ? props.message.body.trim() : rest.join("\n")).trim();
 
 const schema = v.object({

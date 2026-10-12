@@ -65,6 +65,27 @@ func TestSearchFindsMessages(t *testing.T) {
 	}
 }
 
+// TestSearchQuotesTheWordsNotTheMarkdown: a body is the Markdown somebody
+// typed, and what search shows back is read as text.
+func TestSearchQuotesTheWordsNotTheMarkdown(t *testing.T) {
+	handler := newTestAPI(t)
+
+	token := completeSetup(t, handler)
+	roomID := makeRoom(t, handler, token, "general", "public")
+	sendMessage(t, handler, token, roomID, "The **deploy** is done, run `make release`")
+
+	hits := searchFor(t, handler, token, "deploy")
+	if len(hits) != 1 {
+		t.Fatalf("found %d messages, expected 1", len(hits))
+	}
+	if strings.ContainsAny(hits[0].Body+hits[0].Highlighted, "*`") {
+		t.Errorf("search quoted the markers: body %q, highlighted %q", hits[0].Body, hits[0].Highlighted)
+	}
+	if !strings.Contains(hits[0].Highlighted, "<mark>deploy</mark>") {
+		t.Errorf("the match is not marked: %q", hits[0].Highlighted)
+	}
+}
+
 // TestSearchNeverReturnsUnreadableMessages is the requirement this feature
 // lives or dies by.
 //

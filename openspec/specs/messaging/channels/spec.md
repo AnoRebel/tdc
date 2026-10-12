@@ -87,6 +87,41 @@ An edited message MUST be identifiable as edited, and a deleted message MUST lea
 - **WHEN** a user posts to a channel they are not a member of
 - **THEN** the request is denied
 
+### Requirement: Message formatting
+
+A message body SHALL be stored as the Markdown source its author wrote, and clients SHALL render a safe subset of it: bold, italic, strikethrough, inline code, fenced code blocks with an optional language, block quotes, ordered and unordered lists, and links. Headings MUST render no larger than body text. Raw HTML in a body MUST be shown as text and never interpreted; Markdown images MUST NOT be fetched; a link MUST point only to `http`, `https` or `mailto` addresses and MUST open with `rel="noopener noreferrer nofollow"`. Rendered output MUST pass through a sanitiser that admits only the elements the subset produces.
+
+Addresses, email addresses and phone numbers in a body's text SHALL continue to be detected and made clickable as they were before formatting existed, except inside code. Mentions and channel names SHALL read as before; a mention inside code MUST NOT notify anybody.
+
+Everything that cannot show formatting — notification previews, push payloads, desktop banners, the search index and its highlighted excerpts, and quotations of a message in the interface — MUST show the body as plain text with the formatting markers removed and the words, code contents and link addresses kept. The server and every client MUST strip formatting by the same rules.
+
+A person SHALL be able to turn formatting off for themselves, after which bodies show exactly as typed.
+
+#### Scenario: Formatting renders
+
+- **WHEN** a message contains `**bold**`, a fenced code block labelled `go`, and a list
+- **THEN** readers see bold text, a code block with its language, a copy control and horizontal scrolling for long lines, and a list
+
+#### Scenario: Markup in a message stays text
+
+- **WHEN** a message contains `<script>`, an HTML element with an event handler, or a link to a `javascript:` address
+- **THEN** none of it executes, and the HTML is shown as the characters that were typed
+
+#### Scenario: Plain-text surfaces strip formatting
+
+- **WHEN** a message `**deploy** is done` notifies somebody, is pushed to a device, or is found by search
+- **THEN** the preview, payload and excerpt read `deploy is done`
+
+#### Scenario: A mention inside code notifies nobody
+
+- **WHEN** a message contains `@amina` only inside a code span or block
+- **THEN** amina is not notified
+
+#### Scenario: Formatting off shows the source
+
+- **WHEN** a person turns off "Show formatting in messages"
+- **THEN** every message shows its source text, with links still clickable
+
 ### Requirement: Threads
 
 Any message SHALL be able to serve as the root of a thread, with replies grouped under it and kept out of the main channel timeline unless explicitly surfaced.

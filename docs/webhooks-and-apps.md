@@ -328,9 +328,15 @@ channel is accepted, for tools that insist on sending one.
 ### Formatting build results and alerts
 
 The body is Markdown, rendered exactly as somebody's typed message is: **bold**,
-_emphasis_, `code`, fenced code blocks, lists and links. Lead with the outcome
-on the first line, because that is what a notification shows; put detail after
-it. Up to 8,000 characters.
+_emphasis_, `code`, fenced code blocks (name the language after the fence for
+colours), quotes, lists and links. Raw HTML is shown as text, an image in
+Markdown becomes a link to it, and a heading is drawn as a bold line. Lead with
+the outcome on the first line, because that is what a notification shows —
+with the formatting marks taken off — and put detail after it. Up to 8,000
+characters.
+
+Outgoing webhooks deliver a message's body as its Markdown source, exactly as
+it was written.
 
 Buttons may be offered, but only buttons that open a link (`"capability":
 "open"` with an `http` or `https` `url`) — "See the log", "Open the dashboard".

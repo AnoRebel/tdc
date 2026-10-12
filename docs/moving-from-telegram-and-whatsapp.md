@@ -331,12 +331,18 @@ understand that before they decide what to post. It is not what people expect
 from "delete my account" in a consumer app, and saying so late is worse than
 saying so now.
 
-**No message formatting.** No bold, no italic, no lists, and no code blocks.
-Message text is plain text, with links, addresses and phone numbers detected and
-made clickable. For a developer community this is a real loss: a code snippet
-pasted into a message is a wall of unformatted text. Markdown _is_ rendered for
-attached text files, so a snippet attached as a file arrives looking right —
-which is the workaround, and it is a worse workaround than a code fence.
+**Formatting is Markdown, not Telegram's.** Bold, italic, strikethrough,
+inline code, quotes, lists, links and fenced code blocks all work — written the
+way GitHub writes them. Most of what a Telegram or WhatsApp user types carries
+over: `**bold**`, `~~struck~~` and code in backticks mean the same here. Two
+differ: `__text__` is bold here, not italic (use `_text_` for italic), and
+WhatsApp's `*bold*` is italic here. Code blocks
+keep their indentation, scroll sideways instead of wrapping, name their
+language, highlight it, and have a copy button; that is the main reason a
+developer community wants them. There is no spoiler or underline formatting,
+and no rich-text toolbar that hides the marks — the marks are what you type,
+with `Ctrl B`, `Ctrl I` and friends to type them for you. Members who prefer
+plain text can switch formatting off for themselves.
 
 **Federation is opt-in, and young.** Servers can connect and share
 conversations, so people on different servers can talk — but only once both

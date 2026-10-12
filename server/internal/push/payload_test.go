@@ -119,6 +119,18 @@ func TestAShortMessageIsNotAltered(t *testing.T) {
 	}
 }
 
+// A body is Markdown source, and a lock screen shows text.
+func TestALockScreenShowsTheWordsNotTheMarkdown(t *testing.T) {
+	payload := push.Describe(push.Describing{
+		Sender: "Amina", Room: "general",
+		Body: "**Build** ~~failed~~ passed: `go test ./...`\n```\nok\n```",
+	})
+
+	if want := "Build failed passed: go test ./...\nok"; payload.Body != want {
+		t.Errorf("Body = %q, want %q", payload.Body, want)
+	}
+}
+
 /*
 Gone is what separates a subscription that is finished from a service having a
 bad afternoon.

@@ -3,6 +3,8 @@ import { computed, watchEffect } from "vue";
 
 import {
   DENSITY_STORAGE_KEY,
+  FORMATTING_STORAGE_KEY,
+  FORMATTING_TOOLBAR_STORAGE_KEY,
   MOTION_STORAGE_KEY,
   SHORTCUTS_STORAGE_KEY,
   isDensity,
@@ -13,7 +15,7 @@ import {
 } from "#layers/ui/app/lib/interface";
 
 /**
- * How the interface behaves: motion, keyboard shortcuts and density.
+ * How the interface behaves: motion, keyboard shortcuts, density and formatting.
  *
  * One instance for the whole application rather than one per caller, so the
  * preferences panel, the keyboard and the stylesheet can never disagree about
@@ -37,6 +39,17 @@ export const useInterfacePreferences = createGlobalState(() => {
     writeDefaults: false,
   });
   const storedDensity = useLocalStorage<string>(DENSITY_STORAGE_KEY, "comfortable", {
+    writeDefaults: false,
+  });
+
+  // On by default: formatting is how somebody who typed a code block meant it
+  // to be read. Off shows the source, for anybody who would rather.
+  const formatting = useLocalStorage<boolean>(FORMATTING_STORAGE_KEY, true, {
+    writeDefaults: false,
+  });
+  // Off by default: the shortcuts and typing the markers cover most of it, and
+  // a row of buttons costs a line of the composer on a phone.
+  const formattingToolbar = useLocalStorage<boolean>(FORMATTING_TOOLBAR_STORAGE_KEY, false, {
     writeDefaults: false,
   });
 
@@ -77,5 +90,7 @@ export const useInterfacePreferences = createGlobalState(() => {
     travels: computed(() => motion.value === "full"),
     shortcuts,
     density,
+    formatting,
+    formattingToolbar,
   };
 });
