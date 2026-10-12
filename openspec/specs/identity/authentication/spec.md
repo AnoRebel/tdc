@@ -198,3 +198,58 @@ The server MUST NOT ship with any default or well-known credential.
 
 - **WHEN** a newly installed server is started
 - **THEN** no account exists that can be accessed with a credential published in the documentation or source
+
+### Requirement: Account names
+
+A person SHALL be able to change their own display name and, under the operator's rules, their own username.
+
+The display name MUST be freely changeable by its owner, subject to the same rules registration applies: at most 64 characters once trimmed, no control characters, no invisible formatting characters except the joiner inside an emoji sequence, and not a reserved name however it is punctuated. An empty display name MUST mean the username is shown.
+
+Because the username is half of the person's address, a username change:
+
+- MUST be allowed only while the operator permits changes (on by default), and no sooner than the operator's interval after the person's previous change (30 days by default);
+- MUST be confirmed by the account's current password, or, for an account without one, by a session begun within the last 15 minutes, and MUST be refused to API tokens;
+- MUST be rate limited per account, counting failed confirmations;
+- MUST NOT take a name another account holds, a reserved name, or a name another account gave up within the operator's holding period (90 days by default) — and registration MUST refuse a held name in the same way;
+- MUST keep the old name resolving to the person wherever a username is looked up — profile links, saved filters, signing in — until another account takes it;
+- MUST be refused while the person is a member of any room another server takes part in, because peers know people by address and the federation protocol cannot carry a rename;
+- MUST be recorded in the audit log with both names, and administrators MUST be able to see the names an account held before.
+
+Messages already sent MUST keep the address they were signed under, and the client MUST still treat them as the person's own.
+
+#### Scenario: Display name changes at once
+
+- **WHEN** a person sets a new display name
+- **THEN** it is shown wherever their display name is shown from the next fetch
+
+#### Scenario: Deceptive display name is refused
+
+- **WHEN** a person sets a display name containing a right-to-left override, or spelling a reserved name
+- **THEN** it is refused with the reason, at registration as at a change
+
+#### Scenario: Username change needs proof
+
+- **WHEN** a person asks to change their username without their current password, or with an API token
+- **THEN** it is refused and nothing changes
+
+#### Scenario: Old name is held for its owner
+
+- **WHEN** a person changes their username
+- **THEN** nobody else may register or take the old name during the holding period
+- **AND** links to the old name resolve to the person
+
+#### Scenario: Changes are paced
+
+- **WHEN** a person changes their username again before the interval has passed
+- **THEN** it is refused with the date it becomes possible
+
+#### Scenario: Federated membership blocks a rename
+
+- **WHEN** a person in a room shared with another server asks to change their username
+- **THEN** it is refused with an explanation of why and what to do
+
+#### Scenario: Renames are on the record
+
+- **WHEN** a username changes
+- **THEN** the audit log records the previous and new names
+- **AND** administrators see the former name beside the account

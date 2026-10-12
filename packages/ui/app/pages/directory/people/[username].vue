@@ -16,6 +16,7 @@ const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 definePageMeta({ middleware: "auth", layout: "app" });
 
 const route = useRoute();
+const router = useRouter();
 const directory = useDirectory();
 const { user } = useAuth();
 
@@ -31,6 +32,17 @@ async function load() {
   error.value = null;
   try {
     profile.value = await directory.viewProfile(username.value);
+    /*
+     * A link made under a name the person has since changed still finds them;
+     * the address bar then says the name they have now, so a link copied from
+     * here is not one that will stop working when the old name is released.
+     */
+    const current = profile.value?.username;
+    if (current && current.toLowerCase() !== username.value.toLowerCase()) {
+      await router.replace(
+        localeRoute({ name: "directory-people-username", params: { username: current } }),
+      );
+    }
   } catch (cause) {
     profile.value = null;
     if (isApiError(cause) && cause.code === "not-found") missing.value = true;

@@ -8,6 +8,8 @@ export interface Person {
   suspended: boolean;
   suspendedUntil?: string;
   suspensionNote?: string;
+  /** Usernames this account gave up, newest first. */
+  formerUsernames?: string[];
 }
 
 /** An invitation to this server. */

@@ -452,6 +452,26 @@ require a deployment.
 
 Every such change is recorded in the audit log.
 
+#### Changing usernames
+
+People change their own display name freely. Their username is half of their
+address, so three settings decide how it may change:
+
+| Setting                         | Default | What it does                                                                                             |
+| ------------------------------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| `accounts.username_changes`     | `true`  | Whether people may change their own username at all                                                      |
+| `accounts.username_change_days` | `30`    | Days between one person's changes; `0` is no wait                                                        |
+| `accounts.username_hold_days`   | `90`    | Days a given-up name is kept for its owner: nobody else may register or take it. `0` releases it at once |
+
+A given-up name keeps resolving to its last owner — old profile links, saved
+filters naming an assignee, signing in — until somebody else takes it. A change
+asks for the person's password (or, for an account without one, a sign-in in
+the last 15 minutes), is refused to API tokens, is rate limited, and is refused
+while the person is in any room shared with another server, because peers know
+people by address and the protocol cannot carry a rename. Each change is in the
+audit log as `user.username.changed` with both names; display names as
+`user.display_name.changed`.
+
 ### Your privacy policy and terms
 
 The repository carries a [privacy policy](privacy-policy.md) and

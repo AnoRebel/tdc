@@ -74,6 +74,55 @@ out is not something to do by accident.
 Changing your password invalidates every other session. That is the behaviour
 you want if you are changing it because you think somebody else has it.
 
+### Your name
+
+You have two names, and both are changed from **Your name** in your settings.
+
+Your **display name** is what people read beside your messages and in member
+lists. Change it whenever you like; it saves at once, and others see it the next
+time a list or a profile is loaded. Leave it empty to show your username. Any
+script is fine, emoji included. What is refused is only what can deceive: an
+invisible or right-to-left character hidden inside a name, a control character,
+or a name that is one of the server's reserved words — "Admin", "System",
+"Moderator" — however it is spelt. The limit is 64 characters.
+
+Your **username** is the first half of your address, `you@server`, and it is
+what links, mentions and other servers know you by. So changing it is allowed,
+but with care:
+
+- As you type a new one, the field says whether it is free. A name that is
+  taken, reserved, or was given up by somebody else recently is not.
+- Changing it asks you to confirm. It shows your new address and what will and
+  will not change, and asks for your password. If your account has no password
+  — you sign in with a passkey or another service — it asks instead that you
+  have signed in within the last 15 minutes; sign out and in again first.
+- Your **old name stays yours** for a while (90 days unless your server says
+  otherwise): nobody else can register it or take it. Links to your old profile
+  keep finding you, and you can still sign in with the old name until somebody
+  else takes it.
+- **Messages you already sent keep the address they were sent under.** Every
+  message is signed with its sender's address, and rewriting it would break the
+  signature, so old messages show the old name. They are still yours: you can
+  edit and delete them as before.
+- Mentions are text. A message that said `@oldname` still says it; a new
+  mention needs your new name.
+- You can change it again after a wait (30 days unless your server says
+  otherwise), so a name cannot be rotated to dodge a block or confuse people
+  about who is who.
+- **It cannot be changed while you are in a conversation shared with another
+  server.** Other servers know you by your address, and the federation protocol
+  has no way to tell them it changed — they would keep you as a member under a
+  name that no longer exists here. Leave those conversations first; the
+  settings page says so when this is what is in the way.
+
+An operator can turn username changes off entirely, in which case the section
+says so. Every change, of either name, is in the audit log, and administrators
+see the names somebody had before beside their account in the list of people.
+
+Things outside the server that hold your old name keep holding it: a passkey
+shows it on your device until you replace it (it still works), and a ringtone
+somebody chose for you is set against your old address.
+
 ## Conversations
 
 ### Channels
@@ -1015,9 +1064,6 @@ a dialog that appears for everything is a dialog nobody reads.
 
 So that nothing above is read as implying more than it says:
 
-- **Changing your own username or display name.** Neither has a control or an
-  endpoint, so both are whatever they were when the account was made. The
-  server can already change a display name; nothing asks it to.
 - **Choosing who may do what, from the interface.** Roles and permissions are
   managed through the API rather than a screen, so an administrator setting up
   a moderator is doing it with a tool rather than a form.

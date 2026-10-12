@@ -310,6 +310,14 @@ function when(value: string): string {
                 >
                   {{ person.suspensionNote }}
                 </span>
+                <!-- Who somebody was before, which is what a moderator asks
+                     when a report names a name nobody has any more. -->
+                <span
+                  v-if="person.formerUsernames?.length"
+                  class="block truncate text-xs text-muted-foreground"
+                >
+                  {{ $t("names.formerly", { names: person.formerUsernames.join(", ") }) }}
+                </span>
               </span>
 
               <Button
