@@ -73,6 +73,18 @@ const (
 	ActionUserSuspended  Action = "user.suspended"
 	ActionUserReinstated Action = "user.reinstated"
 
+	/*
+		Somebody changing what they are called.
+
+		A username is half of an address, so changing one is recorded with
+		both names: the question a moderator asks later is "who was this
+		before", and the account's current name cannot answer it. A display
+		name is recorded too, more cheaply, because changing it to look like
+		somebody else is the impersonation a moderator will be asked about.
+	*/
+	ActionUsernameChanged    Action = "user.username.changed"
+	ActionDisplayNameChanged Action = "user.display_name.changed"
+
 	// Moderation. A block is deliberately absent: it is a personal boundary
 	// rather than an exercise of authority, and a log a moderator reads should
 	// not turn it into one.

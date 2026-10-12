@@ -599,6 +599,17 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[map[string]int64]()},
 		},
 	},
+	"GET /api/me/username": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[usernamePolicyResponse]()},
+		},
+	},
+	"GET /api/me/username/availability": {
+		Query: []string{"username"},
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[usernameAvailability]()},
+		},
+	},
 	"GET /api/me/webhooks": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]webhookView]()},
@@ -1713,6 +1724,12 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[issueResponse]()},
 		},
 	},
+	"PUT /api/me/display-name": {
+		Request: reflect.TypeFor[displayNameRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[userResponse]()},
+		},
+	},
 	"PUT /api/me/pins/:id": {
 		Request: reflect.TypeFor[pinRoomRequest](),
 		Responses: []responseBody{
@@ -1764,6 +1781,12 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[setStatusRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[presenceResponse]()},
+		},
+	},
+	"PUT /api/me/username": {
+		Request: reflect.TypeFor[changeUsernameRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[userResponse]()},
 		},
 	},
 	"PUT /api/projects/:key/members/:username": {

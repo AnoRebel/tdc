@@ -445,9 +445,15 @@ type Querier interface {
 	// Read whole and written whole: the structure is small, and a partial update
 	// would mean the database knowing what a tour is.
 	GetTourProgress(ctx context.Context, id uuid.UUID) ([]byte, error)
+	// Only the account holding the name now: whether a name is free to take.
+	GetUserByCurrentUsername(ctx context.Context, usernameFolded string) (User, error)
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
-	GetUserByUsername(ctx context.Context, usernameFolded string) (User, error)
+	// Whoever a name means: its holder, or the account that most recently gave it
+	// up, so an old link or a saved filter still finds the person it named — and
+	// somebody whose desktop application remembers the name they used to have can
+	// still sign in with it, for as long as nobody else has taken it.
+	GetUserByUsername(ctx context.Context, folded string) (User, error)
 	GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []byte) (User, error)
 	GetVerification(ctx context.Context, id uuid.UUID) (ProfileVerification, error)
 	GetWebhookSubscription(ctx context.Context, id uuid.UUID) (WebhookSubscription, error)
@@ -459,6 +465,7 @@ type Querier interface {
 	// The furthest this server has stored for a room, which is what a catch-up
 	// request asks from.
 	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
+	InFederatedRoom(ctx context.Context, arg InFederatedRoomParams) (bool, error)
 	// Finding issues, and what was said about them.
 	// Writes an issue's searchable text. The issue's own row is read, never
 	// written: rebuilding the index is never a change to the record.
@@ -497,6 +504,8 @@ type Querier interface {
 	JoinCall(ctx context.Context, arg JoinCallParams) error
 	KnownPeers(ctx context.Context) ([]KnownPeersRow, error)
 	LabelIssue(ctx context.Context, arg LabelIssueParams) (int64, error)
+	// When this account last changed its username, if it ever has.
+	LastUsernameChange(ctx context.Context, userID uuid.UUID) (time.Time, error)
 	// The newest edit of a message, so a message an issue was made from reads as
 	// it reads in its channel now, rather than as it was first written.
 	LatestMessageEdit(ctx context.Context, arg LatestMessageEditParams) (Event, error)
@@ -566,6 +575,9 @@ type Querier interface {
 	ListEngagementsFor(ctx context.Context, viewer uuid.UUID) ([]Engagement, error)
 	// What an account posted, for removing it with the application it acted for.
 	ListEventIDsBySender(ctx context.Context, senderID *uuid.UUID) ([]ListEventIDsBySenderRow, error)
+	ListFormerUsernames(ctx context.Context, userID uuid.UUID) ([]ListFormerUsernamesRow, error)
+	// Former names for a page of accounts at once, for the administrators' list.
+	ListFormerUsernamesFor(ctx context.Context, userIds []uuid.UUID) ([]ListFormerUsernamesForRow, error)
 	// Every grant a user holds, across all their roles. One query rather than one
 	// per role: a request resolves permissions once and consults them many times.
 	//
@@ -801,6 +813,10 @@ type Querier interface {
 	// lets a check against the project's current state stay true until the change
 	// it justifies is written.
 	LockProjectStream(ctx context.Context, roomID uuid.UUID) error
+	// Serialises everything that hands out or gives up one name, for the length
+	// of a transaction: a rename away from a name and somebody else claiming it
+	// would otherwise each see the other's state from before.
+	LockUsername(ctx context.Context, folded string) error
 	// Marks media so viewers see it obscured until they choose otherwise.
 	//
 	// A moderator's mark overwrites an uploader's; an uploader's does not
@@ -882,6 +898,7 @@ type Querier interface {
 	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
 	RecordApplicationRateLimited(ctx context.Context, id uuid.UUID) error
 	RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error)
+	RecordFormerUsername(ctx context.Context, arg RecordFormerUsernameParams) error
 	RecordIdempotentSubmission(ctx context.Context, arg RecordIdempotentSubmissionParams) error
 	RecordIncomingWebhookPost(ctx context.Context, id uuid.UUID) error
 	RecordIncomingWebhookRefused(ctx context.Context, id uuid.UUID) error
@@ -937,6 +954,7 @@ type Querier interface {
 	RemoveRoomPeer(ctx context.Context, arg RemoveRoomPeerParams) error
 	RenamePasskey(ctx context.Context, arg RenamePasskeyParams) (Credential, error)
 	RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, error)
+	RenameUser(ctx context.Context, arg RenameUserParams) (User, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
 	RequestCompletion(ctx context.Context, arg RequestCompletionParams) (int64, error)
 	// Clears presence for connections that ended without a clean close, which is
@@ -1193,6 +1211,9 @@ type Querier interface {
 	UpdateProjectView(ctx context.Context, arg UpdateProjectViewParams) (ProjectView, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
+	// Whether somebody else gave this name up recently enough that it is still
+	// theirs to come back to.
+	UsernameHeldByOther(ctx context.Context, arg UsernameHeldByOtherParams) (bool, error)
 	// A company as a viewer of the given rank may see it, or nothing.
 	ViewCompanyProfile(ctx context.Context, arg ViewCompanyProfileParams) (CompanyProfile, error)
 	ViewDirectoryProfile(ctx context.Context, arg ViewDirectoryProfileParams) (ViewDirectoryProfileRow, error)

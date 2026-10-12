@@ -268,6 +268,14 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		config:       cfg,
 	}
 
+	// How long a username somebody gave up stays theirs is the operator's to
+	// change while the server runs, so it is read at the moment it matters.
+	if services.Identity != nil && services.Settings != nil {
+		services.Identity.HoldFormerNames(func(ctx context.Context) time.Duration {
+			return time.Duration(services.Settings.Int(ctx, settings.UsernameHoldDays)) * 24 * time.Hour
+		})
+	}
+
 	// The hub reads membership from the rooms service at delivery time, which
 	// is what makes a removal take effect on a connection that stays open.
 	if services.Rooms != nil {

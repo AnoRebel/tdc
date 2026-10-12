@@ -927,6 +927,13 @@ type UserRole struct {
 	GrantedBy *uuid.UUID
 }
 
+type UsernameHistory struct {
+	UserID         uuid.UUID
+	Username       string
+	UsernameFolded string
+	ChangedAt      time.Time
+}
+
 type WebauthnCeremony struct {
 	ID            uuid.UUID
 	ChallengeHash []byte

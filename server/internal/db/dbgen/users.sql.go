@@ -115,6 +115,41 @@ func (q *Queries) GetTourProgress(ctx context.Context, id uuid.UUID) ([]byte, er
 	return tour_progress, err
 }
 
+const getUserByCurrentUsername = `-- name: GetUserByCurrentUsername :one
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email FROM users WHERE username_folded = $1
+`
+
+// Only the account holding the name now: whether a name is free to take.
+func (q *Queries) GetUserByCurrentUsername(ctx context.Context, usernameFolded string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByCurrentUsername, usernameFolded)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.UsernameFolded,
+		&i.DisplayName,
+		&i.Email,
+		&i.EmailFolded,
+		&i.EmailVerified,
+		&i.SuspendedAt,
+		&i.SuspendedUntil,
+		&i.SuspendedBy,
+		&i.SuspensionNote,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SendsTypingIndication,
+		&i.LinkPreviewsEnabled,
+		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
+		&i.TourProgress,
+		&i.WebauthnHandle,
+		&i.PendingEmail,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email FROM users WHERE email_folded = $1
 `
@@ -184,11 +219,15 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email FROM users WHERE username_folded = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email FROM users WHERE id = user_named($1)
 `
 
-func (q *Queries) GetUserByUsername(ctx context.Context, usernameFolded string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByUsername, usernameFolded)
+// Whoever a name means: its holder, or the account that most recently gave it
+// up, so an old link or a saved filter still finds the person it named — and
+// somebody whose desktop application remembers the name they used to have can
+// still sign in with it, for as long as nobody else has taken it.
+func (q *Queries) GetUserByUsername(ctx context.Context, folded string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsername, folded)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -217,6 +256,52 @@ func (q *Queries) GetUserByUsername(ctx context.Context, usernameFolded string) 
 	return i, err
 }
 
+const inFederatedRoom = `-- name: InFederatedRoom :one
+/*
+Whether this person is in any conversation another server takes part in: one
+hosted elsewhere, or one hosted here that has peers.
+
+Other servers know a person by their address and nothing else — it is in the
+signed events they hold and the membership they keep — and the protocol has no
+way to say "this address is now that one". A rename would leave them a member
+under a name that no longer exists here.
+*/
+SELECT EXISTS (
+    SELECT 1 FROM room_members m
+    JOIN rooms r ON r.id = m.room_id
+    WHERE m.user_id = $1
+      AND (lower(r.home_server) <> lower($2::text)
+           OR EXISTS (SELECT 1 FROM room_peers p WHERE p.room_id = r.id))
+)::boolean
+`
+
+type InFederatedRoomParams struct {
+	UserID     uuid.UUID
+	ServerName string
+}
+
+func (q *Queries) InFederatedRoom(ctx context.Context, arg InFederatedRoomParams) (bool, error) {
+	row := q.db.QueryRow(ctx, inFederatedRoom, arg.UserID, arg.ServerName)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const lastUsernameChange = `-- name: LastUsernameChange :one
+SELECT changed_at FROM username_history
+WHERE user_id = $1
+ORDER BY changed_at DESC
+LIMIT 1
+`
+
+// When this account last changed its username, if it ever has.
+func (q *Queries) LastUsernameChange(ctx context.Context, userID uuid.UUID) (time.Time, error) {
+	row := q.db.QueryRow(ctx, lastUsernameChange, userID)
+	var changed_at time.Time
+	err := row.Scan(&changed_at)
+	return changed_at, err
+}
+
 const liftUserSuspension = `-- name: LiftUserSuspension :exec
 UPDATE users
 SET suspended_at    = NULL,
@@ -230,6 +315,70 @@ WHERE id = $1
 func (q *Queries) LiftUserSuspension(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, liftUserSuspension, id)
 	return err
+}
+
+const listFormerUsernames = `-- name: ListFormerUsernames :many
+SELECT username, changed_at FROM username_history
+WHERE user_id = $1
+ORDER BY changed_at DESC
+`
+
+type ListFormerUsernamesRow struct {
+	Username  string
+	ChangedAt time.Time
+}
+
+func (q *Queries) ListFormerUsernames(ctx context.Context, userID uuid.UUID) ([]ListFormerUsernamesRow, error) {
+	rows, err := q.db.Query(ctx, listFormerUsernames, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFormerUsernamesRow{}
+	for rows.Next() {
+		var i ListFormerUsernamesRow
+		if err := rows.Scan(&i.Username, &i.ChangedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFormerUsernamesFor = `-- name: ListFormerUsernamesFor :many
+SELECT user_id, username, changed_at FROM username_history
+WHERE user_id = ANY($1::uuid[])
+ORDER BY changed_at DESC
+`
+
+type ListFormerUsernamesForRow struct {
+	UserID    uuid.UUID
+	Username  string
+	ChangedAt time.Time
+}
+
+// Former names for a page of accounts at once, for the administrators' list.
+func (q *Queries) ListFormerUsernamesFor(ctx context.Context, userIds []uuid.UUID) ([]ListFormerUsernamesForRow, error) {
+	rows, err := q.db.Query(ctx, listFormerUsernamesFor, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFormerUsernamesForRow{}
+	for rows.Next() {
+		var i ListFormerUsernamesForRow
+		if err := rows.Scan(&i.UserID, &i.Username, &i.ChangedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listUsers = `-- name: ListUsers :many
@@ -284,6 +433,79 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockUsername = `-- name: LockUsername :exec
+SELECT pg_advisory_xact_lock(hashtext('username:' || $1::text))
+`
+
+// Serialises everything that hands out or gives up one name, for the length
+// of a transaction: a rename away from a name and somebody else claiming it
+// would otherwise each see the other's state from before.
+func (q *Queries) LockUsername(ctx context.Context, folded string) error {
+	_, err := q.db.Exec(ctx, lockUsername, folded)
+	return err
+}
+
+const recordFormerUsername = `-- name: RecordFormerUsername :exec
+INSERT INTO username_history (user_id, username, username_folded)
+VALUES ($1, $2, $3)
+`
+
+type RecordFormerUsernameParams struct {
+	UserID         uuid.UUID
+	Username       string
+	UsernameFolded string
+}
+
+func (q *Queries) RecordFormerUsername(ctx context.Context, arg RecordFormerUsernameParams) error {
+	_, err := q.db.Exec(ctx, recordFormerUsername, arg.UserID, arg.Username, arg.UsernameFolded)
+	return err
+}
+
+const renameUser = `-- name: RenameUser :one
+UPDATE users
+SET username        = $1,
+    username_folded = $2,
+    updated_at      = NOW()
+WHERE id = $3
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email
+`
+
+type RenameUserParams struct {
+	Username       string
+	UsernameFolded string
+	ID             uuid.UUID
+}
+
+func (q *Queries) RenameUser(ctx context.Context, arg RenameUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, renameUser, arg.Username, arg.UsernameFolded, arg.ID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.UsernameFolded,
+		&i.DisplayName,
+		&i.Email,
+		&i.EmailFolded,
+		&i.EmailVerified,
+		&i.SuspendedAt,
+		&i.SuspendedUntil,
+		&i.SuspendedBy,
+		&i.SuspensionNote,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SendsTypingIndication,
+		&i.LinkPreviewsEnabled,
+		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
+		&i.TourProgress,
+		&i.WebauthnHandle,
+		&i.PendingEmail,
+	)
+	return i, err
 }
 
 const setAppearance = `-- name: SetAppearance :exec
@@ -391,4 +613,28 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.PendingEmail,
 	)
 	return i, err
+}
+
+const usernameHeldByOther = `-- name: UsernameHeldByOther :one
+SELECT EXISTS (
+    SELECT 1 FROM username_history
+    WHERE username_folded = $1
+      AND user_id <> $2
+      AND changed_at > $3
+)::boolean
+`
+
+type UsernameHeldByOtherParams struct {
+	Folded string
+	UserID uuid.UUID
+	Since  time.Time
+}
+
+// Whether somebody else gave this name up recently enough that it is still
+// theirs to come back to.
+func (q *Queries) UsernameHeldByOther(ctx context.Context, arg UsernameHeldByOtherParams) (bool, error) {
+	row := q.db.QueryRow(ctx, usernameHeldByOther, arg.Folded, arg.UserID, arg.Since)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
 }
