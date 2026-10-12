@@ -230,13 +230,61 @@ PUT /api/admin/roles/{id}/permissions
 ```
 
 Both are built-in, meaning they cannot be deleted — the accounts holding them
-would be left holding nothing — but their permissions are yours to change. Roles
-beyond them are yours to make, under `/api/admin/roles`.
+would be left holding nothing — and they keep their names, because the server
+finds them by name. Their descriptions and permissions are yours to change.
+Roles beyond them are yours to make, from the screen or under
+`/api/admin/roles`.
+
+#### Setting up a moderator from the screen
+
+**Settings → Administration → Roles and permissions** is where this is done.
+It appears for anybody holding `role.manage` (deciding what roles allow) or
+`role.assign` (deciding who holds them). Somebody with only `role.assign` sees
+the roles and what each allows, and can hand them out, but cannot change them.
+
+1. Choose **New role**, name it `Moderator`, and say what it is for.
+2. On the role's page, set what a moderator does to **Allow**. Usually that is
+   `moderation.review`, `moderation.restrict`, `message.delete.any` and
+   `message.edit.any`, with `user.suspend` if they may suspend accounts. Each
+   permission says beside it what the choice will mean. Leave the rest
+   **Unset**, so the moderator gets them, or not, from their other roles.
+   **Deny** is for withholding something every other role would allow,
+   because a denial wins.
+3. Under **Who holds it**, search for the moderators and add them.
+4. Open one of them (or search on the roles screen) to check. Their page lists
+   every permission with the role that decided it, server-wide or in a channel
+   you pick.
+
+A moderator for one channel only is made from that channel's settings instead:
+**Who may do what here** sets a role's permissions for that channel alone. The
+same panel makes an announcement channel: deny `channel.post` to `Member`
+there, and allow it to the role your announcers hold.
+
+The screen does nothing the API does not. Each change is checked and audited
+on the server, so a refusal shows up with the server's own reason. That
+includes being asked to confirm before you take away your own authority, and
+being refused when a change would leave nobody able to administer the server.
+
+#### From the API
 
 The server refuses two changes however they are asked for: one that would leave
 it with no administrator at all, and one that would remove the authority of the
 person making it. The second can be overridden — somebody stepping down
-deliberately is a real thing — by repeating the request with `confirmed`.
+deliberately is a real thing — by repeating the request with `confirmed`. "No
+administrator" is counted as the people who would still hold
+`server.administer` once the change was made. Withdrawing it from a role every
+administrator shares is refused, as is deleting such a role or denying it on
+another role they all hold, however many administrators there are.
+
+A role says one of three things about a permission. `PUT
+/api/admin/roles/{id}/permissions` with `"granted": true` allows it, and with
+`false` stores a denial. `DELETE
+/api/admin/roles/{id}/permissions/{permission}` (with `?channel=` for one
+channel's entry) clears the entry, so the role says nothing and the person's
+other roles decide. `PATCH /api/admin/roles/{id}` renames or describes a role.
+`GET /api/admin/roles/{id}/members` lists who holds it. `GET
+/api/admin/users/{id}/permissions` (optionally `?channel=`) answers what
+somebody may do, with the role entries behind each answer.
 
 Thirty-seven of the thirty-nine catalogued permissions are enforced — every one
 that projects and the directory added among them — and the two left,

@@ -103,10 +103,51 @@ Administrative permissions MUST be individually revocable rather than tied irrev
 - **WHEN** an action would remove administrative authority from the last account holding it
 - **THEN** the action is refused with an explanation
 
+#### Scenario: A role every administrator shares cannot be emptied
+
+- **WHEN** every account able to administer the server holds one role, and that role would stop conferring administration, by withdrawal, by an explicit denial on it, or by deletion
+- **THEN** the change is refused, however many administrators there are
+
 #### Scenario: Administrator actions are recorded
 
 - **WHEN** an account exercises an administrative permission
 - **THEN** the action is written to the audit log with the actor, target, and permission used
+
+### Requirement: Roles are administered from the interface
+
+Holders of `role.manage` SHALL be able to create, rename, describe and delete roles, and set each permission on a role to allowed, denied or unset, server-wide and for one channel, from the clients without using the API directly. Holders of `role.assign` SHALL be able to see every role and what it allows, and give roles to people and take them away. A built-in role MUST keep its name, because the server finds it by name. Every change MUST go through the same server checks and audit as the API. A client MUST show an entry's consequence under the baseline, denial and administration rules before it is changed. It MUST show a refusal in the server's words and put back any change it showed before the server refused it.
+
+Unset MUST be distinct from denied. A role with no entry for a permission leaves the decision to the person's other roles. A denial beats them.
+
+#### Scenario: A moderator is set up without the API
+
+- **WHEN** an administrator creates a role from the roles screen, allows moderation permissions on it, and adds a person to it
+- **THEN** that person can review reports, with no request made outside the clients
+
+#### Scenario: Clearing a denial gives the decision back
+
+- **WHEN** a role's denial of a permission is cleared rather than replaced with a grant
+- **THEN** its holders have the permission exactly when another of their roles, including the baseline, allows it
+
+#### Scenario: A built-in role keeps its name
+
+- **WHEN** somebody tries to rename `Member` or `Administrator`
+- **THEN** the change is refused and the description can still be changed
+
+#### Scenario: Assigning is not editing
+
+- **WHEN** somebody holding `role.assign` but not `role.manage` opens a role
+- **THEN** they can see what it allows and change who holds it, and cannot change what it allows
+
+### Requirement: Effective permissions are explainable
+
+An administrator SHALL be able to ask what a person may do, server-wide or in one channel. The answer MUST be computed by the same resolution the server uses to decide that person's requests. For each permission it MUST give the outcome, whether that came from administration, a server-wide entry, an entry for the channel, or nothing, and the role entries behind it, with baseline entries marked.
+
+#### Scenario: The explanation matches enforcement
+
+- **WHEN** posting is denied to `Member` in one channel and an administrator asks what a member may do there
+- **THEN** the answer says posting is not allowed in that channel because of `Member`'s entry for it
+- **AND** a post by that member in that channel is refused
 
 ### Requirement: Authority over one's own content
 
