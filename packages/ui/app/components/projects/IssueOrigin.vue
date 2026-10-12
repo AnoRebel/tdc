@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { IssueOrigin } from "@tdc/types";
 import { fully, whenBriefly } from "#layers/ui/app/lib/dates";
+import { plainText } from "#layers/ui/app/lib/formatting";
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
@@ -38,7 +39,9 @@ function who(address: string): string {
         {{ $t("projects.origin.removed", { room: props.origin.roomName ?? "" }) }}
       </p>
       <blockquote v-else-if="props.origin.message" class="mt-1.5 border-l-2 pl-2.5">
-        <p class="text-xs break-words whitespace-pre-wrap">{{ props.origin.message.body }}</p>
+        <p class="text-xs break-words whitespace-pre-wrap">
+          {{ plainText(props.origin.message.body ?? "") }}
+        </p>
         <footer class="mt-1 text-[0.6875rem] text-muted-foreground">
           {{ who(props.origin.message.sender) }} ·
           <time :datetime="props.origin.message.sentAt" :title="fully(props.origin.message.sentAt)">

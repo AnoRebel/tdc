@@ -1,6 +1,10 @@
 package push
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/AnoRebel/tdc/server/internal/markup"
+)
 
 /*
 Deciding what a notification is allowed to say.
@@ -52,7 +56,9 @@ func Describe(about Describing) Payload {
 	if !about.HideContent {
 		return Payload{
 			Title: titleFor(about),
-			Body:  truncate(about.Body, maxBodyLength),
+			// The body is Markdown source, and a lock screen shows text: the
+			// markers come off before the cut, so they cannot use up its length.
+			Body: truncate(markup.PlainText(about.Body), maxBodyLength),
 		}
 	}
 

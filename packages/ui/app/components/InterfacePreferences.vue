@@ -8,6 +8,7 @@ import {
   Rows3,
   Rows4,
   Sparkles,
+  Type,
   Wind,
 } from "lucide-vue-next";
 
@@ -17,7 +18,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Switch } from "#layers/ui/app/components/ui/switch";
 
 /**
- * How the interface behaves: motion, keyboard shortcuts and density.
+ * How the interface behaves: motion, keyboard shortcuts, formatting and density.
  *
  * A section rather than a page, so it can sit in the web client's settings,
  * in the desktop client's appearance window and in a dialog reachable from
@@ -34,7 +35,7 @@ defineProps<{
 }>();
 
 const { $t, $ts } = useI18n();
-const { motionPreference, motion, shortcuts, density } = useInterfacePreferences();
+const { motionPreference, motion, shortcuts, density, formatting } = useInterfacePreferences();
 const system = usePreferredReducedMotion();
 // Ctrl or ⌘, as this platform writes it: a key name, never translated.
 const commandKey = commandKeyLabel();
@@ -105,6 +106,20 @@ const systemSays = computed(() =>
         <p class="text-xs text-muted-foreground">
           {{ $t("interface.shortcutsHint", { key: `${commandKey} K` }) }}
         </p>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="flex items-center gap-1.5 text-xs font-semibold">
+        <Type class="size-3.5" aria-hidden="true" />
+        {{ $t("interface.formatting.title") }}
+      </h3>
+      <div class="mt-2 flex items-start gap-2.5">
+        <Switch v-model="formatting" :label="$ts('interface.formatting.label')" class="mt-0.5" />
+        <div>
+          <p class="text-xs">{{ $t("interface.formatting.label") }}</p>
+          <p class="text-xs text-muted-foreground">{{ $t("interface.formatting.hint") }}</p>
+        </div>
       </div>
     </div>
 

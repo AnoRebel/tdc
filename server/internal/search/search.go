@@ -17,6 +17,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/markup"
 )
 
 // maxResults bounds one search.
@@ -185,6 +186,14 @@ whose message did not send because an index was unavailable has lost something
 real; somebody whose message is briefly unsearchable has not.
 */
 func (s *Service) Index(ctx context.Context, event dbgen.Event, body string) error {
+	/*
+		The index holds the words without their formatting. A body is the
+		Markdown somebody typed, and what search shows back — the excerpt with
+		its matches marked — is read as text: "**deploy**" there would be two
+		pairs of asterisks around the word somebody searched for. The message
+		itself is unchanged; only what can be found and quoted is plain.
+	*/
+	body = markup.PlainText(body)
 	if strings.TrimSpace(body) == "" {
 		return nil
 	}

@@ -21,6 +21,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/markup"
 )
 
 // Level is how much a person wants to hear about a conversation.
@@ -319,8 +320,12 @@ worthless.
 var mentionPattern = regexp.MustCompile(`(?:^|\s)@([a-zA-Z0-9._-]{1,64})\b`)
 
 // MentionsIn returns the usernames a message names.
+//
+// Code is left out: "@Component" in a code sample, or a shell prompt's
+// user@host, is somebody quoting code rather than addressing a person. And
+// formatting comes off first, so a name made bold still reaches its person.
 func MentionsIn(body string) []string {
-	matches := mentionPattern.FindAllStringSubmatch(body, -1)
+	matches := mentionPattern.FindAllStringSubmatch(markup.PlainText(markup.WithoutCode(body)), -1)
 	if len(matches) == 0 {
 		return nil
 	}
@@ -688,7 +693,8 @@ func previewOf(content []byte) string {
 		return ""
 	}
 
-	body := strings.Join(strings.Fields(parsed.Body), " ")
+	// The body is Markdown source; a preview shows the words, not the markers.
+	body := strings.Join(strings.Fields(markup.PlainText(parsed.Body)), " ")
 	if len([]rune(body)) > 140 {
 		return string([]rune(body)[:140]) + "…"
 	}

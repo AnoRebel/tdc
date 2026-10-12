@@ -261,16 +261,83 @@ conversation. The marking is the server's, not the program's, so a program
 cannot leave it off and pretend to be somebody. You can reply to, react to,
 report and (if you moderate) remove these messages exactly as anybody else's.
 
+### Formatting
+
+A message is written in Markdown — the same marks GitHub and Discord
+use — and shown formatted. What you type is what is stored; the formatting is
+how it is drawn.
+
+| Type                     | To get                                 |
+| ------------------------ | -------------------------------------- |
+| `**bold**` or `__bold__` | **bold**                               |
+| `_italic_` or `*italic*` | _italic_                               |
+| `~~struck~~`             | ~~struck~~ (two tildes; one is just ~) |
+| `` `code` ``             | `code`                                 |
+| ` ```go ` … ` ``` `      | a code block, labelled and highlighted |
+| `> quoted`               | a quote                                |
+| `- item` or `* item`     | a list                                 |
+| `1. item`                | a numbered list                        |
+| `[text](https://…)`      | a link with your own words             |
+
+A **code block** keeps every space and line exactly as typed, scrolls sideways
+rather than wrapping a long line, says which language it is when you name one
+after the opening fence, and has a **Copy** button. Colours for the common
+languages (Go, JavaScript, TypeScript, Python, Rust, shell, SQL, JSON, YAML, HTML,
+CSS and others) load the first time a labelled block is on screen.
+
+Some Markdown is deliberately left as text, because in a conversation it is
+typed by accident far more often than on purpose: a heading (`# …`) is drawn as
+a bold line rather than a title; tables, horizontal rules (`---`), four-space
+indented code and HTML are shown exactly as typed. HTML is never interpreted —
+`<b>` reads as the three characters you typed. An image written in Markdown is a
+link to the picture rather than the picture, since attaching it is how an image
+is sent.
+
+**In the message box**, select some text and press:
+
+| Keys           | Wraps it in                    |
+| -------------- | ------------------------------ |
+| `Ctrl B`       | bold                           |
+| `Ctrl I`       | italic                         |
+| `Ctrl Shift X` | strikethrough                  |
+| `Ctrl E`       | inline code                    |
+| `Ctrl Shift C` | a code block, on its own lines |
+
+Pressing the same keys on text that is already wrapped unwraps it. With nothing
+selected, the marks go in as a pair with the cursor between them. The **T**
+button beside the emoji button shows a row of the same as buttons, with a short
+reference to the syntax; whether that row is showing is remembered in this
+browser.
+
+`Enter` sends and `Shift Enter` starts a new line, as always — except inside a
+code block you have opened and not yet closed, where `Enter` starts a new line
+too, so code can be typed or pasted without sending half of it. Type the closing
+` ``` ` and `Enter` sends again.
+
+Wherever a message cannot be shown formatted — a notification, a push to your
+phone, a desktop banner, a search result, the pinned list — its words are shown
+without the marks: `**deploy** is done` reads _deploy is done_. A mention inside
+code (`` `@amina` ``) does not notify anybody; one made bold does.
+
+If you would rather see every message exactly as it was typed, switch off **Show
+formatting in messages** in your interface preferences (next to motion and
+density). Links are still found either way.
+
 ### Links
 
-Message text is plain text. Links, addresses and phone numbers in it are
-detected and made clickable; there is no Markdown or other formatting in a
-message body today. Nothing you can type into a message becomes markup, which is
-what makes that safe: the text is escaped in full and links are inserted only
-around what the application matched itself.
+Links, addresses and phone numbers in a message are detected and made
+clickable, as they always have been — except inside code, where a URL is an
+example rather than a link. A Markdown link (`[text](address)`) may point only
+to a web or mail address; anything else is shown as its text. Every link opens
+in a new tab and carries no referrer back.
 
-Markdown is rendered for text files somebody attaches, where a README arrives
-looking like a README rather than like its source.
+Nothing you can type into a message becomes markup the application did not
+mean to produce: raw HTML is escaped, the Markdown is parsed into a small set of
+elements, and a sanitiser removes anything outside that set before it reaches
+the page.
+
+Markdown is rendered in full for text files somebody attaches, where a README
+arrives looking like a README rather than like its source.
 
 A link posted in a conversation may be shown with a preview of what it points
 at. That depends on two things: whether your operator has link previews on at
@@ -842,8 +909,10 @@ You decide how much of that you want, under **Motion**:
 **Density** makes everything slightly smaller, so more of a conversation fits on
 the screen. **Keyboard shortcuts** can be switched off entirely if you keep
 setting them off by accident; `Esc` and `Ctrl K` keep working either way.
+**Show formatting in messages** is on unless you turn it off; off, every
+message is shown as the text that was typed (see [Formatting](#formatting)).
 
-All three apply the moment you choose them and are kept **in this browser** (or
+All of these apply the moment you choose them and are kept **in this browser** (or
 this desktop app) rather than on your account — you may want motion on a big
 screen and not on your phone. Find them in the command palette (`Ctrl K`, then
 "Motion and keyboard preferences"), behind **More preferences** in the shortcut
@@ -853,27 +922,30 @@ list, and in settings.
 
 Press `?` for the full list, grouped by where each shortcut works.
 
-| Keys                          | What it does                                        |
-| ----------------------------- | --------------------------------------------------- |
-| `Ctrl K`                      | Search messages, channels and people                |
-| `?` or `Ctrl /`               | Show the shortcut list                              |
-| `Esc`                         | Close what is open, or leave the text box           |
-| `[`                           | Show or hide the sidebar                            |
-| `Ctrl Shift K`                | Switch conversation                                 |
-| `Alt ↑` / `Alt ↓`             | Previous and next channel                           |
-| `Alt Shift ↑` / `Alt Shift ↓` | Previous and next conversation with unread messages |
-| `G` then `H`                  | Go to conversations                                 |
-| `G` then `P`                  | Go to projects                                      |
-| `G` then `I`                  | Go to my issues                                     |
-| `G` then `B`                  | Go to the board of the project you are in           |
-| `G` then `D`                  | Go to the directory                                 |
-| `G` then `S`                  | Go to settings                                      |
-| `C`                           | Write a message                                     |
-| `E`, or `↑` in an empty box   | Edit your last message                              |
-| `T`                           | Reply in a thread to the last message               |
-| `R`                           | React to the last message                           |
-| `M`                           | Mark as read and jump to the newest message         |
-| `N`                           | File a new issue, in a project                      |
+| Keys                           | What it does                                        |
+| ------------------------------ | --------------------------------------------------- |
+| `Ctrl K`                       | Search messages, channels and people                |
+| `?` or `Ctrl /`                | Show the shortcut list                              |
+| `Esc`                          | Close what is open, or leave the text box           |
+| `[`                            | Show or hide the sidebar                            |
+| `Ctrl Shift K`                 | Switch conversation                                 |
+| `Alt ↑` / `Alt ↓`              | Previous and next channel                           |
+| `Alt Shift ↑` / `Alt Shift ↓`  | Previous and next conversation with unread messages |
+| `G` then `H`                   | Go to conversations                                 |
+| `G` then `P`                   | Go to projects                                      |
+| `G` then `I`                   | Go to my issues                                     |
+| `G` then `B`                   | Go to the board of the project you are in           |
+| `G` then `D`                   | Go to the directory                                 |
+| `G` then `S`                   | Go to settings                                      |
+| `C`                            | Write a message                                     |
+| `E`, or `↑` in an empty box    | Edit your last message                              |
+| `T`                            | Reply in a thread to the last message               |
+| `R`                            | React to the last message                           |
+| `M`                            | Mark as read and jump to the newest message         |
+| `N`                            | File a new issue, in a project                      |
+| `Ctrl B`, `Ctrl I`, `Ctrl E`   | Bold, italic, inline code, in the message box       |
+| `Ctrl Shift X`, `Ctrl Shift C` | Strikethrough, code block, in the message box       |
+| `Shift Enter`                  | New line instead of sending                         |
 
 On a board, every card has a move handle. Focus it and press `Enter` or `Space`
 to pick the card up, `←` and `→` to choose a column, and `Enter` to put it down
@@ -886,8 +958,9 @@ The single-key shortcuts do nothing while you are typing — a shortcut that sto
 a letter mid-sentence would cost more trust than every shortcut is worth — and
 nothing reaches past an open dialog into the screen behind it. Shortcuts
 carrying a modifier work anywhere, because nobody types `Ctrl K` into a
-sentence. None of them use a key your browser or the desktop app's menu already
-claims.
+sentence. None of them use a key the desktop app's menu already claims, and
+the formatting keys (`Ctrl B` and the rest) work only inside the message box,
+where they take over from the browser's own meaning for them.
 
 The list under `?` is generated from what the application actually binds, so it
 cannot drift from the real behaviour.
@@ -1025,7 +1098,6 @@ So that nothing above is read as implying more than it says:
   them on (see [Calls](#calls)), and ringing people into them. Links to a call, sharing a
   screen, recording, and calls of more than a handful of people are still to
   come.
-- **Message formatting.** No bold, italic, lists or code blocks in a message.
 
 Several capabilities are finished on the server and are waiting only for a
 control in the clients. They are noted where they belong above, and collected

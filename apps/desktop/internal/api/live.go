@@ -270,7 +270,9 @@ func (b *LiveBridge) notify(data []byte) {
 	// The sender's own address is the title: the room's name is not in the
 	// frame, and "someone@server" says more about whether to look than a
 	// channel identifier would.
-	_ = b.notifier.Show(frame.Payload.Sender, frame.Payload.Content.Body, Target{
+	//
+	// The body is Markdown source; a banner shows its words, not its markers.
+	_ = b.notifier.Show(frame.Payload.Sender, plainText(frame.Payload.Content.Body), Target{
 		Server:  server,
 		Room:    frame.RoomID,
 		Message: frame.Payload.ID,

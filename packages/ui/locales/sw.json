@@ -250,7 +250,26 @@
     "actionTaken": "{label} — imejibiwa",
     "actionAlreadyAnswered": "Hilo limeshajibiwa.",
     "actionFailed": "Hilo halikuweza kujibiwa. Jaribu tena.",
-    "editThisMessage": "Hariri ujumbe huu"
+    "editThisMessage": "Hariri ujumbe huu",
+    "formatting": {
+      "copyCode": "Nakili",
+      "copied": "Imenakiliwa",
+      "toolbar": "Mpangilio wa maandishi",
+      "showToolbar": "Onyesha vitufe vya mpangilio",
+      "hideToolbar": "Ficha vitufe vya mpangilio",
+      "bold": "Herufi nzito",
+      "italic": "Herufi za mlalo",
+      "strikethrough": "Mstari katikati",
+      "code": "Msimbo ndani ya mstari",
+      "codeBlock": "Kizuizi cha msimbo",
+      "help": "Msaada wa mpangilio",
+      "helpIntro": "Andika hivi, au chagua maandishi kisha tumia vitufe au vitufe vya kibodi.",
+      "quote": "Nukuu",
+      "list": "Orodha",
+      "numberedList": "Orodha ya namba",
+      "link": "Kiungo",
+      "enterInFence": "Ndani ya kizuizi cha msimbo kilicho wazi, Enter huanzisha mstari mpya. Funga kizuizi kwa ``` na Enter itatuma tena."
+    }
   },
   "channel": {
     "create": "Kipindi kipya",
@@ -1608,7 +1627,8 @@
       "everywhere": "Kila mahali",
       "navigation": "Kuzunguka",
       "conversation": "Ndani ya mazungumzo",
-      "projects": "Ndani ya mradi"
+      "projects": "Ndani ya mradi",
+      "formatting": "Ndani ya kisanduku cha ujumbe"
     },
     "shortcuts": {
       "search": "Tafuta jumbe, chaneli na watu",
@@ -1634,7 +1654,18 @@
       "markRead": "Weka alama kuwa imesomwa na uruke hadi ujumbe mpya zaidi",
       "newIssue": "Fungua suala jipya",
       "pickUpCard": "Inua kadi kwa kishikio chake, kisha iweke chini",
-      "moveCard": "Hamisha kadi safu moja, kwa kishikio chake"
+      "moveCard": "Hamisha kadi safu moja, kwa kishikio chake",
+      "formatBold": "Herufi nzito",
+      "formatItalic": "Herufi za mlalo",
+      "formatStrikethrough": "Mstari katikati",
+      "formatCode": "Msimbo ndani ya mstari",
+      "formatCodeBlock": "Kizuizi cha msimbo",
+      "newLineInMessage": "Mstari mpya badala ya kutuma (Enter peke yake huongeza mstari ndani ya kizuizi cha msimbo kilicho wazi)"
+    },
+    "formatting": {
+      "title": "Mpangilio wa maandishi",
+      "label": "Onyesha mpangilio wa maandishi kwenye jumbe",
+      "hint": "Herufi nzito, vizuizi vya msimbo, orodha na vinginevyo, vikichorwa kama mwandishi alivyokusudia. Ukizima, kila ujumbe unaonyeshwa kama ulivyoandikwa."
     }
   },
   "calls": {

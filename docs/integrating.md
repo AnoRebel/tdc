@@ -449,6 +449,14 @@ this.
 the event type. `sequence` is per-room and monotonic, and is the number to
 remember for replay.
 
+**A body is Markdown source.** `content.body` is exactly what its author typed,
+formatting marks included — `**deploy** is done`, a fenced code block, a list.
+The clients render it; nothing on the server converts it, and nothing is lost
+by reading it as text. An integration that shows messages somewhere that cannot
+render Markdown should strip the marks itself, as the server does for
+notifications, push and search: keep the words, the contents of code and the
+addresses of links, and drop the rest.
+
 ### Sending a message
 
 ```sh
@@ -459,6 +467,16 @@ curl -X POST "http://localhost:8080/api/rooms/$ROOM/messages" \
 ```
 
 Answers **201** with the created message in the same shape the timeline returns.
+
+**What to send.** The body is rendered as Markdown, exactly as a person's
+message is, so a bot can and should format: a fenced code block for a log
+excerpt or a command (with a language after the fence for colours), `**bold**`
+for the one word that matters, a list for several items, `[text](https://…)`
+for a link with a readable name. Raw HTML is shown as text, never rendered;
+images in Markdown become links (attach the file instead); headings are drawn
+as a bold line; tables are shown as typed. A body that is plain text renders as
+plain text, so an integration written before formatting existed looks the same.
+Notifications, push and search see the same message with its marks removed.
 
 `clientToken` is the idempotency key, and an integration should always send one.
 Generate it before the first attempt and reuse it on every retry: a repeat with

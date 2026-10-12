@@ -7,6 +7,9 @@
  *   motion     — whether things move when they change
  *   shortcuts  — whether single keys do things
  *   density    — how much fits on the screen
+ *   formatting — whether messages show bold, code and the rest, or the text
+ *                exactly as it was typed; and whether the composer offers its
+ *                formatting buttons
  *
  * Kept in this browser rather than on the account. Unlike the colours, the
  * server has nowhere to put these: its preferences are separate endpoints with
@@ -64,6 +67,10 @@ export function isDensity(value: unknown): value is Density {
 export const MOTION_STORAGE_KEY = "tdc-motion";
 export const SHORTCUTS_STORAGE_KEY = "tdc-shortcuts";
 export const DENSITY_STORAGE_KEY = "tdc-density";
+/** Whether messages show their formatting, or the text exactly as typed. */
+export const FORMATTING_STORAGE_KEY = "tdc-formatting";
+/** Whether the composer shows its row of formatting buttons. */
+export const FORMATTING_TOOLBAR_STORAGE_KEY = "tdc-formatting-toolbar";
 
 /**
  * The motion and density decisions, made before the first paint.

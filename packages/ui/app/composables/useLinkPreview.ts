@@ -1,4 +1,5 @@
 import type { LinkPreview } from "@tdc/types";
+import { withoutCode } from "#layers/ui/app/lib/formatting";
 
 /**
  * Fetches a summary of a link, once per link per session.
@@ -59,7 +60,9 @@ export function useLinkPreview() {
  * the one being talked about.
  */
 export function firstLinkIn(body: string): string | null {
-  const match = body.match(/https?:\/\/[^\s<>"']+/);
+  // A link inside code is an example, not something being shared, and the
+  // message does not show it as a link either.
+  const match = withoutCode(body).match(/https?:\/\/[^\s<>"']+/);
   if (!match) return null;
 
   // Trailing punctuation is far more likely to be the sentence's than the

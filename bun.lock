@@ -113,6 +113,7 @@
         "@date-fns/tz": "^1.5.0",
         "@fontsource-variable/geist": "^5.3.0",
         "@fontsource-variable/geist-mono": "^5.3.0",
+        "@speed-highlight/core": "^1.2.24",
         "@tanstack/vue-form": "^1.33.5",
         "@tanstack/vue-table": "^9.2.4",
         "@tdc/types": "workspace:*",

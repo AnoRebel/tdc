@@ -250,7 +250,26 @@
     "actionTaken": "{label} — answered",
     "actionAlreadyAnswered": "That has already been answered.",
     "actionFailed": "That could not be answered. Try again.",
-    "editThisMessage": "Edit this message"
+    "editThisMessage": "Edit this message",
+    "formatting": {
+      "copyCode": "Copy",
+      "copied": "Copied",
+      "toolbar": "Formatting",
+      "showToolbar": "Show formatting buttons",
+      "hideToolbar": "Hide formatting buttons",
+      "bold": "Bold",
+      "italic": "Italic",
+      "strikethrough": "Strikethrough",
+      "code": "Inline code",
+      "codeBlock": "Code block",
+      "help": "Formatting help",
+      "helpIntro": "Type these, or select text and use the buttons or keys.",
+      "quote": "Quote",
+      "list": "List",
+      "numberedList": "Numbered list",
+      "link": "Link",
+      "enterInFence": "Inside an open code block, Enter starts a new line. Close the block with ``` and Enter sends again."
+    }
   },
   "channel": {
     "create": "New channel",
@@ -1608,7 +1627,8 @@
       "everywhere": "Everywhere",
       "navigation": "Getting around",
       "conversation": "In a conversation",
-      "projects": "In a project"
+      "projects": "In a project",
+      "formatting": "In the message box"
     },
     "shortcuts": {
       "search": "Search messages, channels and people",
@@ -1634,7 +1654,18 @@
       "markRead": "Mark as read and jump to the newest message",
       "newIssue": "File a new issue",
       "pickUpCard": "Pick up a card from its handle, then put it down",
-      "moveCard": "Move a card one column, from its handle"
+      "moveCard": "Move a card one column, from its handle",
+      "formatBold": "Bold",
+      "formatItalic": "Italic",
+      "formatStrikethrough": "Strikethrough",
+      "formatCode": "Inline code",
+      "formatCodeBlock": "Code block",
+      "newLineInMessage": "New line instead of sending (Enter alone adds one inside an open code block)"
+    },
+    "formatting": {
+      "title": "Formatting",
+      "label": "Show formatting in messages",
+      "hint": "Bold, code blocks, lists and the rest, drawn as their author meant. Off shows every message exactly as it was typed."
     }
   },
   "calls": {

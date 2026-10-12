@@ -340,3 +340,19 @@ Tours MUST be skippable, resumable, and MUST NOT block use of the application.
 
 - **WHEN** a tour is active
 - **THEN** the user can still interact with the application normally
+
+### Requirement: Composing formatted messages
+
+The message box SHALL remain a plain text field in which formatting is the Markdown people type. It SHALL offer keyboard shortcuts that wrap the selection — bold, italic, strikethrough, inline code and a code block — that unwrap text already wrapped, and that are listed in the keyboard reference. It SHALL offer an optional row of formatting buttons, off by default, whose visibility is remembered as an interface preference, and a short reference to the syntax.
+
+Enter SHALL send and Shift-Enter SHALL start a new line, except inside a code block that has been opened and not closed, where Enter MUST start a new line. Editing a message in place MUST keep its lines.
+
+#### Scenario: A shortcut wraps the selection
+
+- **WHEN** somebody selects a word and presses the bold shortcut
+- **THEN** the word is wrapped in `**` and stays selected, and pressing it again unwraps it
+
+#### Scenario: Enter inside an open code block
+
+- **WHEN** somebody has typed an opening fence and presses Enter
+- **THEN** a new line starts and nothing is sent, and after the closing fence Enter sends
