@@ -264,6 +264,15 @@
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
+  /*
+   * Cards and popovers, by the names shadcn-vue components and their copies
+   * use. Without these, bg-card and bg-popover compile to nothing and a
+   * dialog or picker drawn with them is see-through over the page.
+   */
+  --color-card: var(--surface-raised);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--surface-raised);
+  --color-popover-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
