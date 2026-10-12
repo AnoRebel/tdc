@@ -121,7 +121,11 @@ incorrect"}` — the same message whether or not the account exists.
 
 ### API tokens
 
-A program should not be holding somebody's password. Issue it a token instead:
+A program should not be holding somebody's password. Issue it a token instead.
+The simplest way is the screen for it — Settings → _API tokens_ in either
+client, which names the token, sets its lifetime, lists what it may do and
+shows the secret once (see [Using TDC](using-tdc.md#api-tokens)). The same,
+from a program signed in as you:
 
 ```sh
 curl -X POST http://localhost:8080/api/me/tokens \

@@ -296,6 +296,35 @@ Users SHALL be able to browse and search the channels they are permitted to see,
 - **WHEN** a user browses available channels
 - **THEN** results are presented in a documented, stable order with the channel's purpose visible
 
+### Requirement: Scheduled messages
+
+Users SHALL be able to write a message to be sent at a later time, and to list, reword, move, send immediately or cancel their own messages that have not yet been sent. A message being sent at that moment MUST NOT be changed or cancelled, and a message MUST NOT be sent twice.
+
+#### Scenario: Only the author changes a scheduled message
+
+- **WHEN** a user tries to change, send or cancel another user's scheduled message
+- **THEN** the request is refused as though the message did not exist
+
+#### Scenario: Sending now meets the checks sending later would
+
+- **WHEN** a user sends a scheduled message immediately
+- **THEN** it is sent as an ordinary message, subject to the same posting checks, and leaves the list of scheduled messages
+
+#### Scenario: A message being sent is left alone
+
+- **WHEN** a delivery pass has claimed a scheduled message
+- **THEN** cancelling, changing or sending it now is refused
+
+### Requirement: Personal conversation list
+
+Users SHALL be able to pin conversations to the top of their own list, in an order they choose, without that being visible to anybody else.
+
+#### Scenario: Pins are private and ordered
+
+- **WHEN** a user pins conversations and rearranges them
+- **THEN** their list shows them first in that order on every device
+- **AND** no other user can observe the pins
+
 ### Requirement: Addressing
 
 Channels and users SHALL be addressable in a form that includes their home server, so an address remains unambiguous when later exchanged between servers.

@@ -74,6 +74,28 @@ out is not something to do by accident.
 Changing your password invalidates every other session. That is the behaviour
 you want if you are changing it because you think somebody else has it.
 
+### API tokens
+
+A program acting as you — a script, a bot, a deployment — should not hold your
+password. Give it a token instead, under Settings → _API tokens_: a name, how
+long it lasts, and what it may do.
+
+**A token is your account with everything you do not tick denied.** The list
+starts with nothing ticked, and the form counts what the token will be denied
+as you choose. It can never do more than your account, and when your account
+loses a permission, its tokens lose it in the same moment.
+
+**The token is shown once**, when it is made, with a button to copy it. It is
+stored only in a form nobody can turn back into the token, so a lost one is
+revoked and replaced rather than recovered. The list shows each token's name,
+what it may do, when it was made, when it was last used and when it expires —
+a token nobody has used for a year is easy to spot. Revoking one asks first and
+stops it working immediately.
+
+A token cannot make another token, and it does not appear among your sessions.
+Recovering your account ends every token it held. The details for whoever
+writes the program are in [Integrating](integrating.md#api-tokens).
+
 ## Conversations
 
 ### Channels
@@ -104,13 +126,24 @@ on some the operator keeps it.
 
 ### Direct messages
 
-A direct conversation is between you and one other person. Start one by finding
-them in the search box — `Ctrl K` — and choosing them; there is no separate "new
-message" button.
+A direct conversation is between you and one other person, or between you and
+several. Start one with the **+** beside _Direct messages_ in the sidebar, or
+_New message_ in the search box (`Ctrl K`): type a name, press Enter to add
+them, add as many people as you like, and press Enter again — or _Start
+conversation_ — to open it. Choosing one person in the search box opens your
+conversation with them directly, and `Shift Enter` on a person there starts the
+new-message box with them already in it.
 
-The server can hold a conversation between several people, and the API accepts
-it, but no control in either client opens one yet. Group direct messages are in
-practice not yet available.
+A conversation with several people shows in the sidebar as two overlapping
+faces with a count, and is named after everybody in it but you.
+
+**A direct conversation is the people in it.** Opening one with the same people
+again returns the conversation you already have rather than starting a second.
+For the same reason, _Add people_ in a conversation's menu starts a new
+conversation with everybody in the old one and whoever you add — the old one
+stays as it was, its history readable by the people who were there, rather than
+being shown to somebody who was not. A direct conversation has no name of its
+own to change.
 
 **Administrators cannot read them.** Not "should not" — an administrator using
 the ordinary endpoints cannot retrieve other people's direct messages, and that
@@ -177,16 +210,29 @@ composer, which offers a few presets and a picker. At least ten seconds ahead
 and at most a year. Whether this is available at all is one of the capabilities
 your operator can switch off.
 
-Reviewing and cancelling what you have scheduled is in the server and the API
-but has no control in either client yet, so a scheduled message currently cannot
-be called back.
+What you have scheduled is listed under _Scheduled messages_, which appears in
+the sidebar while anything is waiting, and a conversation with messages waiting
+says so above its composer. Each one can be **reworded**, **moved** to another
+time, **sent now**, or **cancelled** — cancelling asks first, since the words go
+with it. Sending now goes through the same checks it would have met later: if
+you may no longer post there, you are told at once rather than finding out
+tomorrow.
+
+A message the server has begun sending can no longer be changed or cancelled;
+for the moment it takes, it is already on its way.
 
 ### Keeping a conversation to hand
 
-Pinning conversations to the top of your own list — a private bookmark rather
-than an announcement — is built on the server but has no control in either
-client yet. Pinning a _message_ is the other thing entirely, that one speaks for
-the channel, and it works.
+Any conversation can be pinned to the top of your own sidebar — a private
+bookmark rather than an announcement, which nobody else sees. Pin it from the
+conversation's menu: the **⋯** beside it in the sidebar (or right-click it, or
+long-press it on a touch screen), or the **⋯** in the conversation's header.
+Pinned conversations sit together under _Pinned_ in the order you choose, and
+_Move up_ and _Move down_ in the same menu rearrange them. The order follows
+you to every device.
+
+Pinning a _message_ is the other thing entirely: that one speaks for the
+channel, and everybody in it sees it.
 
 ### Messages that expire
 
@@ -327,9 +373,20 @@ Separately from that, you can set a status: **Available**, **Busy**, **Away** or
 are seeded when a server is created and there is no interface for changing the
 list, so in practice they are what every server has.
 
-The server supports giving a status an expiry so that it reverts by itself, and
-supports appearing offline while connected, but neither has a control in the
-clients yet.
+Your status is changed where it is shown: press your name at the foot of the
+sidebar. The menu changes it in one press; _Set a note or a time_ opens a
+dialog for a few words to go with it ("back at four") and **when it clears
+itself** — after 30 minutes, an hour, four hours, at the end of today, at the
+end of this week, at a time you pick, or never. The foot of the sidebar then
+says how long it has left, and when the time comes it reverts to Available on
+the server, whether or not any of your devices is open. Settings shows the same
+status and opens the same dialog.
+
+**Appear offline** shows you as offline to everybody while you stay connected:
+your status and its note are withheld with it, and you still receive
+everything. Choosing any other status makes you visible again. It also holds
+notifications, as Busy does — hiding that you are here does not mean you want
+to be interrupted.
 
 ### What a member list says about you
 
@@ -375,9 +432,10 @@ You see who is composing, and the indicator disappears by itself when it stops
 being refreshed rather than sticking around after somebody wandered off
 mid-sentence.
 
-The server honours a per-person preference not to send yours, and respects it
-wherever it is set — but there is no control for it in either client yet, so in
-practice everybody sends one today.
+You can stop others seeing yours: Settings → Privacy → _Show others when I am
+typing_. Turned off, your devices stop announcing that you are writing, and the
+server ignores any device that still does — so an old client somewhere cannot
+give you away. It is one setting for the account, not one per device.
 
 ### Unread state
 
@@ -442,9 +500,28 @@ under _Summaries by email_, and it is off until you turn it on.
 The control appears only where it can work. A server whose operator has not
 configured mail cannot send a summary, and does not offer one.
 
-Muting a single conversation is in the server and the API but has no control in
-either client yet, and it is a plain on or off rather than a duration. Following
-a thread you were not part of is not implemented.
+#### How much to hear from one conversation
+
+Each conversation's menu — the **⋯** beside it in the sidebar, or in its header
+— says how much you want to hear from it:
+
+- **Every new message**, for a channel you follow closely.
+- **Mentions and replies to me**, which is what every channel starts at: you
+  are told when somebody names you or answers you, and not otherwise.
+- **Nothing from here**, which keeps the channel without its interruptions.
+
+A direct conversation does not offer these, because everything in it is
+addressed to you; what it offers is muting.
+
+**Mute conversation** silences it entirely, mentions and all — including a
+reaction or a reply to something of yours there. A muted conversation is drawn
+dimmed in the sidebar with a crossed-out bell and no unread count, and the key
+for the next unread conversation passes over it. Its messages are still
+unread and still there when you open it; muting stops interruptions, not
+reading. It is on or off, not for a set time, and it follows you to every
+device.
+
+Following a thread you were not part of is not implemented.
 
 ### Search
 
@@ -1026,11 +1103,3 @@ So that nothing above is read as implying more than it says:
   screen, recording, and calls of more than a handful of people are still to
   come.
 - **Message formatting.** No bold, italic, lists or code blocks in a message.
-
-Several capabilities are finished on the server and are waiting only for a
-control in the clients. They are noted where they belong above, and collected
-here so that nobody goes looking: group direct messages, muting one
-conversation, pinning conversations to your own list, reviewing or cancelling a
-scheduled message, giving a status an expiry, appearing offline while connected,
-and turning off your own typing indicator. The translations are in the same
-position — written, and not yet read by the interface.
