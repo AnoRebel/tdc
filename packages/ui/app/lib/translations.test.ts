@@ -53,9 +53,12 @@ describe("what every locale has to say", () => {
   for (const locale of LOCALES.filter((one) => one !== "en")) {
     describe(locale, () => {
       const other = load(locale);
+      // Once, as a set: recomputed per key inside the filter, this was quadratic
+      // and timed out under a full parallel run once the files passed 2,000 keys.
+      const otherKeys = new Set(keysOf(other));
 
       it("says everything English says", () => {
-        const missing = englishKeys.filter((key) => !keysOf(other).includes(key));
+        const missing = englishKeys.filter((key) => !otherKeys.has(key));
         expect(missing, `${locale}.json is missing these keys`).toEqual([]);
       });
 

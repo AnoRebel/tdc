@@ -38,6 +38,42 @@ func TestRoleAdministrationIsRefusedToMembers(t *testing.T) {
 	}
 }
 
+/*
+TestSomebodyWhoAssignsRolesSeesThemAndCannotChangeThem.
+
+role.assign opens the list and what each role allows, because handing somebody a
+role means knowing what it is; deciding what a role allows stays role.manage.
+*/
+func TestSomebodyWhoAssignsRolesSeesThemAndCannotChangeThem(t *testing.T) {
+	handler := newTestAPI(t)
+	admin := completeSetup(t, handler)
+	assigner := registerAndSignIn(t, handler, "amina")
+	other := registerAndSignIn(t, handler, "baraka")
+
+	assigners := makeRoleWith(t, handler, admin, "Assigners")
+	setEntry(t, handler, admin, assigners, "role.assign", "", true)
+	mustCall(t, handler, http.MethodPost, "/api/admin/roles/"+assigners+"/members",
+		map[string]string{"user": accountID(t, handler, assigner)}, admin, http.StatusNoContent)
+	helpers := makeRoleWith(t, handler, admin, "Helpers")
+
+	mustCall(t, handler, http.MethodGet, "/api/admin/roles", nil, assigner, http.StatusOK)
+	mustCall(t, handler, http.MethodGet, "/api/admin/permissions", nil, assigner, http.StatusOK)
+	mustCall(t, handler, http.MethodGet, "/api/admin/roles/"+helpers+"/members", nil, assigner, http.StatusOK)
+	mustCall(t, handler, http.MethodGet, "/api/admin/users/"+accountID(t, handler, other)+"/permissions",
+		nil, assigner, http.StatusOK)
+	mustCall(t, handler, http.MethodPost, "/api/admin/roles/"+helpers+"/members",
+		map[string]string{"user": accountID(t, handler, other)}, assigner, http.StatusNoContent)
+
+	mustCall(t, handler, http.MethodPut, "/api/admin/roles/"+helpers+"/permissions",
+		map[string]any{"permission": "user.suspend", "granted": true}, assigner, http.StatusForbidden)
+	mustCall(t, handler, http.MethodDelete, "/api/admin/roles/"+helpers+"/permissions/user.suspend",
+		nil, assigner, http.StatusForbidden)
+	mustCall(t, handler, http.MethodPatch, "/api/admin/roles/"+helpers,
+		map[string]string{"name": "Mine"}, assigner, http.StatusForbidden)
+	mustCall(t, handler, http.MethodPost, "/api/admin/roles",
+		map[string]string{"name": "Mine"}, assigner, http.StatusForbidden)
+}
+
 // TestTheRoleListSaysWhoHoldsWhatAndWhere is what the list is drawn from.
 func TestTheRoleListSaysWhoHoldsWhatAndWhere(t *testing.T) {
 	handler := newTestAPI(t)

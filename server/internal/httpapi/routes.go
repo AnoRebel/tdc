@@ -473,8 +473,11 @@ func (s *Server) routes() {
 	// authority is visible at the routing table rather than buried in a
 	// handler.
 	admin := s.echo.Group("/api/admin", requireAuthentication)
+	// Reading the catalogue and the roles is open to whoever assigns roles as
+	// well as whoever makes them: handing somebody a role means knowing which
+	// roles there are and what each allows.
 	admin.GET("/permissions", s.handlePermissionCatalogue,
-		requirePermission(authz.PermRoleManage))
+		requireAnyPermission(authz.PermRoleManage, authz.PermRoleAssign))
 
 	/*
 		Roles, and who holds them.
@@ -486,7 +489,7 @@ func (s *Server) routes() {
 		to use it.
 	*/
 	admin.GET("/roles", s.handleListRoles,
-		requirePermission(authz.PermRoleManage))
+		requireAnyPermission(authz.PermRoleManage, authz.PermRoleAssign))
 	admin.POST("/roles", s.handleCreateRole,
 		requirePermission(authz.PermRoleManage))
 	admin.PATCH("/roles/:id", s.handleUpdateRole,

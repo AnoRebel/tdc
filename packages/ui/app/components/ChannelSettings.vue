@@ -47,7 +47,7 @@ const emit = defineEmits<{
 const roomId = computed(() => props.room?.id ?? "");
 const admin = useChannelAdmin(roomId);
 const roomsApi = useRooms();
-const { user } = useAuth();
+const { user, can } = useAuth();
 const refreshRooms = inject<() => Promise<void>>("refreshRooms", async () => {});
 
 const open = ref(false);
@@ -247,7 +247,7 @@ const others = computed(() => members.value.filter((member) => member.id !== use
   </Button>
 
   <Button
-    v-if="admin.anything.value"
+    v-if="admin.anything.value || (admin.allowed.value.administrable && can('role.manage'))"
     variant="ghost"
     size="icon"
     :label="$ts('channelAdmin.open')"
@@ -416,6 +416,15 @@ const others = computed(() => members.value.filter((member) => member.id !== use
             {{ $t("channelAdmin.archive") }}
           </Button>
         </section>
+
+        <!-- Who may do what here: roles' entries for this channel alone. Its
+             own chunk, fetched only when somebody who may change roles opens
+             this, so nobody else pays for it. -->
+        <LazyRolesChannelPermissions
+          v-if="can('role.manage') && admin.allowed.value.administrable"
+          :room-id="room.id"
+          :room-name="room.name"
+        />
 
         <!-- Who is in it. -->
         <section v-if="admin.allowed.value.removeMembers" class="mt-5 border-t pt-4">
