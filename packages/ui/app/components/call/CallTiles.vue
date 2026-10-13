@@ -72,6 +72,7 @@ function attach(element: unknown, stream: MediaStream | null | undefined) {
       </div>
       <span class="tile-label">
         <MicOff v-if="!person.audio" class="size-3" :aria-label="$ts('calls.muted')" />
+        <span v-if="person.handRaisedAt" :aria-label="$ts('calls.reactions.handUp')">✋</span>
         {{ person.username }}
         <span v-if="person.held" class="text-white/75">· {{ $t("calls.holding") }}</span>
       </span>

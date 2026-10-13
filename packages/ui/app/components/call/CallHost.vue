@@ -24,6 +24,7 @@ const live = useLiveConnection({
   onCallLobby: (lobby) => c.onLobby(lobby),
   onCallAdmitted: (use) => void c.onAdmitted(use),
   onCallTurnedAway: (use) => c.onTurnedAway(use),
+  onCallReaction: (reaction) => c.onReaction(reaction),
 });
 c.setSignaller((call, to, body) => live.signal(call, to, body));
 

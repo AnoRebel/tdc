@@ -43,6 +43,10 @@ func init() {
 		calls.POST("/ring", s.handleRing)
 		calls.POST("/decline", s.handleDeclineRing)
 		calls.POST("/invite", s.handleInviteToCall)
+		calls.PUT("/hand", s.handleHand(true))
+		calls.DELETE("/hand", s.handleHand(false))
+		calls.DELETE("/hand/:userId", s.handleLowerHand)
+		calls.POST("/reactions", s.handleCallReaction)
 		calls.PUT("/stage", s.handlePresent(true))
 		calls.DELETE("/stage", s.handlePresent(false))
 		calls.DELETE("/stage/presenter", s.handleClearStage,
@@ -61,9 +65,15 @@ func init() {
 	})
 
 	documentRoutes(map[string]entry{
-		"GET /api/rooms/:id/call":          {Summary: "The call in progress in a conversation", Authentication: "session or token", Permission: "channel.read"},
-		"PUT /api/rooms/:id/call/stage":    {Summary: "Present your screen in the call, if nobody else is", Authentication: "session or token"},
-		"DELETE /api/rooms/:id/call/stage": {Summary: "Stop presenting your screen", Authentication: "session or token"},
+		"GET /api/rooms/:id/call":         {Summary: "The call in progress in a conversation", Authentication: "session or token", Permission: "channel.read"},
+		"PUT /api/rooms/:id/call/hand":    {Summary: "Raise your hand in the call", Authentication: "session or token"},
+		"DELETE /api/rooms/:id/call/hand": {Summary: "Lower your hand", Authentication: "session or token"},
+		"DELETE /api/rooms/:id/call/hand/:userId": {
+			Summary: "Lower somebody's hand, as whoever presents or a moderator", Authentication: "session or token",
+		},
+		"POST /api/rooms/:id/call/reactions": {Summary: "Send a passing reaction to everybody in the call", Authentication: "session or token"},
+		"PUT /api/rooms/:id/call/stage":      {Summary: "Present your screen in the call, if nobody else is", Authentication: "session or token"},
+		"DELETE /api/rooms/:id/call/stage":   {Summary: "Stop presenting your screen", Authentication: "session or token"},
 		"DELETE /api/rooms/:id/call/stage/presenter": {
 			Summary: "Take whoever is presenting off the stage", Authentication: "session or token", Permission: "moderation.restrict",
 		},
@@ -104,8 +114,10 @@ type callParticipantView struct {
 	Video    bool   `json:"video"`
 	Held     bool   `json:"held"`
 	// Screen says they are presenting their screen.
-	Screen   bool   `json:"screen"`
-	JoinedAt string `json:"joinedAt"`
+	Screen bool `json:"screen"`
+	// HandRaisedAt is when they raised their hand, while it is up.
+	HandRaisedAt string `json:"handRaisedAt,omitempty"`
+	JoinedAt     string `json:"joinedAt"`
 }
 
 type callView struct {
@@ -129,7 +141,10 @@ func (s *Server) callViewOf(roomID, callID uuid.UUID, startedAt time.Time, parti
 			Audio: p.Audio, Video: p.Video, Held: p.Held, Screen: p.Screen, JoinedAt: p.JoinedAt.UTC().Format(time.RFC3339),
 		})
 	}
-	for _, p := range participants {
+	for index, p := range participants {
+		if p.HandRaisedAt != nil {
+			view.Participants[index].HandRaisedAt = p.HandRaisedAt.UTC().Format(time.RFC3339Nano)
+		}
 		if p.Screen {
 			view.Presenter = p.UserID.String()
 		}
@@ -828,4 +843,100 @@ func (s *Server) handleClearStage(c *echo.Context) error {
 		return callError(err)
 	}
 	return s.respondWithCallState(c, roomID, call)
+}
+
+// The reactions somebody can send in a call. A fixed set, so a reaction is a
+// gesture rather than a message, and nobody can paint the call with text.
+var callReactions = map[string]bool{
+	"clap": true, "laugh": true, "heart": true, "thumbs_up": true, "surprise": true, "celebrate": true,
+}
+
+// Reactions one person may send, so a held key cannot flood a call.
+var reactionsPerPerson = cache.RateLimit{Attempts: 20, Window: 10 * time.Second}
+
+func (s *Server) handleHand(raised bool) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		user, _ := currentUser(c)
+		roomID, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			return echo.NewHTTPError(http.StatusNotFound, "no such room")
+		}
+		call, err := s.callForPresenting(c, roomID)
+		if err != nil {
+			return err
+		}
+		if err := s.rooms.SetHand(c.Request().Context(), call.ID, user.ID, raised); err != nil {
+			return callError(err)
+		}
+		return s.respondWithCallState(c, call.RoomID, call)
+	}
+}
+
+// handleLowerHand lowers somebody else's hand: for whoever is presenting, who
+// is taking the questions, or for a moderator of the conversation.
+func (s *Server) handleLowerHand(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+	target, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "nobody in the call by that name")
+	}
+	call, err := s.callForPresenting(c, roomID)
+	if err != nil {
+		return err
+	}
+	presenting := s.rooms.Presenter(ctx, call.ID)
+	mayModerate := currentPermissions(c).AllowsChannel(authz.PermModerationRestrict, roomID).Allowed
+	if (presenting == nil || *presenting != user.ID) && !mayModerate {
+		return echo.NewHTTPError(http.StatusForbidden, "only whoever is presenting or a moderator lowers somebody else's hand")
+	}
+	if err := s.rooms.SetHand(ctx, call.ID, target, false); err != nil {
+		return callError(err)
+	}
+	return s.respondWithCallState(c, call.RoomID, call)
+}
+
+type callReactionRequest struct {
+	// Kind is one of clap, laugh, heart, thumbs_up, surprise, celebrate.
+	Kind string `json:"kind"`
+}
+
+// handleCallReaction passes a reaction to everybody in the call, and no further.
+func (s *Server) handleCallReaction(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+	var request callReactionRequest
+	if err := c.Bind(&request); err != nil || !callReactions[request.Kind] {
+		return echo.NewHTTPError(http.StatusBadRequest, "a reaction is one of clap, laugh, heart, thumbs_up, surprise or celebrate")
+	}
+	call, err := s.callForPresenting(c, roomID)
+	if err != nil {
+		return err
+	}
+	if s.limiter != nil {
+		decision, err := s.limiter.Allow(ctx, "call.reaction:"+user.ID.String(), reactionsPerPerson)
+		if err == nil && !decision.Allowed {
+			return echo.NewHTTPError(http.StatusTooManyRequests, "that is a lot of reactions; give it a moment")
+		}
+	}
+	payload, _ := json.Marshal(map[string]string{
+		"call": call.ID.String(), "roomId": call.RoomID.String(),
+		"from": user.ID.String(), "username": user.Username, "kind": request.Kind,
+	})
+	frame := realtime.Frame{Type: realtime.FrameCallReaction, Payload: payload}
+	if s.hub != nil {
+		for _, participant := range call.Participants {
+			here := s.hub.SendToUser(participant.UserID, frame)
+			s.whisperElsewhere(ctx, participant.UserID, frame, here)
+		}
+	}
+	return c.NoContent(http.StatusNoContent)
 }

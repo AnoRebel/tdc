@@ -163,7 +163,8 @@ export type LiveFrameType =
   | "call.declined"
   | "call.lobby"
   | "call.admitted"
-  | "call.turned_away";
+  | "call.turned_away"
+  | "call.reaction";
 
 /** One frame from the live connection. */
 export interface LiveFrame {

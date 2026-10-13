@@ -3,6 +3,8 @@ import type {
   CallDeclined,
   CallLinkUse,
   CallLobby,
+  CallReaction,
+  CallReactionKind,
   CallRing,
   CallSignal,
   IceConfiguration,
@@ -755,6 +757,67 @@ export const useCall = createGlobalState(() => {
     }
   }
 
+  /**
+   * Reactions passing over the call shown, each kept a few seconds to float
+   * and fade; and how many of each kind the call has sent while somebody
+   * presented, for the presenter.
+   */
+  const reactions = ref<(CallReaction & { id: number })[]>([]);
+  const reactionCounts = ref<Partial<Record<CallReactionKind, number>>>({});
+  let reactionId = 0;
+
+  function onReaction(reaction: CallReaction) {
+    if (reaction.roomId !== roomId.value) return;
+    const id = ++reactionId;
+    reactions.value = [...reactions.value.slice(-19), { ...reaction, id }];
+    setTimeout(() => {
+      reactions.value = reactions.value.filter((each) => each.id !== id);
+    }, 4000);
+    if (call.value?.presenter) {
+      reactionCounts.value = {
+        ...reactionCounts.value,
+        [reaction.kind]: (reactionCounts.value[reaction.kind] ?? 0) + 1,
+      };
+    }
+  }
+  // Counts belong to one presentation.
+  watch(
+    () => call.value?.presenter,
+    () => (reactionCounts.value = {}),
+  );
+
+  /** Sends a passing reaction to everybody in the call shown. */
+  async function react(kind: CallReactionKind) {
+    const room = roomId.value;
+    if (!room || !live(room)) return;
+    try {
+      await api.post(`/api/rooms/${room}/call/reactions`, { kind });
+    } catch {
+      // A reaction that did not arrive is not worth an error.
+    }
+  }
+
+  /** Raises or lowers our hand, or lowers somebody else's as presenter or moderator. */
+  async function setHand(raised: boolean, userId?: string) {
+    const room = roomId.value;
+    if (!room) return;
+    const path = userId ? `/api/rooms/${room}/call/hand/${userId}` : `/api/rooms/${room}/call/hand`;
+    try {
+      const state = raised ? await api.put<Call>(path) : await api.delete<Call>(path);
+      calls.value = { ...calls.value, [room]: state };
+    } catch (cause) {
+      error.value = isApiError(cause) ? cause.message : "unreachable";
+    }
+  }
+
+  /** Who has a hand up in the call shown, in the order they raised it. */
+  const hands = computed(() =>
+    (call.value?.participants ?? [])
+      .filter((each) => each.handRaisedAt)
+      .sort((a, b) => (a.handRaisedAt! < b.handRaisedAt! ? -1 : 1)),
+  );
+  const handUp = computed(() => hands.value.some((each) => each.userId === user.value?.id));
+
   /** Who is in a call changed. */
   function onState(state: Call) {
     const mine = calls.value[state.roomId];
@@ -826,6 +889,13 @@ export const useCall = createGlobalState(() => {
     metered,
     supported,
     isIn,
+    reactions,
+    reactionCounts,
+    onReaction,
+    react,
+    setHand,
+    hands,
+    handUp,
     screen,
     remoteScreen,
     canShareScreen,

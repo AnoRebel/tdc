@@ -116,6 +116,7 @@ const {
       <div class="flex h-screen flex-col gap-2 p-2">
         <div class="min-h-0 flex-1 overflow-y-auto"><CallTiles compact /></div>
         <CallLobbyList />
+        <CallHands />
         <CallHeld />
         <CallControls :room-name="roomName" in-picture />
       </div>
@@ -203,6 +204,7 @@ const {
       role="region"
       :aria-label="$ts('calls.window')"
     >
+      <CallReactionsFloat />
       <header class="flex items-center gap-1 px-1">
         <span class="size-2 rounded-full bg-success" aria-hidden="true" />
         <NuxtLink
@@ -249,6 +251,7 @@ const {
         <CallTiles />
       </div>
       <CallLobbyList />
+      <CallHands />
       <CallHeld />
       <CallControls :room-name="roomName" />
     </div>
@@ -262,6 +265,7 @@ const {
       role="region"
       :aria-label="$ts('calls.window')"
     >
+      <CallReactionsFloat />
       <header class="flex items-center gap-1 px-1">
         <span
           ref="grip"
@@ -319,6 +323,7 @@ const {
         <CallTiles compact />
       </div>
       <CallLobbyList />
+      <CallHands />
       <CallHeld />
       <CallControls :room-name="roomName" />
     </div>

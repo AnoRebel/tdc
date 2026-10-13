@@ -65,6 +65,9 @@ const (
 	FrameCallAdmitted = "call.admitted"
 	// FrameCallTurnedAway tells somebody waiting in a lobby they were not.
 	FrameCallTurnedAway = "call.turned_away"
+	// FrameCallReaction is a passing reaction somebody in a call sent: a clap,
+	// a laugh. Not kept anywhere.
+	FrameCallReaction = "call.reaction"
 )
 
 // Connection is one client's live connection.

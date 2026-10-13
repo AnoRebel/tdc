@@ -906,6 +906,15 @@ they stop it themselves (or with the browser's own "Stop sharing"). Somebody who
 moderates the conversation can take a presenter off the stage. Sharing needs a
 desktop browser; phones generally cannot share their screen.
 
+**Raising a hand and reacting.** The smiley button in the call controls
+raises your hand — hands are listed in the order they went up, for everybody to
+see, and come down when you lower yours or when whoever is presenting (or a
+moderator) takes your question — and sends a passing reaction: clap, laugh,
+heart, thumbs up, surprise or celebrate. A reaction floats up over the call with
+your name and is gone after a few seconds; nothing is kept. Whoever presents
+sees a running count of the reactions their presentation has drawn. With
+reduced motion, reactions fade in place instead of floating.
+
 **Links to a call.** Somebody allowed to (the `call.link` permission, which
 an administrator grants) can make a link to a conversation's call from the
 link button in the call window: with a label, a lobby where people wait until

@@ -392,7 +392,7 @@ func (q *Queries) JoinCall(ctx context.Context, arg JoinCallParams) error {
 }
 
 const leaveCall = `-- name: LeaveCall :execrows
-UPDATE call_participants SET left_at = NOW(), screen = FALSE
+UPDATE call_participants SET left_at = NOW(), screen = FALSE, hand_raised_at = NULL
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
 `
 
@@ -478,7 +478,7 @@ func (q *Queries) LeaveStage(ctx context.Context, arg LeaveStageParams) error {
 }
 
 const listCallParticipants = `-- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, u.username
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, u.username
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -486,13 +486,14 @@ ORDER BY p.joined_at
 `
 
 type ListCallParticipantsRow struct {
-	UserID   uuid.UUID
-	JoinedAt time.Time
-	Audio    bool
-	Video    bool
-	Held     bool
-	Screen   bool
-	Username string
+	UserID       uuid.UUID
+	JoinedAt     time.Time
+	Audio        bool
+	Video        bool
+	Held         bool
+	Screen       bool
+	HandRaisedAt *time.Time
+	Username     string
 }
 
 func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([]ListCallParticipantsRow, error) {
@@ -511,6 +512,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 			&i.Video,
 			&i.Held,
 			&i.Screen,
+			&i.HandRaisedAt,
 			&i.Username,
 		); err != nil {
 			return nil, err
@@ -576,6 +578,27 @@ type RevokeCallLinkParams struct {
 
 func (q *Queries) RevokeCallLink(ctx context.Context, arg RevokeCallLinkParams) (int64, error) {
 	result, err := q.db.Exec(ctx, revokeCallLink, arg.ID, arg.RoomID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setCallHand = `-- name: SetCallHand :execrows
+UPDATE call_participants
+SET hand_raised_at = CASE WHEN $3::bool THEN COALESCE(hand_raised_at, NOW()) ELSE NULL END
+WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
+`
+
+type SetCallHandParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+	Raised bool
+}
+
+// Raises a hand (keeping when it was first raised) or lowers it.
+func (q *Queries) SetCallHand(ctx context.Context, arg SetCallHandParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setCallHand, arg.CallID, arg.UserID, arg.Raised)
 	if err != nil {
 		return 0, err
 	}

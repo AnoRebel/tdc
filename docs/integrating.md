@@ -1178,6 +1178,8 @@ the call and relays their negotiation, and never carries the media itself.
 | `DELETE /api/rooms/:id/call`                                                                    | Leave                                                                                                                                                                                                |
 | `POST /api/rooms/:id/call/ring`                                                                 | Ring people into it — `{"users": [ids]}`; empty rings everybody else in a direct conversation                                                                                                        |
 | `POST /api/rooms/:id/call/decline`                                                              | Decline a ring, optionally with `{"message": "…"}` for the caller                                                                                                                                    |
+| `PUT`/`DELETE /api/rooms/:id/call/hand`, `DELETE …/hand/:userId`                                | Raise or lower your hand (`handRaisedAt` on the participant, oldest first); lowering somebody else's needs to be the presenter or hold `moderation.restrict`                                         |
+| `POST /api/rooms/:id/call/reactions`                                                            | `{"kind": "clap"}` — one of `clap`, `laugh`, `heart`, `thumbs_up`, `surprise`, `celebrate` — passed to the call's participants as `call.reaction` and kept nowhere; 20 per person every 10 seconds   |
 | `PUT`/`DELETE /api/rooms/:id/call/stage`                                                        | Start or stop presenting your screen; a second presenter is refused with 409 while the first is on the stage. `DELETE …/stage/presenter` takes whoever presents off it (needs `moderation.restrict`) |
 | `POST /api/rooms/:id/call/invite`                                                               | Merge: invite the people of another call you are in, `{"users": [ids]}`                                                                                                                              |
 | `GET`/`POST`/`DELETE /api/rooms/:id/call/links[/:linkId]`                                       | List, make (`{label, passcode, lobby, expiresInHours, maxUses}`) and withdraw links to the call; needs `call.link`. The secret is in the answer to making one, and only there                        |
@@ -1201,6 +1203,7 @@ theirs, and the reason is never disclosed. Rings are limited per caller.
   given up after 45 seconds (which leaves a `missed_call` notification).
 - `call.declined` — somebody you rang declined, with their message if any.
 - `call.signal` — another participant's WebRTC negotiation for you.
+- `call.reaction` — a passing reaction somebody in the call sent.
 - `call.lobby` — who is waiting to be let into a call you are in.
 - `call.admitted` / `call.turned_away` — you, waiting in a lobby, were let in
   or not.

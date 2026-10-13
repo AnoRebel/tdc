@@ -16,7 +16,7 @@ DO UPDATE SET left_at = NULL, joined_at = NOW(), audio = EXCLUDED.audio, video =
               held = FALSE;
 
 -- name: LeaveCall :execrows
-UPDATE call_participants SET left_at = NOW(), screen = FALSE
+UPDATE call_participants SET left_at = NOW(), screen = FALSE, hand_raised_at = NULL
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: SetCallMedia :execrows
@@ -24,7 +24,7 @@ UPDATE call_participants SET audio = $3, video = $4, held = $5
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, u.username
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, u.username
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -151,3 +151,9 @@ UPDATE calls c SET presenter = NULL
 WHERE c.presenter IS NOT NULL AND c.ended_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM call_participants p
                   WHERE p.call_id = c.id AND p.user_id = c.presenter AND p.left_at IS NULL);
+
+-- name: SetCallHand :execrows
+-- Raises a hand (keeping when it was first raised) or lowers it.
+UPDATE call_participants
+SET hand_raised_at = CASE WHEN sqlc.arg(raised)::bool THEN COALESCE(hand_raised_at, NOW()) ELSE NULL END
+WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;

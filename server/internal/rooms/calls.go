@@ -432,3 +432,15 @@ func (s *Service) Presenter(ctx context.Context, callID uuid.UUID) *uuid.UUID {
 	}
 	return record.Presenter
 }
+
+// SetHand raises or lowers somebody's hand in a call they are in.
+func (s *Service) SetHand(ctx context.Context, callID, userID uuid.UUID, raised bool) error {
+	changed, err := s.store.SetCallHand(ctx, dbgen.SetCallHandParams{CallID: callID, UserID: userID, Raised: raised})
+	if err != nil {
+		return fmt.Errorf("set hand: %w", err)
+	}
+	if changed == 0 {
+		return ErrNoCall
+	}
+	return nil
+}

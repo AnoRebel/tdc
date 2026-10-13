@@ -66,6 +66,7 @@ const guest = computed(() => Boolean(c.roomId.value && c.guestOf.value.includes(
       <Video v-if="c.camera.value" class="size-4" />
       <VideoOff v-else class="size-4" />
     </Button>
+    <CallReact />
     <Button
       v-if="c.canShareScreen.value"
       variant="ghost"

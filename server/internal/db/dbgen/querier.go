@@ -1109,6 +1109,8 @@ type Querier interface {
 	// Scoped to the uploader and to attachments not yet sent: a caption is written
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
+	// Raises a hand (keeping when it was first raised) or lowers it.
+	SetCallHand(ctx context.Context, arg SetCallHandParams) (int64, error)
 	SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int64, error)
 	SetCallPolicy(ctx context.Context, arg SetCallPolicyParams) error
 	SetCallScreen(ctx context.Context, arg SetCallScreenParams) error

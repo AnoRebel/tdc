@@ -9,6 +9,8 @@ export interface CallParticipant {
   held: boolean;
   /** Presenting their screen. */
   screen: boolean;
+  /** When they raised their hand, while it is up. */
+  handRaisedAt?: string;
   joinedAt: string;
 }
 
@@ -96,4 +98,16 @@ export interface CallLobby {
   call: string;
   roomId: string;
   waiting: { userId: string; username: string; displayName: string; since: string }[];
+}
+
+/** The passing reactions somebody can send in a call. */
+export type CallReactionKind = "clap" | "laugh" | "heart" | "thumbs_up" | "surprise" | "celebrate";
+
+/** A passing reaction somebody in a call sent. Not kept anywhere. */
+export interface CallReaction {
+  call: string;
+  roomId: string;
+  from: string;
+  username: string;
+  kind: CallReactionKind;
 }

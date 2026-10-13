@@ -143,14 +143,15 @@ type CallLobby struct {
 }
 
 type CallParticipant struct {
-	CallID   uuid.UUID
-	UserID   uuid.UUID
-	JoinedAt time.Time
-	LeftAt   *time.Time
-	Audio    bool
-	Video    bool
-	Held     bool
-	Screen   bool
+	CallID       uuid.UUID
+	UserID       uuid.UUID
+	JoinedAt     time.Time
+	LeftAt       *time.Time
+	Audio        bool
+	Video        bool
+	Held         bool
+	Screen       bool
+	HandRaisedAt *time.Time
 }
 
 type ChannelBan struct {

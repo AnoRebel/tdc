@@ -1816,6 +1816,22 @@
       "presenting": "{name} is presenting",
       "youPresent": "You are presenting",
       "screenOf": "{name}'s screen"
+    },
+    "reactions": {
+      "open": "Raise your hand or react",
+      "raise": "Raise hand",
+      "lower": "Lower hand",
+      "clap": "Clap",
+      "laugh": "Laugh",
+      "heart": "Love it",
+      "thumbs_up": "Thumbs up",
+      "surprise": "Surprised",
+      "celebrate": "Celebrate",
+      "hands": "Raised hands",
+      "handsUp": "Hands up: {count}",
+      "lowerWhose": "Lower {name}'s hand",
+      "handUp": "Hand raised",
+      "counts": "Reactions during your presentation"
     }
   },
   "names": {

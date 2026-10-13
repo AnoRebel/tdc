@@ -54,11 +54,30 @@ function attach(element: unknown, media: MediaStream | null) {
     >
       {{ mine ? $t("calls.stage.youPresent") : $t("calls.stage.presenting", { name: who }) }}
     </figcaption>
+    <p
+      v-if="mine && Object.keys(c.reactionCounts.value).length"
+      class="absolute bottom-1.5 left-1.5 flex gap-2 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white"
+      :aria-label="$ts('calls.reactions.counts')"
+    >
+      <span v-for="(count, kind) in c.reactionCounts.value" :key="kind">
+        {{
+          {
+            clap: "👏",
+            laugh: "😂",
+            heart: "❤️",
+            thumbs_up: "👍",
+            surprise: "😮",
+            celebrate: "🎉",
+          }[kind]
+        }}
+        {{ count }}
+      </span>
+    </p>
     <Button
       v-if="mine"
       size="small"
       variant="danger"
-      class="absolute top-1.5 right-1.5 h-6 px-2 text-xs"
+      class="absolute top-1.5 right-1.5 h-6 bg-destructive px-2 text-xs text-white hover:bg-destructive/90"
       @click="c.stopSharing()"
     >
       <MonitorX class="size-3" aria-hidden="true" />

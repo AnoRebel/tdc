@@ -1816,6 +1816,22 @@
       "presenting": "{name} anawasilisha",
       "youPresent": "Unawasilisha",
       "screenOf": "Skrini ya {name}"
+    },
+    "reactions": {
+      "open": "Inua mkono au toa hisia",
+      "raise": "Inua mkono",
+      "lower": "Shusha mkono",
+      "clap": "Piga makofi",
+      "laugh": "Cheka",
+      "heart": "Nimependa",
+      "thumbs_up": "Safi",
+      "surprise": "Nimeshangaa",
+      "celebrate": "Sherehekea",
+      "hands": "Mikono iliyoinuliwa",
+      "handsUp": "Mikono iliyoinuliwa: {count}",
+      "lowerWhose": "Shusha mkono wa {name}",
+      "handUp": "Mkono umeinuliwa",
+      "counts": "Hisia wakati wa uwasilishaji wako"
     }
   },
   "names": {
