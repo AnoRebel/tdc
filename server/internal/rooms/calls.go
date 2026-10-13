@@ -19,6 +19,8 @@ var (
 	ErrNoCall = errors.New("there is no call here")
 	// ErrCallFull is returned when a call already has as many people as allowed.
 	ErrCallFull = errors.New("the call is full")
+	// ErrStageTaken is returned when somebody else is already presenting.
+	ErrStageTaken = errors.New("somebody else is presenting")
 	// ErrNotCallable is returned for a room calls do not happen in.
 	ErrNotCallable = errors.New("calls happen in channels and direct conversations")
 )
@@ -154,6 +156,7 @@ func (s *Service) LeaveCall(ctx context.Context, callID, userID uuid.UUID) (*dbg
 	if left == 0 {
 		return nil, ErrNoCall
 	}
+	_ = s.store.LeaveStage(ctx, dbgen.LeaveStageParams{ID: callID, Presenter: &userID})
 	return s.endIfEmpty(ctx, callID, userID)
 }
 
@@ -245,6 +248,9 @@ func (s *Service) SweepCalls(ctx context.Context) ([]SweptCall, []dbgen.Event, e
 		if event != nil {
 			ended = append(ended, *event)
 		}
+	}
+	if err := s.store.ClearAbsentPresenters(ctx); err != nil {
+		return changed, ended, fmt.Errorf("clear absent presenters: %w", err)
 	}
 	abandoned, err := s.store.EndAbandonedCalls(ctx)
 	if err != nil {
@@ -379,4 +385,50 @@ func (s *Service) JoinInvited(ctx context.Context, callID, userID uuid.UUID, aud
 		return Call{}, err
 	}
 	return s.openCall(ctx, call.RoomID)
+}
+
+/*
+Present puts somebody's screen on the call's stage, or takes it off.
+
+One presenter at a time, decided by the database in one statement, so two
+people starting at the same moment cannot both win. Stopping clears the stage
+only if it is theirs.
+*/
+func (s *Service) Present(ctx context.Context, callID, userID uuid.UUID, presenting bool) error {
+	if _, in := s.CallRoomOf(ctx, callID, userID); !in {
+		return ErrNoCall
+	}
+	if presenting {
+		taken, err := s.store.TakeStage(ctx, dbgen.TakeStageParams{ID: callID, Presenter: &userID})
+		if err != nil {
+			return fmt.Errorf("take stage: %w", err)
+		}
+		if taken == 0 {
+			return ErrStageTaken
+		}
+	} else if err := s.store.LeaveStage(ctx, dbgen.LeaveStageParams{ID: callID, Presenter: &userID}); err != nil {
+		return fmt.Errorf("leave stage: %w", err)
+	}
+	return s.store.SetCallScreen(ctx, dbgen.SetCallScreenParams{CallID: callID, UserID: userID, Screen: presenting})
+}
+
+// ClearStage takes whoever is presenting off the stage, for a moderator.
+func (s *Service) ClearStage(ctx context.Context, callID uuid.UUID) error {
+	record, err := s.CallRecord(ctx, callID)
+	if err != nil {
+		return err
+	}
+	if record.Presenter != nil {
+		_ = s.store.SetCallScreen(ctx, dbgen.SetCallScreenParams{CallID: callID, UserID: *record.Presenter, Screen: false})
+	}
+	return s.store.ClearStage(ctx, callID)
+}
+
+// Presenter returns who is presenting in a call, if anybody.
+func (s *Service) Presenter(ctx context.Context, callID uuid.UUID) *uuid.UUID {
+	record, err := s.CallRecord(ctx, callID)
+	if err != nil {
+		return nil
+	}
+	return record.Presenter
 }

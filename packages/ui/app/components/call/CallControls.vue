@@ -4,6 +4,8 @@ import {
   Link2,
   Mic,
   MicOff,
+  MonitorUp,
+  MonitorX,
   Pause,
   PhoneOff,
   Play,
@@ -63,6 +65,25 @@ const guest = computed(() => Boolean(c.roomId.value && c.guestOf.value.includes(
     >
       <Video v-if="c.camera.value" class="size-4" />
       <VideoOff v-else class="size-4" />
+    </Button>
+    <Button
+      v-if="c.canShareScreen.value"
+      variant="ghost"
+      size="icon"
+      :disabled="Boolean(!c.screen.value && c.call.value?.presenter)"
+      :label="c.screen.value ? $ts('calls.stage.stop') : $ts('calls.stage.share')"
+      :title="
+        !c.screen.value && c.call.value?.presenter
+          ? $ts('calls.stage.someoneElse')
+          : c.screen.value
+            ? $ts('calls.stage.stop')
+            : $ts('calls.stage.share')
+      "
+      :aria-pressed="Boolean(c.screen.value)"
+      @click="c.screen.value ? c.stopSharing() : c.shareScreen()"
+    >
+      <MonitorX v-if="c.screen.value" class="size-4 text-destructive" />
+      <MonitorUp v-else class="size-4" />
     </Button>
     <Button
       v-if="!guest && can('call.link')"

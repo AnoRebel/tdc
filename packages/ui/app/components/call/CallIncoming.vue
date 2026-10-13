@@ -94,7 +94,7 @@ function where(ring: CallRing) {
 <template>
   <div
     ref="surface"
-    class="fixed z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border bg-background/95 p-2 shadow-xl backdrop-blur"
+    class="fixed z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border bg-background p-2 shadow-xl"
     :class="[corner, isDragging && 'cursor-grabbing select-none']"
     :style="style"
     role="alertdialog"

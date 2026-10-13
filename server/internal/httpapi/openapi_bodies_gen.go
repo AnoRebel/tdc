@@ -196,6 +196,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/rooms/:id/call/stage/presenter": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
+		},
+	},
 	"DELETE /api/rooms/:id/context/:userId": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},

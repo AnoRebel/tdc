@@ -1807,6 +1807,15 @@
       "stopWaiting": "Acha kusubiri",
       "turnedAway": "Hukuruhusiwa kuingia kwenye simu hii.",
       "inCall": "Uko kwenye simu."
+    },
+    "stage": {
+      "share": "Shiriki skrini yako",
+      "stop": "Acha kuwasilisha",
+      "clear": "Simamisha uwasilishaji wao",
+      "someoneElse": "Mtu mwingine anawasilisha",
+      "presenting": "{name} anawasilisha",
+      "youPresent": "Unawasilisha",
+      "screenOf": "Skrini ya {name}"
     }
   },
   "names": {

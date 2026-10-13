@@ -45,11 +45,13 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 
 ## 5. Phase 5 — Screens, presentations and recording
 
-- [ ] 5.1 Screen, window or tab sharing in a call (with tab audio where offered), shown to everybody; absent where the platform cannot
-- [ ] 5.2 Presenting: one presenter at a time, held by the server, on everybody's main stage; handed over, stopped, or cleared by a conversation moderator; verify a second person cannot present over the first
+- [x] 5.1 Screen, window or tab sharing in a call (with tab audio where offered), shown to everybody; absent where the platform cannot
+- [x] 5.2 Presenting: one presenter at a time, held by the server, on everybody's main stage; handed over, stopped, or cleared by a conversation moderator; verify a second person cannot present over the first
 - [ ] 5.3 `calls.recording` setting (off) and `call.record` permission (granted to nobody by default); verify recording is refused with either missing
 - [ ] 5.4 Starting a recording records `call.recording_started` in the room's log and the audit log and sets the call's recording state before the recorder's client begins; every participant is told, an indicator stays up, and somebody joining is told before their media starts; verify a recording cannot begin without the event and the state reaching the others
 - [ ] 5.5 Device-side recording (stage and mixed audio, MediaRecorder); on stop the file is saved to the conversation as an attachment through the ordinary path (limits, scanning, retention), or offered as a download when larger than the server accepts; `call.recording_stopped` recorded, including when the recorder leaves or drops
+- [ ] 5.6 Reactions in a call: raise and lower a hand (kept in order, shown to everybody, lowered by the person or a moderator), and passing reactions — clap, laugh, heart, thumbs up, surprise — floated over the sender's tile and counted for whoever presents; respect the motion preference; rate-limited per person; verify a reaction reaches only the call's participants
+- [ ] 5.7 Remote control of a shared screen: the person sharing their whole screen from the desktop application may hand control to one participant at a time, who sends pointer and keyboard input on a data channel; control is asked for, granted explicitly, shown on the sharer's screen, revocable at once (and by a key the controller cannot send), ends with the share, and is refused where the sharer is in a browser (which cannot move the pointer) or on a platform where input cannot be injected — saying which; verify no input is applied without a grant in force
 - [ ] **MILESTONE 5** — Demonstrate: one person presents a browser tab, another records with everybody told, the recording appears in the conversation, and the conversation and audit log show who recorded and when. Tag `v1.53.0-dev`.
 
 ## 6. Phase 6 — Group calls
@@ -71,5 +73,6 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 
 - [ ] 8.1 Hosting guide: enabling calls, the relay (ports, secret), the forwarding unit (ports, what it can see), limits, federated calling, and recording (what it is and is not)
 - [ ] 8.2 User guide: starting, joining, ringing, who may call you, links, controls, what others can see
+- [ ] 8.4 What hosting costs: a worked guide to the resources and money an event takes — voice only and with video, for audiences of 10, 50, 200 and 1,000, on one server and spread over several connected servers — with bandwidth, CPU and memory per person through the relay and the forwarding unit, and example prices from common hosts
 - [ ] 8.3 Browser checks for two-person calls (fake media devices) in Chromium and Firefox, WebKit in CI
 - [ ] **MILESTONE 8** — A stranger following the hosting guide enables calling with a relay and holds a call. Tag `v1.56.0-dev`.

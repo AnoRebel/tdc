@@ -329,7 +329,7 @@ const {
 @reference "#layers/ui/app/assets/css/main.css";
 
 .call-surface {
-  @apply border bg-background/95 shadow-xl backdrop-blur;
+  @apply border bg-background shadow-xl;
 }
 .grip {
   @apply grid size-7 shrink-0 cursor-grab place-items-center rounded text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring;

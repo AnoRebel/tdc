@@ -107,6 +107,7 @@ type Call struct {
 	StartedAt    time.Time
 	EndedAt      *time.Time
 	StartedEvent *string
+	Presenter    *uuid.UUID
 }
 
 type CallInvite struct {
@@ -149,6 +150,7 @@ type CallParticipant struct {
 	Audio    bool
 	Video    bool
 	Held     bool
+	Screen   bool
 }
 
 type ChannelBan struct {

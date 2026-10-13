@@ -16,7 +16,7 @@ DO UPDATE SET left_at = NULL, joined_at = NOW(), audio = EXCLUDED.audio, video =
               held = FALSE;
 
 -- name: LeaveCall :execrows
-UPDATE call_participants SET left_at = NOW()
+UPDATE call_participants SET left_at = NOW(), screen = FALSE
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: SetCallMedia :execrows
@@ -24,7 +24,7 @@ UPDATE call_participants SET audio = $3, video = $4, held = $5
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, u.username
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, u.username
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -130,3 +130,24 @@ WHERE c.ended_at IS NULL
   AND c.started_at < NOW() - INTERVAL '1 minute'
   AND NOT EXISTS (SELECT 1 FROM call_participants p WHERE p.call_id = c.id AND p.left_at IS NULL)
 RETURNING *;
+
+-- name: TakeStage :execrows
+-- Makes somebody the call's presenter, unless somebody else already is.
+UPDATE calls SET presenter = $2 WHERE id = $1 AND ended_at IS NULL AND (presenter IS NULL OR presenter = $2);
+
+-- name: LeaveStage :exec
+-- Clears the presenter, if it is this person.
+UPDATE calls SET presenter = NULL WHERE id = $1 AND presenter = $2;
+
+-- name: ClearStage :exec
+UPDATE calls SET presenter = NULL WHERE id = $1;
+
+-- name: SetCallScreen :exec
+UPDATE call_participants SET screen = $3 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
+
+-- name: ClearAbsentPresenters :exec
+-- Clears presenters who are no longer in their call.
+UPDATE calls c SET presenter = NULL
+WHERE c.presenter IS NOT NULL AND c.ended_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM call_participants p
+                  WHERE p.call_id = c.id AND p.user_id = c.presenter AND p.left_at IS NULL);

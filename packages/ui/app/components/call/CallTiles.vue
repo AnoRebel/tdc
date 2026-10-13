@@ -29,10 +29,15 @@ function attach(element: unknown, stream: MediaStream | null | undefined) {
 </script>
 
 <template>
+  <CallStage :compact="compact" />
   <ul
     class="grid gap-2"
     :class="
-      compact ? 'grid-cols-2' : 'grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] content-center'
+      compact
+        ? 'grid-cols-2'
+        : c.call.value?.presenter
+          ? 'grid-cols-[repeat(auto-fill,minmax(9rem,1fr))]'
+          : 'grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] content-center'
     "
   >
     <li class="tile">

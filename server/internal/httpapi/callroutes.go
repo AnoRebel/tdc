@@ -43,6 +43,10 @@ func init() {
 		calls.POST("/ring", s.handleRing)
 		calls.POST("/decline", s.handleDeclineRing)
 		calls.POST("/invite", s.handleInviteToCall)
+		calls.PUT("/stage", s.handlePresent(true))
+		calls.DELETE("/stage", s.handlePresent(false))
+		calls.DELETE("/stage/presenter", s.handleClearStage,
+			requireChannelPermission(authz.PermModerationRestrict))
 
 		// One call by its identifier, for the people let into it without being
 		// in its conversation as well as for its members.
@@ -58,6 +62,11 @@ func init() {
 
 	documentRoutes(map[string]entry{
 		"GET /api/rooms/:id/call":          {Summary: "The call in progress in a conversation", Authentication: "session or token", Permission: "channel.read"},
+		"PUT /api/rooms/:id/call/stage":    {Summary: "Present your screen in the call, if nobody else is", Authentication: "session or token"},
+		"DELETE /api/rooms/:id/call/stage": {Summary: "Stop presenting your screen", Authentication: "session or token"},
+		"DELETE /api/rooms/:id/call/stage/presenter": {
+			Summary: "Take whoever is presenting off the stage", Authentication: "session or token", Permission: "moderation.restrict",
+		},
 		"POST /api/rooms/:id/call/invite":  {Summary: "Invite the people of another call you are in into this one", Authentication: "session or token"},
 		"GET /api/calls/:callId":           {Summary: "A call you are in, or are invited into", Authentication: "session or token"},
 		"POST /api/calls/:callId":          {Summary: "Join a call you were invited into", Authentication: "session or token", Permission: "call.join"},
@@ -94,13 +103,17 @@ type callParticipantView struct {
 	Audio    bool   `json:"audio"`
 	Video    bool   `json:"video"`
 	Held     bool   `json:"held"`
+	// Screen says they are presenting their screen.
+	Screen   bool   `json:"screen"`
 	JoinedAt string `json:"joinedAt"`
 }
 
 type callView struct {
-	ID           string                `json:"id"`
-	RoomID       string                `json:"roomId"`
-	StartedAt    string                `json:"startedAt"`
+	ID        string `json:"id"`
+	RoomID    string `json:"roomId"`
+	StartedAt string `json:"startedAt"`
+	// Presenter is who is on the stage, if anybody.
+	Presenter    string                `json:"presenter,omitempty"`
 	Participants []callParticipantView `json:"participants"`
 }
 
@@ -113,8 +126,13 @@ func (s *Server) callViewOf(roomID, callID uuid.UUID, startedAt time.Time, parti
 	for _, p := range participants {
 		view.Participants = append(view.Participants, callParticipantView{
 			UserID: p.UserID.String(), Username: p.Username, Address: s.rooms.UserAddress(p.Username),
-			Audio: p.Audio, Video: p.Video, Held: p.Held, JoinedAt: p.JoinedAt.UTC().Format(time.RFC3339),
+			Audio: p.Audio, Video: p.Video, Held: p.Held, Screen: p.Screen, JoinedAt: p.JoinedAt.UTC().Format(time.RFC3339),
 		})
+	}
+	for _, p := range participants {
+		if p.Screen {
+			view.Presenter = p.UserID.String()
+		}
 	}
 	return view
 }
@@ -753,4 +771,61 @@ func (s *Server) handleLeaveCallByID(c *echo.Context) error {
 		s.log.Warn("could not announce a call somebody left", "error", err)
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+/*
+handlePresent puts the caller's screen on the stage, or takes it off. The
+stage holds one presenter; a second is refused and told who has it, by the
+call's own state, which everybody already sees.
+*/
+func (s *Server) handlePresent(presenting bool) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		ctx := c.Request().Context()
+		user, _ := currentUser(c)
+		roomID, err := uuid.Parse(c.Param("id"))
+		if err != nil {
+			return echo.NewHTTPError(http.StatusNotFound, "no such room")
+		}
+		call, err := s.callForPresenting(c, roomID)
+		if err != nil {
+			return err
+		}
+		if err := s.rooms.Present(ctx, call.ID, user.ID, presenting); err != nil {
+			if errors.Is(err, rooms.ErrStageTaken) {
+				return echo.NewHTTPError(http.StatusConflict, "somebody else is presenting; ask them to stop first")
+			}
+			return callError(err)
+		}
+		return s.respondWithCallState(c, call.RoomID, call)
+	}
+}
+
+// callForPresenting finds the call in a room for somebody in it, whether they
+// belong to the conversation or were let into the call alone.
+func (s *Server) callForPresenting(c *echo.Context, roomID uuid.UUID) (rooms.Call, error) {
+	user, _ := currentUser(c)
+	ctx := c.Request().Context()
+	call, err := s.rooms.OpenCallIn(ctx, roomID)
+	if err != nil {
+		return rooms.Call{}, callError(err)
+	}
+	if _, in := s.rooms.CallRoomOf(ctx, call.ID, user.ID); !in {
+		return rooms.Call{}, echo.NewHTTPError(http.StatusNotFound, "there is no call here")
+	}
+	return call, nil
+}
+
+func (s *Server) handleClearStage(c *echo.Context) error {
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+	call, err := s.rooms.OpenCallIn(c.Request().Context(), roomID)
+	if err != nil {
+		return callError(err)
+	}
+	if err := s.rooms.ClearStage(c.Request().Context(), call.ID); err != nil {
+		return callError(err)
+	}
+	return s.respondWithCallState(c, roomID, call)
 }

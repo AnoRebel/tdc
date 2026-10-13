@@ -898,6 +898,14 @@ them is asked first, and joins only by accepting; once they have, the held call
 ends. People merged in take part in the call and nothing else: they cannot open
 its conversation, read its messages or see who else is in it beyond the call.
 
+**Presenting your screen.** The screen button in the call controls shares a
+screen, a window or a browser tab — with its sound, where your browser offers
+that. Whatever you share takes the stage above everybody's tiles. One person
+presents at a time: while somebody is, the button is greyed and says so, and
+they stop it themselves (or with the browser's own "Stop sharing"). Somebody who
+moderates the conversation can take a presenter off the stage. Sharing needs a
+desktop browser; phones generally cannot share their screen.
+
 **Links to a call.** Somebody allowed to (the `call.link` permission, which
 an administrator grants) can make a link to a conversation's call from the
 link button in the call window: with a label, a lobby where people wait until

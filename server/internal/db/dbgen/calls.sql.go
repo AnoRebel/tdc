@@ -13,7 +13,7 @@ import (
 )
 
 const callByID = `-- name: CallByID :one
-SELECT id, room_id, started_by, started_at, ended_at, started_event FROM calls WHERE id = $1
+SELECT id, room_id, started_by, started_at, ended_at, started_event, presenter FROM calls WHERE id = $1
 `
 
 func (q *Queries) CallByID(ctx context.Context, id uuid.UUID) (Call, error) {
@@ -26,6 +26,7 @@ func (q *Queries) CallByID(ctx context.Context, id uuid.UUID) (Call, error) {
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.StartedEvent,
+		&i.Presenter,
 	)
 	return i, err
 }
@@ -180,6 +181,28 @@ func (q *Queries) CallRoomOfParticipant(ctx context.Context, arg CallRoomOfParti
 	return room_id, err
 }
 
+const clearAbsentPresenters = `-- name: ClearAbsentPresenters :exec
+UPDATE calls c SET presenter = NULL
+WHERE c.presenter IS NOT NULL AND c.ended_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM call_participants p
+                  WHERE p.call_id = c.id AND p.user_id = c.presenter AND p.left_at IS NULL)
+`
+
+// Clears presenters who are no longer in their call.
+func (q *Queries) ClearAbsentPresenters(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, clearAbsentPresenters)
+	return err
+}
+
+const clearStage = `-- name: ClearStage :exec
+UPDATE calls SET presenter = NULL WHERE id = $1
+`
+
+func (q *Queries) ClearStage(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearStage, id)
+	return err
+}
+
 const createCallLink = `-- name: CreateCallLink :one
 INSERT INTO call_links (id, room_id, token_hash, label, passcode_hash, lobby, guests, expires_at, max_uses, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -238,7 +261,7 @@ UPDATE calls c SET ended_at = NOW()
 WHERE c.ended_at IS NULL
   AND c.started_at < NOW() - INTERVAL '1 minute'
   AND NOT EXISTS (SELECT 1 FROM call_participants p WHERE p.call_id = c.id AND p.left_at IS NULL)
-RETURNING id, room_id, started_by, started_at, ended_at, started_event
+RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter
 `
 
 // Ends calls nobody has been in for a while: their last person left without
@@ -260,6 +283,7 @@ func (q *Queries) EndAbandonedCalls(ctx context.Context) ([]Call, error) {
 			&i.StartedAt,
 			&i.EndedAt,
 			&i.StartedEvent,
+			&i.Presenter,
 		); err != nil {
 			return nil, err
 		}
@@ -275,7 +299,7 @@ const endCallIfEmpty = `-- name: EndCallIfEmpty :one
 UPDATE calls SET ended_at = NOW()
 WHERE id = $1 AND ended_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM call_participants WHERE call_id = $1 AND left_at IS NULL)
-RETURNING id, room_id, started_by, started_at, ended_at, started_event
+RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter
 `
 
 // Ends a call nobody is in any more, returning it if this ended it.
@@ -289,6 +313,7 @@ func (q *Queries) EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.StartedEvent,
+		&i.Presenter,
 	)
 	return i, err
 }
@@ -367,7 +392,7 @@ func (q *Queries) JoinCall(ctx context.Context, arg JoinCallParams) error {
 }
 
 const leaveCall = `-- name: LeaveCall :execrows
-UPDATE call_participants SET left_at = NOW()
+UPDATE call_participants SET left_at = NOW(), screen = FALSE
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
 `
 
@@ -437,8 +462,23 @@ func (q *Queries) LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfD
 	return items, nil
 }
 
+const leaveStage = `-- name: LeaveStage :exec
+UPDATE calls SET presenter = NULL WHERE id = $1 AND presenter = $2
+`
+
+type LeaveStageParams struct {
+	ID        uuid.UUID
+	Presenter *uuid.UUID
+}
+
+// Clears the presenter, if it is this person.
+func (q *Queries) LeaveStage(ctx context.Context, arg LeaveStageParams) error {
+	_, err := q.db.Exec(ctx, leaveStage, arg.ID, arg.Presenter)
+	return err
+}
+
 const listCallParticipants = `-- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, u.username
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, u.username
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -451,6 +491,7 @@ type ListCallParticipantsRow struct {
 	Audio    bool
 	Video    bool
 	Held     bool
+	Screen   bool
 	Username string
 }
 
@@ -469,6 +510,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 			&i.Audio,
 			&i.Video,
 			&i.Held,
+			&i.Screen,
 			&i.Username,
 		); err != nil {
 			return nil, err
@@ -482,7 +524,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 }
 
 const openCallInRoom = `-- name: OpenCallInRoom :one
-SELECT id, room_id, started_by, started_at, ended_at, started_event FROM calls WHERE room_id = $1 AND ended_at IS NULL
+SELECT id, room_id, started_by, started_at, ended_at, started_event, presenter FROM calls WHERE room_id = $1 AND ended_at IS NULL
 `
 
 func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, error) {
@@ -495,6 +537,7 @@ func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, e
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.StartedEvent,
+		&i.Presenter,
 	)
 	return i, err
 }
@@ -566,6 +609,21 @@ func (q *Queries) SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int
 	return result.RowsAffected(), nil
 }
 
+const setCallScreen = `-- name: SetCallScreen :exec
+UPDATE call_participants SET screen = $3 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
+`
+
+type SetCallScreenParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+	Screen bool
+}
+
+func (q *Queries) SetCallScreen(ctx context.Context, arg SetCallScreenParams) error {
+	_, err := q.db.Exec(ctx, setCallScreen, arg.CallID, arg.UserID, arg.Screen)
+	return err
+}
+
 const setCallStartedEvent = `-- name: SetCallStartedEvent :exec
 UPDATE calls SET started_event = $2 WHERE id = $1
 `
@@ -605,7 +663,7 @@ func (q *Queries) ShareAnOpenCall(ctx context.Context, arg ShareAnOpenCallParams
 const startCall = `-- name: StartCall :one
 INSERT INTO calls (id, room_id, started_by) VALUES ($1, $2, $3)
 ON CONFLICT (room_id) WHERE ended_at IS NULL DO NOTHING
-RETURNING id, room_id, started_by, started_at, ended_at, started_event
+RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter
 `
 
 type StartCallParams struct {
@@ -626,8 +684,27 @@ func (q *Queries) StartCall(ctx context.Context, arg StartCallParams) (Call, err
 		&i.StartedAt,
 		&i.EndedAt,
 		&i.StartedEvent,
+		&i.Presenter,
 	)
 	return i, err
+}
+
+const takeStage = `-- name: TakeStage :execrows
+UPDATE calls SET presenter = $2 WHERE id = $1 AND ended_at IS NULL AND (presenter IS NULL OR presenter = $2)
+`
+
+type TakeStageParams struct {
+	ID        uuid.UUID
+	Presenter *uuid.UUID
+}
+
+// Makes somebody the call's presenter, unless somebody else already is.
+func (q *Queries) TakeStage(ctx context.Context, arg TakeStageParams) (int64, error) {
+	result, err := q.db.Exec(ctx, takeStage, arg.ID, arg.Presenter)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const useCallLink = `-- name: UseCallLink :execrows

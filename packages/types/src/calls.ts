@@ -7,6 +7,8 @@ export interface CallParticipant {
   video: boolean;
   /** In another call for now, and sending nothing to this one. */
   held: boolean;
+  /** Presenting their screen. */
+  screen: boolean;
   joinedAt: string;
 }
 
@@ -16,6 +18,8 @@ export interface Call {
   roomId: string;
   startedAt: string;
   participants: CallParticipant[];
+  /** Who is presenting, if anybody: one person at a time. */
+  presenter?: string;
 }
 
 /** The servers a client connects a call through. */

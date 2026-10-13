@@ -1807,6 +1807,15 @@
       "stopWaiting": "Stop waiting",
       "turnedAway": "You were not let into this call.",
       "inCall": "You are in the call."
+    },
+    "stage": {
+      "share": "Share your screen",
+      "stop": "Stop presenting",
+      "clear": "Stop their presentation",
+      "someoneElse": "Somebody else is presenting",
+      "presenting": "{name} is presenting",
+      "youPresent": "You are presenting",
+      "screenOf": "{name}'s screen"
     }
   },
   "names": {

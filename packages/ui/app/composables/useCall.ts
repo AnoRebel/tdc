@@ -41,10 +41,20 @@ type SignalSender = (call: string, to: string, body: CallSignal["signal"]) => vo
 /** How the call window is shown: large, small in a corner, or a bar. */
 export type CallView = "expanded" | "docked" | "minimized";
 
+/*
+ * What each connection carries, in this order: microphone, camera, shared
+ * screen, the screen's sound. The order is the same on both sides of every
+ * connection, which is how a receiver tells a camera from a screen.
+ */
+const SLOTS = ["audio", "video", "video", "audio"] as const;
+
 interface Peer {
   connection: RTCPeerConnection;
-  audio: RTCRtpSender;
-  video: RTCRtpSender;
+  /**
+   * The senders, by slot — null on the polite side until the other side's
+   * first offer arrives, since its transceivers are made from that offer.
+   */
+  senders: RTCRtpSender[] | null;
   polite: boolean;
   makingOffer: boolean;
   ignoreOffer: boolean;
@@ -100,6 +110,17 @@ export const useCall = createGlobalState(() => {
   const remotes = shallowReactive(new Map<string, Map<string, MediaStream>>());
   /** What the people in the call shown are sending, by user id. */
   const remote = computed(() => remotes.get(roomId.value ?? "") ?? new Map<string, MediaStream>());
+  /** The screens people are sharing, by conversation and user id. */
+  const remoteScreens = shallowReactive(new Map<string, Map<string, MediaStream>>());
+  const remoteScreen = computed(
+    () => remoteScreens.get(roomId.value ?? "") ?? new Map<string, MediaStream>(),
+  );
+  /** Our own shared screen, while we share it. */
+  const screen = shallowRef<MediaStream | null>(null);
+  /** Whether this device can share a screen at all. */
+  const canShareScreen = computed(
+    () => !import.meta.server && Boolean(navigator.mediaDevices?.getDisplayMedia),
+  );
 
   /** People ringing us now, newest last. */
   const incoming = ref<CallRing[]>([]);
@@ -179,28 +200,33 @@ export const useCall = createGlobalState(() => {
 
   function createPeer(room: string, other: string): Peer {
     const connection = new RTCPeerConnection({ iceServers });
-    const sending = live(room);
-    const peer: Peer = {
-      connection,
-      audio: connection.addTransceiver((sending && track("audio")) || "audio", {
-        direction: "sendrecv",
-      }).sender,
-      video: connection.addTransceiver((sending && track("video")) || "video", {
-        direction: "sendrecv",
-      }).sender,
-      // Decided by something both sides know and agree on, so exactly one of
-      // each pair yields when both offer at once.
-      polite: (user.value?.id ?? "") > other,
-      makingOffer: false,
-      ignoreOffer: false,
-    };
+    // Decided by something both sides know and agree on, so exactly one of
+    // each pair yields when both offer at once.
+    const polite = (user.value?.id ?? "") > other;
+    /*
+     * Only one side of each pair makes the transceivers; the other takes them
+     * from its first offer. Transceivers both sides made for themselves would
+     * never be matched up — each side would send on its own and receive on
+     * the other's, and positions would stop meaning the same thing.
+     */
+    const senders = polite
+      ? null
+      : SLOTS.map((kind) => connection.addTransceiver(kind, { direction: "sendrecv" }).sender);
+    const peer: Peer = { connection, senders, polite, makingOffer: false, ignoreOffer: false };
+    if (senders) void syncPeer(room, peer);
 
     const arriving = new MediaStream();
-    connection.ontrack = ({ track: arrived }) => {
-      arriving.addTrack(arrived);
-      const streams = new Map(remotes.get(room));
-      streams.set(other, arriving);
-      remotes.set(room, streams);
+    const arrivingScreen = new MediaStream();
+    connection.ontrack = ({ track: arrived, transceiver }) => {
+      // One list of transceivers, the same on both sides, so the position
+      // says which is the camera and which the screen.
+      const isScreen = connection.getTransceivers().indexOf(transceiver) >= 2;
+      const into = isScreen ? arrivingScreen : arriving;
+      const store = isScreen ? remoteScreens : remotes;
+      into.addTrack(arrived);
+      const streams = new Map(store.get(room));
+      streams.set(other, into);
+      store.set(room, streams);
     };
     connection.onicecandidate = ({ candidate }) => {
       const current = calls.value[room];
@@ -232,11 +258,13 @@ export const useCall = createGlobalState(() => {
   function closePeer(room: string, other: string) {
     peers.get(room)?.get(other)?.connection.close();
     peers.get(room)?.delete(other);
-    const streams = remotes.get(room);
-    if (streams?.has(other)) {
-      const rest = new Map(streams);
-      rest.delete(other);
-      remotes.set(room, rest);
+    for (const store of [remotes, remoteScreens]) {
+      const streams = store.get(room);
+      if (streams?.has(other)) {
+        const rest = new Map(streams);
+        rest.delete(other);
+        store.set(room, rest);
+      }
     }
   }
 
@@ -255,10 +283,93 @@ export const useCall = createGlobalState(() => {
   }
 
   /** Points a call's connections at our microphone and camera, or at nothing. */
-  async function feed(room: string, sending: boolean) {
-    for (const peer of peers.get(room)?.values() ?? []) {
-      await peer.audio.replaceTrack(sending ? track("audio") : null);
-      await peer.video.replaceTrack(sending ? track("video") : null);
+  /** What a slot should be sending in a conversation's call now. */
+  function wanted(room: string, slot: number): MediaStreamTrack | null {
+    if (!live(room)) return null;
+    return (
+      [track("audio"), track("video"), screenTrack("video"), screenTrack("audio")][slot] ?? null
+    );
+  }
+
+  async function syncPeer(room: string, peer: Peer) {
+    if (!peer.senders) return;
+    for (const [slot, sender] of peer.senders.entries()) {
+      const next = wanted(room, slot);
+      if (sender.track !== next) await sender.replaceTrack(next);
+    }
+  }
+
+  /** Puts on every connection of a call exactly what it should be sending now. */
+  async function sync(room: string) {
+    for (const peer of peers.get(room)?.values() ?? []) await syncPeer(room, peer);
+  }
+
+  function screenTrack(kind: "audio" | "video"): MediaStreamTrack | null {
+    return screen.value?.getTracks().find((each) => each.kind === kind) ?? null;
+  }
+
+  /**
+   * Shares a screen, window or tab in the call shown — with its sound where
+   * the browser offers it. The server holds one presenter at a time; if
+   * somebody else is presenting, nothing is shared and the reason is given.
+   */
+  async function shareScreen() {
+    const room = roomId.value;
+    if (!room || !live(room) || screen.value) return;
+    let captured: MediaStream;
+    try {
+      captured = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    } catch {
+      return; // Cancelled at the browser's picker: nothing to say.
+    }
+    try {
+      calls.value = {
+        ...calls.value,
+        [room]: await api.put<Call>(`/api/rooms/${room}/call/stage`),
+      };
+    } catch (cause) {
+      captured.getTracks().forEach((each) => each.stop());
+      error.value = isApiError(cause) ? cause.message : "unreachable";
+      return;
+    }
+    screen.value = captured;
+    // The browser's own "Stop sharing" ends it too.
+    captured.getVideoTracks()[0]?.addEventListener("ended", () => void stopSharing());
+    await sync(room);
+  }
+
+  /** Stops sharing, here and on the stage. */
+  async function stopSharing() {
+    const shared = screen.value;
+    if (!shared) return;
+    screen.value = null;
+    for (const room of peers.keys()) await sync(room);
+    shared.getTracks().forEach((each) => each.stop());
+    const room = Object.values(calls.value).find((each) =>
+      each.participants.some((p) => p.userId === user.value?.id && p.screen),
+    )?.roomId;
+    if (!room) return;
+    try {
+      calls.value = {
+        ...calls.value,
+        [room]: await api.delete<Call>(`/api/rooms/${room}/call/stage`),
+      };
+    } catch {
+      // The stage clears when we leave the call, or by a moderator.
+    }
+  }
+
+  /** Takes whoever is presenting off the stage, for a moderator. */
+  async function clearStage() {
+    const room = roomId.value;
+    if (!room) return;
+    try {
+      calls.value = {
+        ...calls.value,
+        [room]: await api.delete<Call>(`/api/rooms/${room}/call/stage/presenter`),
+      };
+    } catch (cause) {
+      error.value = isApiError(cause) ? cause.message : "unreachable";
     }
   }
 
@@ -282,7 +393,7 @@ export const useCall = createGlobalState(() => {
     const room = roomId.value;
     if (!room || !live(room)) return;
     holding.value = [...holding.value, room];
-    await feed(room, false);
+    await sync(room);
     await report(room);
   }
 
@@ -295,7 +406,7 @@ export const useCall = createGlobalState(() => {
     if (room !== roomId.value) await holdCurrent();
     roomId.value = room;
     holding.value = holding.value.filter((each) => each !== room);
-    await feed(room, true);
+    await sync(room);
     await report(room);
   }
 
@@ -385,7 +496,7 @@ export const useCall = createGlobalState(() => {
         local.value?.addTrack(video);
         local.value = new MediaStream(local.value?.getTracks() ?? [video]);
         if (sending && room) {
-          for (const peer of peers.get(room)?.values() ?? []) await peer.video.replaceTrack(video);
+          await sync(room);
         }
         camera.value = true;
       } catch {
@@ -395,7 +506,9 @@ export const useCall = createGlobalState(() => {
     } else {
       const video = track("video");
       if (room) {
-        for (const peer of peers.get(room)?.values() ?? []) await peer.video.replaceTrack(null);
+        // Taken off the wire before the camera stops, so nobody sees it freeze.
+        if (video) local.value?.removeTrack(video);
+        await sync(room);
       }
       video?.stop();
       if (video) local.value?.removeTrack(video);
@@ -412,10 +525,12 @@ export const useCall = createGlobalState(() => {
    */
   async function leave(room: string | null = roomId.value, options: { keepMedia?: boolean } = {}) {
     if (!room || !calls.value[room]) return;
+    if (screen.value && room === roomId.value) await stopSharing();
     const path = callPath(room);
     for (const other of [...(peers.get(room)?.keys() ?? [])]) closePeer(room, other);
     peers.delete(room);
     remotes.delete(room);
+    remoteScreens.delete(room);
     const rest = { ...calls.value };
     delete rest[room];
     calls.value = rest;
@@ -667,6 +782,16 @@ export const useCall = createGlobalState(() => {
       if (peer.ignoreOffer) return;
 
       await connection.setRemoteDescription(signal.description);
+      if (!peer.senders) {
+        // The polite side takes the transceivers the other side's offer made,
+        // in their order, and starts sending on them.
+        const transceivers = connection.getTransceivers().slice(0, SLOTS.length);
+        if (transceivers.length === SLOTS.length) {
+          for (const transceiver of transceivers) transceiver.direction = "sendrecv";
+          peer.senders = transceivers.map((transceiver) => transceiver.sender);
+          await syncPeer(room, peer);
+        }
+      }
       if (signal.description.type === "offer") {
         await connection.setLocalDescription();
         if (connection.localDescription) {
@@ -701,6 +826,12 @@ export const useCall = createGlobalState(() => {
     metered,
     supported,
     isIn,
+    screen,
+    remoteScreen,
+    canShareScreen,
+    shareScreen,
+    stopSharing,
+    clearStage,
     lobbies,
     waitingIn,
     joinByLink,

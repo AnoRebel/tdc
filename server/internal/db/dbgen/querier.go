@@ -90,6 +90,8 @@ type Querier interface {
 	// to receive the redirect. Consumed as it is read, exactly as the handle is.
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
 	ClaimWebhookDeliveries(ctx context.Context, capacity int32) ([]WebhookDelivery, error)
+	// Clears presenters who are no longer in their call.
+	ClearAbsentPresenters(ctx context.Context) error
 	ClearApplicationChannels(ctx context.Context, applicationID uuid.UUID) error
 	// A success resets everything: consecutive failures are what matter, and a
 	// peer that answers has none.
@@ -100,6 +102,7 @@ type Querier interface {
 	ClearExpiredTyping(ctx context.Context) error
 	ClearIssueCycle(ctx context.Context, issueID uuid.UUID) error
 	ClearIssueMilestone(ctx context.Context, issueID uuid.UUID) error
+	ClearStage(ctx context.Context, id uuid.UUID) error
 	ClearVerification(ctx context.Context, id uuid.UUID) (int64, error)
 	CloseCycle(ctx context.Context, arg CloseCycleParams) error
 	// Collected once: the row is deleted as it is read, so a handle presented twice
@@ -535,6 +538,8 @@ type Querier interface {
 	// Takes out of their calls everybody with no live connection left, so a
 	// closed laptop or a lost network does not leave somebody "in" a call forever.
 	LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfDisconnectedRow, error)
+	// Clears the presenter, if it is this person.
+	LeaveStage(ctx context.Context, arg LeaveStageParams) error
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
 	// Within the scope the request names — one channel, or the whole server when
 	// the room is null — so lifting by identifier cannot reach a restriction made
@@ -1106,6 +1111,7 @@ type Querier interface {
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
 	SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int64, error)
 	SetCallPolicy(ctx context.Context, arg SetCallPolicyParams) error
+	SetCallScreen(ctx context.Context, arg SetCallScreenParams) error
 	SetCallStartedEvent(ctx context.Context, arg SetCallStartedEventParams) error
 	// After a project's zone changes: the same days, at different instants.
 	SetCycleInstants(ctx context.Context, arg SetCycleInstantsParams) error
@@ -1194,6 +1200,8 @@ type Querier interface {
 	// Taking the authorization consumes it: the row is deleted as it is read, so a
 	// state value cannot be presented twice even if two callbacks arrive at once.
 	TakeOAuthAuthorization(ctx context.Context, stateHash []byte) (OauthAuthorization, error)
+	// Makes somebody the call's presenter, unless somebody else already is.
+	TakeStage(ctx context.Context, arg TakeStageParams) (int64, error)
 	// Taking it consumes it, so a challenge cannot be answered twice even if two
 	// responses arrive at once.
 	TakeWebauthnCeremony(ctx context.Context, arg TakeWebauthnCeremonyParams) (WebauthnCeremony, error)
