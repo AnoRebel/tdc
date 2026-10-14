@@ -43,6 +43,27 @@ func (s *Service) append(
 }
 
 /*
+AppendIn appends to a room's log as part of a transaction the caller holds, so
+a change and the event recording it are written together or not at all — what
+projects do for issues, and the calendar for events.
+
+The sender's account may be nil for something the server did by itself.
+*/
+func (s *Service) AppendIn(
+	ctx context.Context,
+	q Store,
+	room dbgen.Room,
+	senderID *uuid.UUID,
+	senderAddress string,
+	eventType events.Type,
+	content json.RawMessage,
+) (dbgen.Event, error) {
+	within := *s
+	within.store = q
+	return within.appendAs(ctx, room, senderID, senderAddress, eventType, content, "")
+}
+
+/*
 appendAs is append for a sender that may have no account behind it — an
 incoming webhook, which posts as itself rather than as anybody. The address is
 still recorded and signed, so the event says who it is from; only the account

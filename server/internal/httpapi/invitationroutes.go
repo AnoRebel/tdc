@@ -94,8 +94,15 @@ func (s *Server) handleIssueChannelInvitation(c *echo.Context) error {
 
 	// A member of the room, so an invitation cannot be issued to a channel the
 	// issuer cannot see.
-	if _, err := s.rooms.RequireMembership(ctx, roomID, user.ID); err != nil {
+	room, err := s.rooms.RequireMembership(ctx, roomID, user.ID)
+	if err != nil {
 		return roomError(err)
+	}
+	// An event's conversation is joined by answering the event, which is
+	// where its capacity and invitations are kept; a link around them would
+	// be a way in that neither knows about.
+	if room.Kind == "event" {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
 	var request issueInvitationRequest

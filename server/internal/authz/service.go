@@ -383,8 +383,8 @@ detail — it is one person doing setup by hand for everybody.
 
 So there is a role, and registration puts people in it. What it grants is
 deliberately small: reading and posting in the channels somebody belongs to,
-making a channel, inviting somebody to one, starting a project, and calling
-where calls are switched on. None is destructive, all are what an ordinary
+making a channel, inviting somebody to one, starting a project, calling
+where calls are switched on, and scheduling an event. None is destructive, all are what an ordinary
 member of a developer community does without asking, and an operator who
 disagrees can take any of them away — it is an ordinary role, and taking a
 permission from it is one call. Withdrawing
@@ -405,7 +405,7 @@ func (s *Service) EnsureDefaultRole(ctx context.Context) (dbgen.Role, error) {
 	return s.EnsureRole(ctx, DefaultRoleName,
 		"What every member can do",
 		PermChannelRead, PermChannelPost, PermChannelCreate, PermChannelInvite, PermProjectCreate,
-		PermCallStart, PermCallJoin)
+		PermCallStart, PermCallJoin, PermEventCreate)
 }
 
 func (s *Service) EnsureRole(

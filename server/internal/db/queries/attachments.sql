@@ -39,8 +39,10 @@ SELECT count(*) FROM attachments WHERE storage_key = $1;
 -- Attachments that never became part of a message, oldest first.
 -- name: ListOrphanedAttachments :many
 SELECT * FROM attachments
-WHERE event_id IS NULL AND created_at < $1
-ORDER BY created_at
+WHERE attachments.event_id IS NULL AND attachments.created_at < $1
+  -- An event's cover is held by the event rather than by a message.
+  AND NOT EXISTS (SELECT 1 FROM calendar_events covers WHERE covers.cover_attachment_id = attachments.id)
+ORDER BY attachments.created_at
 LIMIT $2;
 
 -- Counts what still points at a stored preview, so its bytes are only removed

@@ -100,6 +100,100 @@ type AuditEntry struct {
 	Detail     []byte
 }
 
+type CalendarEvent struct {
+	ID                uuid.UUID
+	ChannelID         *uuid.UUID
+	Kind              string
+	Title             string
+	Description       string
+	StartsAt          time.Time
+	EndsAt            time.Time
+	TimeZone          string
+	AllDay            bool
+	Recurrence        string
+	Exceptions        []time.Time
+	LastEndsAt        *time.Time
+	Location          string
+	Online            bool
+	OnlineUrl         string
+	Capacity          *int32
+	Visibility        string
+	CoverAttachmentID *uuid.UUID
+	Uid               string
+	Sequence          int32
+	SubscriptionID    *uuid.UUID
+	CreatedBy         *uuid.UUID
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	CancelledAt       *time.Time
+	CancelReason      string
+}
+
+type CalendarEventPerson struct {
+	EventID uuid.UUID
+	UserID  uuid.UUID
+	Role    string
+}
+
+type CalendarFeed struct {
+	UserID     uuid.UUID
+	TokenHash  []byte
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
+}
+
+type CalendarInvite struct {
+	ID        uuid.UUID
+	EventID   uuid.UUID
+	UserID    *uuid.UUID
+	ChannelID *uuid.UUID
+	InvitedBy *uuid.UUID
+	CreatedAt time.Time
+}
+
+type CalendarReminder struct {
+	EventID     uuid.UUID
+	Occurrence  time.Time
+	LeadMinutes int32
+	SentAt      time.Time
+}
+
+type CalendarRsvp struct {
+	EventID     uuid.UUID
+	UserID      uuid.UUID
+	Status      string
+	RespondedAt time.Time
+}
+
+type CalendarSession struct {
+	ID            uuid.UUID
+	EventID       uuid.UUID
+	Title         string
+	Description   string
+	StartsAt      time.Time
+	EndsAt        time.Time
+	Speakers      []uuid.UUID
+	GuestSpeakers string
+}
+
+type CalendarSubscription struct {
+	ID            uuid.UUID
+	Url           string
+	Label         string
+	ChannelID     *uuid.UUID
+	Visibility    string
+	Kind          string
+	CreatedBy     *uuid.UUID
+	CreatedAt     time.Time
+	NextFetchAt   time.Time
+	LastFetchedAt *time.Time
+	LastError     string
+	Failures      int32
+	PausedAt      *time.Time
+	Etag          string
+	LastModified  string
+}
+
 type Call struct {
 	ID           uuid.UUID
 	RoomID       uuid.UUID
@@ -953,6 +1047,7 @@ type UserPrivacy struct {
 	ShowsLastSeen         bool
 	Calls                 string
 	CallsFromOtherServers bool
+	ShowsEventAttendance  bool
 }
 
 type UserRole struct {

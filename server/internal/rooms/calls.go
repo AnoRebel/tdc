@@ -34,14 +34,14 @@ type Call struct {
 /*
 callable is whether calls happen in a room here.
 
-Channels, direct conversations and disposable chats — the places people talk.
-Not a project's stream or an issue's discussion, and not a room another server
-orders: its members on other servers could not be reached by anything this
-server relays.
+Channels, direct conversations and disposable chats — the places people talk —
+and an event's own conversation, whose call is the event's. Not a project's
+stream or an issue's discussion, and not a room another server orders: its
+members on other servers could not be reached by anything this server relays.
 */
 func (s *Service) callable(room dbgen.Room) error {
 	switch room.Kind {
-	case "channel", "direct", "disposable":
+	case "channel", "direct", "disposable", "event":
 	default:
 		return ErrNotCallable
 	}

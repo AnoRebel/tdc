@@ -80,6 +80,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/events/:eventId": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/invitations/:id": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -497,6 +502,17 @@ var routeBodies = map[string]routeBodySet{
 		Query: []string{"q"},
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]skillView]()},
+		},
+	},
+	"GET /api/events": {
+		Query: []string{"channel", "from", "limit", "to"},
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]eventView]()},
+		},
+	},
+	"GET /api/events/:eventId": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[eventDetailView]()},
 		},
 	},
 	"GET /api/federation/rooms": {
@@ -1327,6 +1343,20 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 201, Type: reflect.TypeFor[skillView]()},
 		},
 	},
+	"POST /api/events": {
+		Request: reflect.TypeFor[eventRequest](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[eventDetailView]()},
+		},
+	},
+	"POST /api/events/:eventId/cancel": {
+		Request: reflect.TypeFor[struct {
+			Reason string "json:\"reason\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[eventDetailView]()},
+		},
+	},
 	"POST /api/federation/ping": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
@@ -1792,6 +1822,20 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[moderateProfileRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[ownProfileResponse]()},
+		},
+	},
+	"PUT /api/events/:eventId": {
+		Request: reflect.TypeFor[eventRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[eventDetailView]()},
+		},
+	},
+	"PUT /api/events/:eventId/cover": {
+		Request: reflect.TypeFor[struct {
+			AttachmentID *string "json:\"attachmentId\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[eventDetailView]()},
 		},
 	},
 	"PUT /api/issues/:ref/assignees/:username": {

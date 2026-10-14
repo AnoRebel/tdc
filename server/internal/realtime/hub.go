@@ -68,6 +68,10 @@ const (
 	// FrameCallReaction is a passing reaction somebody in a call sent: a clap,
 	// a laugh. Not kept anywhere.
 	FrameCallReaction = "call.reaction"
+	// FrameEventReminder tells somebody an event they are going to is about
+	// to start, so an open client — or the desktop application, closed to its
+	// tray — can say so at once.
+	FrameEventReminder = "event.reminder"
 )
 
 // Connection is one client's live connection.

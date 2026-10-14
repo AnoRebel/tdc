@@ -19,6 +19,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
 	"github.com/AnoRebel/tdc/server/internal/cache"
+	"github.com/AnoRebel/tdc/server/internal/calendar"
 	"github.com/AnoRebel/tdc/server/internal/config"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -166,6 +167,10 @@ type Server struct {
 	// projects owns projects and issues. Built when its routes are mounted,
 	// from the pool and rooms service above; see projectroutes.go.
 	projects *projects.Service
+
+	// calendar keeps events. Built when its routes are mounted; see
+	// eventroutes.go.
+	calendar *calendar.Service
 
 	// shell is the built application's index.html, held in memory so social
 	// metadata can be inserted per request.
