@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -116,7 +117,21 @@ type Service struct {
 	queries *dbgen.Queries
 	rooms   *rooms.Service
 	log     *slog.Logger
+
+	// appended is told about each event in a project's stream once the
+	// transaction that wrote it has committed. See OnAppended.
+	appended func(context.Context, dbgen.Event)
+	// uncommitted holds what each open transaction has appended, keyed by
+	// the transaction's queries, until it commits or is abandoned.
+	uncommitted sync.Map
 }
+
+/*
+OnAppended sets what is told about each event in a project's stream, once it
+is committed — never before, so nothing outside hears of a change that was
+rolled back. Called once while the server is being built.
+*/
+func (s *Service) OnAppended(tell func(context.Context, dbgen.Event)) { s.appended = tell }
 
 // NewService builds a projects service.
 func NewService(pool *db.Pool, roomsService *rooms.Service, log *slog.Logger) *Service {
@@ -592,13 +607,36 @@ func (s *Service) inTransaction(ctx context.Context, work func(*dbgen.Queries) e
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if err := work(dbgen.New(tx)); err != nil {
+	q := dbgen.New(tx)
+	var appended []dbgen.Event
+	s.uncommitted.Store(q, &appended)
+	defer s.uncommitted.Delete(q)
+
+	if err := work(q); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
+	if s.appended != nil {
+		for _, event := range appended {
+			s.appended(ctx, event)
+		}
+	}
 	return nil
+}
+
+// stored notes an event appended through q, to be told about when q's
+// transaction commits — or now, if q is not a transaction's.
+func (s *Service) stored(ctx context.Context, q *dbgen.Queries, event dbgen.Event) {
+	if pending, ok := s.uncommitted.Load(q); ok {
+		list := pending.(*[]dbgen.Event)
+		*list = append(*list, event)
+		return
+	}
+	if s.appended != nil {
+		s.appended(ctx, event)
+	}
 }
 
 func isUniqueViolation(err error) bool {

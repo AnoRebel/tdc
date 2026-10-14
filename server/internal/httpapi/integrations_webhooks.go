@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -24,6 +25,21 @@ longer read it, and nobody else can see or remove it.
 
 func init() {
 	registerRoutes(func(s *Server) {
+		/*
+			Every event this server stores, wherever it was stored from, and
+			every account it creates, however it came about — told here once,
+			rather than by each route remembering to.
+		*/
+		if s.rooms != nil {
+			s.rooms.OnAppended(s.queueWebhooks)
+		}
+		if s.identity != nil {
+			s.identity.OnCreated(func(ctx context.Context, user dbgen.User) {
+				s.queueServerEvent(ctx, webhooks.TypeAccountCreated, s.serverName(),
+					map[string]any{"account": s.accountRef(user)})
+			})
+		}
+
 		own := s.echo.Group("/api/me/webhooks", requireAuthentication)
 		own.GET("", s.handleListWebhooks)
 		own.POST("", s.handleCreateWebhook)
@@ -38,7 +54,7 @@ func init() {
 
 	documentRoutes(map[string]entry{
 		"GET /api/me/webhooks":             {Summary: "List your outgoing webhooks", Authentication: "session or token"},
-		"POST /api/me/webhooks":            {Summary: "Subscribe an endpoint to a channel's events", Authentication: "session or token"},
+		"POST /api/me/webhooks":            {Summary: "Subscribe an endpoint to a channel's, a project's or the server's events", Authentication: "session or token"},
 		"GET /api/me/webhooks/:id":         {Summary: "An outgoing webhook and its delivery history", Authentication: "session or token"},
 		"DELETE /api/me/webhooks/:id":      {Summary: "Remove an outgoing webhook", Authentication: "session or token"},
 		"POST /api/me/webhooks/:id/enable": {Summary: "Turn a disabled webhook back on", Authentication: "session or token"},
@@ -48,10 +64,15 @@ func init() {
 
 // webhookView is one subscription as its owner sees it. Never the secret.
 type webhookView struct {
-	ID             string   `json:"id"`
-	Label          string   `json:"label"`
-	URL            string   `json:"url"`
-	RoomID         string   `json:"roomId"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	URL   string `json:"url"`
+	// Scope is channel, project or server.
+	Scope string `json:"scope"`
+	// RoomID is the channel, or the project's stream; absent for the server.
+	RoomID string `json:"roomId,omitempty"`
+	// ProjectID is set for a project subscription, the same as RoomID.
+	ProjectID      string   `json:"projectId,omitempty"`
 	EventTypes     []string `json:"eventTypes"`
 	PayloadVersion int32    `json:"payloadVersion"`
 	// State is "active" or "disabled".
@@ -75,7 +96,7 @@ func viewOfWebhook(subscription dbgen.WebhookSubscription) webhookView {
 		ID:                  subscription.ID.String(),
 		Label:               subscription.Label,
 		URL:                 subscription.Url,
-		RoomID:              subscription.RoomID.String(),
+		Scope:               subscription.Scope,
 		EventTypes:          subscription.EventTypes,
 		PayloadVersion:      subscription.PayloadVersion,
 		State:               subscription.State,
@@ -89,6 +110,12 @@ func viewOfWebhook(subscription dbgen.WebhookSubscription) webhookView {
 	if subscription.DisabledReason != nil {
 		view.DisabledReason = *subscription.DisabledReason
 	}
+	if subscription.RoomID != nil {
+		view.RoomID = subscription.RoomID.String()
+		if subscription.Scope == webhooks.ScopeProject {
+			view.ProjectID = view.RoomID
+		}
+	}
 	return view
 }
 
@@ -100,7 +127,12 @@ type createdWebhook struct {
 }
 
 type createWebhookRequest struct {
-	RoomID     string   `json:"roomId"`
+	// Scope is channel (the default), project or server.
+	Scope string `json:"scope"`
+	// RoomID names the channel, for a channel subscription.
+	RoomID string `json:"roomId"`
+	// ProjectID names the project, for a project subscription.
+	ProjectID  string   `json:"projectId"`
 	Label      string   `json:"label"`
 	URL        string   `json:"url"`
 	EventTypes []string `json:"eventTypes"`
@@ -135,13 +167,30 @@ func (s *Server) handleCreateWebhook(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
-	roomID, err := uuid.Parse(request.RoomID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	scope := request.Scope
+	if scope == "" {
+		scope = webhooks.ScopeChannel
+	}
+	var roomID uuid.UUID
+	switch scope {
+	case webhooks.ScopeChannel, webhooks.ScopeProject:
+		named := request.RoomID
+		if scope == webhooks.ScopeProject {
+			named = request.ProjectID
+		}
+		parsed, err := uuid.Parse(named)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusNotFound, "no such "+scope)
+		}
+		roomID = parsed
+	case webhooks.ScopeServer:
+	default:
+		return echo.NewHTTPError(http.StatusBadRequest, "scope is channel, project or server")
 	}
 
 	subscription, err := service.Subscribe(c.Request().Context(), webhooks.NewSubscription{
 		OwnerID:    user.ID,
+		Scope:      scope,
 		RoomID:     roomID,
 		Label:      request.Label,
 		URL:        request.URL,
@@ -152,8 +201,8 @@ func (s *Server) handleCreateWebhook(c *echo.Context) error {
 	}
 
 	s.recordModeration(c, user, audit.ActionWebhookSubscribed, "webhook", subscription.ID.String(),
-		map[string]any{"room": subscription.RoomID.String(), "url": subscription.Url,
-			"eventTypes": subscription.EventTypes})
+		map[string]any{"scope": subscription.Scope, "room": auditedID(subscription.RoomID),
+			"url": subscription.Url, "eventTypes": subscription.EventTypes})
 
 	return c.JSON(http.StatusCreated, createdWebhook{
 		webhookView: viewOfWebhook(subscription),
@@ -275,7 +324,7 @@ func (s *Server) handleDeleteWebhook(c *echo.Context) error {
 	}
 
 	s.recordModeration(c, user, audit.ActionWebhookUnsubscribed, "webhook", removed.ID.String(),
-		map[string]any{"room": removed.RoomID.String(), "url": removed.Url})
+		map[string]any{"scope": removed.Scope, "room": auditedID(removed.RoomID), "url": removed.Url})
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -298,15 +347,50 @@ func (s *Server) handleEnableWebhook(c *echo.Context) error {
 }
 
 type eventTypesView struct {
-	EventTypes     []string `json:"eventTypes"`
-	PayloadVersion int32    `json:"payloadVersion"`
+	// EventTypes are the names alone, as clients written before the
+	// catalogue described them read them.
+	EventTypes []string `json:"eventTypes"`
+	// Catalogue describes each: its group, where it can be asked for, and
+	// the permission it needs, if any.
+	Catalogue      []catalogueEntry `json:"catalogue"`
+	PayloadVersion int32            `json:"payloadVersion"`
+}
+
+type catalogueEntry struct {
+	webhooks.EventType
+	// Available says whether the caller could subscribe to it now: false
+	// for a type whose permission they do not hold.
+	Available bool `json:"available"`
 }
 
 func (s *Server) handleWebhookEventTypes(c *echo.Context) error {
+	user, _ := currentUser(c)
+	ctx := c.Request().Context()
+	held := map[string]bool{}
+	catalogue := make([]catalogueEntry, 0, len(webhooks.Catalogue))
+	for _, kind := range webhooks.Catalogue {
+		available := true
+		if kind.Permission != "" {
+			if _, asked := held[kind.Permission]; !asked {
+				held[kind.Permission] = s.holdsForWebhooks(ctx, user.ID, kind.Permission)
+			}
+			available = held[kind.Permission]
+		}
+		catalogue = append(catalogue, catalogueEntry{EventType: kind, Available: available})
+	}
 	return c.JSON(http.StatusOK, eventTypesView{
 		EventTypes:     webhooks.EventTypes,
+		Catalogue:      catalogue,
 		PayloadVersion: webhooks.CurrentVersion(),
 	})
+}
+
+// auditedID is an identifier for the audit log, or nothing.
+func auditedID(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
 }
 
 func webhooksUnavailable() error {
@@ -323,8 +407,11 @@ func webhookError(err error) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	case errors.Is(err, webhooks.ErrUnknownEventType),
 		errors.Is(err, webhooks.ErrNoEventTypes),
-		errors.Is(err, webhooks.ErrLabelRequired):
+		errors.Is(err, webhooks.ErrLabelRequired),
+		errors.Is(err, webhooks.ErrWrongScope):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	case errors.Is(err, webhooks.ErrNotPermitted):
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
 	case errors.Is(err, delivery.ErrPrivateDestination), errors.Is(err, delivery.ErrUnusableURL):
 		return destinationError(err)
 	default:

@@ -213,6 +213,7 @@ func (s *Service) PostRemote(
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
 	}
+	s.told(ctx, stored)
 	return stored, nil
 }
 
@@ -280,6 +281,7 @@ func (s *Service) appendFrom(
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
 	}
+	s.told(ctx, stored)
 	return stored, nil
 }
 

@@ -1010,7 +1010,7 @@ type WebhookDelivery struct {
 type WebhookSubscription struct {
 	ID                  uuid.UUID
 	OwnerID             uuid.UUID
-	RoomID              uuid.UUID
+	RoomID              *uuid.UUID
 	Label               string
 	Url                 string
 	Secret              string
@@ -1025,4 +1025,5 @@ type WebhookSubscription struct {
 	AccessLostAt        *time.Time
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	Scope               string
 }

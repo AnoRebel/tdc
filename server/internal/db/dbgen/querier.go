@@ -553,8 +553,10 @@ type Querier interface {
 	ListAcceptedCompanyMembers(ctx context.Context, companyID uuid.UUID) ([]ListAcceptedCompanyMembersRow, error)
 	// Who pressed what on one message, oldest first.
 	ListActionPressesForEvent(ctx context.Context, eventID string) ([]ActionPress, error)
+	// Server-wide subscriptions that asked for this type, wherever it happened.
+	ListActiveServerWebhookSubscriptions(ctx context.Context, eventType string) ([]WebhookSubscription, error)
 	// What an event in this room might need delivering to.
-	ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roomID uuid.UUID) ([]WebhookSubscription, error)
+	ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roomID *uuid.UUID) ([]WebhookSubscription, error)
 	// Every entry on every role, with the name of the channel or project a scoped
 	// one applies to. A project is also a room, so the project is looked for
 	// first. An entry whose channel has gone keeps an empty name.

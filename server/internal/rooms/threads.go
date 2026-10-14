@@ -151,6 +151,7 @@ func (s *Service) appendThreaded(
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
 	}
+	s.told(ctx, stored)
 
 	if clientToken != "" {
 		if err := s.store.RecordIdempotentSubmission(ctx, dbgen.RecordIdempotentSubmissionParams{

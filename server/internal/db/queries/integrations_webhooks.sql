@@ -1,6 +1,6 @@
 -- name: CreateWebhookSubscription :one
-INSERT INTO webhook_subscriptions (id, owner_id, room_id, label, url, secret, event_types, payload_version)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO webhook_subscriptions (id, owner_id, room_id, label, url, secret, event_types, payload_version, scope)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: GetWebhookSubscription :one
@@ -12,6 +12,11 @@ SELECT * FROM webhook_subscriptions WHERE owner_id = $1 ORDER BY created_at DESC
 -- name: ListActiveWebhookSubscriptionsForRoom :many
 -- What an event in this room might need delivering to.
 SELECT * FROM webhook_subscriptions WHERE room_id = $1 AND state = 'active';
+
+-- name: ListActiveServerWebhookSubscriptions :many
+-- Server-wide subscriptions that asked for this type, wherever it happened.
+SELECT * FROM webhook_subscriptions
+WHERE scope = 'server' AND state = 'active' AND sqlc.arg(event_type)::text = ANY(event_types);
 
 -- name: DeleteWebhookSubscription :one
 -- Scoped to its owner, so a subscription cannot be removed by guessing.

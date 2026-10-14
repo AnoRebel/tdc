@@ -380,6 +380,9 @@ func (s *Service) moveLocked(
 			"previousName": from.Name,
 			"newName":      to.Name,
 			"completed":    to.IsCompletion,
+			// Whether it was finished before, so a reader can tell closing
+			// and reopening from a move between two open states.
+			"wasCompleted": from.IsCompletion,
 		})); err != nil {
 		return dbgen.Issue{}, err
 	}
