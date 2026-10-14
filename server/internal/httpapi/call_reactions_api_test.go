@@ -44,7 +44,7 @@ func TestHandsAndReactionsInACall(t *testing.T) {
 			aminaAt = at
 		}
 	}
-	if barakaAt == "" || aminaAt == "" || !(barakaAt < aminaAt) {
+	if barakaAt == "" || aminaAt == "" || barakaAt >= aminaAt {
 		t.Errorf("hands should be up in the order raised: baraka %q, amina %q", barakaAt, aminaAt)
 	}
 
