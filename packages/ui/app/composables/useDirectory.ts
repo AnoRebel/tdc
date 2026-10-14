@@ -1,4 +1,5 @@
 import type {
+  AgreementRevision,
   Company,
   CompanyAssociation,
   DirectoryFilters,
@@ -294,6 +295,25 @@ export function useDirectory() {
     return api.post<Engagement>(`/api/directory/engagements/${id}/confirm-completion`);
   }
 
+  /**
+   * Proposes a revision of the agreement in force: why, and the amended terms.
+   * The agreement in force stands until both accept one version of it.
+   */
+  function openRevision(id: string, reason: string, draft: ProposalDraft) {
+    return api.post<{ revision: AgreementRevision; version: ProposalVersion }>(
+      `/api/directory/engagements/${id}/revisions`,
+      { reason, ...draft },
+    );
+  }
+
+  /** Withdraws a revision the caller opened. */
+  function withdrawRevision(id: string, number: number, reason = "") {
+    return api.post<AgreementRevision>(
+      `/api/directory/engagements/${id}/revisions/${number}/withdraw`,
+      { reason },
+    );
+  }
+
   /** The agreement as a document either party keeps. */
   function exportAgreement(id: string) {
     return api.get<Record<string, unknown>>(`/api/directory/engagements/${id}/agreement/export`);
@@ -307,6 +327,8 @@ export function useDirectory() {
     requestCompletion,
     confirmCompletion,
     exportAgreement,
+    openRevision,
+    withdrawRevision,
     acceptEnquiry,
     declineEnquiry,
     withdrawEnquiry,

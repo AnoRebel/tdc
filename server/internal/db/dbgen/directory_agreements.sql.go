@@ -44,9 +44,10 @@ func (q *Queries) AcceptancesOf(ctx context.Context, versionID uuid.UUID) ([]Acc
 }
 
 const getAgreement = `-- name: GetAgreement :one
-SELECT id, engagement_id, version_id, version, client_id, developer_id, client_label, developer_label, client_accepted_at, developer_accepted_at, terms, recorded_at FROM engagement_agreements WHERE engagement_id = $1
+SELECT id, engagement_id, version_id, version, client_id, developer_id, client_label, developer_label, client_accepted_at, developer_accepted_at, terms, recorded_at, revision_id FROM engagement_agreements WHERE engagement_id = $1 ORDER BY version DESC LIMIT 1
 `
 
+// The agreement in force: the latest version both parties accepted.
 func (q *Queries) GetAgreement(ctx context.Context, engagementID uuid.UUID) (EngagementAgreement, error) {
 	row := q.db.QueryRow(ctx, getAgreement, engagementID)
 	var i EngagementAgreement
@@ -63,6 +64,30 @@ func (q *Queries) GetAgreement(ctx context.Context, engagementID uuid.UUID) (Eng
 		&i.DeveloperAcceptedAt,
 		&i.Terms,
 		&i.RecordedAt,
+		&i.RevisionID,
+	)
+	return i, err
+}
+
+const getOpenRevision = `-- name: GetOpenRevision :one
+SELECT r.id, r.engagement_id, r.number, r.opened_by, r.opened_by_label, r.reason, r.opened_at FROM agreement_revisions r
+WHERE r.engagement_id = $1
+  AND NOT EXISTS (SELECT 1 FROM agreement_revision_outcomes o WHERE o.revision_id = r.id)
+ORDER BY r.number DESC LIMIT 1
+`
+
+// The revision under negotiation, if there is one.
+func (q *Queries) GetOpenRevision(ctx context.Context, engagementID uuid.UUID) (AgreementRevision, error) {
+	row := q.db.QueryRow(ctx, getOpenRevision, engagementID)
+	var i AgreementRevision
+	err := row.Scan(
+		&i.ID,
+		&i.EngagementID,
+		&i.Number,
+		&i.OpenedBy,
+		&i.OpenedByLabel,
+		&i.Reason,
+		&i.OpenedAt,
 	)
 	return i, err
 }
@@ -70,9 +95,9 @@ func (q *Queries) GetAgreement(ctx context.Context, engagementID uuid.UUID) (Eng
 const insertAgreement = `-- name: InsertAgreement :one
 INSERT INTO engagement_agreements (id, engagement_id, version_id, version, client_id, developer_id,
                                    client_label, developer_label, client_accepted_at,
-                                   developer_accepted_at, terms)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, engagement_id, version_id, version, client_id, developer_id, client_label, developer_label, client_accepted_at, developer_accepted_at, terms, recorded_at
+                                   developer_accepted_at, terms, revision_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, engagement_id, version_id, version, client_id, developer_id, client_label, developer_label, client_accepted_at, developer_accepted_at, terms, recorded_at, revision_id
 `
 
 type InsertAgreementParams struct {
@@ -87,6 +112,7 @@ type InsertAgreementParams struct {
 	ClientAcceptedAt    time.Time
 	DeveloperAcceptedAt time.Time
 	Terms               []byte
+	RevisionID          *uuid.UUID
 }
 
 func (q *Queries) InsertAgreement(ctx context.Context, arg InsertAgreementParams) (EngagementAgreement, error) {
@@ -102,6 +128,7 @@ func (q *Queries) InsertAgreement(ctx context.Context, arg InsertAgreementParams
 		arg.ClientAcceptedAt,
 		arg.DeveloperAcceptedAt,
 		arg.Terms,
+		arg.RevisionID,
 	)
 	var i EngagementAgreement
 	err := row.Scan(
@@ -117,6 +144,7 @@ func (q *Queries) InsertAgreement(ctx context.Context, arg InsertAgreementParams
 		&i.DeveloperAcceptedAt,
 		&i.Terms,
 		&i.RecordedAt,
+		&i.RevisionID,
 	)
 	return i, err
 }
@@ -172,11 +200,12 @@ here that changes one, because nothing may.
 */
 
 INSERT INTO proposal_versions (id, engagement_id, version, sent_by, sent_by_label,
-                               scope, timeline, line_items, currency, total_minor)
+                               scope, timeline, line_items, currency, total_minor, revision_id)
 SELECT $1, $2,
        COALESCE((SELECT max(version) FROM proposal_versions WHERE engagement_id = $2), 0) + 1,
-       $3, $4, $5, $6, $7, $8, $9
-RETURNING id, engagement_id, version, sent_by, sent_by_label, scope, timeline, line_items, currency, total_minor, sent_at
+       $3, $4, $5, $6, $7, $8, $9,
+       $10::uuid
+RETURNING id, engagement_id, version, sent_by, sent_by_label, scope, timeline, line_items, currency, total_minor, sent_at, revision_id
 `
 
 type InsertProposalVersionParams struct {
@@ -189,11 +218,14 @@ type InsertProposalVersionParams struct {
 	LineItems    []byte
 	Currency     string
 	TotalMinor   int64
+	RevisionID   *uuid.UUID
 }
 
 // The next version for the engagement. Numbered here, in the statement that
 // inserts, so two people sending at once cannot both claim the same number:
 // the unique key refuses the second.
+// A version sent within a revision carries the revision; the numbering runs on
+// across them, so "version 4" names one set of terms on the engagement.
 func (q *Queries) InsertProposalVersion(ctx context.Context, arg InsertProposalVersionParams) (ProposalVersion, error) {
 	row := q.db.QueryRow(ctx, insertProposalVersion,
 		arg.ID,
@@ -205,6 +237,7 @@ func (q *Queries) InsertProposalVersion(ctx context.Context, arg InsertProposalV
 		arg.LineItems,
 		arg.Currency,
 		arg.TotalMinor,
+		arg.RevisionID,
 	)
 	var i ProposalVersion
 	err := row.Scan(
@@ -219,12 +252,76 @@ func (q *Queries) InsertProposalVersion(ctx context.Context, arg InsertProposalV
 		&i.Currency,
 		&i.TotalMinor,
 		&i.SentAt,
+		&i.RevisionID,
 	)
 	return i, err
 }
 
+const insertRevision = `-- name: InsertRevision :one
+INSERT INTO agreement_revisions (id, engagement_id, number, opened_by, opened_by_label, reason)
+SELECT $1, $2,
+       COALESCE((SELECT max(number) FROM agreement_revisions WHERE engagement_id = $2), 0) + 1,
+       $3, $4, $5
+RETURNING id, engagement_id, number, opened_by, opened_by_label, reason, opened_at
+`
+
+type InsertRevisionParams struct {
+	ID            uuid.UUID
+	EngagementID  uuid.UUID
+	OpenedBy      *uuid.UUID
+	OpenedByLabel string
+	Reason        string
+}
+
+func (q *Queries) InsertRevision(ctx context.Context, arg InsertRevisionParams) (AgreementRevision, error) {
+	row := q.db.QueryRow(ctx, insertRevision,
+		arg.ID,
+		arg.EngagementID,
+		arg.OpenedBy,
+		arg.OpenedByLabel,
+		arg.Reason,
+	)
+	var i AgreementRevision
+	err := row.Scan(
+		&i.ID,
+		&i.EngagementID,
+		&i.Number,
+		&i.OpenedBy,
+		&i.OpenedByLabel,
+		&i.Reason,
+		&i.OpenedAt,
+	)
+	return i, err
+}
+
+const insertRevisionOutcome = `-- name: InsertRevisionOutcome :exec
+INSERT INTO agreement_revision_outcomes (revision_id, engagement_id, outcome, actor_id, actor_label, note)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertRevisionOutcomeParams struct {
+	RevisionID   uuid.UUID
+	EngagementID uuid.UUID
+	Outcome      string
+	ActorID      *uuid.UUID
+	ActorLabel   string
+	Note         string
+}
+
+func (q *Queries) InsertRevisionOutcome(ctx context.Context, arg InsertRevisionOutcomeParams) error {
+	_, err := q.db.Exec(ctx, insertRevisionOutcome,
+		arg.RevisionID,
+		arg.EngagementID,
+		arg.Outcome,
+		arg.ActorID,
+		arg.ActorLabel,
+		arg.Note,
+	)
+	return err
+}
+
 const latestProposalVersion = `-- name: LatestProposalVersion :one
-SELECT id, engagement_id, version, sent_by, sent_by_label, scope, timeline, line_items, currency, total_minor, sent_at FROM proposal_versions WHERE engagement_id = $1 ORDER BY version DESC LIMIT 1
+SELECT id, engagement_id, version, sent_by, sent_by_label, scope, timeline, line_items, currency, total_minor, sent_at, revision_id FROM proposal_versions WHERE engagement_id = $1 ORDER BY version DESC LIMIT 1
 `
 
 func (q *Queries) LatestProposalVersion(ctx context.Context, engagementID uuid.UUID) (ProposalVersion, error) {
@@ -242,8 +339,48 @@ func (q *Queries) LatestProposalVersion(ctx context.Context, engagementID uuid.U
 		&i.Currency,
 		&i.TotalMinor,
 		&i.SentAt,
+		&i.RevisionID,
 	)
 	return i, err
+}
+
+const listAgreements = `-- name: ListAgreements :many
+SELECT id, engagement_id, version_id, version, client_id, developer_id, client_label, developer_label, client_accepted_at, developer_accepted_at, terms, recorded_at, revision_id FROM engagement_agreements WHERE engagement_id = $1 ORDER BY version
+`
+
+// Every agreement on an engagement, the first one first.
+func (q *Queries) ListAgreements(ctx context.Context, engagementID uuid.UUID) ([]EngagementAgreement, error) {
+	rows, err := q.db.Query(ctx, listAgreements, engagementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []EngagementAgreement{}
+	for rows.Next() {
+		var i EngagementAgreement
+		if err := rows.Scan(
+			&i.ID,
+			&i.EngagementID,
+			&i.VersionID,
+			&i.Version,
+			&i.ClientID,
+			&i.DeveloperID,
+			&i.ClientLabel,
+			&i.DeveloperLabel,
+			&i.ClientAcceptedAt,
+			&i.DeveloperAcceptedAt,
+			&i.Terms,
+			&i.RecordedAt,
+			&i.RevisionID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listProposalResponses = `-- name: ListProposalResponses :many
@@ -281,7 +418,7 @@ func (q *Queries) ListProposalResponses(ctx context.Context, engagementID uuid.U
 }
 
 const listProposalVersions = `-- name: ListProposalVersions :many
-SELECT id, engagement_id, version, sent_by, sent_by_label, scope, timeline, line_items, currency, total_minor, sent_at FROM proposal_versions WHERE engagement_id = $1 ORDER BY version
+SELECT id, engagement_id, version, sent_by, sent_by_label, scope, timeline, line_items, currency, total_minor, sent_at, revision_id FROM proposal_versions WHERE engagement_id = $1 ORDER BY version
 `
 
 func (q *Queries) ListProposalVersions(ctx context.Context, engagementID uuid.UUID) ([]ProposalVersion, error) {
@@ -305,6 +442,7 @@ func (q *Queries) ListProposalVersions(ctx context.Context, engagementID uuid.UU
 			&i.Currency,
 			&i.TotalMinor,
 			&i.SentAt,
+			&i.RevisionID,
 		); err != nil {
 			return nil, err
 		}
@@ -314,6 +452,74 @@ func (q *Queries) ListProposalVersions(ctx context.Context, engagementID uuid.UU
 		return nil, err
 	}
 	return items, nil
+}
+
+const listRevisions = `-- name: ListRevisions :many
+SELECT r.id, r.engagement_id, r.number, r.opened_by, r.opened_by_label, r.reason, r.opened_at,
+       o.outcome, o.actor_label AS outcome_by, o.note AS outcome_note, o.occurred_at AS outcome_at
+FROM agreement_revisions r
+LEFT JOIN agreement_revision_outcomes o ON o.revision_id = r.id
+WHERE r.engagement_id = $1
+ORDER BY r.number
+`
+
+type ListRevisionsRow struct {
+	ID            uuid.UUID
+	EngagementID  uuid.UUID
+	Number        int32
+	OpenedBy      *uuid.UUID
+	OpenedByLabel string
+	Reason        string
+	OpenedAt      time.Time
+	Outcome       *string
+	OutcomeBy     *string
+	OutcomeNote   *string
+	OutcomeAt     *time.Time
+}
+
+// Every revision of an engagement's agreement with how it ended, if it has.
+func (q *Queries) ListRevisions(ctx context.Context, engagementID uuid.UUID) ([]ListRevisionsRow, error) {
+	rows, err := q.db.Query(ctx, listRevisions, engagementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRevisionsRow{}
+	for rows.Next() {
+		var i ListRevisionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.EngagementID,
+			&i.Number,
+			&i.OpenedBy,
+			&i.OpenedByLabel,
+			&i.Reason,
+			&i.OpenedAt,
+			&i.Outcome,
+			&i.OutcomeBy,
+			&i.OutcomeNote,
+			&i.OutcomeAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockEngagement = `-- name: LockEngagement :exec
+SELECT id FROM engagements WHERE id = $1 FOR UPDATE
+`
+
+// Holds an engagement still for the rest of a transaction, so that opening,
+// answering and ending a revision, and finishing the work, happen one at a
+// time on it.
+func (q *Queries) LockEngagement(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockEngagement, id)
+	return err
 }
 
 const requestCompletion = `-- name: RequestCompletion :execrows

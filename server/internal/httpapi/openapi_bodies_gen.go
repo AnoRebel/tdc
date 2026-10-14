@@ -1254,6 +1254,18 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 201, Type: reflect.TypeFor[engagementView]()},
 		},
 	},
+	"POST /api/directory/engagements/:id/revisions": {
+		Request: reflect.TypeFor[openRevisionRequest](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/directory/engagements/:id/revisions/:number/withdraw": {
+		Request: reflect.TypeFor[withdrawRevisionRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[revisionView]()},
+		},
+	},
 	"POST /api/directory/engagements/:id/start": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[engagementView]()},

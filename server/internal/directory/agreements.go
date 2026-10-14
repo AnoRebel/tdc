@@ -134,8 +134,12 @@ func (input ProposalInput) Total() int64 {
 
 // ProposalVersion is one sent version.
 type ProposalVersion struct {
-	ID         uuid.UUID
-	Version    int32
+	ID      uuid.UUID
+	Version int32
+	// Revision is the number of the revision it was sent in, or 0 for the
+	// negotiation before the first agreement.
+	Revision   int32
+	RevisionID *uuid.UUID `json:"-"`
 	SentBy     string
 	Scope      string
 	Timeline   string
@@ -167,9 +171,11 @@ type Response struct {
 
 // Agreement is the record of both people accepting one version.
 type Agreement struct {
-	ID                  uuid.UUID
-	EngagementID        uuid.UUID
-	Version             int32
+	ID           uuid.UUID
+	EngagementID uuid.UUID
+	Version      int32
+	// Revision is the revision this agreement came from, or 0 for the first.
+	Revision            int32
 	ClientLabel         string
 	DeveloperLabel      string
 	ClientAcceptedAt    time.Time
@@ -182,14 +188,19 @@ type Agreement struct {
 type Negotiation struct {
 	Versions  []ProposalVersion
 	Responses []Response
+	// Agreement is the agreement in force: the latest one recorded.
 	Agreement *Agreement
+	// Agreements is every agreement recorded, the first one first.
+	Agreements []Agreement
+	// Revisions is every revision of the agreement, open or ended.
+	Revisions []Revision
 }
 
 func versionOf(row dbgen.ProposalVersion) ProposalVersion {
 	items := []LineItem{}
 	_ = json.Unmarshal(row.LineItems, &items)
 	return ProposalVersion{
-		ID: row.ID, Version: row.Version, SentBy: row.SentByLabel, Scope: row.Scope,
+		ID: row.ID, Version: row.Version, RevisionID: row.RevisionID, SentBy: row.SentByLabel, Scope: row.Scope,
 		Timeline: row.Timeline, LineItems: items, Currency: row.Currency,
 		TotalMinor: row.TotalMinor, SentAt: row.SentAt,
 	}
@@ -199,7 +210,7 @@ func agreementOf(row dbgen.EngagementAgreement) Agreement {
 	var terms ProposalVersion
 	_ = json.Unmarshal(row.Terms, &terms)
 	return Agreement{
-		ID: row.ID, EngagementID: row.EngagementID, Version: row.Version,
+		ID: row.ID, EngagementID: row.EngagementID, Version: row.Version, Revision: terms.Revision,
 		ClientLabel: row.ClientLabel, DeveloperLabel: row.DeveloperLabel,
 		ClientAcceptedAt: row.ClientAcceptedAt, DeveloperAcceptedAt: row.DeveloperAcceptedAt,
 		Terms: terms, RecordedAt: row.RecordedAt,
@@ -215,7 +226,19 @@ func (s *Service) Negotiation(ctx context.Context, engagementID, viewer uuid.UUI
 }
 
 func negotiationWith(ctx context.Context, queries *dbgen.Queries, engagementID uuid.UUID) (Negotiation, error) {
-	negotiation := Negotiation{Versions: []ProposalVersion{}, Responses: []Response{}}
+	negotiation := Negotiation{
+		Versions: []ProposalVersion{}, Responses: []Response{}, Agreements: []Agreement{}, Revisions: []Revision{},
+	}
+
+	revisions, err := revisionsOf(ctx, queries, engagementID)
+	if err != nil {
+		return Negotiation{}, err
+	}
+	negotiation.Revisions = revisions
+	revisionNumbers := map[uuid.UUID]int32{}
+	for _, revision := range revisions {
+		revisionNumbers[revision.ID] = revision.Number
+	}
 
 	versions, err := queries.ListProposalVersions(ctx, engagementID)
 	if err != nil {
@@ -223,7 +246,11 @@ func negotiationWith(ctx context.Context, queries *dbgen.Queries, engagementID u
 	}
 	numbers := map[uuid.UUID]int32{}
 	for _, row := range versions {
-		negotiation.Versions = append(negotiation.Versions, versionOf(row))
+		version := versionOf(row)
+		if version.RevisionID != nil {
+			version.Revision = revisionNumbers[*version.RevisionID]
+		}
+		negotiation.Versions = append(negotiation.Versions, version)
 		numbers[row.ID] = row.Version
 	}
 
@@ -242,12 +269,16 @@ func negotiationWith(ctx context.Context, queries *dbgen.Queries, engagementID u
 		})
 	}
 
-	agreement, err := queries.GetAgreement(ctx, engagementID)
-	if err == nil {
-		recorded := agreementOf(agreement)
-		negotiation.Agreement = &recorded
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return Negotiation{}, fmt.Errorf("read an agreement: %w", err)
+	agreements, err := queries.ListAgreements(ctx, engagementID)
+	if err != nil {
+		return Negotiation{}, fmt.Errorf("read agreements: %w", err)
+	}
+	for _, row := range agreements {
+		negotiation.Agreements = append(negotiation.Agreements, agreementOf(row))
+	}
+	if count := len(negotiation.Agreements); count > 0 {
+		inForce := negotiation.Agreements[count-1]
+		negotiation.Agreement = &inForce
 	}
 	return negotiation, nil
 }
@@ -283,10 +314,11 @@ func (s *Service) Propose(ctx context.Context, engagementID, actor uuid.UUID, ac
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := s.queries.WithTx(tx)
 
-	engagement, err := engagementWith(ctx, queries, engagementID, actor)
+	engagement, err := lockedEngagement(ctx, queries, engagementID, actor)
 	if err != nil {
 		return ProposalVersion{}, Engagement{}, err
 	}
+	var revision *dbgen.AgreementRevision
 	switch engagement.State {
 	case StateDiscussion, StateNegotiation:
 		if err := move(ctx, queries, engagement, StateProposal, actor, actorLabel, ""); err != nil {
@@ -296,13 +328,26 @@ func (s *Service) Propose(ctx context.Context, engagementID, actor uuid.UUID, ac
 		// A revision of a proposal nobody has answered: the state stands, and
 		// the new version is the one now open.
 	default:
-		return ProposalVersion{}, Engagement{}, ErrNotNow
+		// After an agreement, a new version is a counter-proposal within the
+		// open revision of it — and without one there is nothing to answer.
+		open, err := openRevision(ctx, queries, engagement)
+		if err != nil {
+			return ProposalVersion{}, Engagement{}, err
+		}
+		if open == nil {
+			return ProposalVersion{}, Engagement{}, ErrNotNow
+		}
+		revision = open
 	}
 
+	var revisionID *uuid.UUID
+	if revision != nil {
+		revisionID = &revision.ID
+	}
 	row, err := queries.InsertProposalVersion(ctx, dbgen.InsertProposalVersionParams{
 		ID: uuid.New(), EngagementID: engagementID, SentBy: &actor, SentByLabel: actorLabel,
 		Scope: input.Scope, Timeline: input.Timeline, LineItems: items,
-		Currency: input.Currency, TotalMinor: input.Total(),
+		Currency: input.Currency, TotalMinor: input.Total(), RevisionID: revisionID,
 	})
 	if isUniqueViolation(err) {
 		return ProposalVersion{}, Engagement{}, ErrChanged
@@ -313,8 +358,12 @@ func (s *Service) Propose(ctx context.Context, engagementID, actor uuid.UUID, ac
 	if err := tx.Commit(ctx); err != nil {
 		return ProposalVersion{}, Engagement{}, fmt.Errorf("commit a proposal: %w", err)
 	}
+	sent := versionOf(row)
+	if revision != nil {
+		sent.Revision = revision.Number
+	}
 	updated, err := s.Engagement(ctx, engagementID, actor)
-	return versionOf(row), updated, err
+	return sent, updated, err
 }
 
 // partName is how a change request names what it is about.
@@ -328,7 +377,10 @@ either person may propose again or withdraw. Accepting moves nothing by itself;
 it is the second acceptance of the same version that records the agreement,
 with both acceptance times, in the same transaction.
 
-Returns whether an agreement was recorded.
+When the latest version belongs to an open revision of the agreement, the
+answer is to that revision instead; see answerRevision.
+
+Returns what the answer led to.
 */
 func (s *Service) Respond(
 	ctx context.Context,
@@ -337,18 +389,18 @@ func (s *Service) Respond(
 	versionID uuid.UUID,
 	kind ResponseKind,
 	part, comment string,
-) (bool, Engagement, error) {
+) (Answer, Engagement, error) {
 	part = strings.TrimSpace(part)
 	comment = strings.TrimSpace(comment)
 	switch {
 	case kind != Accept && kind != Decline && kind != RequestChanges:
-		return false, Engagement{}, invalid("kind", `"accept", "decline" or "request_changes"`)
+		return Answer{}, Engagement{}, invalid("kind", `"accept", "decline" or "request_changes"`)
 	case utf8.RuneCountInString(comment) > maxComment:
-		return false, Engagement{}, invalid("comment", fmt.Sprintf("at most %d characters", maxComment))
+		return Answer{}, Engagement{}, invalid("comment", fmt.Sprintf("at most %d characters", maxComment))
 	case kind == RequestChanges && !partName.MatchString(part):
-		return false, Engagement{}, invalid("part", `name what the change is about: "scope", "timeline", "currency" or "item:N"`)
+		return Answer{}, Engagement{}, invalid("part", `name what the change is about: "scope", "timeline", "currency" or "item:N"`)
 	case kind == RequestChanges && comment == "":
-		return false, Engagement{}, invalid("comment", "say what should change")
+		return Answer{}, Engagement{}, invalid("comment", "say what should change")
 	}
 	if kind != RequestChanges {
 		part = ""
@@ -356,80 +408,126 @@ func (s *Service) Respond(
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
-		return false, Engagement{}, fmt.Errorf("begin responding: %w", err)
+		return Answer{}, Engagement{}, fmt.Errorf("begin responding: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := s.queries.WithTx(tx)
 
-	engagement, err := engagementWith(ctx, queries, engagementID, actor)
+	engagement, err := lockedEngagement(ctx, queries, engagementID, actor)
 	if err != nil {
-		return false, Engagement{}, err
+		return Answer{}, Engagement{}, err
 	}
 	latest, err := queries.LatestProposalVersion(ctx, engagementID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, Engagement{}, ErrNoProposal
+		return Answer{}, Engagement{}, ErrNoProposal
 	}
 	if err != nil {
-		return false, Engagement{}, fmt.Errorf("read the latest proposal: %w", err)
+		return Answer{}, Engagement{}, fmt.Errorf("read the latest proposal: %w", err)
 	}
 	if latest.ID != versionID {
-		return false, Engagement{}, ErrNotLatest
-	}
-	// Only an open proposal is answered: one already declined, or asked to
-	// change, waits for a new version.
-	if engagement.State != StateProposal {
-		return false, Engagement{}, ErrNotNow
+		return Answer{}, Engagement{}, ErrNotLatest
 	}
 	if kind == RequestChanges && strings.HasPrefix(part, "item:") {
 		index, _ := strconv.Atoi(strings.TrimPrefix(part, "item:"))
 		if index < 1 || index > len(versionOf(latest).LineItems) {
-			return false, Engagement{}, invalid("part", "that line is not in the proposal")
+			return Answer{}, Engagement{}, invalid("part", "that line is not in the proposal")
 		}
 	}
-
-	var partValue *string
-	if part != "" {
-		partValue = &part
+	if latest.RevisionID != nil {
+		answer, err := answerRevision(ctx, queries, engagement, latest, actor, actorLabel, kind, part, comment)
+		if err != nil {
+			return Answer{}, Engagement{}, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return Answer{}, Engagement{}, fmt.Errorf("commit an answer to a revision: %w", err)
+		}
+		updated, err := s.Engagement(ctx, engagementID, actor)
+		return answer, updated, err
 	}
-	if _, err := queries.InsertProposalResponse(ctx, dbgen.InsertProposalResponseParams{
-		ID: uuid.New(), VersionID: latest.ID, EngagementID: engagementID,
-		ResponderID: &actor, ResponderLabel: actorLabel, Kind: string(kind),
-		Part: partValue, Comment: comment,
-	}); isUniqueViolation(err) {
-		return false, Engagement{}, ErrAlreadyAccepted
-	} else if err != nil {
-		return false, Engagement{}, fmt.Errorf("record a response: %w", err)
+	// Only an open proposal is answered: one already declined, or asked to
+	// change, waits for a new version.
+	if engagement.State != StateProposal {
+		return Answer{}, Engagement{}, ErrNotNow
+	}
+	if err := recordResponse(ctx, queries, latest, actor, actorLabel, kind, part, comment); err != nil {
+		return Answer{}, Engagement{}, err
 	}
 
-	agreed := false
+	var answer Answer
 	switch kind {
 	case Decline, RequestChanges:
 		if err := move(ctx, queries, engagement, StateNegotiation, actor, actorLabel, comment); err != nil {
-			return false, Engagement{}, err
+			return Answer{}, Engagement{}, err
 		}
 	case Accept:
-		agreed, err = recordAgreementIfBoth(ctx, queries, engagement, latest, actor, actorLabel)
+		answer.Agreed, err = recordAgreementIfBoth(ctx, queries, engagement, latest, nil, actor, actorLabel)
 		if err != nil {
-			return false, Engagement{}, err
+			return Answer{}, Engagement{}, err
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return false, Engagement{}, fmt.Errorf("commit a response: %w", err)
+		return Answer{}, Engagement{}, fmt.Errorf("commit a response: %w", err)
 	}
 	updated, err := s.Engagement(ctx, engagementID, actor)
-	return agreed, updated, err
+	return answer, updated, err
+}
+
+// Answer is what answering the latest version led to.
+type Answer struct {
+	// Agreed is true when the answer completed an agreement: the first, or a
+	// revision's.
+	Agreed bool
+	// Revision is the number of the revision answered, or 0 for the
+	// negotiation before the first agreement.
+	Revision int32
+	// Closed is true when the answer ended the revision without an agreement.
+	Closed bool
+}
+
+// recordResponse records one answer to a version, refusing a second
+// acceptance of it by the same person.
+func recordResponse(
+	ctx context.Context,
+	queries *dbgen.Queries,
+	version dbgen.ProposalVersion,
+	actor uuid.UUID,
+	actorLabel string,
+	kind ResponseKind,
+	part, comment string,
+) error {
+	var partValue *string
+	if part != "" {
+		partValue = &part
+	}
+	_, err := queries.InsertProposalResponse(ctx, dbgen.InsertProposalResponseParams{
+		ID: uuid.New(), VersionID: version.ID, EngagementID: version.EngagementID,
+		ResponderID: &actor, ResponderLabel: actorLabel, Kind: string(kind),
+		Part: partValue, Comment: comment,
+	})
+	if isUniqueViolation(err) {
+		return ErrAlreadyAccepted
+	}
+	if err != nil {
+		return fmt.Errorf("record a response: %w", err)
+	}
+	return nil
 }
 
 /*
 recordAgreementIfBoth records the agreement once both parties have accepted the
 same version, and not before. One acceptance moves nothing.
+
+For a revision, the agreement is recorded beside the ones before it and the
+revision is closed as accepted; the engagement's state does not move, because
+the work stands where it stood — only the terms it is done to changed.
 */
 func recordAgreementIfBoth(
 	ctx context.Context,
 	queries *dbgen.Queries,
 	engagement Engagement,
 	version dbgen.ProposalVersion,
+	revision *dbgen.AgreementRevision,
 	actor uuid.UUID,
 	actorLabel string,
 ) (bool, error) {
@@ -452,7 +550,13 @@ func recordAgreementIfBoth(
 		return false, nil
 	}
 
-	terms, err := json.Marshal(versionOf(version))
+	agreed := versionOf(version)
+	var revisionID *uuid.UUID
+	if revision != nil {
+		agreed.Revision = revision.Number
+		revisionID = &revision.ID
+	}
+	terms, err := json.Marshal(agreed)
 	if err != nil {
 		return false, fmt.Errorf("encode agreed terms: %w", err)
 	}
@@ -461,8 +565,18 @@ func recordAgreementIfBoth(
 		ClientID: engagement.ClientID, DeveloperID: engagement.DeveloperID,
 		ClientLabel: engagement.ClientLabel, DeveloperLabel: engagement.DeveloperLabel,
 		ClientAcceptedAt: *clientAt, DeveloperAcceptedAt: *developerAt, Terms: terms,
+		RevisionID: revisionID,
 	}); err != nil {
 		return false, fmt.Errorf("record an agreement: %w", err)
+	}
+	if revision != nil {
+		if err := queries.InsertRevisionOutcome(ctx, dbgen.InsertRevisionOutcomeParams{
+			RevisionID: revision.ID, EngagementID: engagement.ID, Outcome: string(RevisionAccepted),
+			ActorID: &actor, ActorLabel: actorLabel,
+		}); err != nil {
+			return false, fmt.Errorf("close an accepted revision: %w", err)
+		}
+		return true, nil
 	}
 	if err := move(ctx, queries, engagement, StateAgreement, actor, actorLabel, ""); err != nil {
 		return false, err
@@ -492,12 +606,15 @@ func (s *Service) RequestCompletion(ctx context.Context, engagementID, actor uui
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := s.queries.WithTx(tx)
 
-	engagement, err := engagementWith(ctx, queries, engagementID, actor)
+	engagement, err := lockedEngagement(ctx, queries, engagementID, actor)
 	if err != nil {
 		return Engagement{}, err
 	}
 	if engagement.State != StateActive {
 		return Engagement{}, ErrNotNow
+	}
+	if err := refuseWhileRevising(ctx, queries, engagement); err != nil {
+		return Engagement{}, err
 	}
 	if _, err := queries.RequestCompletion(ctx, dbgen.RequestCompletionParams{
 		ID: engagementID, RequestedBy: &actor,
@@ -537,9 +654,14 @@ func (s *Service) step(ctx context.Context, engagementID, actor uuid.UUID, actor
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := s.queries.WithTx(tx)
 
-	engagement, err := engagementWith(ctx, queries, engagementID, actor)
+	engagement, err := lockedEngagement(ctx, queries, engagementID, actor)
 	if err != nil {
 		return Engagement{}, err
+	}
+	if to == StateCompleted {
+		if err := refuseWhileRevising(ctx, queries, engagement); err != nil {
+			return Engagement{}, err
+		}
 	}
 	if err := move(ctx, queries, engagement, to, actor, actorLabel, note); err != nil {
 		return Engagement{}, err
@@ -551,6 +673,11 @@ func (s *Service) step(ctx context.Context, engagementID, actor uuid.UUID, actor
 }
 
 // AgreementExport is an agreement in the documented format.
+//
+// The top-level version, parties and terms are the agreement in force. Every
+// agreement recorded on the engagement, and every revision with each of its
+// versions and answers, follow it, so the file shows how the terms in force
+// came to be.
 type AgreementExport struct {
 	Format       string             `json:"format"`
 	ExportedAt   string             `json:"exportedAt"`
@@ -559,11 +686,14 @@ type AgreementExport struct {
 	EngagementID string             `json:"engagementId"`
 	Title        string             `json:"title"`
 	Version      int32              `json:"version"`
+	Revision     int32              `json:"revision"`
 	Client       ExportParty        `json:"client"`
 	Developer    ExportParty        `json:"developer"`
 	Terms        ExportTerms        `json:"terms"`
 	RecordedAt   string             `json:"recordedAt"`
 	History      []ExportTransition `json:"history"`
+	Agreements   []ExportAgreed     `json:"agreements"`
+	Revisions    []ExportRevision   `json:"revisions"`
 }
 
 // ExportParty is one party and when they accepted.
@@ -592,42 +722,127 @@ type ExportTransition struct {
 	At    string `json:"at"`
 }
 
+// ExportAgreed is one agreement recorded on the engagement.
+type ExportAgreed struct {
+	Version    int32       `json:"version"`
+	Revision   int32       `json:"revision"`
+	Client     ExportParty `json:"client"`
+	Developer  ExportParty `json:"developer"`
+	Terms      ExportTerms `json:"terms"`
+	RecordedAt string      `json:"recordedAt"`
+}
+
+// ExportRevision is one revision of the agreement and how it went.
+type ExportRevision struct {
+	Number   int32  `json:"number"`
+	OpenedBy string `json:"openedBy"`
+	Reason   string `json:"reason"`
+	OpenedAt string `json:"openedAt"`
+	// Outcome is "open", "accepted", "declined" or "withdrawn".
+	Outcome     string           `json:"outcome"`
+	OutcomeBy   string           `json:"outcomeBy,omitempty"`
+	OutcomeNote string           `json:"outcomeNote,omitempty"`
+	OutcomeAt   string           `json:"outcomeAt,omitempty"`
+	Versions    []ExportVersion  `json:"versions"`
+	Responses   []ExportResponse `json:"responses"`
+}
+
+// ExportVersion is one version sent within a revision.
+type ExportVersion struct {
+	Version int32       `json:"version"`
+	Terms   ExportTerms `json:"terms"`
+}
+
+// ExportResponse is one answer to a version.
+type ExportResponse struct {
+	Version   int32  `json:"version"`
+	Responder string `json:"responder"`
+	Kind      string `json:"kind"`
+	Part      string `json:"part,omitempty"`
+	Comment   string `json:"comment,omitempty"`
+	At        string `json:"at"`
+}
+
+func exportStamp(at time.Time) string { return at.UTC().Format(time.RFC3339) }
+
+func exportTermsOf(version ProposalVersion) ExportTerms {
+	return ExportTerms{
+		Scope: version.Scope, Timeline: version.Timeline, LineItems: version.LineItems,
+		Currency: version.Currency, TotalMinor: version.TotalMinor, SentBy: version.SentBy,
+		SentAt: exportStamp(version.SentAt),
+	}
+}
+
+func exportAgreedOf(agreement Agreement) ExportAgreed {
+	return ExportAgreed{
+		Version: agreement.Version, Revision: agreement.Revision,
+		Client:     ExportParty{Username: agreement.ClientLabel, AcceptedAt: exportStamp(agreement.ClientAcceptedAt)},
+		Developer:  ExportParty{Username: agreement.DeveloperLabel, AcceptedAt: exportStamp(agreement.DeveloperAcceptedAt)},
+		Terms:      exportTermsOf(agreement.Terms),
+		RecordedAt: exportStamp(agreement.RecordedAt),
+	}
+}
+
 // ExportAgreement returns an engagement's agreement for one of its parties.
 func (s *Service) ExportAgreement(ctx context.Context, engagementID, viewer uuid.UUID, server string) (AgreementExport, error) {
 	engagement, err := s.Engagement(ctx, engagementID, viewer)
 	if err != nil {
 		return AgreementExport{}, err
 	}
-	row, err := s.queries.GetAgreement(ctx, engagementID)
-	if errors.Is(err, pgx.ErrNoRows) {
+	negotiation, err := negotiationWith(ctx, s.queries, engagementID)
+	if err != nil {
+		return AgreementExport{}, err
+	}
+	if negotiation.Agreement == nil {
 		return AgreementExport{}, ErrNoAgreement
 	}
-	if err != nil {
-		return AgreementExport{}, fmt.Errorf("read an agreement: %w", err)
-	}
-	agreement := agreementOf(row)
-	stamp := func(at time.Time) string { return at.UTC().Format(time.RFC3339) }
+	inForce := exportAgreedOf(*negotiation.Agreement)
 
 	export := AgreementExport{
-		Format: AgreementExportFormat, ExportedAt: stamp(time.Now()), Server: server,
+		Format: AgreementExportFormat, ExportedAt: exportStamp(time.Now()), Server: server,
 		Disclosure: Disclosure, EngagementID: engagement.ID.String(), Title: engagement.Title,
-		Version:   agreement.Version,
-		Client:    ExportParty{Username: agreement.ClientLabel, AcceptedAt: stamp(agreement.ClientAcceptedAt)},
-		Developer: ExportParty{Username: agreement.DeveloperLabel, AcceptedAt: stamp(agreement.DeveloperAcceptedAt)},
-		Terms: ExportTerms{
-			Scope: agreement.Terms.Scope, Timeline: agreement.Terms.Timeline,
-			LineItems: agreement.Terms.LineItems, Currency: agreement.Terms.Currency,
-			TotalMinor: agreement.Terms.TotalMinor, SentBy: agreement.Terms.SentBy,
-			SentAt: stamp(agreement.Terms.SentAt),
-		},
-		RecordedAt: stamp(agreement.RecordedAt),
-		History:    []ExportTransition{},
+		Version: inForce.Version, Revision: inForce.Revision,
+		Client: inForce.Client, Developer: inForce.Developer, Terms: inForce.Terms,
+		RecordedAt: inForce.RecordedAt,
+		History:    []ExportTransition{}, Agreements: []ExportAgreed{}, Revisions: []ExportRevision{},
 	}
 	for _, transition := range engagement.Transitions {
 		export.History = append(export.History, ExportTransition{
 			From: string(transition.From), To: string(transition.To), Actor: transition.Actor,
-			Note: transition.Note, At: stamp(transition.OccurredAt),
+			Note: transition.Note, At: exportStamp(transition.OccurredAt),
 		})
+	}
+	for _, agreement := range negotiation.Agreements {
+		export.Agreements = append(export.Agreements, exportAgreedOf(agreement))
+	}
+	for _, revision := range negotiation.Revisions {
+		exported := ExportRevision{
+			Number: revision.Number, OpenedBy: revision.OpenedBy, Reason: revision.Reason,
+			OpenedAt: exportStamp(revision.OpenedAt), Outcome: "open",
+			Versions: []ExportVersion{}, Responses: []ExportResponse{},
+		}
+		if !revision.Open() {
+			exported.Outcome, exported.OutcomeBy, exported.OutcomeNote = string(revision.Outcome), revision.OutcomeBy, revision.OutcomeNote
+			if revision.OutcomeAt != nil {
+				exported.OutcomeAt = exportStamp(*revision.OutcomeAt)
+			}
+		}
+		for _, version := range negotiation.Versions {
+			if version.Revision == revision.Number {
+				exported.Versions = append(exported.Versions, ExportVersion{Version: version.Version, Terms: exportTermsOf(version)})
+			}
+		}
+		for _, response := range negotiation.Responses {
+			for _, version := range exported.Versions {
+				if version.Version == response.Version {
+					exported.Responses = append(exported.Responses, ExportResponse{
+						Version: response.Version, Responder: response.Responder, Kind: string(response.Kind),
+						Part: response.Part, Comment: response.Comment, At: exportStamp(response.At),
+					})
+				}
+			}
+		}
+		export.Revisions = append(export.Revisions, exported)
 	}
 	return export, nil
 }
