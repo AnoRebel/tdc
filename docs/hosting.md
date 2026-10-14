@@ -967,9 +967,89 @@ Ringing is limited to ten rings per person every five minutes. Each person
 decides who may ring them; whether people on connected servers may ring anybody
 here is the server's decision first.
 
-**Not yet:** links to a call, screen sharing and recording;
-calls in conversations shared with other servers; and calls of more than a few
-people through a forwarding unit.
+**Not yet:** recording; calls in conversations shared with other servers; and
+calls of more than a few people through a forwarding unit.
+
+#### What an event costs
+
+A talk, a meetup online, a workshop: a few people speak or present and many
+listen. What that costs depends almost entirely on **how many people receive
+video**, because a listener receiving voice costs a fiftieth of one receiving
+video. Use this to plan; the prices are examples, and every host prices
+differently.
+
+**How the media travels decides who pays.** Today calls are a mesh — everybody
+sends to everybody — which suits four to six people and puts the cost on their
+own connections, not the server's (see the table above). An event of fifty or
+a thousand needs the **forwarding unit** (planned, not yet built): each speaker
+sends once to the server, and the server sends a copy to each listener. Then the
+server's outbound bandwidth is the cost, and it grows with the audience. Spread
+over **several connected servers** (also planned), each server forwards to its
+own members and receives one copy from the server hosting the event, so the
+audience's bandwidth is shared between the servers whose members are watching.
+
+**What one listener costs the server**, per hour, through a forwarding unit:
+
+| What the listener receives     | Bitrate       | Per listener-hour |
+| ------------------------------ | ------------- | ----------------- |
+| One speaker, voice             | ~40 kbit/s    | ~18 MB            |
+| A few speakers, voice          | ~40–80 kbit/s | ~18–36 MB         |
+| Speaker's camera, small (360p) | ~0.5 Mbit/s   | ~225 MB           |
+| Speaker's camera, 720p         | ~1.5 Mbit/s   | ~675 MB           |
+| Shared screen (slides) + voice | ~0.3–1 Mbit/s | ~135–450 MB       |
+| Screen + camera, 720p          | ~2–2.5 Mbit/s | ~0.9–1.1 GB       |
+
+Slides change little, so a shared screen of slides is cheaper than a camera;
+a shared video or a live demo with scrolling is as expensive as a camera.
+
+**A one-hour event**, the server's outbound traffic and the bandwidth it needs
+at its peak:
+
+| Audience | Voice only          | Slides + voice            | Camera 720p + slides        |
+| -------- | ------------------- | ------------------------- | --------------------------- |
+| 10       | 0.2 GB · 0.4 Mbit/s | 1.5–4.5 GB · 3–10 Mbit/s  | 9–11 GB · 20–25 Mbit/s      |
+| 50       | 0.9 GB · 2 Mbit/s   | 7–23 GB · 15–50 Mbit/s    | 45–55 GB · 100–125 Mbit/s   |
+| 200      | 3.6 GB · 8 Mbit/s   | 27–90 GB · 60–200 Mbit/s  | 180–220 GB · 0.4–0.5 Gbit/s |
+| 1,000    | 18 GB · 40 Mbit/s   | 135–450 GB · 0.3–1 Gbit/s | 0.9–1.1 TB · 2–2.5 Gbit/s   |
+
+Speakers add their own upload — about 1–3 Mbit/s each with a camera — and a
+little more for every listener who speaks.
+
+**The machine.** Forwarding is copying encrypted packets; it does not decode
+or mix them. As a rough guide, one CPU core forwards a few hundred Mbit/s, and
+each connected person holds a few megabytes of memory:
+
+| Audience | Voice only          | With video (720p)                                              |
+| -------- | ------------------- | -------------------------------------------------------------- |
+| 50       | the server you have | the server you have                                            |
+| 200      | the server you have | 2 cores, 2 GB, a 1 Gbit/s port                                 |
+| 1,000    | 1–2 cores           | 4–8 cores, 4 GB, a port of several Gbit/s — or several servers |
+
+**What that comes to.** Bandwidth is the cost to watch; most of the rest is
+noise. With example prices (check your own host — these change):
+
+- A VPS that includes ~20 TB of traffic a month (common at European budget
+  hosts, around €5–15/month) carries a weekly hour-long video talk for 200
+  people (~0.9 TB a month) without any extra charge, and a thousand-person
+  voice event without noticing.
+- At ~€1 per extra TB, a thousand-person video hour (~1 TB) costs about €1
+  past the allowance.
+- At hyperscaler egress prices (around $0.05–0.09 per GB), the same
+  thousand-person video hour costs roughly $50–90 — the same event, a hundred
+  times the bill. For events, the host's traffic price matters more than
+  anything else on this page.
+
+**Over several servers** the arithmetic is the same, divided by where the
+audience is: a thousand watching, six hundred on the host's server and four
+hundred on a connected one, means the host sends six hundred copies plus one to
+the other server, and the other server sends four hundred. Each pays for its own
+members.
+
+**Ways to make an event cheaper:** ask listeners to join muted with cameras
+off; share slides rather than a
+camera; keep video to the speakers; and for a very large audience, a voice
+event with slides costs less than a tenth of a video event and reaches people on
+poor connections too.
 
 ## TLS
 
