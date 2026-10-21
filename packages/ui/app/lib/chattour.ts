@@ -13,15 +13,13 @@ import type { DriveStep } from "driver.js";
  * that breaks when somebody restyles a button is a tour that quietly stops
  * working, and nobody notices until a new colleague asks what happened to it.
  */
-export function chatTour(): DriveStep[] {
+export function chatTour(say: (key: string) => string): DriveStep[] {
   return [
     {
       element: "[data-tour='channels']",
       popover: {
-        title: "Your conversations",
-        description:
-          "Channels you have joined, and the people you are talking to. " +
-          "Whatever you were last reading is where you come back to.",
+        title: say("tour.conversations.title"),
+        description: say("tour.conversations.body"),
         side: "right",
         align: "start",
       },
@@ -29,10 +27,8 @@ export function chatTour(): DriveStep[] {
     {
       element: "[data-tour='search']",
       popover: {
-        title: "Finding something",
-        description:
-          "Search messages, channels and people from here — or press the " +
-          "shortcut shown, from anywhere.",
+        title: say("tour.finding.title"),
+        description: say("tour.finding.body"),
         side: "right",
         align: "start",
       },
@@ -40,10 +36,8 @@ export function chatTour(): DriveStep[] {
     {
       element: "[data-tour='create']",
       popover: {
-        title: "Starting a channel",
-        description:
-          "A channel is a room for a subject. Anyone on this server can be " +
-          "in one, unless you make it private.",
+        title: say("tour.starting.title"),
+        description: say("tour.starting.body"),
         side: "right",
         align: "end",
       },
@@ -51,10 +45,8 @@ export function chatTour(): DriveStep[] {
     {
       element: "[data-tour='notifications']",
       popover: {
-        title: "What you have missed",
-        description:
-          "Unread messages gather here. You decide per channel how much you " +
-          "want to hear, in its settings.",
+        title: say("tour.missed.title"),
+        description: say("tour.missed.body"),
         side: "top",
         align: "end",
       },

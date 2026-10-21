@@ -203,6 +203,89 @@ func (s *Server) handleCancelScheduled(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+type changeScheduledRequest struct {
+	// Body rewords the message. Absent keeps it as it was.
+	Body *string `json:"body,omitempty"`
+	// SendAt moves it, as an RFC 3339 time. Absent keeps it as it was.
+	SendAt string `json:"sendAt,omitempty"`
+}
+
+// handleChangeScheduled rewords or moves one of somebody's own scheduled messages.
+func (s *Server) handleChangeScheduled(c *echo.Context) error {
+	user, _ := currentUser(c)
+	ctx := c.Request().Context()
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such scheduled message")
+	}
+
+	var request changeScheduledRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	var sendAt *time.Time
+	if request.SendAt != "" {
+		at, err := time.Parse(time.RFC3339, request.SendAt)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "when to send it, as a date and time")
+		}
+		sendAt = &at
+	}
+
+	// Filtered on the way in, as scheduling it was: a reworded message is a
+	// message written now, and is held to what one written now would be.
+	var body *string
+	if request.Body != nil {
+		filtered, err := s.applyContentFilter(ctx, *request.Body)
+		if err != nil {
+			return err
+		}
+		body = &filtered.Body
+	}
+
+	changed, err := s.rooms.ChangeScheduled(ctx, id, user.ID, body, sendAt)
+	switch {
+	case errors.Is(err, rooms.ErrNoSuchScheduledMessage):
+		return echo.NewHTTPError(http.StatusNotFound, "no such scheduled message")
+	case errors.Is(err, rooms.ErrScheduledInThePast):
+		return echo.NewHTTPError(http.StatusBadRequest, "that time has already passed")
+	case errors.Is(err, rooms.ErrScheduledTooFar):
+		return echo.NewHTTPError(http.StatusBadRequest, "that is too far ahead to schedule")
+	case err != nil:
+		return err
+	}
+
+	return c.JSON(http.StatusOK, scheduledResponseOf(changed))
+}
+
+/*
+handleSendScheduledNow sends one of somebody's scheduled messages immediately.
+
+Answers with the message as sent. A refusal at send time — they have been
+banned, or may no longer post there — is the same refusal the delivery pass
+would have met, and is said now, while the author is here to read it.
+*/
+func (s *Server) handleSendScheduledNow(c *echo.Context) error {
+	user, _ := currentUser(c)
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such scheduled message")
+	}
+
+	event, err := s.rooms.SendScheduledNow(c.Request().Context(), id, user.ID, s.scheduledDelivery(), s.log)
+	switch {
+	case errors.Is(err, rooms.ErrNoSuchScheduledMessage):
+		return echo.NewHTTPError(http.StatusNotFound, "no such scheduled message")
+	case err != nil:
+		return echo.NewHTTPError(http.StatusConflict, err.Error())
+	}
+
+	return c.JSON(http.StatusCreated, messageResponseOf(event))
+}
+
 func scheduledResponseOf(scheduled rooms.ScheduledMessage) scheduledResponse {
 	response := scheduledResponse{
 		ID:         scheduled.ID.String(),

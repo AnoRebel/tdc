@@ -680,6 +680,35 @@ func (s *Service) SetPreference(
 		})
 }
 
+/*
+Preferences returns everything somebody has set: their default, and each
+conversation they have set apart from it.
+
+The default is the server's — mentions only — when they have never chosen one,
+so a client is told what actually applies rather than left to guess.
+*/
+func (s *Service) Preferences(
+	ctx context.Context,
+	userID uuid.UUID,
+) (Preference, map[uuid.UUID]Preference, error) {
+	rows, err := s.queries.ListNotificationPreferences(ctx, userID)
+	if err != nil {
+		return Preference{}, nil, fmt.Errorf("read notification preferences: %w", err)
+	}
+
+	global := Preference{Level: LevelMentions}
+	rooms := make(map[uuid.UUID]Preference, len(rows))
+	for _, row := range rows {
+		preference := Preference{Level: Level(row.Level), Muted: row.Muted}
+		if row.RoomID == nil {
+			global = preference
+			continue
+		}
+		rooms[*row.RoomID] = preference
+	}
+	return global, rooms, nil
+}
+
 // previewOf pulls the readable part out of a message's content.
 //
 // Short, because a notification is a summary. Sending the whole message would

@@ -25,11 +25,11 @@ import * as Api from "#bindings/api";
  */
 
 definePageMeta({ layout: "auth" });
-useHead({ title: "Sign in" });
 
 const { signIn, refresh, setupStatus } = useAuth();
 const router = useRouter();
-const { $t, $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+useHead({ title: $ts("auth.signIn") });
 
 const server = ref("");
 const remember = ref(false);
@@ -85,9 +85,7 @@ async function chooseProvider(provider: string) {
   } catch (cause) {
     openingProvider.value = null;
     waitingForProvider.value = false;
-    error.value = isApiError(cause)
-      ? cause.message
-      : "Could not open the browser for that sign-in.";
+    error.value = isApiError(cause) ? cause.message : $ts("desktop.signin.couldNotOpenBrowser");
   }
 }
 
@@ -153,8 +151,8 @@ onBeforeUnmount(() => {
  * anything to ask about.
  */
 const credentials = v.object({
-  username: v.pipe(v.string(), v.trim(), v.minLength(1, "Your username or email goes here.")),
-  password: v.pipe(v.string(), v.minLength(1, "Your password goes here.")),
+  username: v.pipe(v.string(), v.trim(), v.minLength(1, $ts("auth.usernameGoesHere"))),
+  password: v.pipe(v.string(), v.minLength(1, $ts("auth.passwordGoesHere"))),
 });
 
 /** The first thing wrong with a field, once somebody has touched it. */
@@ -216,7 +214,9 @@ onMounted(async () => {
       // Nothing remembered, or no keychain. The empty form is correct.
     }
   } catch (cause) {
-    error.value = "Startup error: " + String((cause as Error)?.message ?? cause);
+    error.value = $ts("desktop.signin.startupError", {
+      message: String((cause as Error)?.message ?? cause),
+    });
   }
 });
 
@@ -264,12 +264,12 @@ const form = useForm({
       if (isApiError(cause) && cause.code === "rate-limited") {
         const wait = cause.retryAfterSeconds;
         error.value = wait
-          ? `Too many attempts. Try again in ${Math.ceil(wait / 60)} minute(s).`
-          : "Too many attempts. Try again later.";
+          ? $ts("auth.tooManyAttemptsMinutes", { count: Math.ceil(wait / 60) })
+          : $ts("auth.tooManyAttempts");
       } else if (isApiError(cause)) {
         error.value = cause.message;
       } else {
-        error.value = "Could not reach the server.";
+        error.value = $ts("error.couldNotReach");
       }
     } finally {
       submitting.value = false;
@@ -306,7 +306,7 @@ const form = useForm({
       <SignInWithPasskey @done="signedInWithPasskey" />
 
       <div class="mb-6 text-center">
-        <h2 class="text-base font-semibold">Sign in</h2>
+        <h2 class="text-base font-semibold">{{ $t("auth.signIn") }}</h2>
         <p v-if="server" class="mt-1 truncate text-xs text-muted-foreground">{{ server }}</p>
       </div>
 
@@ -321,7 +321,7 @@ const form = useForm({
 
         <form.Field name="username">
           <template #default="{ field }">
-            <Field label="Username or email" :error="firstError(field)" required>
+            <Field :label="$ts('auth.usernameOrEmail')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -340,7 +340,7 @@ const form = useForm({
 
         <form.Field name="password">
           <template #default="{ field }">
-            <Field label="Password" :error="firstError(field)" required>
+            <Field :label="$ts('auth.password')" :error="firstError(field)" required>
               <template #default="{ id, invalid, describedBy }">
                 <Input
                   :id="id"
@@ -362,11 +362,11 @@ const form = useForm({
         <!-- eslint-disable-next-line vuejs-accessibility/label-has-for -->
         <label v-if="keychain" class="flex cursor-pointer items-center gap-2">
           <Checkbox v-model="remember" />
-          <span class="text-sm">Keep me signed in on this machine</span>
+          <span class="text-sm">{{ $t("desktop.signin.keepSignedIn") }}</span>
         </label>
 
         <Button type="submit" class="h-9 w-full" :disabled="submitting">
-          {{ submitting ? "Signing in" : "Sign in" }}
+          {{ submitting ? $t("auth.signingIn") : $t("auth.signIn") }}
         </Button>
       </form>
 
@@ -382,7 +382,7 @@ const form = useForm({
         role="status"
       >
         <Spinner size="sm" />
-        Waiting for your browser. You can come back here when you are done.
+        {{ $t("desktop.signin.waitingForBrowser") }}
       </p>
 
       <!-- The mail carries a link to the server's own page, which opens in a
@@ -394,7 +394,7 @@ const form = useForm({
           class="font-medium text-muted-foreground hover:text-foreground hover:underline"
           @click="askingForRecovery = true"
         >
-          Forgotten your password?
+          {{ $t("auth.forgottenPassword") }}
         </button>
       </p>
 
@@ -409,12 +409,12 @@ const form = useForm({
       </p>
 
       <p class="mt-2 text-center text-xs text-muted-foreground">
-        Signing in to a different server?
+        {{ $t("desktop.signin.differentServer") }}
         <NuxtLink
           :to="localeRoute({ name: 'servers' })"
           class="font-medium text-primary hover:underline"
         >
-          Choose one
+          {{ $t("desktop.signin.chooseOne") }}
         </NuxtLink>
       </p>
     </div>

@@ -52,6 +52,25 @@ Exported so a test can make a pass when it chooses rather than wait out the
 interval.
 */
 func (s *Server) DeliverScheduled(ctx context.Context) int {
+	sent, err := s.rooms.DeliverDue(ctx, 50, s.scheduledDelivery(), s.log)
+	if err != nil && ctx.Err() == nil {
+		// Logged rather than fatal: a failed pass means a message goes out on
+		// the next one, not that the server cannot serve.
+		s.log.Error("scheduled delivery failed", slog.String("error", err.Error()))
+	}
+	if sent > 0 {
+		s.log.Info("sent scheduled messages", "count", sent)
+	}
+	return sent
+}
+
+/*
+scheduledDelivery is what sending a scheduled message is followed by.
+
+One value for the timer and for somebody pressing "send now", so a message
+sent early is followed by exactly what one sent on time would be.
+*/
+func (s *Server) scheduledDelivery() rooms.ScheduledDelivery {
 	delivery := rooms.ScheduledDelivery{
 		MayPost: s.mayStillPost,
 		Sent: func(ctx context.Context, event dbgen.Event, row dbgen.ScheduledMessage) {
@@ -65,17 +84,7 @@ func (s *Server) DeliverScheduled(ctx context.Context) int {
 	if s.attachments != nil {
 		delivery.Bind = s.attachments.Bind
 	}
-
-	sent, err := s.rooms.DeliverDue(ctx, 50, delivery, s.log)
-	if err != nil && ctx.Err() == nil {
-		// Logged rather than fatal: a failed pass means a message goes out on
-		// the next one, not that the server cannot serve.
-		s.log.Error("scheduled delivery failed", slog.String("error", err.Error()))
-	}
-	if sent > 0 {
-		s.log.Info("sent scheduled messages", "count", sent)
-	}
-	return sent
+	return delivery
 }
 
 /*

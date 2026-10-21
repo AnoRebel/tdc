@@ -33,7 +33,7 @@ async function load() {
   try {
     state.value = await emailState();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not read your address.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotReadAddress");
   } finally {
     loading.value = false;
   }
@@ -43,10 +43,10 @@ const address = v.object({
   email: v.pipe(
     v.string(),
     v.trim(),
-    v.minLength(1, "An address to send the link to."),
+    v.minLength(1, $ts("auth.addressForLink")),
     // Shallow on purpose: only sending proves an address, and a stricter rule
     // refuses ones that work.
-    v.regex(/.+@.+\..+/, "That does not look like an email address."),
+    v.regex(/.+@.+\..+/, $ts("auth.notAnEmail")),
   ),
 });
 
@@ -70,7 +70,7 @@ const form = useForm({
       form.reset();
       await load();
     } catch (cause) {
-      error.value = isApiError(cause) ? cause.message : "Could not send the link.";
+      error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotSendLink");
     }
   },
 });

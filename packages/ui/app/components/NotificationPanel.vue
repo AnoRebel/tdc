@@ -25,7 +25,7 @@ const open = defineModel<boolean>({ default: false });
 
 const emit = defineEmits<{ open: [notification: Notification] }>();
 
-const { $t } = useI18n();
+const { $t, $ts } = useI18n();
 
 const { items, unread, refresh, markRead, dismissRoom } = useNotifications();
 
@@ -69,7 +69,7 @@ function go(notification: Notification) {
 }
 
 function when(notification: Notification): string {
-  return describeNotification(notification);
+  return describeNotification(notification, $ts);
 }
 </script>
 

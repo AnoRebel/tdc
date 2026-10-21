@@ -56,7 +56,7 @@ async function load() {
   try {
     state.value = await status();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not read your settings.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotReadSettings");
   } finally {
     loading.value = false;
   }
@@ -68,7 +68,7 @@ async function startSetup() {
   try {
     setup.value = await begin();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not start setting this up.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotStartSetup");
   } finally {
     busy.value = false;
   }
@@ -84,11 +84,7 @@ const confirmForm = useForm({
   defaultValues: { code: "" },
   validators: {
     onSubmit: v.object({
-      code: v.pipe(
-        v.string(),
-        v.trim(),
-        v.regex(/^\d{6}$/, "Six digits, from your authenticator app."),
-      ),
+      code: v.pipe(v.string(), v.trim(), v.regex(/^\d{6}$/, $ts("auth.sixDigits"))),
     }),
   },
   async onSubmit({ value }) {
@@ -100,7 +96,7 @@ const confirmForm = useForm({
       confirmForm.reset();
       await load();
     } catch (cause) {
-      error.value = isApiError(cause) ? cause.message : "That code was not accepted.";
+      error.value = isApiError(cause) ? cause.message : $ts("auth.codeNotAccepted");
     } finally {
       busy.value = false;
     }
@@ -114,7 +110,7 @@ async function makeNewCodes() {
     codes.value = await reissueRecoveryCodes();
     await load();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not make new codes.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotMakeCodes");
   } finally {
     busy.value = false;
   }
@@ -125,7 +121,7 @@ const disableForm = useForm({
   defaultValues: { password: "" },
   validators: {
     onSubmit: v.object({
-      password: v.pipe(v.string(), v.minLength(1, "Your password goes here.")),
+      password: v.pipe(v.string(), v.minLength(1, $ts("auth.passwordGoesHere"))),
     }),
   },
   async onSubmit({ value }) {
@@ -137,7 +133,7 @@ const disableForm = useForm({
       disabling.value = false;
       await load();
     } catch (cause) {
-      error.value = isApiError(cause) ? cause.message : "Could not turn this off.";
+      error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotTurnOff");
     } finally {
       busy.value = false;
     }

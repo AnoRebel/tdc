@@ -340,17 +340,42 @@ func (s *Server) handleSetStatus(c *echo.Context) error {
 		}
 	}
 
-	state, err := s.presence.Of(ctx, user.ID)
+	return s.respondWithOwnStatus(c, user.ID)
+}
+
+/*
+ownStatusResponse is somebody's status as they set it.
+
+Not presenceResponse, which is what others see and so withholds the status of
+somebody appearing offline. The person who chose both is shown both, with when
+the status lapses, so a client can say "until 15:00" and offer to change it.
+*/
+type ownStatusResponse struct {
+	Status     string `json:"status"`
+	StatusText string `json:"statusText"`
+	// ExpiresAt is when the status reverts on its own, absent when it does not.
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	// Invisible is whether this person appears offline while connected.
+	Invisible bool `json:"invisible"`
+}
+
+// handleGetStatus returns the signed-in person's own status.
+func (s *Server) handleGetStatus(c *echo.Context) error {
+	user, _ := currentUser(c)
+	return s.respondWithOwnStatus(c, user.ID)
+}
+
+func (s *Server) respondWithOwnStatus(c *echo.Context, userID uuid.UUID) error {
+	own, err := s.presence.Own(c.Request().Context(), userID)
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(http.StatusOK, presenceResponse{
-		UserID:     user.ID.String(),
-		State:      string(state.State),
-		Status:     state.Status,
-		StatusText: state.StatusText,
-		LastSeenAt: &state.LastSeenAt,
+	return c.JSON(http.StatusOK, ownStatusResponse{
+		Status:     own.Status,
+		StatusText: own.StatusText,
+		ExpiresAt:  own.ExpiresAt,
+		Invisible:  own.Invisible,
 	})
 }
 

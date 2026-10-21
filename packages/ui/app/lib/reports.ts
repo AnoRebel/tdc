@@ -8,16 +8,8 @@
  * The server's list is authoritative — a reason it sends that has no entry
  * here falls back to its own name rather than disappearing from the screen.
  */
-const wording: Record<string, string> = {
-  spam: "Spam or advertising",
-  harassment: "Harassment or bullying",
-  hate: "Hate speech",
-  violence: "Violence or threats",
-  sexual: "Sexual content",
-  illegal: "Something illegal",
-  other: "Something else",
-};
+const known = new Set(["spam", "harassment", "hate", "violence", "sexual", "illegal", "other"]);
 
-export function reportReasonLabel(reason: string): string {
-  return wording[reason] ?? reason;
+export function reportReasonLabel(reason: string, say: (key: string) => string): string {
+  return known.has(reason) ? say(`moderation.reasonLabels.${reason}`) : reason;
 }

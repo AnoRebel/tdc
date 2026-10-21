@@ -193,10 +193,12 @@ export interface AccentPair {
   dark: string;
 }
 
-/** Why an accent was refused, in words somebody can act on. */
+/**
+ * Why an accent was refused. The interface puts it into words somebody can act
+ * on, in their own language.
+ */
 export interface AccentRefusal {
   reason: "unreadable" | "unmeasurable";
-  message: string;
   /** The best ratio reached while trying, when it could be measured at all. */
   ratio?: number;
 }
@@ -285,10 +287,7 @@ function shadeFor(base: Oklch, foreground: Rgb, direction: "darker" | "lighter")
 export function deriveAccent(colour: string): AccentPair | AccentRefusal {
   const parsed = parseColour(colour);
   if (!parsed) {
-    return {
-      reason: "unmeasurable",
-      message: "That colour could not be read. Use a hex value like #4f46e5, or an oklch() colour.",
-    };
+    return { reason: "unmeasurable" };
   }
 
   const base = rgbToOklch(parsed);
@@ -301,12 +300,7 @@ export function deriveAccent(colour: string): AccentPair | AccentRefusal {
   const dark = shadeFor(base, darkForeground, "lighter");
 
   if (!light || !dark) {
-    return {
-      reason: "unreadable",
-      message:
-        "No shade of that colour can be read in both light and dark. " +
-        "Try one with more colour in it — a near-grey has nowhere to move to.",
-    };
+    return { reason: "unreadable" };
   }
 
   return { light, dark };

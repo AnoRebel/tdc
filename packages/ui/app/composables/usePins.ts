@@ -32,35 +32,3 @@ export function usePins(roomId: Ref<string>) {
 
   return { pinned, pinnedIds, refresh, pin, unpin };
 }
-
-/**
- * The conversations somebody keeps at the top of their own list.
- *
- * A bookmark rather than an announcement: this is private to the person, and
- * says nothing to anybody else in the room.
- */
-export function usePinnedRooms() {
-  const api = useApi();
-
-  const ids = ref<string[]>([]);
-  const isPinned = computed(() => new Set(ids.value));
-
-  async function refresh() {
-    try {
-      ids.value = await api.get<string[]>("/api/me/pins");
-    } catch {
-      ids.value = [];
-    }
-  }
-
-  async function toggle(roomId: string) {
-    if (isPinned.value.has(roomId)) {
-      await api.delete(`/api/me/pins/${roomId}`);
-    } else {
-      await api.put(`/api/me/pins/${roomId}`, { position: ids.value.length });
-    }
-    await refresh();
-  }
-
-  return { ids, isPinned, refresh, toggle };
-}

@@ -126,6 +126,18 @@ A status MAY carry an expiry after which it reverts automatically.
 - **WHEN** a user holds a status configured to suppress notifications
 - **THEN** notifications are withheld or downgraded per that configuration
 
+#### Scenario: Appearing offline does not undo a status
+
+- **WHEN** a user holds a status configured to suppress notifications and also chooses to appear offline
+- **THEN** other users see neither the status nor its note
+- **AND** notifications remain suppressed
+- **AND** the user is shown their own status, its note, its expiry and that they appear offline
+
+#### Scenario: A client offers the expiry
+
+- **WHEN** a user sets a status in either client
+- **THEN** they may choose when it clears — after a fixed time, at the end of the day or week, at a chosen time, or never — and are shown how long it has left
+
 ### Requirement: Typing indication
 
 The server SHALL support indicating that a user is composing a message in a conversation. Indicators MUST expire automatically if not refreshed, and MUST be suppressible by the user.
@@ -139,6 +151,12 @@ The server SHALL support indicating that a user is composing a message in a conv
 
 - **WHEN** a user disables sending typing indication
 - **THEN** no such indication is sent on their behalf
+
+#### Scenario: The setting is the account's
+
+- **WHEN** a user turns off typing indication in either client's privacy settings
+- **THEN** their clients stop announcing typing
+- **AND** the server records nothing from any client that still announces it
 
 ### Requirement: Delivery and read state
 

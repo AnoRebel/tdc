@@ -33,10 +33,10 @@ const details = v.object({
   email: v.pipe(
     v.string(),
     v.trim(),
-    v.minLength(1, "The email address on your account."),
+    v.minLength(1, $ts("auth.emailOnAccount")),
     // Shallow on purpose: only sending proves an address, and a strict rule
     // refuses ones that work.
-    v.regex(/.+@.+/, "That does not look like an email address."),
+    v.regex(/.+@.+/, $ts("auth.notAnEmail")),
   ),
 });
 
@@ -61,12 +61,12 @@ const form = useForm({
       if (isApiError(cause) && cause.code === "rate-limited") {
         const wait = cause.retryAfterSeconds;
         error.value = wait
-          ? `Too many requests. Try again in ${Math.ceil(wait / 60)} minute(s).`
-          : "Too many requests. Try again later.";
+          ? $ts("auth.tooManyRequestsMinutes", { count: Math.ceil(wait / 60) })
+          : $ts("auth.tooManyRequests");
       } else if (isApiError(cause)) {
         error.value = cause.message;
       } else {
-        error.value = "Could not reach the server.";
+        error.value = $ts("error.couldNotReach");
       }
     } finally {
       submitting.value = false;

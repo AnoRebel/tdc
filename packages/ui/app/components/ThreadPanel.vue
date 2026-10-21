@@ -10,7 +10,7 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { atTime } from "#layers/ui/app/lib/dates";
 
-const { $t } = useI18n();
+const { $t, $ts } = useI18n();
 
 /**
  * A thread, opened beside the channel.
@@ -39,7 +39,7 @@ async function load() {
   try {
     thread.value = await roomsApi.thread(props.roomId, props.rootId);
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not open this thread.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotOpenThread");
   }
 }
 
@@ -60,14 +60,14 @@ async function send() {
   } catch (cause) {
     // The text is restored, so a failure does not lose what was typed.
     draft.value = previous;
-    error.value = isApiError(cause) ? cause.message : "Could not post that reply.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotPostReply");
   } finally {
     sending.value = false;
   }
 }
 
 function bodyOf(message: Message): string {
-  return message.redacted ? "This message was removed" : (message.content.body ?? "");
+  return message.redacted ? $ts("room.messageRemoved") : (message.content.body ?? "");
 }
 
 function shortName(address: string): string {
@@ -84,13 +84,17 @@ function when(value: string): string {
     <header class="flex h-12 shrink-0 items-center gap-2 border-b px-3">
       <h2 class="text-sm font-semibold">{{ $t("room.thread") }}</h2>
       <span v-if="thread" class="text-xs text-muted-foreground">
-        {{ thread.replies.length === 1 ? "1 reply" : `${thread.replies.length} replies` }}
+        {{
+          thread.replies.length === 1
+            ? $t("room.oneReply")
+            : $t("room.manyReplies", { count: thread.replies.length })
+        }}
       </span>
       <Button
         variant="ghost"
         size="icon"
         class="ml-auto"
-        label="Close thread"
+        :label="$ts('room.closeThread')"
         @click="emit('close')"
       >
         <X class="size-4" />
@@ -115,7 +119,11 @@ function when(value: string): string {
             <div class="min-w-0 flex-1">
               <p class="flex items-baseline gap-2">
                 <span class="text-xs font-semibold">
-                  {{ thread.root.sender === selfAddress ? "You" : shortName(thread.root.sender) }}
+                  {{
+                    thread.root.sender === selfAddress
+                      ? $t("room.you")
+                      : shortName(thread.root.sender)
+                  }}
                 </span>
                 <time class="text-[0.6875rem] text-muted-foreground">
                   {{ when(thread.root.sentAt) }}
@@ -130,7 +138,11 @@ function when(value: string): string {
 
         <Separator
           v-if="thread.replies.length"
-          :label="thread.replies.length === 1 ? '1 reply' : `${thread.replies.length} replies`"
+          :label="
+            thread.replies.length === 1
+              ? $ts('room.oneReply')
+              : $ts('room.manyReplies', { count: thread.replies.length })
+          "
         />
 
         <p v-else class="py-6 text-center text-xs text-muted-foreground">
@@ -142,7 +154,7 @@ function when(value: string): string {
           <div class="min-w-0 flex-1">
             <p class="mb-0.5 flex items-baseline gap-2 leading-tight">
               <span class="text-xs font-semibold">
-                {{ reply.sender === selfAddress ? "You" : shortName(reply.sender) }}
+                {{ reply.sender === selfAddress ? $t("room.you") : shortName(reply.sender) }}
               </span>
               <time class="text-[0.6875rem] text-muted-foreground">{{ when(reply.sentAt) }}</time>
             </p>
@@ -171,7 +183,7 @@ function when(value: string): string {
       >
         <input
           v-model="draft"
-          placeholder="Reply"
+          :placeholder="$ts('action.reply')"
           class="min-w-0 flex-1 bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
           autocomplete="off"
         />
@@ -180,7 +192,7 @@ function when(value: string): string {
           class="shrink-0"
           type="submit"
           :disabled="sending || !draft.trim()"
-          title="Reply"
+          :title="$ts('action.reply')"
         >
           <Spinner v-if="sending" size="sm" />
           <SendHorizontal v-else class="size-4" />

@@ -74,7 +74,7 @@ async function askForEmailedCode() {
     await sendEmailedCode(props.pending.ticket);
     emailSent.value = true;
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not send a code.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotSendCode");
   } finally {
     sendingEmail.value = false;
   }
@@ -94,7 +94,7 @@ async function withPasskey() {
     ) {
       return;
     }
-    error.value = isApiError(cause) ? cause.message : "That passkey was not accepted.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.passkeyNotAccepted");
   } finally {
     usingPasskey.value = false;
   }
@@ -110,7 +110,7 @@ const submitting = ref(false);
  * the codes somebody reaches for precisely when nothing else is working.
  */
 const answer = v.object({
-  code: v.pipe(v.string(), v.trim(), v.minLength(1, "The code from your app, or a recovery code.")),
+  code: v.pipe(v.string(), v.trim(), v.minLength(1, $ts("auth.codeOrRecovery"))),
 });
 
 function firstError(field: AnyFieldApi): string | undefined {
@@ -145,11 +145,11 @@ const form = useForm({
       if (isApiError(cause) && cause.code === "rate-limited") {
         // Past the allowance for this ticket. Said as what to do next, since
         // trying again here cannot work.
-        error.value = "Too many codes have been tried. Sign in again to start over.";
+        error.value = $ts("auth.tooManyCodes");
       } else if (isApiError(cause)) {
         error.value = cause.message;
       } else {
-        error.value = "Could not reach the server.";
+        error.value = $ts("error.couldNotReach");
       }
     } finally {
       submitting.value = false;

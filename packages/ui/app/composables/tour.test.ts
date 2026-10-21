@@ -26,6 +26,7 @@ vi.stubGlobal("computed", (fn: () => unknown) => ({
   },
 }));
 vi.stubGlobal("useAuth", () => ({ user: { value: { id: "person-1" } } }));
+vi.stubGlobal("useI18n", () => ({ $ts: (key: string) => key }));
 vi.stubGlobal("useApi", () => ({
   async get(path: string) {
     requests.push({ method: "GET", path });

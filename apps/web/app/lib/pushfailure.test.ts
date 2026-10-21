@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { subscribeFailure } from "./pushfailure";
+import en from "../../../../packages/ui/locales/en.json";
+import { subscribeFailure as withTranslator } from "./pushfailure";
+
+/** The English the interface would show, looked up the way the app looks it up. */
+function say(key: string): string {
+  let node: unknown = en;
+  for (const part of key.split(".")) node = (node as Record<string, unknown> | undefined)?.[part];
+  return typeof node === "string" ? node : key;
+}
+
+const subscribeFailure = (cause: unknown) => withTranslator(cause, say);
 
 /** The error a browser throws when its push service will not register it. */
 function pushServiceError(): Error {

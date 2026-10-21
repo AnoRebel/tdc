@@ -14,6 +14,7 @@ import type {
   TypingPerson,
 } from "@tdc/types";
 import { isApiError } from "@tdc/types";
+import { useIntervalFn } from "@vueuse/core";
 import { readFailure } from "#layers/ui/app/lib/reachability";
 import type { MenuItem } from "#layers/ui/app/components/ContextMenu.vue";
 import {
@@ -50,7 +51,11 @@ import {
   X,
   UserX,
   Video,
+  BellOff,
+  CalendarClock,
+  MoreHorizontal,
 } from "lucide-vue-next";
+import { otherParticipants } from "#layers/ui/app/lib/sidebar";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Bubble } from "#layers/ui/app/components/ui/bubble";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
@@ -95,6 +100,32 @@ const route = useRoute();
 
 const { user, can } = useAuth();
 const roomsApi = useRooms();
+
+/*
+ * What the reader has chosen about this conversation for themselves: muted or
+ * not, pinned or not, what is waiting to be sent here. The same menu as the
+ * sidebar's, so the two never offer different things.
+ */
+const conversationMenu = useConversationMenu();
+const notificationPreferences = useNotificationPreferences();
+const scheduledMessages = useScheduled();
+const waitingHere = computed(() => scheduledMessages.inRoom(roomId.value));
+const typingPreference = useTypingPreference();
+void typingPreference.load();
+
+/** Who the conversation is with, for a direct one: everybody but the reader. */
+const title = computed(() => {
+  if (!room.value) return $ts("room.loading");
+  return room.value.kind === "direct"
+    ? otherParticipants(room.value, user.value?.displayName).join(", ")
+    : room.value.name;
+});
+
+async function openConversationMenu(event: MouseEvent) {
+  const opener = event.currentTarget as Element;
+  if (!room.value) return;
+  contextMenu.showFrom(opener, await conversationMenu.itemsFor(room.value));
+}
 const refreshRooms = inject<() => Promise<void>>("refreshRooms", async () => {});
 
 const room = ref<Room | null>(null);
@@ -265,7 +296,7 @@ watch([scheduled, reported], () => {
 useHead({
   title: computed(() => {
     const name = room.value?.name;
-    if (!name) return "Loading";
+    if (!name) return $ts("room.loading");
 
     const waiting = unreadHere.value;
     return waiting > 0 ? `(${waiting}) ${name}` : name;
@@ -431,14 +462,14 @@ async function blockSender(sender: string) {
       (candidate: { id: string; username: string }) => candidate.username === username,
     );
     if (!person) {
-      error.value = "Could not find that person to block.";
+      error.value = $ts("room.couldNotFindToBlock");
       return;
     }
 
     await personal.block(person.id);
     blocked.value = true;
   } catch {
-    error.value = "Could not block that person.";
+    error.value = $ts("room.couldNotBlock");
   }
 }
 
@@ -479,7 +510,7 @@ async function banSender(sender: string, reason: string, hours?: number) {
       (candidate: { id: string; username: string }) => candidate.username === username,
     );
     if (!person) {
-      error.value = "Could not find that person to ban.";
+      error.value = $ts("room.couldNotFindToBan");
       return;
     }
 
@@ -489,7 +520,7 @@ async function banSender(sender: string, reason: string, hours?: number) {
     // rather than having to go looking for it.
     showBans.value = true;
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not ban that person.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotBan");
   }
 }
 const attaching = ref(false);
@@ -697,7 +728,7 @@ async function attachGif(url: string) {
 
     await uploads.upload(roomId.value, file);
   } catch {
-    error.value = "Could not attach that GIF.";
+    error.value = $ts("room.couldNotAttachGif");
   }
 }
 
@@ -729,8 +760,9 @@ async function scheduleDraft(sendAt: Date) {
     draft.value = "";
     uploads.clearFinished();
     scheduled.value = true;
+    void scheduledMessages.refresh();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not schedule that message.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotSchedule");
   }
 }
 
@@ -859,7 +891,7 @@ async function forwardTo(destination: string) {
     }
     clearSelection();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not forward that.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotForward");
   }
 }
 
@@ -878,7 +910,7 @@ async function submitReport(filing: { reason: string; detail: string }) {
     });
     reported.value = true;
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not file that report.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotReport");
   }
 }
 
@@ -894,9 +926,9 @@ const onlineCount = computed(
 const typingLabel = computed(() => {
   const names = typingNow.value.map((person) => person.displayName);
   if (names.length === 0) return "";
-  if (names.length === 1) return `${names[0]} is typing`;
-  if (names.length === 2) return `${names[0]} and ${names[1]} are typing`;
-  return `${names.length} people are typing`;
+  if (names.length === 1) return $ts("room.typing", { names: names[0]! });
+  if (names.length === 2) return $ts("room.typingTwo", { first: names[0]!, second: names[1]! });
+  return $ts("room.typingCount", { count: names.length });
 });
 
 /**
@@ -1011,8 +1043,8 @@ function dayBreakBefore(index: number): string | null {
 
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86_400_000).toDateString();
-  if (day === today) return "Today";
-  if (day === yesterday) return "Yesterday";
+  if (day === today) return $ts("room.today");
+  if (day === yesterday) return $ts("room.yesterday");
   return onDay(group.at);
 }
 
@@ -1207,11 +1239,9 @@ async function load() {
         showingLastSeen.value = kept.at;
       }
 
-      error.value = kept
-        ? null
-        : "You are offline. This conversation will load when the connection comes back.";
+      error.value = kept ? null : $ts("room.offlineWillLoad");
     } else {
-      error.value = isApiError(cause) ? cause.message : "Could not open this room.";
+      error.value = isApiError(cause) ? cause.message : $ts("room.couldNotOpen");
     }
   } finally {
     loading.value = false;
@@ -1285,6 +1315,17 @@ async function loadTyping() {
     // As above.
   }
 }
+
+/*
+ * Asked again every few seconds while the conversation is on screen.
+ *
+ * Typing has no live frame, so without this the indicator only changed when
+ * a message arrived — by which time the person had stopped typing. Not while
+ * the tab is hidden, where nobody is watching for it.
+ */
+useIntervalFn(() => {
+  if (room.value?.member && document.visibilityState === "visible") void loadTyping();
+}, 3000);
 
 /**
  * Records that everything shown has been read.
@@ -1385,7 +1426,9 @@ function scrollToLatest() {
 // The server expires an indication on its own, so this only has to be sent
 // often enough to keep it alive while someone is actually writing.
 const announceTyping = useThrottleFn(() => {
-  if (room.value?.member) {
+  // Not announced at all by somebody who turned it off, rather than sent and
+  // ignored: what is never sent cannot be shown.
+  if (room.value?.member && typingPreference.sends.value !== false) {
     void roomsApi.startTyping(roomId.value).catch(() => {});
   }
 }, 4000);
@@ -1491,7 +1534,7 @@ async function send() {
       draft.value = previous;
       await nextTick();
       fitComposer();
-      error.value = isApiError(cause) ? cause.message : "Could not send that message.";
+      error.value = isApiError(cause) ? cause.message : $ts("room.couldNotSend");
     }
   } finally {
     sending.value = false;
@@ -1512,7 +1555,7 @@ async function saveEdit(messageId: string) {
     messages.value.push(edit);
     editing.value = null;
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not save that edit.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotSaveEdit");
   }
 }
 
@@ -1704,30 +1747,30 @@ function menuFor(
  */
 function lifetimeLabel(lifetime: MessageLifetime): string {
   if (!lifetime.expiresAt) {
-    return lifetime.kind === "once_seen" ? "Goes when read" : "Goes after reading";
+    return lifetime.kind === "once_seen" ? $ts("room.goesWhenRead") : $ts("room.goesAfterReading");
   }
 
   const remaining = new Date(lifetime.expiresAt).getTime() - Date.now();
-  if (remaining <= 0) return "Going";
+  if (remaining <= 0) return $ts("room.going");
 
   const minutes = Math.round(remaining / 60000);
-  if (minutes < 60) return `${minutes}m left`;
+  if (minutes < 60) return $ts("room.minutesLeft", { count: minutes });
 
   const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours}h left`;
+  if (hours < 48) return $ts("room.hoursLeft", { count: hours });
 
-  return `${Math.round(hours / 24)}d left`;
+  return $ts("room.daysLeft", { count: Math.round(hours / 24) });
 }
 
 /** The whole rule, for somebody who wants to know exactly what happens. */
 function lifetimeExplanation(lifetime: MessageLifetime): string {
   switch (lifetime.kind) {
     case "once_seen":
-      return "This message goes once everybody has read it.";
+      return $ts("room.goesOnceRead");
     case "after_seeing":
-      return "This message goes a set time after each person first reads it.";
+      return $ts("room.goesAfterEachRead");
     default:
-      return "This message goes a set time after it was sent.";
+      return $ts("room.goesAfterSent");
   }
 }
 
@@ -1740,7 +1783,7 @@ async function setLifetime(messageId: string, lifetime: { kind: string; seconds?
     );
     await load();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "That expiry was not accepted.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.expiryRefused");
   }
 }
 
@@ -1764,18 +1807,18 @@ const retentionLabel = computed(() => {
   if (seconds <= 0) return "";
 
   const units: [number, string][] = [
-    [86400, "day"],
-    [3600, "hour"],
-    [60, "minute"],
+    [86400, "Day"],
+    [3600, "Hour"],
+    [60, "Minute"],
   ];
 
   for (const [size, name] of units) {
     if (seconds >= size) {
       const count = Math.round(seconds / size);
-      return `Kept ${count} ${name}${count === 1 ? "" : "s"}`;
+      return $ts(`room.kept${name}${count === 1 ? "" : "s"}`, { count });
     }
   }
-  return `Kept ${seconds} seconds`;
+  return $ts("room.keptSeconds", { count: seconds });
 });
 
 async function togglePin(messageId: string) {
@@ -1788,9 +1831,9 @@ async function togglePin(messageId: string) {
   } catch (cause) {
     error.value = isApiError(cause)
       ? cause.requiredPermission
-        ? "You do not have permission to pin messages in this channel."
+        ? $ts("room.noPinPermission")
         : cause.message
-      : "Could not pin that message.";
+      : $ts("room.couldNotPin");
   }
 }
 
@@ -1833,7 +1876,7 @@ async function remove(messageId: string) {
     const deletion = await roomsApi.remove(roomId.value, messageId);
     messages.value.push(deletion);
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not delete that message.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotDelete");
   }
 }
 
@@ -1854,7 +1897,7 @@ async function join() {
     }
     await refreshRooms();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not join this room.";
+    error.value = isApiError(cause) ? cause.message : $ts("room.couldNotJoin");
   }
 }
 
@@ -1908,20 +1951,27 @@ watch(roomId, load, { immediate: true });
           variant="ghost"
           size="icon"
           class="shrink-0 md:hidden"
-          label="Channels"
+          :label="$ts('nav.channels')"
           @click="navigationOpen = true"
         >
           <Menu class="size-4" />
         </Button>
 
+        <Avatar v-if="room?.kind === 'direct'" :name="title" size="sm" class="shrink-0" />
         <component
           :is="room?.visibility === 'private' ? Lock : Hash"
+          v-else
           class="size-4 shrink-0 text-muted-foreground"
         />
 
         <div class="min-w-0">
-          <h1 class="truncate text-sm leading-tight font-semibold">
-            {{ room?.name ?? "Loading" }}
+          <h1 class="flex items-center gap-1.5 truncate text-sm leading-tight font-semibold">
+            <span class="truncate">{{ title }}</span>
+            <BellOff
+              v-if="room?.member && notificationPreferences.of(roomId).muted"
+              class="size-3.5 shrink-0 text-muted-foreground"
+              :aria-label="$ts('conversation.isMuted')"
+            />
           </h1>
           <p v-if="room?.topic" class="truncate text-xs leading-tight text-muted-foreground">
             {{ room.topic }}
@@ -1952,8 +2002,8 @@ watch(roomId, load, { immediate: true });
             class="flex items-center gap-1.5 text-muted-foreground"
             :title="
               room?.retentionFromChannel
-                ? 'This channel keeps messages for a set time.'
-                : 'This server keeps messages for a set time.'
+                ? $ts('room.channelRetention')
+                : $ts('room.serverRetention')
             "
           >
             <Clock class="size-3.5" />
@@ -1963,7 +2013,7 @@ watch(roomId, load, { immediate: true });
           <span
             v-if="onlineCount > 0"
             class="flex items-center gap-1.5 text-muted-foreground"
-            :title="`${onlineCount} online`"
+            :title="$ts('room.onlineCount', { count: onlineCount })"
           >
             <span class="size-1.5 rounded-full bg-success" />
             <span class="tabular">{{ onlineCount }}</span>
@@ -1976,7 +2026,7 @@ watch(roomId, load, { immediate: true });
           >
             <Spinner v-if="live.state.value === 'reconnecting'" size="sm" />
             <span v-else class="size-1.5 rounded-full bg-warning" />
-            {{ live.state.value === "reconnecting" ? "Reconnecting" : "Offline" }}
+            {{ live.state.value === "reconnecting" ? $t("room.reconnecting") : $t("room.offline") }}
           </span>
 
           <Button
@@ -2004,14 +2054,29 @@ watch(roomId, load, { immediate: true });
 
           <ChannelSettings :room="room" :events="messages" @changed="room = $event" />
 
+          <!-- The reader's own choices about this conversation: pinning it,
+               how much to hear from it, and what is waiting to be sent. -->
+          <Button
+            v-if="room"
+            variant="ghost"
+            size="icon"
+            aria-haspopup="menu"
+            data-conversation-menu
+            :label="$ts('conversation.optionsFor', { name: title })"
+            :title="$ts('conversation.options')"
+            @click="openConversationMenu"
+          >
+            <MoreHorizontal class="size-3.5" />
+          </Button>
+
           <!-- Only for whoever moderates: a ban that can only be issued is a
                ban nobody reverses, so the way back in lives beside it. -->
           <Button
             variant="ghost"
             size="icon"
             v-if="can('moderation.restrict')"
-            :label="showBans ? 'Hide bans' : 'Show who is banned'"
-            :title="showBans ? 'Hide bans' : 'Show who is banned'"
+            :label="showBans ? $ts('room.hideBans') : $ts('room.showBans')"
+            :title="showBans ? $ts('room.hideBans') : $ts('room.showBans')"
             @click="showBans = !showBans"
           >
             <ShieldOff class="size-3.5" />
@@ -2038,8 +2103,8 @@ watch(roomId, load, { immediate: true });
         <span class="truncate text-muted-foreground">
           {{
             pins.pinned.value.length === 1
-              ? "1 pinned message"
-              : `${pins.pinned.value.length} pinned messages`
+              ? $t("room.onePinned")
+              : $t("room.manyPinned", { count: pins.pinned.value.length })
           }}
         </span>
         <ChevronDown
@@ -2125,10 +2190,9 @@ watch(roomId, load, { immediate: true });
         role="status"
       >
         <CloudOff class="size-3.5 shrink-0" />
-        <span
-          >Showing this conversation as it was
-          {{ when(new Date(showingLastSeen).toISOString()) }}</span
-        >
+        <span>{{
+          $t("room.showingAsItWas", { when: when(new Date(showingLastSeen).toISOString()) })
+        }}</span>
       </div>
 
       <div ref="timelineElement" class="flex-1 overflow-y-auto px-4 py-4">
@@ -2171,7 +2235,9 @@ watch(roomId, load, { immediate: true });
               >
                 <Avatar :name="viaOf(group)?.name ?? group.sender" size="sm" />
                 <span class="text-xs font-semibold">
-                  {{ group.mine ? "You" : (viaOf(group)?.name ?? shortName(group.sender)) }}
+                  {{
+                    group.mine ? $t("room.you") : (viaOf(group)?.name ?? shortName(group.sender))
+                  }}
                 </span>
                 <!-- A program is named as one, in words, so nobody reads a
                      webhook's or a bot's message as a person's. -->
@@ -2212,7 +2278,7 @@ watch(roomId, load, { immediate: true });
                     variant="ghost"
                     size="icon"
                     class="md:hidden"
-                    label="Message actions"
+                    :label="$ts('room.messageActions')"
                     @click.stop="
                       contextMenu.show(
                         ($event.currentTarget as HTMLElement).getBoundingClientRect().left,
@@ -2227,7 +2293,7 @@ watch(roomId, load, { immediate: true });
                     variant="ghost"
                     size="icon"
                     v-if="room?.member"
-                    label="Reply in thread"
+                    :label="$ts('room.replyInThread')"
                     @click="openThread(message.id)"
                   >
                     <MessageSquareText class="size-3.5" />
@@ -2236,7 +2302,7 @@ watch(roomId, load, { immediate: true });
                     variant="ghost"
                     size="icon"
                     v-if="group.mine"
-                    label="Edit"
+                    :label="$ts('action.edit')"
                     @click="startEditing(message)"
                   >
                     <Pencil class="size-3.5" />
@@ -2245,7 +2311,7 @@ watch(roomId, load, { immediate: true });
                     variant="danger"
                     size="icon"
                     v-if="group.mine"
-                    title="Delete"
+                    :title="$ts('action.delete')"
                     @click="confirmDelete(message)"
                   >
                     <Trash2 class="size-3.5" />
@@ -2264,7 +2330,7 @@ watch(roomId, load, { immediate: true });
                     type="checkbox"
                     class="size-4 cursor-pointer accent-primary"
                     :checked="selected.has(message.id)"
-                    :aria-label="`Select this message`"
+                    :aria-label="$ts('room.selectThisMessage')"
                     @change="toggleSelected(message.id)"
                   />
                 </label>
@@ -2323,9 +2389,9 @@ watch(roomId, load, { immediate: true });
                            that state now. -->
                       <p class="mt-1 text-[0.6875rem]">
                         <Kbd class="border-current/30 bg-transparent text-current">Enter</Kbd>
-                        to save,
+                        {{ $t("room.toSave") }}
                         <Kbd class="border-current/30 bg-transparent text-current">Esc</Kbd>
-                        to cancel
+                        {{ $t("room.toCancel") }}
                       </p>
                     </form>
 
@@ -2387,7 +2453,7 @@ watch(roomId, load, { immediate: true });
                         v-if="message.edited && !message.removed"
                         class="ml-1 align-baseline text-[0.6875rem] opacity-85"
                       >
-                        edited
+                        {{ $t("room.edited") }}
                       </span>
                       <!-- Said on the message itself rather than on hover:
                            somebody deciding whether to answer needs to know it
@@ -2442,7 +2508,9 @@ watch(roomId, load, { immediate: true });
               >
                 <MessageSquareText class="size-3" />
                 {{
-                  threadCounts[message.id] === 1 ? "1 reply" : `${threadCounts[message.id]} replies`
+                  threadCounts[message.id] === 1
+                    ? $t("room.oneReply")
+                    : $t("room.manyReplies", { count: threadCounts[message.id] ?? 0 })
                 }}
               </button>
             </MessageGroup>
@@ -2456,7 +2524,7 @@ watch(roomId, load, { immediate: true });
           <MessageGroup v-if="waiting.length" :mine="true">
             <div class="flex flex-row-reverse items-center gap-2 px-0.5">
               <Avatar :name="user?.address ?? ''" size="sm" />
-              <span class="text-xs font-semibold">You</span>
+              <span class="text-xs font-semibold">{{ $t("room.you") }}</span>
               <span class="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
                 <CloudOff class="size-3" />
                 {{ $t("room.waitingToSend") }}
@@ -2479,7 +2547,7 @@ watch(roomId, load, { immediate: true });
                   <Button
                     variant="ghost"
                     class="size-7 shrink-0 p-0 opacity-0 transition-opacity group-hover/waiting:opacity-100 focus-visible:opacity-100"
-                    :label="`Do not send: ${plainText(message.body)}`"
+                    :label="$ts('room.doNotSend', { body: plainText(message.body) })"
                     @click="unsendWaiting(message.clientToken)"
                   >
                     <X class="size-3.5" />
@@ -2504,8 +2572,32 @@ watch(roomId, load, { immediate: true });
               <span /><span /><span />
             </span>
           </Transition>
-          {{ typingLabel ? `${typingLabel}…` : "" }}
+          {{ typingLabel }}
         </p>
+
+        <!-- What the reader has written here and not yet sent, so a message
+             scheduled for tomorrow is not forgotten and written again. -->
+        <Transition name="motion-fade">
+          <button
+            v-if="room?.member && waitingHere.length"
+            type="button"
+            class="mb-1.5 flex w-full cursor-pointer items-center gap-2 rounded-lg bg-muted/40 px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted"
+            data-scheduled-here
+            @click="scheduledMessages.open(roomId)"
+          >
+            <CalendarClock class="size-3.5 shrink-0" aria-hidden="true" />
+            <span class="truncate">
+              {{
+                waitingHere.length === 1
+                  ? $t("scheduled.oneHere")
+                  : $t("scheduled.manyHere", { count: waitingHere.length })
+              }}
+            </span>
+            <span class="ml-auto shrink-0 font-medium text-foreground">{{
+              $t("scheduled.view")
+            }}</span>
+          </button>
+        </Transition>
 
         <UploadTray
           v-if="room?.member"
@@ -2533,7 +2625,7 @@ watch(roomId, load, { immediate: true });
             ref="filePicker"
             type="file"
             multiple
-            aria-label="Choose files to attach"
+            :aria-label="$ts('attachment.chooseFiles')"
             :accept="pickerAccept"
             class="sr-only"
             @change="pickFiles"
@@ -2548,8 +2640,8 @@ watch(roomId, load, { immediate: true });
               variant="ghost"
               size="icon"
               :disabled="room.archived"
-              title="Attach"
-              label="Attach"
+              :title="$ts('room.attach')"
+              :label="$ts('room.attach')"
               @click="attaching = !attaching"
             >
               <Paperclip class="size-4" />
@@ -2581,11 +2673,7 @@ watch(roomId, load, { immediate: true });
             :variant="sendOriginal ? 'primary' : 'ghost'"
             :disabled="room.archived"
             :aria-pressed="sendOriginal"
-            :title="
-              sendOriginal
-                ? 'Sending images at full size. Click to reduce them instead.'
-                : 'Images are reduced before sending. Click to send them at full size.'
-            "
+            :title="sendOriginal ? $ts('room.sendingFullSize') : $ts('room.reducingImages')"
             @click="sendOriginal = !sendOriginal"
           >
             <Maximize2 class="size-4" />
@@ -2595,8 +2683,8 @@ watch(roomId, load, { immediate: true });
             size="icon"
             class="shrink-0"
             :disabled="room.archived || !draft.trim()"
-            title="Send later"
-            label="Send later"
+            :title="$ts('room.sendLater')"
+            :label="$ts('room.sendLater')"
             @click="scheduling = true"
           >
             <Clock class="size-4" />
@@ -2607,8 +2695,8 @@ watch(roomId, load, { immediate: true });
               variant="ghost"
               size="icon"
               :disabled="room.archived"
-              title="Emoji"
-              label="Emoji"
+              :title="$ts('attachment.emoji')"
+              :label="$ts('attachment.emoji')"
               @click="choosingEmoji = !choosingEmoji"
             >
               <Smile class="size-4" />
@@ -2653,7 +2741,11 @@ watch(roomId, load, { immediate: true });
             v-model="draft"
             rows="1"
             :disabled="room.archived"
-            :placeholder="room.archived ? 'This room is archived' : `Message ${room.name}`"
+            :placeholder="
+              room.archived
+                ? $ts('room.archivedPlaceholder')
+                : $ts('room.messagePlaceholder', { room: room.name })
+            "
             class="max-h-40 min-w-0 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
             @input="
               announceTyping();
@@ -2669,7 +2761,7 @@ watch(roomId, load, { immediate: true });
             :disabled="
               sending || room.archived || (!draft.trim() && uploads.completed.value.length === 0)
             "
-            title="Send"
+            :title="$ts('action.send')"
           >
             <Spinner v-if="sending" size="sm" />
             <SendHorizontal v-else class="size-4" />
@@ -2683,7 +2775,7 @@ watch(roomId, load, { immediate: true });
           <p class="text-sm text-muted-foreground">{{ $t("room.joinToTakePart") }}</p>
           <Button @click="join">
             <Check class="size-3.5" />
-            Join
+            {{ $t("action.join") }}
           </Button>
         </div>
       </footer>
@@ -2707,18 +2799,18 @@ watch(roomId, load, { immediate: true });
 
     <ConfirmDialog
       v-if="pendingDelete"
-      title="Delete this message?"
+      :title="$ts('room.deleteThisMessage')"
       :detail="plainText(pendingDelete.body)"
-      confirm-label="Delete"
+      :confirm-label="$ts('action.delete')"
       @cancel="pendingDelete = null"
       @confirm="remove(pendingDelete.id)"
     />
 
     <ConfirmDialog
       v-if="blocking"
-      title="Block this person?"
-      :detail="`${shortName(blocking.sender)} will not be able to start a conversation with you. They are not told.`"
-      confirm-label="Block"
+      :title="$ts('room.blockThisPerson')"
+      :detail="$ts('room.blockDetail', { name: shortName(blocking.sender) })"
+      :confirm-label="$ts('room.block')"
       @cancel="blocking = null"
       @confirm="blockSender(blocking.sender)"
     />

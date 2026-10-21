@@ -3,6 +3,8 @@ import { AlertCircle, Code, FileText } from "lucide-vue-next";
 import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 import { Button } from "#layers/ui/app/components/ui/button";
 
+const { $t, $ts } = useI18n();
+
 /**
  * A text or markdown attachment, read in place.
  *
@@ -67,7 +69,7 @@ async function load() {
     // The provider puts the status in the message where it has one; a plain
     // unreachable server has none, and either is more use than a bare failure.
     error.value =
-      cause instanceof Error && cause.message ? cause.message : "The file could not be reached.";
+      cause instanceof Error && cause.message ? cause.message : $ts("attachment.fileUnreachable");
   } finally {
     loading.value = false;
   }
@@ -91,7 +93,7 @@ onMounted(load);
         v-if="props.kind === 'markdown'"
         @click="showSource = !showSource"
       >
-        {{ showSource ? "Rendered" : "Source" }}
+        {{ showSource ? $t("attachment.rendered") : $t("attachment.source") }}
       </Button>
     </header>
 
@@ -130,7 +132,7 @@ onMounted(load);
       v-if="truncated && !loading && !error"
       class="shrink-0 border-t px-3 py-2 text-[0.6875rem] text-muted-foreground"
     >
-      Showing the first {{ Math.round(maxBytes / 1024) }} KB. Download the file to read all of it.
+      {{ $t("attachment.showingFirstKb", { size: Math.round(maxBytes / 1024) }) }}
     </footer>
   </div>
 </template>

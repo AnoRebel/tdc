@@ -12,11 +12,10 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
 
-useHead({ title: "Sign in" });
-
 const { signIn, setupStatus, refresh } = useAuth();
 const router = useRouter();
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+useHead({ title: $ts("auth.signIn") });
 
 const error = ref<string | null>(null);
 const submitting = ref(false);
@@ -63,7 +62,7 @@ async function chooseProvider(provider: string) {
     window.location.replace(start.url);
   } catch (cause) {
     openingProvider.value = null;
-    error.value = isApiError(cause) ? cause.message : "Could not reach the server.";
+    error.value = isApiError(cause) ? cause.message : $ts("error.couldNotReach");
   }
 }
 
@@ -97,8 +96,8 @@ async function signedInThroughProvider(result: OAuthResult) {
  * whether there is anything to ask about.
  */
 const credentials = v.object({
-  username: v.pipe(v.string(), v.trim(), v.minLength(1, "Your username or email goes here.")),
-  password: v.pipe(v.string(), v.minLength(1, "Your password goes here.")),
+  username: v.pipe(v.string(), v.trim(), v.minLength(1, $ts("auth.usernameGoesHere"))),
+  password: v.pipe(v.string(), v.minLength(1, $ts("auth.passwordGoesHere"))),
 });
 
 /** The first thing wrong with a field, once somebody has touched it. */
@@ -147,7 +146,7 @@ if (handle) {
       returned.value = result;
     }
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "That sign-in could not be completed.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotCompleteSignIn");
   }
 }
 
@@ -179,12 +178,12 @@ const form = useForm({
       if (isApiError(cause) && cause.code === "rate-limited") {
         const wait = cause.retryAfterSeconds;
         error.value = wait
-          ? `Too many attempts. Try again in ${Math.ceil(wait / 60)} minute(s).`
-          : "Too many attempts. Try again later.";
+          ? $ts("auth.tooManyAttemptsMinutes", { count: Math.ceil(wait / 60) })
+          : $ts("auth.tooManyAttempts");
       } else if (isApiError(cause)) {
         error.value = cause.message;
       } else {
-        error.value = "Could not reach the server.";
+        error.value = $ts("error.couldNotReach");
       }
     } finally {
       submitting.value = false;

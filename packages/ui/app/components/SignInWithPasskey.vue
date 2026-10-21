@@ -6,6 +6,8 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { isApiError } from "@tdc/types";
 import type { SignInResult } from "@tdc/types";
 
+const { $t, $ts } = useI18n();
+
 /**
  * The button for signing in with a passkey.
  *
@@ -52,12 +54,12 @@ async function attempt() {
     if (isApiError(cause) && cause.code === "rate-limited") {
       const wait = cause.retryAfterSeconds;
       error.value = wait
-        ? `Too many attempts. Try again in ${Math.ceil(wait / 60)} minute(s).`
-        : "Too many attempts. Try again later.";
+        ? $ts("auth.tooManyAttemptsMinutes", { count: Math.ceil(wait / 60) })
+        : $ts("auth.tooManyAttempts");
     } else if (isApiError(cause)) {
       error.value = cause.message;
     } else {
-      error.value = "That passkey did not sign you in.";
+      error.value = $ts("auth.passkeyDidNotSignIn");
     }
   } finally {
     busy.value = false;
@@ -78,19 +80,19 @@ async function attempt() {
     <Button
       type="button"
       class="h-9 w-full justify-center gap-2"
-      label="Sign in with a passkey"
+      :label="$ts('auth.signInWithPasskey')"
       :disabled="busy"
       @click="attempt"
     >
       <Spinner v-if="busy" size="sm" />
       <Fingerprint v-else class="size-4" aria-hidden="true" />
-      {{ busy ? "Waiting for your device" : "Sign in with a passkey" }}
+      {{ busy ? $t("auth.waitingForDevice") : $t("auth.signInWithPasskey") }}
     </Button>
 
     <!-- What the fields below are, rather than an unlabelled rule. -->
     <div class="mt-6 flex items-center gap-3" role="separator">
       <span class="h-px flex-1 bg-border" />
-      <span class="text-xs text-muted-foreground">or use your password</span>
+      <span class="text-xs text-muted-foreground">{{ $t("auth.orUsePassword") }}</span>
       <span class="h-px flex-1 bg-border" />
     </div>
   </div>

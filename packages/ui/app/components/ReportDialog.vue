@@ -88,7 +88,7 @@ function submit() {
                 :value="option"
                 class="cursor-pointer accent-primary"
               />
-              {{ reportReasonLabel(option) }}
+              {{ reportReasonLabel(option, $ts) }}
             </label>
           </div>
         </fieldset>

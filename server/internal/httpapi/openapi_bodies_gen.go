@@ -616,6 +616,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[hidePushContentResponse]()},
 		},
 	},
+	"GET /api/me/preferences/notifications": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[preferencesResponse]()},
+		},
+	},
 	"GET /api/me/preferences/tours": {
 		Raw: map[int]string{
 			200: "application/json",
@@ -644,6 +649,11 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/me/sessions": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]sessionResponse]()},
+		},
+	},
+	"GET /api/me/status": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[ownStatusResponse]()},
 		},
 	},
 	"GET /api/me/tokens": {
@@ -972,6 +982,12 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[renamePasskeyRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[passkeyView]()},
+		},
+	},
+	"PATCH /api/me/scheduled/:id": {
+		Request: reflect.TypeFor[changeScheduledRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[scheduledResponse]()},
 		},
 	},
 	"PATCH /api/projects/:key": {
@@ -1452,6 +1468,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 201, Type: reflect.TypeFor[subscriptionResponse]()},
 		},
 	},
+	"POST /api/me/scheduled/:id/send": {
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[messageResponse]()},
+		},
+	},
 	"POST /api/me/second-factor/begin": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
@@ -1890,7 +1911,7 @@ var routeBodies = map[string]routeBodySet{
 	"PUT /api/me/status": {
 		Request: reflect.TypeFor[setStatusRequest](),
 		Responses: []responseBody{
-			{Status: 200, Type: reflect.TypeFor[presenceResponse]()},
+			{Status: 200, Type: reflect.TypeFor[ownStatusResponse]()},
 		},
 	},
 	"PUT /api/me/username": {

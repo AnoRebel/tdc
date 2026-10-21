@@ -407,3 +407,59 @@ func makeRoom(t *testing.T, queries *dbgen.Queries, creator uuid.UUID) uuid.UUID
 	}
 	return room.ID
 }
+
+/*
+Appearing offline hides a status from everybody else; it does not undo it.
+
+Somebody who is busy and also appears offline is still not to be interrupted,
+and still sees their own choice — both were lost when the person's own view
+went through what others are shown.
+*/
+func TestAppearingOfflineKeepsYourOwnStatus(t *testing.T) {
+	service, queries, _ := newTestService(t)
+	ctx := context.Background()
+	user := makeUser(t, queries, "amina")
+
+	later := time.Now().Add(time.Hour)
+	if err := service.SetStatus(ctx, user, "busy", "in a meeting", &later); err != nil {
+		t.Fatalf("SetStatus: %v", err)
+	}
+	if err := service.SetInvisible(ctx, user, true); err != nil {
+		t.Fatalf("SetInvisible: %v", err)
+	}
+
+	if !service.SuppressesNotifications(ctx, user) {
+		t.Error("busy stopped withholding notifications once the person appeared offline")
+	}
+
+	own, err := service.Own(ctx, user)
+	if err != nil {
+		t.Fatalf("Own: %v", err)
+	}
+	if own.Status != "busy" || own.StatusText != "in a meeting" || !own.Invisible {
+		t.Errorf("own = %+v, want busy, its note, and invisible", own)
+	}
+	if own.ExpiresAt == nil || own.ExpiresAt.Sub(later).Abs() > time.Millisecond {
+		t.Errorf("expiresAt = %v, want %v", own.ExpiresAt, later)
+	}
+}
+
+// A lapsed status is not shown to its owner either.
+func TestOwnStatusLapses(t *testing.T) {
+	service, queries, _ := newTestService(t)
+	ctx := context.Background()
+	user := makeUser(t, queries, "amina")
+
+	past := time.Now().Add(-time.Minute)
+	if err := service.SetStatus(ctx, user, "away", "lunch", &past); err != nil {
+		t.Fatalf("SetStatus: %v", err)
+	}
+
+	own, err := service.Own(ctx, user)
+	if err != nil {
+		t.Fatalf("Own: %v", err)
+	}
+	if own.Status != "available" || own.StatusText != "" || own.ExpiresAt != nil {
+		t.Errorf("own = %+v after expiry, want the default with no note or expiry", own)
+	}
+}

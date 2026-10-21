@@ -26,6 +26,7 @@ const { matching } = useCommands({
 });
 const rooms = useRooms();
 const router = useRouter();
+const newMessage = useNewMessage();
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 const field = ref<HTMLInputElement>();
@@ -73,14 +74,18 @@ watch(entries, () => {
   active.value = 0;
 });
 
-watch(open, async (isOpen) => {
-  if (!isOpen) {
-    clear();
-    return;
-  }
-  await nextTick();
-  field.value?.focus();
-});
+watch(
+  open,
+  async (isOpen) => {
+    if (!isOpen) {
+      clear();
+      return;
+    }
+    await nextTick();
+    field.value?.focus();
+  },
+  { immediate: true },
+);
 
 function onInput(event: Event) {
   search((event.target as HTMLInputElement).value);
@@ -179,10 +184,19 @@ function onKeydown(event: KeyboardEvent) {
       event.preventDefault();
       move(-1);
       break;
-    case "Enter":
+    case "Enter": {
       event.preventDefault();
-      void choose(entries.value[active.value]);
+      const entry = entries.value[active.value];
+      // With Shift, a person starts a conversation with several: the
+      // new-message dialog opens with them chosen, ready for the next name.
+      if (event.shiftKey && entry?.kind === "person") {
+        open.value = false;
+        newMessage.openWith([entry.person]);
+        break;
+      }
+      void choose(entry);
       break;
+    }
     case "Escape":
       event.preventDefault();
       open.value = false;
@@ -344,8 +358,21 @@ function iconFor(room: RoomHit) {
                   <Avatar :name="person.address" size="sm" class="shrink-0" />
                   <span class="truncate font-medium">{{ person.displayName }}</span>
                   <span class="truncate text-xs text-muted-foreground">@{{ person.username }}</span>
-                  <Spinner v-if="joining === person.id" class="ml-auto size-3.5 shrink-0" />
-                  <User v-else class="ml-auto size-3.5 shrink-0 text-muted-foreground" />
+                  <!-- Said only on the row it applies to, so it reads as an
+                       option for this person rather than a rule to learn. -->
+                  <span
+                    v-if="active === peopleFrom + index"
+                    class="ml-auto hidden shrink-0 items-center gap-1 text-[0.6875rem] text-muted-foreground sm:flex"
+                  >
+                    <Kbd>⇧ ↵</Kbd>
+                    {{ $t("newMessage.withOthers") }}
+                  </span>
+                  <Spinner v-if="joining === person.id" class="ml-2 size-3.5 shrink-0" />
+                  <User
+                    v-else
+                    class="size-3.5 shrink-0 text-muted-foreground"
+                    :class="active === peopleFrom + index ? 'ml-2' : 'ml-auto'"
+                  />
                 </button>
               </section>
 

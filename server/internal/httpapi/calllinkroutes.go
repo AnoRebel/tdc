@@ -58,6 +58,7 @@ func init() {
 		"POST /api/rooms/:id/call/links":              {Summary: "Make a link to a conversation's call", Authentication: "session or token", Permission: "call.link"},
 		"DELETE /api/rooms/:id/call/links/:linkId":    {Summary: "Revoke a call link", Authentication: "session or token", Permission: "call.link"},
 		"GET /api/call-links/:secret":                 {Summary: "What a call link leads to", Authentication: "none"},
+		"POST /api/call-links/:secret/guest":          {Summary: "Join a call by its link without an account, where guests are allowed", Authentication: "none"},
 		"POST /api/call-links/:secret/join":           {Summary: "Join a call by its link, or wait in its lobby", Authentication: "session or token"},
 		"GET /api/calls/:callId/lobby":                {Summary: "Who is waiting to be let into a call", Authentication: "session or token"},
 		"POST /api/calls/:callId/lobby/:userId/admit": {Summary: "Let somebody waiting into a call", Authentication: "session or token"},

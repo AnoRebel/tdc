@@ -88,8 +88,12 @@ export function useNotifications() {
  * deployment, and so a client in another language can phrase it its own way
  * from the same reason.
  */
-export function describeNotification(notification: Notification): string {
+export function describeNotification(
+  notification: Notification,
+  say: (key: string, params?: Record<string, string | number>) => string,
+): string {
   const who = shortNameOf(notification.actor);
+  const detail = notification.detail ?? "";
 
   /*
    * A group is described by what it stands for rather than by its newest
@@ -99,36 +103,42 @@ export function describeNotification(notification: Notification): string {
   const count = notification.count ?? 1;
   if (count > 1) {
     const others = (notification.actors ?? 1) - 1;
-    const people = others > 0 ? `${who} and ${others} other${others === 1 ? "" : "s"}` : who;
-    return `${people} — ${count} new`;
+    const people =
+      others > 0
+        ? say(others === 1 ? "notification.reasons.andOther" : "notification.reasons.andOthers", {
+            who,
+            count: others,
+          })
+        : who;
+    return say("notification.reasons.grouped", { people, count });
   }
 
   switch (notification.reason) {
     case "mention":
-      return `${who} mentioned you`;
+      return say("notification.reasons.mention", { who });
     case "direct":
-      return `${who} sent you a message`;
+      return say("notification.reasons.direct", { who });
     case "thread":
-      return `${who} posted`;
+      return say("notification.reasons.thread", { who });
     case "reaction":
-      return `${who} reacted ${notification.detail ?? ""}`.trim();
+      return say("notification.reasons.reaction", { who, emoji: detail }).trim();
     case "reply":
-      return `${who} replied in your thread`;
+      return say("notification.reasons.reply", { who });
     case "join":
-      return `${who} joined`;
+      return say("notification.reasons.join", { who });
     case "forward":
-      return `${who} forwarded your message`;
+      return say("notification.reasons.forward", { who });
     case "pin":
-      return `${who} pinned your message`;
+      return say("notification.reasons.pin", { who });
     case "webhook_disabled":
       // Said by the server, not a person, so the sender's name is not used.
-      return `Your webhook “${notification.detail ?? ""}” was turned off after repeated failures`;
+      return say("notification.reasons.webhookDisabled", { name: detail });
     case "assigned":
-      return `${who} assigned you ${notification.detail ?? ""}`.trim();
+      return say("notification.reasons.assigned", { who, issue: detail }).trim();
     case "missed_call":
-      return `You missed a call from ${who}`;
+      return say("notification.reasons.missedCall", { who });
     default:
-      return `${who} did something`;
+      return say("notification.reasons.other", { who });
   }
 }
 

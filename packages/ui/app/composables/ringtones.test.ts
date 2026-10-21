@@ -16,6 +16,7 @@ const server = ref({ canonicalAddress: "one.example", name: "One" });
 async function ringtones() {
   vi.resetModules();
   vi.stubGlobal("useServerInfo", () => ({ info: server }));
+  vi.stubGlobal("useI18n", () => ({ $ts: (key: string) => key }));
   const module = await import("./useRingtones");
   return module.useRingtones();
 }

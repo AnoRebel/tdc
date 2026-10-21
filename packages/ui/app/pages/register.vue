@@ -11,11 +11,10 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
 definePageMeta({ layout: "auth" });
 
-useHead({ title: "Create an account" });
-
 const { register } = useAuth();
 const router = useRouter();
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+useHead({ title: $ts("auth.createAnAccount") });
 
 const error = ref<string | null>(null);
 const submitting = ref(false);
@@ -36,15 +35,15 @@ const account = v.object({
   username: v.pipe(
     v.string(),
     v.trim(),
-    v.minLength(1, "Choose a username."),
-    v.regex(/^[a-z0-9_.-]+$/i, "Letters, digits, underscore, dot and hyphen."),
+    v.minLength(1, $ts("auth.chooseUsernameRule")),
+    v.regex(/^[a-z0-9_.-]+$/i, $ts("channel.slugRule")),
   ),
   displayName: v.string(),
   email: v.union([
     v.literal(""),
-    v.pipe(v.string(), v.trim(), v.email("That is not an email address.")),
+    v.pipe(v.string(), v.trim(), v.email($ts("directory.form.notAnEmail"))),
   ]),
-  password: v.pipe(v.string(), v.minLength(12, "At least twelve characters.")),
+  password: v.pipe(v.string(), v.minLength(12, $ts("auth.atLeastTwelveCharacters"))),
 });
 
 /** The first thing wrong with a field, once somebody has touched it. */
@@ -73,7 +72,7 @@ const form = useForm({
     } catch (cause) {
       // The server names which field is the problem — a taken username, a weak
       // password — so its message is shown rather than a generic one.
-      error.value = isApiError(cause) ? cause.message : "Could not reach the server.";
+      error.value = isApiError(cause) ? cause.message : $ts("error.couldNotReach");
     } finally {
       submitting.value = false;
     }

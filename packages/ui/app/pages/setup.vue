@@ -12,8 +12,6 @@ import { Button } from "#layers/ui/app/components/ui/button";
 
 definePageMeta({ layout: "auth" });
 
-useHead({ title: "Set up this server" });
-
 /**
  * First-run setup: creates the server's first administrator.
  *
@@ -25,6 +23,7 @@ useHead({ title: "Set up this server" });
 const { setupStatus, completeSetup } = useAuth();
 const router = useRouter();
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+useHead({ title: $ts("auth.setUpThisServer") });
 
 const error = ref<string | null>(null);
 const submitting = ref(false);
@@ -39,11 +38,11 @@ const administrator = v.object({
   username: v.pipe(
     v.string(),
     v.trim(),
-    v.minLength(1, "Choose a username."),
-    v.regex(/^[a-z0-9_.-]+$/i, "Letters, digits, underscore, dot and hyphen."),
+    v.minLength(1, $ts("auth.chooseUsernameRule")),
+    v.regex(/^[a-z0-9_.-]+$/i, $ts("channel.slugRule")),
   ),
   displayName: v.string(),
-  password: v.pipe(v.string(), v.minLength(12, "At least twelve characters.")),
+  password: v.pipe(v.string(), v.minLength(12, $ts("auth.atLeastTwelveCharacters"))),
 });
 
 /** The first thing wrong with a field, once somebody has touched it. */
@@ -69,7 +68,7 @@ const form = useForm({
       });
       await router.push(localeRoute({ name: "index" }));
     } catch (cause) {
-      error.value = isApiError(cause) ? cause.message : "Could not reach the server.";
+      error.value = isApiError(cause) ? cause.message : $ts("error.couldNotReach");
     } finally {
       submitting.value = false;
     }

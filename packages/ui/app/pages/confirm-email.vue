@@ -14,12 +14,12 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
  */
 
 definePageMeta({ layout: "auth" });
-useHead({ title: "Confirm your address" });
 
 const { completeConfirmation } = useRecovery();
 const router = useRouter();
 const route = useRoute();
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+useHead({ title: $ts("auth.confirmYourAddress") });
 
 const working = ref(true);
 const confirmed = ref(false);
@@ -29,7 +29,7 @@ onMounted(async () => {
   const token = typeof route.query.token === "string" ? route.query.token : "";
   if (!token) {
     working.value = false;
-    error.value = "That link is missing its token.";
+    error.value = $ts("auth.linkMissingToken");
     return;
   }
 
@@ -37,9 +37,7 @@ onMounted(async () => {
     await completeConfirmation(token);
     confirmed.value = true;
   } catch (cause) {
-    error.value = isApiError(cause)
-      ? cause.message
-      : "That link could not be used. Ask for another from your settings.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.confirmLinkUnusable");
   } finally {
     working.value = false;
   }

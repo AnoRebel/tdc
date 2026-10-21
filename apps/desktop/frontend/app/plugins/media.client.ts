@@ -49,14 +49,14 @@ export default defineNuxtPlugin({
       if (/^https?:\/\//i.test(path)) {
         const response = await fetch(path);
         if (!response.ok) {
-          throw new Error(`The file could not be read (${response.status}).`);
+          throw new Error(nuxtApp.$ts("attachment.fileUnreadable", { status: response.status }));
         }
         return response.arrayBuffer();
       }
 
       const result = await Api.Service.FetchMedia(path);
       if (!result.ok) {
-        throw new Error(`The file could not be read (${result.status}).`);
+        throw new Error(nuxtApp.$ts("attachment.fileUnreadable", { status: result.status }));
       }
       // The runtime hands []byte across as base64; decode it back to bytes.
       return bytesFromBase64(result.data ?? "");
@@ -77,10 +77,10 @@ export default defineNuxtPlugin({
           if (response.ok && response.body) {
             handlers.onDone(response.body as unknown as Attachment);
           } else {
-            handlers.onError(messageFrom(response.status ?? 0));
+            handlers.onError(messageFrom(response.status ?? 0, nuxtApp.$ts));
           }
         } catch {
-          if (!cancelled) handlers.onError("The upload could not reach the server.");
+          if (!cancelled) handlers.onError(nuxtApp.$ts("attachment.uploadUnreachable"));
         }
       })();
 
@@ -105,7 +105,7 @@ export default defineNuxtPlugin({
     nuxtApp.vueApp.provide(downloadKey, async (path, filename) => {
       const result = await Api.Service.FetchMedia(path);
       if (!result.ok) {
-        throw new Error(`The file could not be read (${result.status}).`);
+        throw new Error(nuxtApp.$ts("attachment.fileUnreadable", { status: result.status }));
       }
 
       const blob = new Blob([bytesFromBase64(result.data ?? "")], {
@@ -121,12 +121,15 @@ export default defineNuxtPlugin({
 });
 
 /** The same explanations the web client gives, keyed on status alone. */
-function messageFrom(status: number): string {
-  if (status === 413) return "That file is larger than this server allows.";
-  if (status === 415) return "This server does not accept that kind of file.";
-  if (status === 401) return "Your session has expired. Sign in and try again.";
-  if (status === 403) return "You do not have permission to upload here.";
-  return `The upload failed (${status}).`;
+function messageFrom(
+  status: number,
+  say: (key: string, params?: Record<string, number>) => string,
+): string {
+  if (status === 413) return say("attachment.tooLarge");
+  if (status === 415) return say("attachment.notAccepted");
+  if (status === 401) return say("attachment.sessionExpired");
+  if (status === 403) return say("attachment.noUploadPermission");
+  return say("attachment.uploadFailed", { status });
 }
 
 /** base64 to bytes, without a Buffer this webview does not have. */

@@ -77,6 +77,10 @@ type Querier interface {
 	CallRoomOfParticipant(ctx context.Context, arg CallRoomOfParticipantParams) (uuid.UUID, error)
 	// Everything still waiting for a subscription that has been turned off.
 	CancelPendingWebhookDeliveries(ctx context.Context, subscriptionID *uuid.UUID) (int64, error)
+	// Rewording or moving a message that has not gone, on the same terms as
+	// cancelling it: the sender's, unsent, not failed, and not being sent. Either
+	// may be left out to keep it as it was.
+	ChangeScheduledMessage(ctx context.Context, arg ChangeScheduledMessageParams) (ScheduledMessage, error)
 	ClaimDueNotificationDigests(ctx context.Context, limit int32) ([]NotificationDigest, error)
 	// What is ready to send, claimed by whoever asked.
 	//
@@ -89,6 +93,9 @@ type Querier interface {
 	// Claiming by the state the client already holds, for a client with no browser
 	// to receive the redirect. Consumed as it is read, exactly as the handle is.
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
+	// One message, claimed to be sent now at its author's request. The same claim
+	// a delivery pass takes, so the pass cannot send it a second time.
+	ClaimScheduledMessage(ctx context.Context, arg ClaimScheduledMessageParams) (ScheduledMessage, error)
 	ClaimWebhookDeliveries(ctx context.Context, capacity int32) ([]WebhookDelivery, error)
 	// Clears presenters who are no longer in their call.
 	ClearAbsentPresenters(ctx context.Context) error
@@ -294,6 +301,10 @@ type Querier interface {
 	DeleteRole(ctx context.Context, id uuid.UUID) error
 	// Scoped to the sender, and only while unsent: cancelling is the sender's to
 	// do, and a message already sent is a message, not a plan.
+	//
+	// Nor while a delivery pass holds it. A claimed message is being sent at this
+	// moment, and deleting it underneath would tell its author it was cancelled
+	// when it is about to arrive.
 	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
 	DeleteTOTPCredential(ctx context.Context, userID uuid.UUID) error

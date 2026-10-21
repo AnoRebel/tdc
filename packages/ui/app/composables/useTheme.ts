@@ -9,6 +9,7 @@ import {
   deriveAccent,
   isAppearance,
   isPalette,
+  type AccentRefusal,
   type Appearance,
   type Palette,
 } from "#layers/ui/app/lib/theme";
@@ -163,7 +164,7 @@ export function useTheme() {
    * application. An empty value clears the override and returns the palette's
    * own accent, which is always readable.
    */
-  function setAccent(colour: string): { refused?: string } {
+  function setAccent(colour: string): { refused?: AccentRefusal["reason"] } {
     const wanted = colour.trim();
 
     if (wanted) {
@@ -175,7 +176,7 @@ export function useTheme() {
        * recognisably the colour that was asked for.
        */
       const derived = deriveAccent(wanted);
-      if ("reason" in derived) return { refused: derived.message };
+      if ("reason" in derived) return { refused: derived.reason };
 
       accent.value = wanted;
       if (!import.meta.server) applyAccent(derived.light, derived.dark);

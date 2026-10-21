@@ -12,6 +12,51 @@ import (
 	uuid "github.com/google/uuid"
 )
 
+const changeScheduledMessage = `-- name: ChangeScheduledMessage :one
+UPDATE scheduled_messages
+SET body    = COALESCE($3, body),
+    send_at = COALESCE($4, send_at)
+WHERE id = $1 AND sender_id = $2
+  AND sent_event_id IS NULL AND failed_reason = ''
+  AND (claimed_until IS NULL OR claimed_until < now())
+RETURNING id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason, claimed_until
+`
+
+type ChangeScheduledMessageParams struct {
+	ID       uuid.UUID
+	SenderID uuid.UUID
+	Body     *string
+	SendAt   *time.Time
+}
+
+// Rewording or moving a message that has not gone, on the same terms as
+// cancelling it: the sender's, unsent, not failed, and not being sent. Either
+// may be left out to keep it as it was.
+func (q *Queries) ChangeScheduledMessage(ctx context.Context, arg ChangeScheduledMessageParams) (ScheduledMessage, error) {
+	row := q.db.QueryRow(ctx, changeScheduledMessage,
+		arg.ID,
+		arg.SenderID,
+		arg.Body,
+		arg.SendAt,
+	)
+	var i ScheduledMessage
+	err := row.Scan(
+		&i.ID,
+		&i.RoomID,
+		&i.SenderID,
+		&i.SenderAddress,
+		&i.Body,
+		&i.AttachmentIds,
+		&i.ThreadRootID,
+		&i.SendAt,
+		&i.CreatedAt,
+		&i.SentEventID,
+		&i.FailedReason,
+		&i.ClaimedUntil,
+	)
+	return i, err
+}
+
 const claimDueScheduledMessages = `-- name: ClaimDueScheduledMessages :many
 UPDATE scheduled_messages
 SET claimed_until = now() + interval '5 minutes'
@@ -66,6 +111,42 @@ func (q *Queries) ClaimDueScheduledMessages(ctx context.Context, limit int32) ([
 	return items, nil
 }
 
+const claimScheduledMessage = `-- name: ClaimScheduledMessage :one
+UPDATE scheduled_messages
+SET claimed_until = now() + interval '5 minutes'
+WHERE id = $1 AND sender_id = $2
+  AND sent_event_id IS NULL AND failed_reason = ''
+  AND (claimed_until IS NULL OR claimed_until < now())
+RETURNING id, room_id, sender_id, sender_address, body, attachment_ids, thread_root_id, send_at, created_at, sent_event_id, failed_reason, claimed_until
+`
+
+type ClaimScheduledMessageParams struct {
+	ID       uuid.UUID
+	SenderID uuid.UUID
+}
+
+// One message, claimed to be sent now at its author's request. The same claim
+// a delivery pass takes, so the pass cannot send it a second time.
+func (q *Queries) ClaimScheduledMessage(ctx context.Context, arg ClaimScheduledMessageParams) (ScheduledMessage, error) {
+	row := q.db.QueryRow(ctx, claimScheduledMessage, arg.ID, arg.SenderID)
+	var i ScheduledMessage
+	err := row.Scan(
+		&i.ID,
+		&i.RoomID,
+		&i.SenderID,
+		&i.SenderAddress,
+		&i.Body,
+		&i.AttachmentIds,
+		&i.ThreadRootID,
+		&i.SendAt,
+		&i.CreatedAt,
+		&i.SentEventID,
+		&i.FailedReason,
+		&i.ClaimedUntil,
+	)
+	return i, err
+}
+
 const createScheduledMessage = `-- name: CreateScheduledMessage :one
 INSERT INTO scheduled_messages (
     id, room_id, sender_id, sender_address, body, attachment_ids,
@@ -117,6 +198,7 @@ func (q *Queries) CreateScheduledMessage(ctx context.Context, arg CreateSchedule
 const deleteScheduledMessage = `-- name: DeleteScheduledMessage :execrows
 DELETE FROM scheduled_messages
 WHERE id = $1 AND sender_id = $2 AND sent_event_id IS NULL
+  AND (claimed_until IS NULL OR claimed_until < now())
 `
 
 type DeleteScheduledMessageParams struct {
@@ -126,6 +208,10 @@ type DeleteScheduledMessageParams struct {
 
 // Scoped to the sender, and only while unsent: cancelling is the sender's to
 // do, and a message already sent is a message, not a plan.
+//
+// Nor while a delivery pass holds it. A claimed message is being sent at this
+// moment, and deleting it underneath would tell its author it was cancelled
+// when it is about to arrive.
 func (q *Queries) DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteScheduledMessage, arg.ID, arg.SenderID)
 	if err != nil {

@@ -10,9 +10,11 @@ import { Interval } from "#bindings/updater/models";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { ArrowLeft } from "lucide-vue-next";
 
+const { $t, $ts } = useI18n();
+
 const router = useRouter();
 
-useHead({ title: "Updates" });
+useHead({ title: $ts("desktop.settings.updates") });
 
 /*
  * Where somebody downloads a version by hand.
@@ -52,9 +54,9 @@ async function changeInterval(every: Interval) {
  * again here — a value this side invented would be refused on arrival.
  */
 const intervals = [
-  { value: Interval.Daily, label: "Every day" },
-  { value: Interval.Weekly, label: "Every week" },
-  { value: Interval.NeverCheck, label: "Only when I ask" },
+  { value: Interval.Daily, label: $ts("desktop.updates.everyDay") },
+  { value: Interval.Weekly, label: $ts("desktop.updates.everyWeek") },
+  { value: Interval.NeverCheck, label: $ts("desktop.updates.onlyWhenAsked") },
 ];
 </script>
 
@@ -65,7 +67,7 @@ const intervals = [
       <ArrowLeft class="size-3.5" />
       {{ $t("action.back") }}
     </button>
-    <h1 class="text-lg font-semibold">Updates</h1>
+    <h1 class="text-lg font-semibold">{{ $t("desktop.settings.updates") }}</h1>
 
     <template v-if="state">
       <!-- Said plainly rather than hidden. A build that cannot verify a
@@ -75,15 +77,15 @@ const intervals = [
         v-if="!state.enabled"
         class="mt-4 rounded-lg border border-warning/40 bg-warning/10 p-3"
       >
-        <h2 class="text-xs font-semibold">Updates are switched off in this build</h2>
+        <h2 class="text-xs font-semibold">{{ $t("desktop.updates.switchedOff") }}</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          It has no way to check that a download came from TDC, so it will not install one. You can
-          still update by downloading a new version yourself.
+          {{ $t("desktop.updates.switchedOffHint") }}
         </p>
       </section>
 
       <p class="mt-2 text-sm text-muted-foreground">
-        You are running version <span class="tabular">{{ state.current }}</span
+        {{ $t("desktop.updates.runningVersion") }}
+        <span class="tabular">{{ state.current }}</span
         >.
       </p>
 
@@ -97,14 +99,16 @@ const intervals = [
       <section class="mt-5">
         <div class="flex flex-wrap items-center gap-2">
           <Button variant="outline" :disabled="busy" @click="check">
-            {{ state.checking ? "Checking…" : "Check now" }}
+            {{ state.checking ? $t("desktop.checking") : $t("desktop.updates.checkNow") }}
           </Button>
 
           <span v-if="state.available" class="text-sm">
-            Version <span class="tabular font-medium">{{ state.available }}</span> is available.
+            {{ $t("desktop.updates.version") }}
+            <span class="tabular font-medium">{{ state.available }}</span>
+            {{ $t("desktop.updates.isAvailable") }}
           </span>
           <span v-else-if="!state.checking" class="text-sm text-muted-foreground">
-            No newer version.
+            {{ $t("desktop.updates.noNewer") }}
           </span>
         </div>
 
@@ -128,27 +132,32 @@ const intervals = [
             target="_blank"
             rel="noreferrer"
           >
-            Download {{ state.available }}
+            {{ $t("desktop.updates.downloadVersion", { version: state.available }) }}
           </a>
 
-          <Button v-else-if="!state.ready" :disabled="busy" @click="download"> Download it </Button>
+          <Button v-else-if="!state.ready" :disabled="busy" @click="download">
+            {{ $t("desktop.updates.downloadIt") }}
+          </Button>
 
           <template v-else>
-            <Button :disabled="busy" @click="installAndSay"> Install it </Button>
-            <Button variant="ghost" :disabled="busy" @click="discard"> Not now </Button>
+            <Button :disabled="busy" @click="installAndSay">
+              {{ $t("desktop.updates.installIt") }}
+            </Button>
+            <Button variant="ghost" :disabled="busy" @click="discard">
+              {{ $t("update.notNow") }}
+            </Button>
           </template>
         </div>
 
         <p v-if="restartNeeded" class="mt-3 text-xs text-success-text">
-          Installed. Close and reopen TDC to run the new version.
+          {{ $t("desktop.updates.installed") }}
         </p>
       </section>
 
       <section v-if="settings" class="mt-8">
-        <h2 class="text-sm font-semibold">When to look</h2>
+        <h2 class="text-sm font-semibold">{{ $t("desktop.updates.whenToLook") }}</h2>
         <p class="mt-1 text-xs text-muted-foreground">
-          Checking tells the release server that TDC is installed here and which version. Nothing is
-          downloaded or installed without you saying so.
+          {{ $t("desktop.updates.whenToLookHint") }}
         </p>
 
         <div class="mt-3 flex flex-wrap gap-1.5">
@@ -170,7 +179,7 @@ const intervals = [
             :checked="settings.onLaunch"
             @change="change('onLaunch', ($event.target as HTMLInputElement).checked)"
           />
-          <span>Also check shortly after starting</span>
+          <span>{{ $t("desktop.updates.checkOnLaunch") }}</span>
         </label>
 
         <label class="mt-2 flex items-start gap-2 text-xs">
@@ -181,9 +190,9 @@ const intervals = [
             @change="change('download', ($event.target as HTMLInputElement).checked)"
           />
           <span>
-            Download an update as soon as one is found
+            {{ $t("desktop.updates.autoDownload") }}
             <span class="block text-muted-foreground">
-              It is still only installed when you say so.
+              {{ $t("desktop.updates.autoDownloadHint") }}
             </span>
           </span>
         </label>

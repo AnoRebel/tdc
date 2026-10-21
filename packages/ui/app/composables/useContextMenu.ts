@@ -42,6 +42,18 @@ export function useContextMenu() {
     open.value = false;
   }
 
+  /**
+   * Opens the menu below a control, for a button that says "more".
+   *
+   * Also where a keyboard-opened context menu goes: the Menu key and Shift+F10
+   * fire the same event with no pointer position, and a menu drawn at the top
+   * left corner of the window is a menu nobody connects with what they asked.
+   */
+  function showFrom(element: Element, menu: MenuItem[]) {
+    const box = element.getBoundingClientRect();
+    show(box.left, box.bottom + 4, menu);
+  }
+
   function cancelTimer() {
     if (timer !== null) {
       clearTimeout(timer);
@@ -54,6 +66,10 @@ export function useContextMenu() {
     return {
       onContextmenu(event: MouseEvent) {
         event.preventDefault();
+        if (!event.clientX && !event.clientY && event.currentTarget instanceof Element) {
+          showFrom(event.currentTarget, menu());
+          return;
+        }
         show(event.clientX, event.clientY, menu());
       },
 
@@ -105,5 +121,5 @@ export function useContextMenu() {
 
   onScopeDispose(cancelTimer);
 
-  return { open, position, items, show, close, handlers };
+  return { open, position, items, show, showFrom, close, handlers };
 }

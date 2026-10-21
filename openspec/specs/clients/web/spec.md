@@ -299,6 +299,32 @@ Accessibility MUST be verified automatically, and regressions MUST fail continuo
 - **WHEN** a change introduces a detectable accessibility violation
 - **THEN** continuous integration fails and names the violation
 
+### Requirement: Personal controls
+
+Every capability the server offers a person about their own experience SHALL have a control in the client: starting a direct conversation with one or several people, how much to hear from each conversation and muting it, pinning and ordering conversations, reviewing and changing scheduled messages, setting a status with a note and an expiry, appearing offline, turning off the typing indicator, and managing personal API tokens.
+
+Each control MUST be reachable from the keyboard, MUST carry an accessible name, and MUST show its result at once and restore the previous state, with an explanation, when the server refuses.
+
+#### Scenario: Group direct message
+
+- **WHEN** a user chooses several people in the new-message dialog
+- **THEN** the conversation between exactly those people opens, and the sidebar shows it with each person's face and a count
+
+#### Scenario: Muting from the sidebar
+
+- **WHEN** a user mutes a conversation from its menu in the sidebar
+- **THEN** the conversation is dimmed and its unread count is not shown, immediately and on every device
+
+#### Scenario: Refused change is put back
+
+- **WHEN** the server refuses a pin, a mute or a status change
+- **THEN** the interface returns to what it showed before and says the change was not made
+
+#### Scenario: Token secret shown once
+
+- **WHEN** a user creates an API token
+- **THEN** its secret is shown once with a way to copy it, and is not retrievable afterwards
+
 ### Requirement: Internationalisation
 
 The application SHALL support translation of all user-facing text, with English and Swahili provided.

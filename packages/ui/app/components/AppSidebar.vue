@@ -5,6 +5,11 @@ import type { Notification } from "@tdc/types";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
 import { Button } from "#layers/ui/app/components/ui/button";
+import { useNow } from "@vueuse/core";
+import { appearOfflineKey } from "#layers/ui/app/composables/useOwnStatus";
+import { arrangeSidebar, showsUnreadBadge } from "#layers/ui/app/lib/sidebar";
+import { presenceDotClass } from "#layers/ui/app/lib/presencedot";
+import { remaining } from "#layers/ui/app/lib/statusexpiry";
 
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
@@ -36,10 +41,98 @@ const emit = defineEmits<{ create: []; search: [] }>();
 const { user } = useAuth();
 const route = useRoute();
 
-const joined = computed(() => props.rooms);
-const conversations = computed(() => props.direct);
-const joinable = computed(() => props.available);
 const peers = computed(() => props.servers);
+
+/*
+ * What is pinned comes out of its usual list and goes to the top, in the
+ * order the person chose; everything else stays where it was.
+ */
+const pins = usePinnedRooms();
+const notificationPreferences = useNotificationPreferences();
+const groups = computed(() =>
+  arrangeSidebar(props.rooms, props.direct, props.available, pins.ids.value),
+);
+const joined = computed(() => groups.value.channels);
+const conversations = computed(() => groups.value.direct);
+const joinable = computed(() => groups.value.browse);
+
+function rowProps(room: Room) {
+  const setting = notificationPreferences.of(room.id);
+  return {
+    room,
+    unread: props.unread[room.id],
+    badge: showsUnreadBadge(
+      notificationPreferences.preferences.value,
+      room.id,
+      props.unread[room.id],
+    ),
+    muted: room.member && setting.muted,
+    current: isCurrent(room.id),
+    joinable: !room.member,
+  };
+}
+
+/* One menu for every row, opened on whichever asked. */
+const conversationMenu = useConversationMenu();
+const rowMenu = useContextMenu();
+const menuFor = ref<Room | null>(null);
+
+async function openRowMenu(room: Room, at: { x: number; y: number } | Element) {
+  menuFor.value = room;
+  const items = await conversationMenu.itemsFor(room);
+  if (at instanceof Element) rowMenu.showFrom(at, items);
+  else rowMenu.show(at.x, at.y, items);
+}
+
+const newMessage = useNewMessage();
+const scheduled = useScheduled();
+
+/*
+ * The person's own status, at the foot of the sidebar: a dot for how they
+ * appear, and the note with how long it has left. Its menu changes it in one
+ * press; the dialog is for a note and a time.
+ */
+const ownStatus = useOwnStatus();
+const statusOpen = useState("status.open", () => false);
+const userMenu = useContextMenu();
+
+const now = useNow({ interval: 30_000 });
+const statusLine = computed(() => {
+  const own = ownStatus.own.value;
+  const parts: string[] = [];
+  if (own.invisible) parts.push(ownStatus.labelOf(appearOfflineKey));
+  else if (own.status !== "available") parts.push(ownStatus.labelOf(own.status));
+  if (own.statusText) parts.push(own.statusText);
+  if (!parts.length) return null;
+
+  if (own.expiresAt) {
+    const left = remaining(new Date(own.expiresAt), now.value);
+    if (left) parts.push($ts(`status.left.${left.unit}`, { count: left.count }));
+  }
+  return parts.join(" · ");
+});
+
+async function openUserMenu(event: MouseEvent) {
+  const opener = event.currentTarget as Element;
+  const own = ownStatus.own.value;
+  const { userMenuItems } = await import("#layers/ui/app/lib/conversationmenu");
+  const items = userMenuItems({
+    $ts,
+    own,
+    statuses: ownStatus.statuses.value,
+    appearOfflineKey,
+    choose: (status) => {
+      ownStatus.set({ status, text: own.statusText }).catch(() => say($ts("status.couldNotSave")));
+    },
+    openDialog: () => (statusOpen.value = true),
+    clear: () => {
+      ownStatus.clear().catch(() => say($ts("status.couldNotSave")));
+    },
+    openSettings: () => void router.push(localeRoute({ name: "settings" })),
+  });
+  userMenu.showFrom(opener, items);
+}
+const { say } = useNotice();
 
 /**
  * The modifier this platform actually uses, so the hint is not a lie on one of
@@ -87,16 +180,6 @@ const shortcut = computed(() => {
 
 function isCurrent(roomId: string): boolean {
   return route.params.id === roomId;
-}
-
-/** The other person's name, rather than the conversation's full title. */
-function conversationName(room: Room): string {
-  const self = user.value?.displayName;
-  const others = room.name
-    .split(", ")
-    .filter((name) => name !== self)
-    .join(", ");
-  return others || room.name;
 }
 </script>
 
@@ -197,57 +280,79 @@ function conversationName(room: Room): string {
             <span class="truncate">{{ $t("projects.saved.title") }}</span>
           </NuxtLink>
         </li>
+        <!-- Only while something is waiting: an empty list is not worth a
+             permanent line in the sidebar. -->
+        <li v-if="scheduled.scheduled.value.length">
+          <button type="button" class="nav-item w-full" @click="scheduled.open()">
+            <Icon name="lucide:calendar-clock" class="size-3.5 shrink-0 opacity-60" />
+            <span class="truncate">{{ $t("scheduled.title") }}</span>
+            <span class="tabular ml-auto shrink-0 text-[0.6875rem] text-muted-foreground">
+              {{ scheduled.scheduled.value.length }}
+            </span>
+          </button>
+        </li>
       </ul>
+
+      <!-- What somebody keeps to hand, above everything else. Reordered from
+           each row's menu, which a keyboard reaches as easily as a pointer. -->
+      <SidebarSection v-if="groups.pinned.length" id="pinned" :title="$ts('conversation.pinned')">
+        <TransitionGroup tag="ul" name="motion-list" class="relative space-y-px">
+          <SidebarRoom
+            v-for="room in groups.pinned"
+            :key="room.id"
+            v-bind="rowProps(room)"
+            @menu="openRowMenu(room, $event)"
+          />
+        </TransitionGroup>
+      </SidebarSection>
 
       <SidebarSection v-if="joined.length" id="channels" :title="$ts('nav.channels')">
         <ul class="space-y-px">
-          <li v-for="room in joined" :key="room.id">
-            <NuxtLink :to="`/rooms/${room.id}`" class="nav-item" :data-active="isCurrent(room.id)">
-              <!-- A literal name either way, because the scanner reads names
-                   rather than following a binding: an icon chosen by an
-                   expression is one it cannot see, and the bundle would ship
-                   without it. -->
-              <Icon
-                :name="room.visibility === 'private' ? 'lucide:lock' : 'lucide:hash'"
-                class="size-3.5 shrink-0 opacity-60"
-              />
-              <span class="truncate">{{ room.name }}</span>
-              <span
-                v-if="unread[room.id]"
-                class="motion-badge tabular ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-semibold text-primary-foreground"
-              >
-                <UiCount :value="unread[room.id]!" />
-              </span>
-            </NuxtLink>
-          </li>
+          <SidebarRoom
+            v-for="room in joined"
+            :key="room.id"
+            v-bind="rowProps(room)"
+            @menu="openRowMenu(room, $event)"
+          />
         </ul>
       </SidebarSection>
 
-      <SidebarSection v-if="conversations.length" id="direct" :title="$ts('nav.directMessages')">
+      <!-- Shown even when empty, because the "+" beside its heading is how a
+           conversation is started at all. -->
+      <SidebarSection id="direct" :title="$ts('nav.directMessages')">
+        <template #action>
+          <button
+            type="button"
+            class="mr-1 mb-1 grid size-5 cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+            :aria-label="$ts('newMessage.title')"
+            :title="$ts('newMessage.title')"
+            data-new-message
+            @click="newMessage.open()"
+          >
+            <Icon name="lucide:plus" class="size-3.5" aria-hidden="true" />
+          </button>
+        </template>
         <ul class="space-y-px">
-          <li v-for="room in conversations" :key="room.id">
-            <NuxtLink :to="`/rooms/${room.id}`" class="nav-item" :data-active="isCurrent(room.id)">
-              <Avatar :name="conversationName(room)" size="sm" class="shrink-0" />
-              <span class="truncate">{{ conversationName(room) }}</span>
-              <span
-                v-if="unread[room.id]"
-                class="motion-badge tabular ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-semibold text-primary-foreground"
-              >
-                <UiCount :value="unread[room.id]!" />
-              </span>
-            </NuxtLink>
-          </li>
+          <SidebarRoom
+            v-for="room in conversations"
+            :key="room.id"
+            v-bind="rowProps(room)"
+            @menu="openRowMenu(room, $event)"
+          />
         </ul>
+        <p v-if="!conversations.length" class="px-2 py-1 text-xs text-muted-foreground">
+          {{ $t("newMessage.noneYet") }}
+        </p>
       </SidebarSection>
 
       <SidebarSection v-if="joinable.length" id="browse" :title="$ts('nav.browse')">
         <ul class="space-y-px">
-          <li v-for="room in joinable" :key="room.id">
-            <NuxtLink :to="`/rooms/${room.id}`" class="nav-item" :data-active="isCurrent(room.id)">
-              <Icon name="lucide:hash" class="size-3.5 shrink-0 opacity-40" />
-              <span class="truncate opacity-75">{{ room.name }}</span>
-            </NuxtLink>
-          </li>
+          <SidebarRoom
+            v-for="room in joinable"
+            :key="room.id"
+            v-bind="rowProps(room)"
+            @menu="openRowMenu(room, $event)"
+          />
         </ul>
       </SidebarSection>
 
@@ -312,13 +417,51 @@ function conversationName(room: Room): string {
     </div>
 
     <footer class="relative flex items-center gap-2 border-t p-2">
-      <Avatar :name="user?.displayName ?? 'You'" size="sm" online />
-      <span class="min-w-0 flex-1">
-        <span class="block truncate text-xs font-medium">{{ user?.displayName }}</span>
-        <span class="block truncate text-[0.6875rem] text-muted-foreground">
-          {{ user?.address }}
+      <!-- The person, as a button: their status is changed from here, where
+           it is shown, rather than three screens away in settings. -->
+      <button
+        type="button"
+        class="-m-1 flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg p-1 text-left transition-colors hover:bg-accent"
+        aria-haspopup="menu"
+        data-user-menu
+        :title="statusLine ?? undefined"
+        :aria-label="
+          statusLine ? $ts('status.menuWithStatus', { status: statusLine }) : $ts('status.menu')
+        "
+        @click="openUserMenu"
+      >
+        <span class="relative shrink-0">
+          <Avatar :name="user?.displayName ?? $ts('room.you')" size="sm" />
+          <span
+            class="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-surface-sunken transition-colors duration-(--motion-duration-fast)"
+            :class="presenceDotClass(ownStatus.own.value.status, ownStatus.own.value.invisible)"
+            aria-hidden="true"
+          />
         </span>
-      </span>
+        <span class="min-w-0 flex-1">
+          <span class="block truncate text-xs font-medium">{{ user?.displayName }}</span>
+          <span class="block truncate text-[0.6875rem] text-muted-foreground">
+            {{ statusLine ?? user?.address }}
+          </span>
+        </span>
+      </button>
+
+      <LazyContextMenu
+        v-if="userMenu.open.value"
+        :items="userMenu.items.value"
+        :x="userMenu.position.value.x"
+        :y="userMenu.position.value.y"
+        :label="$ts('status.menu')"
+        @close="userMenu.close"
+      />
+      <LazyContextMenu
+        v-if="rowMenu.open.value"
+        :items="rowMenu.items.value"
+        :x="rowMenu.position.value.x"
+        :y="rowMenu.position.value.y"
+        :label="$ts('conversation.optionsFor', { name: menuFor?.name ?? '' })"
+        @close="rowMenu.close"
+      />
       <Button
         variant="ghost"
         size="icon"

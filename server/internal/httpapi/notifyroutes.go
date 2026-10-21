@@ -139,6 +139,42 @@ func (s *Server) handleMarkNotificationRead(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// levelResponse is one notification setting.
+type levelResponse struct {
+	// Level is "all", "mentions" or "none".
+	Level string `json:"level"`
+	Muted bool   `json:"muted"`
+}
+
+// preferencesResponse is somebody's default and each conversation set apart.
+type preferencesResponse struct {
+	Default levelResponse `json:"default"`
+	// Rooms holds only the conversations with a setting of their own; every
+	// other one follows Default.
+	Rooms map[string]levelResponse `json:"rooms"`
+}
+
+func (s *Server) handleGetNotificationPreferences(c *echo.Context) error {
+	user, _ := currentUser(c)
+
+	global, rooms, err := s.notify.Preferences(c.Request().Context(), user.ID)
+	if err != nil {
+		return err
+	}
+
+	response := preferencesResponse{
+		Default: levelResponse{Level: string(global.Level), Muted: global.Muted},
+		Rooms:   make(map[string]levelResponse, len(rooms)),
+	}
+	for roomID, preference := range rooms {
+		response.Rooms[roomID.String()] = levelResponse{
+			Level: string(preference.Level),
+			Muted: preference.Muted,
+		}
+	}
+	return c.JSON(http.StatusOK, response)
+}
+
 type preferenceRequest struct {
 	// Level is "all", "mentions" or "none".
 	Level string `json:"level"`

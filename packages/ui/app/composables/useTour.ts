@@ -39,6 +39,7 @@ function storageKey(who: string): string {
 export function useTour() {
   const { user } = useAuth();
   const api = useApi();
+  const { $ts } = useI18n();
 
   /** Who this progress belongs to, or nobody when signed out. */
   const owner = computed(() => user.value?.id ?? "");
@@ -186,6 +187,12 @@ export function useTour() {
      */
     const instance: Driver = driver({
       showProgress: true,
+      // driver.js fills {{current}} and {{total}} itself, so they are passed
+      // through the translation as values rather than written into it.
+      progressText: $ts("attachment.indexOfTotal", { index: "{{current}}", total: "{{total}}" }),
+      nextBtnText: $ts("action.next"),
+      prevBtnText: $ts("action.previous"),
+      doneBtnText: $ts("action.done"),
       // The overlay is the point: everything but the thing being explained is
       // dimmed, so there is one place to look.
       overlayOpacity: 0.6,

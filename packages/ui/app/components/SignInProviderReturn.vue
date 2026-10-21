@@ -77,12 +77,12 @@ function report(cause: unknown) {
   if (isApiError(cause) && cause.code === "rate-limited") {
     const wait = cause.retryAfterSeconds;
     error.value = wait
-      ? `Too many attempts. Try again in ${Math.ceil(wait / 60)} minute(s).`
-      : "Too many attempts. Try again later.";
+      ? $ts("auth.tooManyAttemptsMinutes", { count: Math.ceil(wait / 60) })
+      : $ts("auth.tooManyAttempts");
   } else if (isApiError(cause)) {
     error.value = cause.message;
   } else {
-    error.value = "Could not reach the server.";
+    error.value = $ts("error.couldNotReach");
   }
 }
 
@@ -93,7 +93,7 @@ function report(cause: unknown) {
  * same string the rule carries, as everywhere else.
  */
 const linkAnswer = v.object({
-  password: v.pipe(v.string(), v.minLength(1, "Your password for that account goes here.")),
+  password: v.pipe(v.string(), v.minLength(1, $ts("auth.providerPasswordGoesHere"))),
 });
 
 const linkForm = useForm({
@@ -122,8 +122,8 @@ const newAccount = v.object({
   username: v.pipe(
     v.string(),
     v.trim(),
-    v.minLength(1, "Pick a username."),
-    v.regex(/^[a-z0-9_-]+$/i, "Letters, digits, hyphen and underscore only."),
+    v.minLength(1, $ts("auth.pickUsername")),
+    v.regex(/^[a-z0-9_-]+$/i, $ts("auth.usernameCharacters")),
   ),
   displayName: v.string(),
 });
