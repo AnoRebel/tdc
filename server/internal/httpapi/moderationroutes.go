@@ -409,6 +409,10 @@ type privacyRequest struct {
 	// CallsFromOtherServers is whether people on connected servers may.
 	Calls                 string `json:"calls,omitempty"`
 	CallsFromOtherServers *bool  `json:"callsFromOtherServers,omitempty"`
+
+	// ShowsEventAttendance is whether others may see which events this
+	// person is going to. Organisers see their own attendees regardless.
+	ShowsEventAttendance *bool `json:"showsEventAttendance,omitempty"`
 }
 
 // handleSetPrivacy records who may open a conversation with somebody, and what
@@ -479,6 +483,14 @@ func (s *Server) handleSetPrivacy(c *echo.Context) error {
 		}
 	}
 
+	if request.ShowsEventAttendance != nil {
+		if err := s.queries.SetShowsEventAttendance(ctx, dbgen.SetShowsEventAttendanceParams{
+			UserID: user.ID, ShowsEventAttendance: *request.ShowsEventAttendance,
+		}); err != nil {
+			return err
+		}
+	}
+
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -507,6 +519,11 @@ func (s *Server) handleGetPrivacy(c *echo.Context) error {
 	response.ShowsPresence = &disclosure.Presence
 	response.ShowsStatus = &disclosure.Status
 	response.ShowsLastSeen = &disclosure.LastSeen
+	attendance, err := s.queries.ShowsEventAttendance(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	response.ShowsEventAttendance = &attendance
 
 	return c.JSON(http.StatusOK, response)
 }

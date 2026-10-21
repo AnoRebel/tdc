@@ -128,6 +128,9 @@ func (s *Server) queueWebhooks(ctx context.Context, event dbgen.Event) {
 	}
 	s.inBackground(ctx, "queue webhooks", func(ctx context.Context) {
 		service.Enqueue(ctx, event)
+		if channel, ok := s.eventChannelFor(ctx, event); ok {
+			service.EnqueueFor(ctx, channel, event)
+		}
 	})
 }
 

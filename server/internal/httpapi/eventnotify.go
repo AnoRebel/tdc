@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -126,4 +127,29 @@ func (s *Server) tellPromoted(ctx context.Context, event dbgen.CalendarEvent, pr
 		event: event, reason: notify.ReasonEventPromoted, entry: s.anchorOf(ctx, event.ID),
 		pushTitle: event.Title, pushBody: "A place freed up — you are going",
 	}, promoted)
+}
+
+// whenIn says when something starts in its own zone, for a line of text.
+func whenIn(at time.Time, zone string) string {
+	location, err := time.LoadLocation(zone)
+	if err != nil {
+		location = time.UTC
+	}
+	return at.In(location).Format("Mon 2 Jan 15:04 MST")
+}
+
+/*
+eventChannelFor is the channel whose webhooks should hear about an entry in an
+event's conversation: the event's channel, unless the event is invite-only —
+a channel's subscriber may not be somebody the event was shown to.
+*/
+func (s *Server) eventChannelFor(ctx context.Context, entry dbgen.Event) (uuid.UUID, bool) {
+	if s.calendar == nil || !strings.HasPrefix(entry.Type, "event.") {
+		return uuid.Nil, false
+	}
+	event, err := s.calendar.Queries().GetCalendarEvent(ctx, entry.RoomID)
+	if err != nil || event.ChannelID == nil || event.Visibility == calendar.VisibilityInvite {
+		return uuid.Nil, false
+	}
+	return *event.ChannelID, true
 }

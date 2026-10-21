@@ -71,6 +71,11 @@ var EventTypes = []string{
 	string(events.TypeRoomArchived),
 	string(events.TypeRoomRestored),
 	string(events.TypeRoomVisibilityChanged),
+	// A channel's events, from each event's own conversation; see EnqueueFor.
+	string(events.TypeEventCreated),
+	string(events.TypeEventUpdated),
+	string(events.TypeEventCancelled),
+	string(events.TypeEventRSVP),
 }
 
 // MaxLabelLength bounds a subscription's label.
@@ -253,7 +258,19 @@ A subscription whose owner can no longer read the channel is skipped here, and
 again at delivery, since access can be lost between the two.
 */
 func (s *Service) Enqueue(ctx context.Context, event dbgen.Event) {
-	subscriptions, err := s.store.ListActiveWebhookSubscriptionsForRoom(ctx, event.RoomID)
+	s.EnqueueFor(ctx, event.RoomID, event)
+}
+
+/*
+EnqueueFor offers an event stored in one room to the subscriptions of another.
+
+An event's conversation is a room of its own, but the people who would want to
+hear about it subscribed to the channel the event belongs to; the calendar
+entries of a channel's events are offered to that channel's subscriptions this
+way, with the owner's access to the channel checked as for every delivery.
+*/
+func (s *Service) EnqueueFor(ctx context.Context, roomID uuid.UUID, event dbgen.Event) {
+	subscriptions, err := s.store.ListActiveWebhookSubscriptionsForRoom(ctx, roomID)
 	if err != nil {
 		s.log.Error("cannot find webhooks for an event", "eventId", event.ID, "error", err)
 		return
