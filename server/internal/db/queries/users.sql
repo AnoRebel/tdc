@@ -85,10 +85,12 @@ SELECT EXISTS (
 SELECT * FROM users WHERE email_folded = $1;
 
 -- name: CountUsers :one
-SELECT COUNT(*) FROM users;
+-- The server's people, which guests of a call are not.
+SELECT COUNT(*) FROM users WHERE guest_call IS NULL;
 
 -- name: ListUsers :many
 SELECT * FROM users
+WHERE guest_call IS NULL
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
@@ -140,3 +142,8 @@ SELECT tour_progress FROM users WHERE id = $1;
 
 -- name: SetTourProgress :exec
 UPDATE users SET tour_progress = $2 WHERE id = $1;
+
+-- name: CreateGuestUser :one
+INSERT INTO users (id, username, username_folded, display_name, guest_call)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;

@@ -77,8 +77,10 @@ LIMIT @result_limit;
 -- name: SearchPeople :many
 SELECT id, username, display_name
 FROM users
-WHERE username ILIKE '%' || @query::text || '%'
-   OR display_name ILIKE '%' || @query::text || '%'
+WHERE (username ILIKE '%' || @query::text || '%'
+   OR display_name ILIKE '%' || @query::text || '%')
+  -- Guests of a call are nobody to find.
+  AND guest_call IS NULL
 ORDER BY
   -- An exact match first, then a prefix, then anything containing it. Somebody
   -- typing a whole username wants that person, not the twelve others whose

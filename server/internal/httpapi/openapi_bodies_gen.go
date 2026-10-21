@@ -1201,6 +1201,12 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"POST /api/call-links/:secret/guest": {
+		Request: reflect.TypeFor[guestRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
 	"POST /api/call-links/:secret/join": {
 		Request: reflect.TypeFor[useLinkRequest](),
 		Responses: []responseBody{

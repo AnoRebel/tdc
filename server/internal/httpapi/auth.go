@@ -59,6 +59,19 @@ func (s *Server) authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 			return err
 		}
 
+		// A guest of a call reaches that call and nothing else, and only
+		// while it lasts; past its end the session is as good as signed out.
+		if user.GuestCall != nil {
+			allowed, open := s.guestMayReach(c, *user.GuestCall)
+			if !open {
+				clearSessionCookie(c, s.config.SecureCookies)
+				return next(c)
+			}
+			if !allowed {
+				return echo.NewHTTPError(http.StatusForbidden, "a guest of a call reaches that call and nothing else")
+			}
+		}
+
 		permissions, err := s.authz.PermissionsFor(c.Request().Context(), user.ID)
 		if err != nil {
 			return err
@@ -270,4 +283,45 @@ func clearSessionCookie(c *echo.Context, secure bool) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
+}
+
+// The paths a guest's session may use besides its call's own: what a client
+// reads before anything else, the live connection, and signing out.
+var guestPaths = map[string]bool{
+	"/api/me": true, "/api/me/permissions": true, "/api/server": true, "/api/version": true,
+	"/api/health": true, "/api/live": true, "/api/calls/ice": true, "/api/auth/signout": true,
+}
+
+/*
+guestMayReach says whether a guest's request is for their call, and whether
+that call is still going. Their call is reached by its own address, by its
+conversation's call routes for what somebody in a call does — presenting, a
+hand, a reaction — and by the link that let them in; the conversation itself,
+and everything else on the server, stays closed.
+*/
+func (s *Server) guestMayReach(c *echo.Context, callID uuid.UUID) (allowed, open bool) {
+	if s.rooms == nil {
+		return false, false
+	}
+	record, err := s.rooms.CallRecord(c.Request().Context(), callID)
+	if err != nil || record.EndedAt != nil {
+		return false, false
+	}
+	path := c.Request().URL.Path
+	if !strings.HasPrefix(path, "/api/") || guestPaths[path] {
+		return true, true
+	}
+	if path == "/api/calls/"+callID.String() || strings.HasPrefix(path, "/api/calls/"+callID.String()+"/") {
+		return true, true
+	}
+	if strings.HasPrefix(path, "/api/call-links/") {
+		return true, true
+	}
+	room := "/api/rooms/" + record.RoomID.String() + "/call/"
+	for _, sub := range []string{"stage", "hand", "reactions"} {
+		if path == room+sub || strings.HasPrefix(path, room+sub+"/") {
+			return true, true
+		}
+	}
+	return false, true
 }

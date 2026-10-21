@@ -182,6 +182,7 @@ type Querier interface {
 	CountUnread(ctx context.Context, arg CountUnreadParams) (int64, error)
 	CountUnreadNotifications(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountUnusedRecoveryCodes(ctx context.Context, userID uuid.UUID) (int64, error)
+	// The server's people, which guests of a call are not.
 	CountUsers(ctx context.Context) (int64, error)
 	// How many people hold a permission at server scope without an explicit
 	// denial. The administrator floor uses this to refuse a change that would
@@ -209,6 +210,7 @@ type Querier interface {
 	// out too; the participant key names the enquiry, so it never collides with
 	// the ordinary direct conversation between the same two people.
 	CreateEnquiryRoom(ctx context.Context, arg CreateEnquiryRoomParams) (Room, error)
+	CreateGuestUser(ctx context.Context, arg CreateGuestUserParams) (User, error)
 	CreateIncomingWebhook(ctx context.Context, arg CreateIncomingWebhookParams) (IncomingWebhook, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
 	CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error)
@@ -306,7 +308,8 @@ type Querier interface {
 	// the end being recorded — a tab closed mid-request, a server stopped. The
 	// grace keeps a call being started, whose first person is not in yet, open.
 	EndAbandonedCalls(ctx context.Context) ([]Call, error)
-	// Ends a call nobody is in any more, returning it if this ended it.
+	// Ends a call nobody who belongs here is in any more — guests of the call do
+	// not keep it going on their own — returning it if this ended it.
 	EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error)
 	EnqueueInvocation(ctx context.Context, arg EnqueueInvocationParams) (WebhookDelivery, error)
 	EnqueueWebhookDelivery(ctx context.Context, arg EnqueueWebhookDeliveryParams) (WebhookDelivery, error)
@@ -538,6 +541,8 @@ type Querier interface {
 	// Takes out of their calls everybody with no live connection left, so a
 	// closed laptop or a lost network does not leave somebody "in" a call forever.
 	LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfDisconnectedRow, error)
+	// Takes whoever is left — guests — out of a call that has ended.
+	LeaveEndedCall(ctx context.Context, callID uuid.UUID) error
 	// Clears the presenter, if it is this person.
 	LeaveStage(ctx context.Context, arg LeaveStageParams) error
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)

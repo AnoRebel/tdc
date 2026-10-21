@@ -181,8 +181,10 @@ func (q *Queries) SearchMessagesFuzzy(ctx context.Context, arg SearchMessagesFuz
 const searchPeople = `-- name: SearchPeople :many
 SELECT id, username, display_name
 FROM users
-WHERE username ILIKE '%' || $1::text || '%'
-   OR display_name ILIKE '%' || $1::text || '%'
+WHERE (username ILIKE '%' || $1::text || '%'
+   OR display_name ILIKE '%' || $1::text || '%')
+  -- Guests of a call are nobody to find.
+  AND guest_call IS NULL
 ORDER BY
   -- An exact match first, then a prefix, then anything containing it. Somebody
   -- typing a whole username wants that person, not the twelve others whose

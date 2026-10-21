@@ -24,7 +24,7 @@ UPDATE call_participants SET audio = $3, video = $4, held = $5
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, u.username
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, u.username, u.display_name, (u.guest_call IS NOT NULL)::boolean AS guest
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -36,11 +36,18 @@ SELECT c.room_id FROM call_participants p JOIN calls c ON c.id = p.call_id
 WHERE p.call_id = $1 AND p.user_id = $2 AND p.left_at IS NULL AND c.ended_at IS NULL;
 
 -- name: EndCallIfEmpty :one
--- Ends a call nobody is in any more, returning it if this ended it.
-UPDATE calls SET ended_at = NOW()
-WHERE id = $1 AND ended_at IS NULL
-  AND NOT EXISTS (SELECT 1 FROM call_participants WHERE call_id = $1 AND left_at IS NULL)
+-- Ends a call nobody who belongs here is in any more — guests of the call do
+-- not keep it going on their own — returning it if this ended it.
+UPDATE calls c SET ended_at = NOW()
+WHERE c.id = $1 AND c.ended_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
+                  WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
 RETURNING *;
+
+-- name: LeaveEndedCall :exec
+-- Takes whoever is left — guests — out of a call that has ended.
+UPDATE call_participants SET left_at = NOW(), screen = FALSE, hand_raised_at = NULL
+WHERE call_id = $1 AND left_at IS NULL;
 
 -- name: LeaveCallsOfDisconnected :many
 -- Takes out of their calls everybody with no live connection left, so a
@@ -128,7 +135,8 @@ RETURNING passcode_failures;
 UPDATE calls c SET ended_at = NOW()
 WHERE c.ended_at IS NULL
   AND c.started_at < NOW() - INTERVAL '1 minute'
-  AND NOT EXISTS (SELECT 1 FROM call_participants p WHERE p.call_id = c.id AND p.left_at IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
+                  WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
 RETURNING *;
 
 -- name: TakeStage :execrows

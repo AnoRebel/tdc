@@ -67,6 +67,8 @@ type userResponse struct {
 	// Address is the federated form, user@server, which stays unambiguous once
 	// servers exchange messages.
 	Address string `json:"address"`
+	// Guest marks somebody let into one call without an account.
+	Guest bool `json:"guest,omitempty"`
 	/*
 		FormerAddresses are the addresses this person had before changing their
 		username, newest first — only ever told to the person themselves.
@@ -84,6 +86,7 @@ func (s *Server) userResponse(user dbgen.User) userResponse {
 		Username:    user.Username,
 		DisplayName: user.DisplayName,
 		Address:     user.Username + "@" + s.serverName(),
+		Guest:       user.GuestCall != nil,
 	}
 }
 

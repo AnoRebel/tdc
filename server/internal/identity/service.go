@@ -2,6 +2,8 @@ package identity
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -293,3 +295,46 @@ func (s *Service) LiftSuspension(ctx context.Context, userID uuid.UUID) error {
 
 // ErrReasonRequired is returned when a suspension carries no explanation.
 var ErrReasonRequired = errors.New("a reason is required")
+
+// guestSessionLifetime is how long a guest's session lasts at most; it stops
+// sooner, the moment their call ends.
+const guestSessionLifetime = 12 * time.Hour
+
+/*
+CreateGuest makes the account a guest of one call holds: a generated name,
+the name they gave to show, no password, and the call it belongs to. It
+cannot sign in; the session started for it is the only way it is used.
+*/
+func (s *Service) CreateGuest(ctx context.Context, callID uuid.UUID, displayName string, device DeviceContext) (dbgen.User, Session, error) {
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		return dbgen.User{}, Session{}, fmt.Errorf("%w: a guest needs a name to be shown by", ErrInvalidDisplayName)
+	}
+	if err := ValidateDisplayName(displayName); err != nil {
+		return dbgen.User{}, Session{}, err
+	}
+	var user dbgen.User
+	for attempt := 0; ; attempt++ {
+		raw := make([]byte, 6)
+		if _, err := rand.Read(raw); err != nil {
+			return dbgen.User{}, Session{}, err
+		}
+		username := "guest-" + hex.EncodeToString(raw)
+		created, err := s.store.CreateGuestUser(ctx, dbgen.CreateGuestUserParams{
+			ID: uuid.New(), Username: username, UsernameFolded: NormaliseUsername(username),
+			DisplayName: displayName, GuestCall: &callID,
+		})
+		if err == nil {
+			user = created
+			break
+		}
+		if attempt >= 2 {
+			return dbgen.User{}, Session{}, fmt.Errorf("create guest: %w", err)
+		}
+	}
+	session, err := s.StartSession(ctx, user.ID, device, guestSessionLifetime)
+	if err != nil {
+		return dbgen.User{}, Session{}, err
+	}
+	return user, session, nil
+}

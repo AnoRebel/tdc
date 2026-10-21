@@ -168,6 +168,9 @@ func (s *Service) endIfEmpty(ctx context.Context, callID, actorID uuid.UUID) (*d
 	if err != nil {
 		return nil, fmt.Errorf("end call: %w", err)
 	}
+	if err := s.store.LeaveEndedCall(ctx, ended.ID); err != nil {
+		return nil, fmt.Errorf("leave ended call: %w", err)
+	}
 	return s.noteCallEnded(ctx, ended, actorID)
 }
 
@@ -257,6 +260,9 @@ func (s *Service) SweepCalls(ctx context.Context) ([]SweptCall, []dbgen.Event, e
 		return changed, ended, fmt.Errorf("end abandoned calls: %w", err)
 	}
 	for _, call := range abandoned {
+		if err := s.store.LeaveEndedCall(ctx, call.ID); err != nil {
+			return changed, ended, fmt.Errorf("leave ended call: %w", err)
+		}
 		if call.StartedBy == nil {
 			continue
 		}

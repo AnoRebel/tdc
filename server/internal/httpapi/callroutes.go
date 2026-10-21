@@ -115,6 +115,10 @@ type callParticipantView struct {
 	Held     bool   `json:"held"`
 	// Screen says they are presenting their screen.
 	Screen bool `json:"screen"`
+	// DisplayName is the name to show them by.
+	DisplayName string `json:"displayName"`
+	// Guest marks somebody in the call without an account here.
+	Guest bool `json:"guest,omitempty"`
 	// HandRaisedAt is when they raised their hand, while it is up.
 	HandRaisedAt string `json:"handRaisedAt,omitempty"`
 	JoinedAt     string `json:"joinedAt"`
@@ -138,7 +142,7 @@ func (s *Server) callViewOf(roomID, callID uuid.UUID, startedAt time.Time, parti
 	for _, p := range participants {
 		view.Participants = append(view.Participants, callParticipantView{
 			UserID: p.UserID.String(), Username: p.Username, Address: s.rooms.UserAddress(p.Username),
-			Audio: p.Audio, Video: p.Video, Held: p.Held, Screen: p.Screen, JoinedAt: p.JoinedAt.UTC().Format(time.RFC3339),
+			Audio: p.Audio, Video: p.Video, Held: p.Held, Screen: p.Screen, DisplayName: p.DisplayName, Guest: p.Guest, JoinedAt: p.JoinedAt.UTC().Format(time.RFC3339),
 		})
 	}
 	for index, p := range participants {
@@ -261,6 +265,7 @@ func (s *Server) handleLeaveCall(c *echo.Context) error {
 	}
 	if ended != nil {
 		s.publishEvent(ctx, *ended)
+		s.dismissRemaining(ctx, roomID, call)
 	}
 	if _, err := s.announceCall(ctx, roomID, call); err != nil {
 		// Left is left; the others learn it from the sweep or their next read.
@@ -336,9 +341,14 @@ func (s *Server) Signal(ctx context.Context, from, callID, to uuid.UUID, signal 
 	}
 	for _, person := range []uuid.UUID{from, to} {
 		permissions, err := s.authz.PermissionsFor(ctx, person)
-		if err != nil || !permissions.AllowsChannel(authz.PermCallJoin, roomID).Allowed {
-			return errors.New("not allowed to take part in this call")
+		if err == nil && permissions.AllowsChannel(authz.PermCallJoin, roomID).Allowed {
+			continue
 		}
+		// A guest of this call takes part by the link that let them in.
+		if guest, err := s.identity.UserByID(ctx, person); err == nil && guest.GuestCall != nil && *guest.GuestCall == callID {
+			continue
+		}
+		return errors.New("not allowed to take part in this call")
 	}
 
 	payload, err := json.Marshal(map[string]any{
@@ -734,7 +744,10 @@ func (s *Server) handleJoinCallByID(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if decision := currentPermissions(c).AllowsChannel(authz.PermCallJoin, call.RoomID); !decision.Allowed {
+	// A guest's authority to be here is the link that let them in, made by
+	// somebody allowed to; they hold no role to carry call.join.
+	guestHere := user.GuestCall != nil && *user.GuestCall == call.ID
+	if decision := currentPermissions(c).AllowsChannel(authz.PermCallJoin, call.RoomID); !decision.Allowed && !guestHere {
 		return echo.NewHTTPError(http.StatusForbidden, decision.Error())
 	}
 	var request callMediaRequest
@@ -781,6 +794,7 @@ func (s *Server) handleLeaveCallByID(c *echo.Context) error {
 	}
 	if ended != nil {
 		s.publishEvent(ctx, *ended)
+		s.dismissRemaining(ctx, call.RoomID, call)
 	}
 	if _, err := s.announceCall(ctx, call.RoomID, call); err != nil {
 		s.log.Warn("could not announce a call somebody left", "error", err)
@@ -939,4 +953,24 @@ func (s *Server) handleCallReaction(c *echo.Context) error {
 		}
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+/*
+dismissRemaining tells whoever was still in a call that has just ended — the
+guests the last member left behind — that it is over: the call as it now
+stands, with nobody in it, which their client takes as the end.
+*/
+func (s *Server) dismissRemaining(ctx context.Context, roomID uuid.UUID, call rooms.Call) {
+	if s.hub == nil {
+		return
+	}
+	payload, err := json.Marshal(s.callViewOf(roomID, call.ID, call.StartedAt, nil))
+	if err != nil {
+		return
+	}
+	frame := realtime.Frame{Type: realtime.FrameCallState, RoomID: roomID.String(), Payload: payload}
+	for _, participant := range call.Participants {
+		here := s.hub.SendToUser(participant.UserID, frame)
+		s.whisperElsewhere(ctx, participant.UserID, frame, here)
+	}
 }

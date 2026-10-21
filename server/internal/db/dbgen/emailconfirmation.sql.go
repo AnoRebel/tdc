@@ -27,7 +27,7 @@ SET email = $2,
     pending_email = NULL,
     updated_at = NOW()
 WHERE id = $1 AND pending_email = $2
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call
 `
 
 type ConfirmEmailParams struct {
@@ -61,6 +61,7 @@ func (q *Queries) ConfirmEmail(ctx context.Context, arg ConfirmEmailParams) (Use
 		&i.TourProgress,
 		&i.WebauthnHandle,
 		&i.PendingEmail,
+		&i.GuestCall,
 	)
 	return i, err
 }

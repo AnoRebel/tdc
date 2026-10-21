@@ -14,6 +14,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 	"github.com/AnoRebel/tdc/server/internal/settings"
@@ -43,6 +44,7 @@ func init() {
 
 		s.echo.GET("/api/call-links/:secret", s.handleReadCallLink, feature)
 		s.echo.POST("/api/call-links/:secret/join", s.handleUseCallLink, requireAuthentication, feature)
+		s.echo.POST("/api/call-links/:secret/guest", s.handleJoinAsGuest, feature)
 
 		lobby := s.echo.Group("/api/calls/:callId/lobby", requireAuthentication, feature)
 		lobby.GET("", s.handleCallLobby)
@@ -430,4 +432,81 @@ func (s *Server) recordLinkAudit(c *echo.Context, action audit.Action, linkID uu
 	if err := s.audit.Record(c.Request().Context(), entry); err != nil {
 		s.log.Warn("could not record a call link in the audit log", "error", err)
 	}
+}
+
+// Guests one address may let in, so a link cannot be used to fill a call or the
+// accounts table from one machine.
+var guestsPerAddress = cache.RateLimit{Attempts: 5, Window: 10 * time.Minute}
+
+type guestRequest struct {
+	// Name is what the guest is shown as in the call.
+	Name     string `json:"name"`
+	Passcode string `json:"passcode"`
+}
+
+/*
+handleJoinAsGuest lets somebody without an account into a call, through a link
+made to allow guests, on a server that allows them at all.
+
+They give a name to be shown by, and the link's passcode if it has one. They
+are given a guest account for this call and a session for it — which reaches
+the call and nothing else, and stops when the call ends — and then go in, or
+into the lobby, exactly as anybody using the link does. Everybody in the call
+sees them marked as a guest.
+*/
+func (s *Server) handleJoinAsGuest(c *echo.Context) error {
+	ctx := c.Request().Context()
+	var request guestRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	link, err := s.rooms.CallLink(ctx, c.Param("secret"))
+	if err != nil {
+		return linkError(err)
+	}
+	if !link.Guests || s.settings.Get(ctx, settings.CallsGuests) != "true" {
+		return echo.NewHTTPError(http.StatusForbidden, "this call takes only people with an account here; sign in to join")
+	}
+	if s.limiter != nil {
+		decision, err := s.limiter.Allow(ctx, "call.guest:"+requestIP(c).String(), guestsPerAddress)
+		if err == nil && !decision.Allowed {
+			return echo.NewHTTPError(http.StatusTooManyRequests, "too many guests from here just now; try again later")
+		}
+	}
+	if err := s.checkLinkPasscode(c, link, request.Passcode); err != nil {
+		return err
+	}
+	call, err := s.rooms.OpenCallIn(ctx, link.RoomID)
+	if err != nil {
+		return linkError(rooms.ErrCallNotStarted)
+	}
+	guest, session, err := s.identity.CreateGuest(ctx, call.ID, request.Name, identity.DeviceContext{
+		UserAgent: c.Request().UserAgent(), IPAddress: requestIP(c),
+	})
+	if err != nil {
+		if errors.Is(err, identity.ErrInvalidDisplayName) {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		return err
+	}
+	_, waiting, err := s.rooms.UseCallLink(ctx, link, guest.ID)
+	if err != nil {
+		return linkError(err)
+	}
+	if waiting {
+		s.announceLobby(ctx, call)
+	}
+	if s.audit != nil {
+		_ = s.audit.Record(ctx, audit.Entry{
+			ActorID: &guest.ID, ActorLabel: guest.DisplayName + " (guest)",
+			Action: audit.ActionCallGuestAdmitted, TargetKind: "call_link", TargetID: link.ID.String(),
+			SourceIP: requestIP(c), UserAgent: c.Request().UserAgent(),
+		})
+	}
+	setSessionCookie(c, session.Token, s.config.SecureCookies, int(time.Until(session.Record.ExpiresAt).Seconds()))
+	return c.JSON(http.StatusOK, map[string]any{
+		"user":  s.userResponse(guest),
+		"token": session.Token,
+		"use":   linkUse{CallID: call.ID.String(), RoomID: call.RoomID.String(), Waiting: waiting},
+	})
 }

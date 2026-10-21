@@ -925,6 +925,7 @@ type User struct {
 	TourProgress          []byte
 	WebauthnHandle        []byte
 	PendingEmail          *string
+	GuestCall             *uuid.UUID
 }
 
 type UserBlock struct {

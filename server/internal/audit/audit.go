@@ -229,6 +229,8 @@ const (
 	ActionCallLinkCreated        Action = "call.link.created"
 	ActionCallLinkRevoked        Action = "call.link.revoked"
 	ActionCallLinkPasscodeFailed Action = "call.link.passcode_failed"
+	// ActionCallGuestAdmitted is somebody without an account let in by a link.
+	ActionCallGuestAdmitted Action = "call.guest.admitted"
 )
 
 // Entry describes an action to record.

@@ -260,7 +260,8 @@ const endAbandonedCalls = `-- name: EndAbandonedCalls :many
 UPDATE calls c SET ended_at = NOW()
 WHERE c.ended_at IS NULL
   AND c.started_at < NOW() - INTERVAL '1 minute'
-  AND NOT EXISTS (SELECT 1 FROM call_participants p WHERE p.call_id = c.id AND p.left_at IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
+                  WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
 RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter
 `
 
@@ -296,13 +297,15 @@ func (q *Queries) EndAbandonedCalls(ctx context.Context) ([]Call, error) {
 }
 
 const endCallIfEmpty = `-- name: EndCallIfEmpty :one
-UPDATE calls SET ended_at = NOW()
-WHERE id = $1 AND ended_at IS NULL
-  AND NOT EXISTS (SELECT 1 FROM call_participants WHERE call_id = $1 AND left_at IS NULL)
+UPDATE calls c SET ended_at = NOW()
+WHERE c.id = $1 AND c.ended_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
+                  WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
 RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter
 `
 
-// Ends a call nobody is in any more, returning it if this ended it.
+// Ends a call nobody who belongs here is in any more — guests of the call do
+// not keep it going on their own — returning it if this ended it.
 func (q *Queries) EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error) {
 	row := q.db.QueryRow(ctx, endCallIfEmpty, id)
 	var i Call
@@ -462,6 +465,17 @@ func (q *Queries) LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfD
 	return items, nil
 }
 
+const leaveEndedCall = `-- name: LeaveEndedCall :exec
+UPDATE call_participants SET left_at = NOW(), screen = FALSE, hand_raised_at = NULL
+WHERE call_id = $1 AND left_at IS NULL
+`
+
+// Takes whoever is left — guests — out of a call that has ended.
+func (q *Queries) LeaveEndedCall(ctx context.Context, callID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, leaveEndedCall, callID)
+	return err
+}
+
 const leaveStage = `-- name: LeaveStage :exec
 UPDATE calls SET presenter = NULL WHERE id = $1 AND presenter = $2
 `
@@ -478,7 +492,7 @@ func (q *Queries) LeaveStage(ctx context.Context, arg LeaveStageParams) error {
 }
 
 const listCallParticipants = `-- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, u.username
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, u.username, u.display_name, (u.guest_call IS NOT NULL)::boolean AS guest
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -494,6 +508,8 @@ type ListCallParticipantsRow struct {
 	Screen       bool
 	HandRaisedAt *time.Time
 	Username     string
+	DisplayName  string
+	Guest        bool
 }
 
 func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([]ListCallParticipantsRow, error) {
@@ -514,6 +530,8 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 			&i.Screen,
 			&i.HandRaisedAt,
 			&i.Username,
+			&i.DisplayName,
+			&i.Guest,
 		); err != nil {
 			return nil, err
 		}

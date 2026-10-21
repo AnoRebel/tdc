@@ -452,6 +452,12 @@ func (s *Server) requireSecondFactorEnrolment(next echo.HandlerFunc) echo.Handle
 			return next(c)
 		}
 
+		// Nor is a guest of a call, who has no account to secure — only one
+		// call, which the guest gate already confines them to.
+		if user.GuestCall != nil {
+			return next(c)
+		}
+
 		required, err := s.secondFactorRequiredOf(c, user.ID)
 		if err != nil {
 			return err
