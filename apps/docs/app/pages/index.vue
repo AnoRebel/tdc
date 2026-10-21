@@ -12,10 +12,10 @@ const { tdc } = appConfig as unknown as {
 };
 const { current } = useDocsVersions();
 
-useSeoMeta({
-  title: "TDC documentation",
-  description: appConfig.seo.description,
-});
+// The site's own name is the whole title here, rather than "… · TDC docs".
+useHead({ titleTemplate: "%s" });
+useSeo({ title: "TDC documentation", description: appConfig.seo.description, type: "website" });
+useDocsSeo();
 
 const groups = computed(() =>
   tdc.groups

@@ -21,7 +21,7 @@ const items = computed(() =>
       variant="subtle"
       size="xs"
       class="font-mono"
-      :aria-label="`Documentation version: ${current.label}. Choose another version`"
+      :aria-label="`${current.version}: ${current.label} documentation. Choose another version`"
     />
   </UDropdownMenu>
 </template>

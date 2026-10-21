@@ -35,7 +35,6 @@ RUN bun install --frozen-lockfile --ignore-scripts --filter @tdc/docs --filter @
 
 COPY docs/ docs/
 COPY packages/ui/ packages/ui/
-COPY apps/web/public/ apps/web/public/
 COPY apps/docs/ apps/docs/
 
 ARG DOCS_VERSION=main

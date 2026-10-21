@@ -389,7 +389,8 @@ if a guide ever contains a component block.
 A guide appears on the site as soon as it is in `docs/`. Where it sits in the
 sidebar, and its short name, come from the help centre's own list in
 `packages/ui/app/lib/guides.ts` and the English translations — add a guide
-there and both places pick it up. Links between guides (`hosting.md#tls`) work
+there and both places pick it up. The previous and next links at the foot of
+each guide follow the same order, crossing from one group into the next. Links between guides (`hosting.md#tls`) work
 on the site as they do in the application and on GitHub, and a link to another
 file in the repository opens it on the version's own branch.
 
@@ -414,6 +415,16 @@ Each GitHub OAuth app's callback URL is the deployment's address followed by
 repository is private: that lets the signed-in editor's token read and write
 every repository they can, for as long as the session lasts, which is worth
 knowing before signing in.
+
+**Search engines and link previews.** Only the stable site is indexed. A build
+with `DOCS_VERSION` other than `main` serves a robots.txt of `Disallow: /`,
+marks every page `noindex`, and gives each page the stable site's address as
+its canonical one, taken from the `main` entry of `NUXT_PUBLIC_DOCS_VERSIONS`.
+Every site has a sitemap at `/sitemap.xml`. A page's description is the guide's
+first paragraph, and a shared link shows one static picture, `apps/docs/public/og.png`:
+the layer's per-page pictures are drawn only when prerendering, which this site
+does not do. The icons in `apps/docs/public` are the application's mark,
+`apps/desktop/build/icons/tdc.svg`; make them again from it if it changes.
 
 ## Screenshots in the guides
 
