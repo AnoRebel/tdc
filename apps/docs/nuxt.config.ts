@@ -41,12 +41,45 @@ export default defineNuxtConfig({
   site: {
     name: "TDC",
     url: versions.find((entry) => entry.version === version)?.url,
+    /*
+     * Only the stable site is for search engines. The beta and development
+     * sites describe work that may never ship, so they answer robots.txt with
+     * "Disallow: /", mark every page noindex, and name the stable page as the
+     * canonical one (app/composables/useDocsSeo.ts).
+     */
+    indexable: version === "main",
   },
 
   app: {
     head: {
-      link: [{ rel: "icon", type: "image/png", href: "/brand/icon-192.png" }],
+      /*
+       * The application's mark (apps/desktop/build/icons/tdc.svg), as files in
+       * public/: an SVG for browsers that take one, an .ico for those that do
+       * not, and a touch icon on a full-bleed ground because iOS rounds it.
+       */
+      link: [
+        { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+        { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+        { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+        { rel: "manifest", href: "/site.webmanifest" },
+      ],
+      // The page ground in each scheme, so the browser's own chrome matches it.
+      meta: [
+        { name: "theme-color", content: "#ffffff", media: "(prefers-color-scheme: light)" },
+        { name: "theme-color", content: "#18181b", media: "(prefers-color-scheme: dark)" },
+      ],
     },
+  },
+
+  // The layer lists the guides in the sitemap from the content; the front page
+  // is not content, so it is named here.
+  sitemap: { urls: ["/"] },
+
+  agentDiscovery: {
+    // The module's "Content-Signal" line is not a directive search engines
+    // know, and Lighthouse fails robots.txt over it. The AI crawlers it lists
+    // are still allowed.
+    robots: { aiPolicy: true, contentSignal: "" },
   },
 
   appConfig: {
@@ -115,13 +148,7 @@ export default defineNuxtConfig({
      * when it starts: where the other versions live, and whether Studio is on.
      */
     prerender: { crawlLinks: false, ignore: ["/"] },
-    // The application's icon, served from where the application keeps it.
     publicAssets: [
-      {
-        dir: fileURLToPath(new URL("../web/public", import.meta.url)),
-        baseURL: "/brand",
-        maxAge: 60 * 60 * 24 * 7,
-      },
       // The guides' screenshots, from docs/ where the guides name them.
       {
         dir: fileURLToPath(new URL("../../docs/images", import.meta.url)),

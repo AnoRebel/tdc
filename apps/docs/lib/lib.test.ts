@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { prepareGuide, remarkGuideLinks, siteHref, siteImage, type ParsedBody } from "./guides";
+import { readingOrder, sidebar, surround } from "./sidebar";
 import { redirectStudioRequest } from "./studio-paths";
 
 describe("links in a guide, on the site", () => {
@@ -119,6 +120,50 @@ describe("Studio's requests", () => {
     expect(redirectStudioRequest(`${api}/git/commits`, "{}", repo)).toEqual({
       url: `${api}/git/commits`,
       body: "{}",
+    });
+  });
+});
+
+describe("the links at the foot of a guide", () => {
+  const catalogue = {
+    groups: [
+      { id: "using", title: "Using", icon: "" },
+      { id: "operators", title: "Operators", icon: "" },
+    ],
+    guides: [
+      { slug: "using-tdc", group: "using", title: "Using TDC", description: "Start here" },
+      { slug: "directory", group: "using", title: "The directory", description: "" },
+      { slug: "hosting", group: "operators", title: "Hosting", description: "" },
+    ],
+  };
+  // Nuxt Content's own order: by file name.
+  const pages = ["/directory", "/extra", "/hosting", "/using-tdc"].map((path) => ({
+    path,
+    title: path,
+  }));
+  const groups = sidebar(pages, catalogue);
+  const paths = (path: string) => surround(groups, path).map((page) => page?.path ?? null);
+
+  it("follow the sidebar, not the file names", () => {
+    expect(readingOrder(groups).map((page) => page.path)).toEqual([
+      "/using-tdc",
+      "/directory",
+      "/hosting",
+      "/extra",
+    ]);
+    expect(paths("/directory")).toEqual(["/using-tdc", "/hosting"]);
+  });
+
+  it("cross into the next group, and stop at either end", () => {
+    expect(paths("/hosting")).toEqual(["/directory", "/extra"]);
+    expect(paths("/using-tdc")).toEqual([null, "/directory"]);
+    expect(paths("/extra")).toEqual(["/hosting", null]);
+  });
+
+  it("use the help centre's names", () => {
+    expect(surround(groups, "/directory")[0]).toMatchObject({
+      title: "Using TDC",
+      description: "Start here",
     });
   });
 });
