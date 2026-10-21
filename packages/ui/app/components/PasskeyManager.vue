@@ -35,7 +35,7 @@ async function load() {
   try {
     passkeys.value = await list();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not read your passkeys.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.couldNotReadPasskeys");
   } finally {
     loading.value = false;
   }
@@ -76,7 +76,7 @@ async function add() {
     ) {
       return;
     }
-    error.value = isApiError(cause) ? cause.message : "That passkey could not be added.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.passkeyNotAdded");
   } finally {
     adding.value = false;
   }
@@ -94,7 +94,7 @@ async function confirmRemoval() {
   } catch (cause) {
     // The server explains the one refusal that is not about an attacker: this
     // being the only way left in.
-    error.value = isApiError(cause) ? cause.message : "That passkey could not be removed.";
+    error.value = isApiError(cause) ? cause.message : $ts("auth.passkeyNotRemoved");
   }
 }
 

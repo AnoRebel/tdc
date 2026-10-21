@@ -4,6 +4,8 @@ import { Github, Gitlab, KeyRound, LogIn } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 
+const { $t, $ts } = useI18n();
+
 /**
  * The buttons for signing in through a provider somebody else runs.
  *
@@ -52,7 +54,7 @@ function iconFor(name: string) {
          unlabelled rule: "or" alone leaves somebody to infer it. -->
     <div class="flex items-center gap-3" role="separator">
       <span class="h-px flex-1 bg-border" />
-      <span class="text-xs text-muted-foreground">or continue with</span>
+      <span class="text-xs text-muted-foreground">{{ $t("auth.orContinueWith") }}</span>
       <span class="h-px flex-1 bg-border" />
     </div>
 
@@ -63,7 +65,7 @@ function iconFor(name: string) {
         type="button"
         variant="outline"
         class="h-9 w-full justify-center gap-2"
-        :label="`Continue with ${provider.label}`"
+        :label="$ts('auth.continueWith', { provider: provider.label })"
         :disabled="Boolean(props.busy)"
         @click="emit('choose', provider.name)"
       >

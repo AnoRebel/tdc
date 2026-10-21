@@ -481,7 +481,7 @@ watch(
      */
     if (!describesThisScreen(route.path)) return;
 
-    const steps = chatTour();
+    const steps = chatTour($ts);
     // The sidebar mounts after this layout, so the tour's targets are not
     // there the instant this runs even on the screen it is about.
     const anchor = steps[0]?.element;

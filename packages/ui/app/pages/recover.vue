@@ -18,12 +18,12 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
  */
 
 definePageMeta({ layout: "auth" });
-useHead({ title: "Set a new password" });
 
 const { usable, redeem } = useRecovery();
 const router = useRouter();
 const route = useRoute();
 const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+useHead({ title: $ts("auth.setNewPassword") });
 
 const token = computed(() => {
   const value = route.query.token;
@@ -46,7 +46,7 @@ const chosen = v.pipe(
       v.string(),
       // The server has the real rule and will say so; this is the one that
       // saves a round trip for the commonest mistake.
-      v.minLength(12, "Twelve characters or more."),
+      v.minLength(12, $ts("auth.twelveOrMore")),
     ),
     again: v.string(),
   }),
@@ -54,7 +54,7 @@ const chosen = v.pipe(
     v.partialCheck(
       [["password"], ["again"]],
       (input) => input.password === input.again,
-      "Those do not match.",
+      $ts("auth.doNotMatch"),
     ),
     ["again"],
   ),
@@ -84,7 +84,7 @@ const form = useForm({
         // rather than inviting a second attempt that cannot work.
         if (cause.status === 404) linkWorks.value = false;
       } else {
-        error.value = "Could not reach the server.";
+        error.value = $ts("error.couldNotReach");
       }
     } finally {
       submitting.value = false;

@@ -202,7 +202,7 @@ watch(results, () => {
           <h3
             class="px-1 pb-1 text-[0.6875rem] font-semibold tracking-wide text-muted-foreground uppercase"
           >
-            {{ group.name }}
+            {{ $t(`attachment.emojiGroups.${group.name.toLowerCase()}`) }}
           </h3>
           <div class="grid grid-cols-8 gap-0.5">
             <button

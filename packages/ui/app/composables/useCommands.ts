@@ -62,7 +62,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
     if (can("channel.create")) {
       available.push({
         id: "new-channel",
-        label: "New channel",
+        label: $ts("nav.newChannel"),
         icon: Plus,
         keywords: "create make room",
         run: options.createChannel,
@@ -101,14 +101,14 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
     available.push(
       {
         id: "settings",
-        label: "Settings",
+        label: $ts("nav.settings"),
         icon: Settings,
         keywords: "account status devices privacy blocked",
         run: () => void router.push(localeRoute({ name: "settings" })),
       },
       {
         id: "shortcuts",
-        label: "Keyboard shortcuts",
+        label: $ts("nav.keyboardShortcuts"),
         icon: Keyboard,
         keywords: "keys help",
         run: options.openShortcuts,
@@ -149,14 +149,14 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
       },
       {
         id: "theme-dark",
-        label: "Dark appearance",
+        label: $ts("nav.darkAppearance"),
         icon: Moon,
         keywords: "theme night colour color",
         run: () => theme.set("dark"),
       },
       {
         id: "theme-light",
-        label: "Light appearance",
+        label: $ts("nav.lightAppearance"),
         icon: Sun,
         keywords: "theme day colour color",
         run: () => theme.set("light"),
@@ -166,7 +166,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
     if (can("moderation.review")) {
       available.push({
         id: "reports",
-        label: "Reports",
+        label: $ts("moderation.reports"),
         icon: Flag,
         keywords: "moderation queue abuse",
         run: () => void router.push(localeRoute({ name: "reports" })),
@@ -176,7 +176,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
     if (can("user.suspend") || can("user.invite")) {
       available.push({
         id: "people",
-        label: "People",
+        label: $ts("nav.people"),
         icon: Users,
         keywords: "members invite suspend accounts",
         run: () => void router.push(localeRoute({ name: "people" })),
@@ -186,7 +186,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
     if (can("server.configure")) {
       available.push({
         id: "admin",
-        label: "Server settings",
+        label: $ts("admin.serverSettings"),
         icon: SlidersHorizontal,
         keywords: "administration limits policy filter branding",
         run: () => void router.push(localeRoute({ name: "admin" })),
@@ -196,7 +196,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
     if (can("server.audit.read")) {
       available.push({
         id: "audit",
-        label: "Audit log",
+        label: $ts("moderation.auditLog"),
         icon: ScrollText,
         keywords: "history record who did",
         run: () => void router.push(localeRoute({ name: "audit" })),
@@ -213,7 +213,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
     if (can("user.invite") && offers("invitations")) {
       available.push({
         id: "invite",
-        label: "Invite somebody",
+        label: $ts("directory.company.invite"),
         icon: Users,
         keywords: "invitation link code join",
         run: () => void router.push(localeRoute({ name: "people" })),
@@ -222,7 +222,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
 
     available.push({
       id: "sign-out",
-      label: "Sign out",
+      label: $ts("auth.signOut"),
       icon: LogOut,
       keywords: "leave log out",
       run: async () => {

@@ -3,6 +3,8 @@ import { Maximize2, Pause, Play, Volume2, VolumeX } from "lucide-vue-next";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
 
+const { $ts } = useI18n();
+
 /**
  * An audio player, rather than the browser's default controls.
  *
@@ -145,7 +147,11 @@ function clock(seconds: number): string {
     />
 
     <div class="flex items-center gap-3">
-      <Button class="size-9 shrink-0 px-0" :label="playing ? 'Pause' : 'Play'" @click="toggle">
+      <Button
+        class="size-9 shrink-0 px-0"
+        :label="playing ? $ts('attachment.pause') : $ts('attachment.play')"
+        @click="toggle"
+      >
         <Spinner v-if="buffering" size="sm" />
         <Pause v-else-if="playing" class="size-4" />
         <Play v-else class="size-4" />
@@ -164,8 +170,10 @@ function clock(seconds: number): string {
         :aria-valuenow="Math.round(currentTime)"
         aria-valuemin="0"
         :aria-valuemax="Math.round(duration)"
-        :aria-valuetext="`${clock(currentTime)} of ${clock(duration)}`"
-        aria-label="Seek"
+        :aria-valuetext="
+          $ts('attachment.indexOfTotal', { index: clock(currentTime), total: clock(duration) })
+        "
+        :aria-label="$ts('attachment.seek')"
         @click="seek"
         @keydown.left.prevent="nudge(-5)"
         @keydown.right.prevent="nudge(5)"
@@ -195,8 +203,8 @@ function clock(seconds: number): string {
       <Button
         variant="ghost"
         class="tabular h-8 shrink-0 px-1.5 text-xs font-medium"
-        :label="`Playback speed, currently ${speed} times`"
-        :title="`Speed: ${speed}×`"
+        :label="$ts('attachment.playbackSpeed', { speed })"
+        :title="$ts('attachment.speed', { speed })"
         @click="cycleSpeed"
       >
         {{ speed }}×
@@ -206,7 +214,7 @@ function clock(seconds: number): string {
         variant="ghost"
         size="icon"
         class="shrink-0"
-        :label="muted ? 'Unmute' : 'Mute'"
+        :label="muted ? $ts('calls.unmute') : $ts('calls.mute')"
         @click="toggleMute"
       >
         <VolumeX v-if="muted" class="size-4" />
@@ -218,8 +226,8 @@ function clock(seconds: number): string {
         size="icon"
         class="shrink-0"
         v-if="props.expandable"
-        label="Open in the viewer"
-        title="Open in the viewer"
+        :label="$ts('attachment.openInViewer')"
+        :title="$ts('attachment.openInViewer')"
         @click="emit('expand')"
       >
         <Maximize2 class="size-3.5" />

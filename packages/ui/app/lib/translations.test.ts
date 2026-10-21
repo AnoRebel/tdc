@@ -55,7 +55,10 @@ describe("what every locale has to say", () => {
       const other = load(locale);
 
       it("says everything English says", () => {
-        const missing = englishKeys.filter((key) => !keysOf(other).includes(key));
+        // Walked once rather than per key: per key is quadratic, and with a
+        // couple of thousand strings that alone outlasts the test's timeout.
+        const otherKeys = new Set(keysOf(other));
+        const missing = englishKeys.filter((key) => !otherKeys.has(key));
         expect(missing, `${locale}.json is missing these keys`).toEqual([]);
       });
 

@@ -4,6 +4,8 @@ import { AlertCircle, Check, RotateCw, X } from "lucide-vue-next";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
 
+const { $t, $ts } = useI18n();
+
 /**
  * Uploads in flight, shown above the composer.
  *
@@ -102,9 +104,11 @@ function readableSize(bytes: number): string {
               class="shrink-0 text-[0.6875rem] text-muted-foreground"
             >
               <template v-if="upload.reduced">
-                reduced to {{ readableSize(upload.size) }}
+                {{ $t("attachment.reducedTo", { size: readableSize(upload.size) }) }}
               </template>
-              <template v-else>full size · {{ readableSize(upload.size) }}</template>
+              <template v-else>{{
+                $t("attachment.fullSize", { size: readableSize(upload.size) })
+              }}</template>
             </span>
           </p>
 
@@ -121,7 +125,7 @@ function readableSize(bytes: number): string {
             :aria-valuenow="percent(upload)"
             aria-valuemin="0"
             aria-valuemax="100"
-            :aria-label="`Uploading ${upload.filename}`"
+            :aria-label="$ts('attachment.uploadingNamed', { name: upload.filename })"
           >
             <div
               class="h-full rounded-full bg-primary transition-[width] duration-200"
@@ -135,7 +139,7 @@ function readableSize(bytes: number): string {
           size="icon"
           class="shrink-0"
           v-if="upload.status === 'failed'"
-          title="Try again"
+          :title="$ts('action.retry')"
           @click="emit('retry', upload.id)"
         >
           <RotateCw class="size-3.5" />
@@ -145,7 +149,9 @@ function readableSize(bytes: number): string {
           variant="ghost"
           size="icon"
           class="shrink-0"
-          :title="upload.status === 'uploading' ? 'Cancel upload' : 'Remove'"
+          :title="
+            upload.status === 'uploading' ? $ts('attachment.cancelUpload') : $ts('action.remove')
+          "
           @click="
             upload.status === 'uploading' || upload.status === 'waiting'
               ? emit('cancel', upload.id)
@@ -165,8 +171,8 @@ function readableSize(bytes: number): string {
         :value="captions[upload.attachment.id] ?? upload.attachment.caption ?? ''"
         type="text"
         class="mt-1.5 h-7 w-full rounded-md border border-border bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground focus:border-primary/50"
-        :placeholder="`Say something about ${upload.filename}`"
-        :aria-label="`Caption for ${upload.filename}`"
+        :placeholder="$ts('attachment.saySomethingAbout', { name: upload.filename })"
+        :aria-label="$ts('attachment.captionFor', { name: upload.filename })"
         @input="onCaption(upload.attachment.id, ($event.target as HTMLInputElement).value)"
         @blur="emit('caption', upload.attachment.id, ($event.target as HTMLInputElement).value)"
       />

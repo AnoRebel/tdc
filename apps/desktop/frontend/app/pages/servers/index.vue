@@ -3,7 +3,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
 import * as Api from "#bindings/api";
 
-const { $localeRoute: localeRoute } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 /**
  * Choosing which server to talk to.
@@ -12,7 +12,7 @@ const { $localeRoute: localeRoute } = useI18n();
  * for: a browser is already at a server, and this application is installed once
  * and pointed wherever its owner belongs.
  */
-useHead({ title: "Servers" });
+useHead({ title: $ts("nav.servers") });
 
 const { servers, loading, refresh, add, use, forget } = useServers();
 
@@ -79,27 +79,26 @@ async function useAndSignIn(url: string) {
 <template>
   <main class="mx-auto grid min-h-dvh max-w-lg place-items-center p-8">
     <div class="w-full">
-      <h1 class="text-lg font-semibold">Your servers</h1>
+      <h1 class="text-lg font-semibold">{{ $t("desktop.servers.yours") }}</h1>
       <p class="mt-1 text-sm text-muted-foreground">
-        TDC is self-hosted, so there is no single place to sign in to — add the address of the
-        server you belong to.
+        {{ $t("desktop.servers.hint") }}
       </p>
 
       <form class="mt-6 flex gap-2" @submit.prevent="addServer">
-        <label class="sr-only" for="address">Server address</label>
+        <label class="sr-only" for="address">{{ $t("desktop.servers.address") }}</label>
         <Input
           id="address"
           v-model="typed"
           class="flex-1"
           placeholder="tdc.or.tz"
           autocomplete="off"
-          label="Server address"
+          :label="$ts('desktop.servers.address')"
           :invalid="Boolean(refusal)"
           :described-by="refusal ? 'refusal' : undefined"
           :disabled="loading"
         />
         <Button type="submit" :disabled="loading || !typed.trim()">
-          {{ loading ? "Checking…" : "Add" }}
+          {{ loading ? $t("desktop.checking") : $t("auth.add") }}
         </Button>
       </form>
 
@@ -118,7 +117,7 @@ async function useAndSignIn(url: string) {
         v-if="storageAdvice"
         class="mt-6 rounded-lg border border-warning/40 bg-warning/10 p-3"
       >
-        <h2 class="text-xs font-semibold">You will have to sign in each time</h2>
+        <h2 class="text-xs font-semibold">{{ $t("desktop.servers.signInEachTime") }}</h2>
         <p class="mt-1 text-xs whitespace-pre-line text-muted-foreground">{{ storageAdvice }}</p>
       </section>
 
@@ -135,7 +134,7 @@ async function useAndSignIn(url: string) {
             :to="localeRoute({ name: 'signin' })"
             class="btn btn-primary shrink-0 text-xs"
           >
-            Sign in
+            {{ $t("auth.signIn") }}
           </NuxtLink>
           <Button
             v-else
@@ -144,7 +143,7 @@ async function useAndSignIn(url: string) {
             class="shrink-0"
             @click="useAndSignIn(server.url)"
           >
-            Sign in
+            {{ $t("auth.signIn") }}
           </Button>
 
           <!-- Removing a server takes its session with it, which is said here
@@ -154,22 +153,22 @@ async function useAndSignIn(url: string) {
             variant="danger"
             size="small"
             class="shrink-0"
-            :label="`Remove ${server.url} and sign out of it`"
+            :label="$ts('desktop.servers.removeNamed', { url: server.url })"
             @click="removing = server"
           >
-            Remove
+            {{ $t("action.remove") }}
           </Button>
         </li>
       </ul>
 
-      <p v-else class="mt-6 text-xs text-muted-foreground">No servers yet.</p>
+      <p v-else class="mt-6 text-xs text-muted-foreground">{{ $t("desktop.servers.none") }}</p>
     </div>
 
     <ConfirmDialog
       v-if="removing"
-      title="Remove this server?"
-      :detail="`${removing.url} will be forgotten, along with the session kept for it. You will need to sign in again to add it back. Nothing on the server itself is changed.`"
-      confirm-label="Remove"
+      :title="$ts('desktop.servers.removeTitle')"
+      :detail="$ts('desktop.servers.removeDetail', { url: removing.url })"
+      :confirm-label="$ts('action.remove')"
       @cancel="removing = null"
       @confirm="confirmRemoval"
     />

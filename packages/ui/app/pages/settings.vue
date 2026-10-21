@@ -27,7 +27,7 @@ const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 definePageMeta({ middleware: "auth", layout: "app" });
 
-useHead({ title: "Settings" });
+useHead({ title: $ts("settings.title") });
 
 const personal = usePersonalModeration();
 const theme = useTheme();
@@ -110,7 +110,7 @@ watchEffect(() => {
 
 function applyAccent() {
   const { refused } = theme.setAccent(accentDraft.value);
-  accentRefusal.value = refused ?? "";
+  accentRefusal.value = refused ? $ts(`settings.accentRefused.${refused}`) : "";
 }
 
 function clearAccent() {
@@ -249,7 +249,7 @@ async function endSession(id: string) {
     await revokeSession(id);
     sessions.value = await listSessions();
   } catch (cause) {
-    error.value = isApiError(cause) ? cause.message : "Could not end that session.";
+    error.value = isApiError(cause) ? cause.message : $ts("settings.couldNotEndSession");
   } finally {
     busy.value = null;
   }
@@ -299,7 +299,7 @@ function deviceName(userAgent: string): string {
             ? "Linux"
             : null;
 
-  if (browser && platform) return `${browser} on ${platform}`;
+  if (browser && platform) return $ts("settings.browserOnPlatform", { browser, platform });
   // Anything unrecognised keeps its original string rather than being
   // flattened to "Unknown": an operator may need to see exactly what connected.
   return browser ?? userAgent;
@@ -330,7 +330,7 @@ function deviceName(userAgent: string): string {
 
       <section>
         <div class="flex items-center gap-3">
-          <Avatar :name="user?.displayName ?? 'You'" size="lg" online />
+          <Avatar :name="user?.displayName ?? $ts('room.you')" size="lg" online />
           <div class="min-w-0">
             <p class="truncate font-medium">{{ user?.displayName }}</p>
             <p class="truncate text-sm text-muted-foreground">{{ user?.address }}</p>

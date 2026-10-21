@@ -7,7 +7,7 @@
  * means. The browser reports it as "Registration failed - push service
  * error", which names neither the problem nor anything the reader can do.
  */
-export function subscribeFailure(cause: unknown): string {
+export function subscribeFailure(cause: unknown, say: (key: string) => string): string {
   /*
    * The browser could not register with its own push service.
    *
@@ -17,11 +17,7 @@ export function subscribeFailure(cause: unknown): string {
    * leaving somebody to retry a button that cannot work.
    */
   if (cause instanceof Error && cause.name === "AbortError") {
-    return (
-      "This browser could not register for notifications. Its push service " +
-      "is unavailable, which is a limit of the browser rather than of this " +
-      "server — TDC still notifies you while it is open."
-    );
+    return say("notification.browserCannot");
   }
 
   /*
@@ -30,10 +26,7 @@ export function subscribeFailure(cause: unknown): string {
    * the remedy is a step the reader can take.
    */
   if (cause instanceof Error && cause.name === "InvalidStateError") {
-    return (
-      "This device is subscribed with a key this server no longer uses. " +
-      "Removing it below and subscribing again will fix it."
-    );
+    return say("notification.staleKey");
   }
 
   /*
@@ -41,5 +34,5 @@ export function subscribeFailure(cause: unknown): string {
    * inventing a friendlier message for a failure nobody has characterised
    * would be guessing at what went wrong.
    */
-  return cause instanceof Error ? cause.message : "This device could not be subscribed.";
+  return cause instanceof Error ? cause.message : say("notification.couldNotSubscribe");
 }

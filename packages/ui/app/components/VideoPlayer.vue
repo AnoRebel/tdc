@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Maximize2 } from "lucide-vue-next";
 
+const { $ts } = useI18n();
+
 /**
  * A video, played where it sits in the conversation.
  *
@@ -57,8 +59,8 @@ const shape = computed(() => ({
       v-if="props.expandable"
       type="button"
       class="absolute top-2 right-2 grid size-7 place-items-center rounded-md bg-black/50 text-white opacity-0 transition-opacity group-hover/video:opacity-100 focus-visible:opacity-100"
-      aria-label="Open in the viewer"
-      title="Open in the viewer"
+      :aria-label="$ts('attachment.openInViewer')"
+      :title="$ts('attachment.openInViewer')"
       @click="emit('expand')"
     >
       <Maximize2 class="size-3.5" />

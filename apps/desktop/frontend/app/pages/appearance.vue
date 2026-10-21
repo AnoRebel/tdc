@@ -3,6 +3,8 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 import { ArrowLeft } from "lucide-vue-next";
 
+const { $t, $ts } = useI18n();
+
 const router = useRouter();
 
 /**
@@ -12,7 +14,7 @@ const router = useRouter();
  * clients have. What is here instead of there is the one thing a browser tab
  * cannot do: show what is behind it.
  */
-useHead({ title: "Appearance" });
+useHead({ title: $ts("settings.appearance") });
 
 const { opacity, refresh, set } = useWindowOpacity();
 
@@ -54,14 +56,22 @@ onMounted(() => {
 const theme = useTheme();
 
 const appearances = [
-  { value: "auto" as const, label: "Follow my device" },
-  { value: "light" as const, label: "Light" },
-  { value: "dark" as const, label: "Dark" },
+  { value: "auto" as const, label: $ts("settings.followMyDevice") },
+  { value: "light" as const, label: $ts("settings.light") },
+  { value: "dark" as const, label: $ts("settings.dark") },
 ];
 
 const palettes = [
-  { value: "default" as const, label: "Cool", description: "Indigo on tinted grey" },
-  { value: "congrator" as const, label: "Warm", description: "Terracotta and amber" },
+  {
+    value: "default" as const,
+    label: $ts("settings.paletteCool"),
+    description: $ts("settings.paletteCoolDescription"),
+  },
+  {
+    value: "congrator" as const,
+    label: $ts("settings.paletteWarm"),
+    description: $ts("settings.paletteWarmDescription"),
+  },
 ];
 
 onMounted(async () => {
@@ -78,15 +88,15 @@ onMounted(async () => {
       <ArrowLeft class="size-3.5" />
       {{ $t("action.back") }}
     </button>
-    <h1 class="text-lg font-semibold">Appearance</h1>
+    <h1 class="text-lg font-semibold">{{ $t("settings.appearance") }}</h1>
 
     <section class="mt-5">
-      <h2 class="text-sm font-semibold">Colours</h2>
+      <h2 class="text-sm font-semibold">{{ $t("settings.colours") }}</h2>
       <p class="mt-1 text-xs text-muted-foreground">
-        The palette, and whether to follow your device's light or dark setting.
+        {{ $t("desktop.appearance.coloursHint") }}
       </p>
 
-      <h3 class="mt-4 text-xs font-semibold">Light or dark</h3>
+      <h3 class="mt-4 text-xs font-semibold">{{ $t("desktop.appearance.lightOrDark") }}</h3>
       <div class="mt-2 flex flex-wrap gap-1.5">
         <Button
           v-for="option in appearances"
@@ -99,7 +109,7 @@ onMounted(async () => {
         </Button>
       </div>
 
-      <h3 class="mt-4 text-xs font-semibold">Palette</h3>
+      <h3 class="mt-4 text-xs font-semibold">{{ $t("desktop.appearance.palette") }}</h3>
       <div class="mt-2 flex flex-wrap gap-1.5">
         <Button
           v-for="option in palettes"
@@ -119,14 +129,13 @@ onMounted(async () => {
     </section>
 
     <section class="mt-5">
-      <h2 class="text-sm font-semibold">Window</h2>
+      <h2 class="text-sm font-semibold">{{ $t("desktop.appearance.window") }}</h2>
       <p class="mt-1 text-xs text-muted-foreground">
-        How much of what is behind TDC shows through. Only the empty space becomes see-through —
-        messages and menus stay on something solid.
+        {{ $t("desktop.appearance.windowHint") }}
       </p>
 
       <div class="mt-3 flex items-center gap-3">
-        <label class="sr-only" for="opacity">Window opacity</label>
+        <label class="sr-only" for="opacity">{{ $t("desktop.appearance.opacity") }}</label>
         <input
           id="opacity"
           type="range"
@@ -135,29 +144,26 @@ onMounted(async () => {
           step="1"
           class="flex-1"
           :value="opacity"
-          :aria-valuetext="`${opacity} per cent solid`"
+          :aria-valuetext="$ts('desktop.appearance.perCentSolid', { value: opacity })"
           @input="set(Number(($event.target as HTMLInputElement).value))"
         />
         <span class="tabular w-12 shrink-0 text-right text-xs">{{ opacity }}%</span>
       </div>
 
       <p v-if="ignoredHere" class="mt-2 text-xs text-warning">
-        Your desktop ignores this at the moment. The toolkit TDC is built on has not implemented
-        window transparency on Linux yet, so the window stays solid whatever this says. The setting
-        is kept because it will work as soon as that lands.
+        {{ $t("desktop.appearance.ignoredOnLinux") }}
       </p>
       <p v-else-if="pending" class="mt-2 text-xs text-warning">
-        Reopen TDC to see this. A window's transparency is fixed when it opens, so this one stays at
-        {{ running }}% until then.
+        {{ $t("desktop.appearance.reopenToSee", { percent: running }) }}
       </p>
       <p class="mt-2 text-xs text-muted-foreground">
-        The slider stops at half, because below that text on any background becomes a struggle.
+        {{ $t("desktop.appearance.sliderStops") }}
       </p>
     </section>
     <section class="mt-8">
-      <h2 class="text-sm font-semibold">Starting</h2>
+      <h2 class="text-sm font-semibold">{{ $t("desktop.appearance.starting") }}</h2>
       <p class="mt-1 text-xs text-muted-foreground">
-        Neither of these is on unless you turn it on.
+        {{ $t("desktop.appearance.startingHint") }}
       </p>
 
       <!-- The label wraps its control, which is how HTML associates the
@@ -170,8 +176,10 @@ onMounted(async () => {
           @update:model-value="startup.setAtLogin($event)"
         />
         <span>
-          Open TDC when I log in
-          <span class="block text-muted-foreground">Takes effect at your next login.</span>
+          {{ $t("desktop.appearance.openAtLogin") }}
+          <span class="block text-muted-foreground">{{
+            $t("desktop.appearance.openAtLoginHint")
+          }}</span>
         </span>
       </label>
 
@@ -185,10 +193,9 @@ onMounted(async () => {
           @update:model-value="startup.setHidden($event)"
         />
         <span>
-          Start in the tray, without a window
+          {{ $t("desktop.appearance.startInTray") }}
           <span class="block text-muted-foreground">
-            TDC is there and receiving messages, without a window appearing over whatever you sat
-            down to do.
+            {{ $t("desktop.appearance.startInTrayHint") }}
           </span>
         </span>
       </label>

@@ -3,6 +3,8 @@ import type { Reaction } from "@tdc/types";
 import { SmilePlus } from "lucide-vue-next";
 import { quickReactions } from "#layers/ui/app/lib/emoji";
 
+const { $ts } = useI18n();
+
 /**
  * The reactions on one message, and the way to add another.
  *
@@ -42,7 +44,7 @@ function whoReacted(reaction: Reaction): string {
   const names = reaction.users.map((address) => address.split("@")[0] ?? address);
 
   if (names.length <= 6) return names.join(", ");
-  return `${names.slice(0, 6).join(", ")} and ${names.length - 6} more`;
+  return $ts("room.namesAndMore", { names: names.slice(0, 6).join(", "), count: names.length - 6 });
 }
 </script>
 
@@ -66,8 +68,8 @@ function whoReacted(reaction: Reaction): string {
       <button
         type="button"
         class="reaction reaction-add"
-        aria-label="Add a reaction"
-        title="Add a reaction"
+        :aria-label="$ts('room.addReaction')"
+        :title="$ts('room.addReaction')"
         @click="picking = !picking"
       >
         <SmilePlus class="size-3.5" aria-hidden="true" />

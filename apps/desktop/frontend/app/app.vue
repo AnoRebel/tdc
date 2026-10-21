@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Button } from "#layers/ui/app/components/ui/button";
+
+const { $t, $ts } = useI18n();
 /*
  * The desktop client.
  *
@@ -108,9 +110,9 @@ const { about, showingAbout, confirmingQuit, quit } = useAppCommands();
   -->
   <ConfirmDialog
     v-if="confirmingQuit"
-    title="Quit TDC?"
-    detail="Anything you have written and not sent will be lost."
-    confirm-label="Quit"
+    :title="$ts('desktop.quitTitle')"
+    :detail="$ts('desktop.quitDetail')"
+    :confirm-label="$ts('desktop.quit')"
     @cancel="confirmingQuit = false"
     @confirm="quit"
   />
@@ -137,33 +139,33 @@ const { about, showingAbout, confirmingQuit, quit } = useAppCommands();
 
       <dl class="mt-4 space-y-1 text-xs">
         <div class="flex gap-2">
-          <dt class="w-20 shrink-0 text-muted-foreground">Version</dt>
+          <dt class="w-20 shrink-0 text-muted-foreground">{{ $t("desktop.about.version") }}</dt>
           <dd class="tabular">{{ about.version }}</dd>
         </div>
         <div class="flex gap-2">
-          <dt class="w-20 shrink-0 text-muted-foreground">Platform</dt>
+          <dt class="w-20 shrink-0 text-muted-foreground">{{ $t("desktop.about.platform") }}</dt>
           <dd class="tabular">{{ about.platform }}</dd>
         </div>
         <div class="flex gap-2">
-          <dt class="w-20 shrink-0 text-muted-foreground">Licence</dt>
+          <dt class="w-20 shrink-0 text-muted-foreground">{{ $t("desktop.about.licence") }}</dt>
           <dd>{{ about.licence }}</dd>
         </div>
       </dl>
 
-      <p class="mt-4 text-xs text-muted-foreground">Free and open source. Self-hosted, always.</p>
+      <p class="mt-4 text-xs text-muted-foreground">{{ $t("auth.freeAndOpenSource") }}</p>
 
       <div class="mt-4 flex justify-end">
-        <Button @click="showingAbout = false">Close</Button>
+        <Button @click="showingAbout = false">{{ $t("action.close") }}</Button>
       </div>
     </div>
   </div>
 
   <ConfirmDialog
     v-if="askingCloseBehaviour"
-    title="Keep TDC running when you close it?"
-    detail="It will stay in the tray so new messages still reach you. You can change this later in the tray menu, and quitting from there always quits."
-    confirm-label="Keep it running"
-    cancel-label="Quit on close"
+    :title="$ts('desktop.keepRunningTitle')"
+    :detail="$ts('desktop.keepRunningDetail')"
+    :confirm-label="$ts('desktop.keepRunning')"
+    :cancel-label="$ts('desktop.quitOnClose')"
     @cancel="chooseCloseBehaviour('quit')"
     @confirm="chooseCloseBehaviour('tray')"
   />

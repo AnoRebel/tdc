@@ -22,18 +22,16 @@ export interface Tone {
 }
 
 /** The tones made here, by note and timing. */
-const builtIn: Record<string, { name: string; notes: [number, number, number][] }> = {
+const builtIn: Record<string, { notes: [number, number, number][] }> = {
   // [offset seconds, frequency, length seconds]
   classic: {
-    name: "Classic",
     notes: [
       [0, 880, 0.22],
       [0.25, 660, 0.22],
     ],
   },
-  soft: { name: "Soft", notes: [[0, 523, 0.5]] },
+  soft: { notes: [[0, 523, 0.5]] },
   bright: {
-    name: "Bright",
     notes: [
       [0, 784, 0.12],
       [0.15, 988, 0.12],
@@ -41,7 +39,6 @@ const builtIn: Record<string, { name: string; notes: [number, number, number][] 
     ],
   },
   pulse: {
-    name: "Pulse",
     notes: [
       [0, 698, 0.08],
       [0.12, 698, 0.08],
@@ -49,7 +46,6 @@ const builtIn: Record<string, { name: string; notes: [number, number, number][] 
     ],
   },
   low: {
-    name: "Low",
     notes: [
       [0, 330, 0.3],
       [0.35, 392, 0.3],
@@ -86,6 +82,7 @@ export function canVibrate(): boolean {
 
 export const useRingtones = createGlobalState(() => {
   const { info } = useServerInfo();
+  const { $ts } = useI18n();
   const serverKey = computed(() => info.value?.canonicalAddress || info.value?.name || "server");
   const stored = useLocalStorage<Record<string, Settings>>("tdc.ringtones", {});
 
@@ -95,7 +92,7 @@ export const useRingtones = createGlobalState(() => {
   }
 
   const tones = computed<Tone[]>(() => [
-    ...Object.entries(builtIn).map(([id, tone]) => ({ id, name: tone.name })),
+    ...Object.keys(builtIn).map((id) => ({ id, name: $ts(`calls.tones.${id}`) })),
     ...settings.value.custom,
   ]);
 

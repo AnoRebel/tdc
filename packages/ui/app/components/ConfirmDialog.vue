@@ -2,6 +2,8 @@
 import { AlertTriangle } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
 
+const { $t } = useI18n();
+
 /**
  * Asks before something is destroyed.
  *
@@ -15,18 +17,16 @@ import { Button } from "#layers/ui/app/components/ui/button";
  * something by reflex.
  */
 
-const props = withDefaults(
-  defineProps<{
-    /** What is about to happen, e.g. "Delete this message?". */
-    title: string;
-    /** What will be lost. Shown verbatim, so the person recognises it. */
-    detail?: string;
-    /** The wording on the destructive button, e.g. "Delete". */
-    confirmLabel?: string;
-    cancelLabel?: string;
-  }>(),
-  { confirmLabel: "Delete", cancelLabel: "Cancel" },
-);
+const props = defineProps<{
+  /** What is about to happen, e.g. "Delete this message?". */
+  title: string;
+  /** What will be lost. Shown verbatim, so the person recognises it. */
+  detail?: string;
+  /** The wording on the destructive button, e.g. "Delete". Defaults to that. */
+  confirmLabel?: string;
+  /** Defaults to "Cancel". */
+  cancelLabel?: string;
+}>();
 
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
 
@@ -83,13 +83,13 @@ onKeyStroke("Escape", () => emit("cancel"));
              what a reflexive Enter activates. -->
         <div class="mt-5 flex justify-end gap-2">
           <Button variant="outline" ref="cancelButton" @click="emit('cancel')">
-            {{ props.cancelLabel }}
+            {{ props.cancelLabel ?? $t("action.cancel") }}
           </Button>
           <Button
             class="bg-destructive text-destructive-foreground hover:opacity-90"
             @click="emit('confirm')"
           >
-            {{ props.confirmLabel }}
+            {{ props.confirmLabel ?? $t("action.delete") }}
           </Button>
         </div>
       </div>

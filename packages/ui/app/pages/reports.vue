@@ -143,7 +143,7 @@ function name(address: string): string {
                 <p class="text-sm">
                   <span class="font-medium">{{ name(report.subject) }}</span>
                   <span class="text-muted-foreground"> {{ $t("moderation.wasReportedFor") }} </span>
-                  <span class="font-medium">{{ reportReasonLabel(report.reason) }}</span>
+                  <span class="font-medium">{{ reportReasonLabel(report.reason, $ts) }}</span>
                 </p>
                 <p class="mt-0.5 text-xs text-muted-foreground">
                   <template v-if="report.reporter">

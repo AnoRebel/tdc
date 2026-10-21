@@ -33,7 +33,7 @@ export default defineNuxtPlugin({
       const url = /^https?:\/\//i.test(path) ? path : `${base}${path}`;
       const response = await fetch(url, { credentials: "include" });
       if (!response.ok) {
-        throw new Error(`The file could not be read (${response.status}).`);
+        throw new Error(nuxtApp.$ts("attachment.fileUnreadable", { status: response.status }));
       }
       return response.arrayBuffer();
     });
@@ -56,15 +56,15 @@ export default defineNuxtPlugin({
           try {
             handlers.onDone(JSON.parse(request.responseText) as Attachment);
           } catch {
-            handlers.onError("The server's reply could not be read.");
+            handlers.onError(nuxtApp.$ts("attachment.replyUnreadable"));
           }
         } else {
-          handlers.onError(messageFrom(request));
+          handlers.onError(messageFrom(request, nuxtApp.$ts));
         }
       });
 
       request.addEventListener("error", () =>
-        handlers.onError("The upload could not reach the server."),
+        handlers.onError(nuxtApp.$ts("attachment.uploadUnreachable")),
       );
 
       // Fires on abort() as well as on a browser-initiated cancellation, so
@@ -101,7 +101,10 @@ export default defineNuxtPlugin({
  * 31457280" — which is what someone needs in order to act. Falling back to the
  * status code alone would throw that away.
  */
-function messageFrom(request: XMLHttpRequest): string {
+function messageFrom(
+  request: XMLHttpRequest,
+  say: (key: string, params?: Record<string, number>) => string,
+): string {
   try {
     const body = JSON.parse(request.responseText);
     if (typeof body?.message === "string" && body.message) return body.message;
@@ -109,10 +112,10 @@ function messageFrom(request: XMLHttpRequest): string {
     // Not JSON; fall through to the status.
   }
 
-  if (request.status === 413) return "That file is larger than this server allows.";
-  if (request.status === 415) return "This server does not accept that kind of file.";
-  if (request.status === 401) return "Your session has expired. Sign in and try again.";
-  if (request.status === 403) return "You do not have permission to upload here.";
+  if (request.status === 413) return say("attachment.tooLarge");
+  if (request.status === 415) return say("attachment.notAccepted");
+  if (request.status === 401) return say("attachment.sessionExpired");
+  if (request.status === 403) return say("attachment.noUploadPermission");
 
-  return `The upload failed (${request.status}).`;
+  return say("attachment.uploadFailed", { status: request.status });
 }

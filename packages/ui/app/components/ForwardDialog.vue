@@ -3,6 +3,8 @@ import type { Room } from "@tdc/types";
 import { Forward, Hash, Lock, Search } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
 
+const { $t, $ts } = useI18n();
+
 /**
  * Choosing where to forward.
  *
@@ -43,7 +45,7 @@ function iconFor(room: Room) {
     class="fixed inset-0 z-50 flex items-start justify-center bg-background/70 p-4 backdrop-blur-sm"
     role="dialog"
     aria-modal="true"
-    aria-label="Forward"
+    :aria-label="$ts('room.forward')"
     @click.self="emit('cancel')"
     @keydown.esc="emit('cancel')"
   >
@@ -53,7 +55,7 @@ function iconFor(room: Room) {
       <header class="border-b border-border px-4 py-3">
         <h2 class="flex items-center gap-2 text-sm font-semibold">
           <Forward class="size-4" />
-          {{ count === 1 ? "Forward this message" : `Forward ${count} messages` }}
+          {{ count === 1 ? $t("room.forwardOne") : $t("room.forwardMany", { count }) }}
         </h2>
       </header>
 
@@ -66,19 +68,19 @@ function iconFor(room: Room) {
             ref="field"
             v-model="filter"
             type="text"
-            placeholder="Search conversations"
+            :placeholder="$ts('room.searchConversations')"
             class="h-11 w-full bg-transparent pl-7 text-sm outline-none placeholder:text-muted-foreground"
-            aria-label="Search conversations"
+            :aria-label="$ts('room.searchConversations')"
           />
         </div>
       </div>
 
       <div class="max-h-72 overflow-y-auto p-1.5">
         <p v-if="!rooms.length" class="px-2 py-8 text-center text-xs text-muted-foreground">
-          There is nowhere else to forward this. Join another conversation first.
+          {{ $t("room.nowhereToForward") }}
         </p>
         <p v-else-if="!matching.length" class="px-2 py-8 text-center text-xs text-muted-foreground">
-          Nothing matches &ldquo;{{ filter.trim() }}&rdquo;.
+          {{ $t("nav.noMatches", { query: filter.trim() }) }}
         </p>
 
         <button
@@ -97,7 +99,7 @@ function iconFor(room: Room) {
       </div>
 
       <footer class="flex justify-end border-t border-border px-4 py-3">
-        <Button variant="ghost" @click="emit('cancel')">Cancel</Button>
+        <Button variant="ghost" @click="emit('cancel')">{{ $t("action.cancel") }}</Button>
       </footer>
     </div>
   </div>

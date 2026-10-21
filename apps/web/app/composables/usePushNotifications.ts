@@ -19,6 +19,7 @@ export interface PushDevice {
  */
 export function usePushNotifications() {
   const api = useApi();
+  const { $ts } = useI18n();
 
   const supported = ref(false);
   const offered = ref(false);
@@ -106,7 +107,7 @@ export function usePushNotifications() {
     try {
       const config = await api.get<{ enabled: boolean; publicKey?: string }>("/api/push/config");
       if (!config.enabled || !config.publicKey) {
-        error.value = "This server has not set up notifications.";
+        error.value = $ts("notification.notSetUp");
         return;
       }
 
@@ -117,10 +118,7 @@ export function usePushNotifications() {
          * choice, and a browser that has been refused once will not ask again
          * — telling them where to change it is more use than an apology.
          */
-        error.value =
-          permission.value === "denied"
-            ? "Notifications are blocked for this site in your browser's settings."
-            : null;
+        error.value = permission.value === "denied" ? $ts("notification.blockedInBrowser") : null;
         return;
       }
 
@@ -151,7 +149,7 @@ export function usePushNotifications() {
 
       await refresh();
     } catch (cause) {
-      error.value = subscribeFailure(cause);
+      error.value = subscribeFailure(cause, $ts);
     } finally {
       busy.value = false;
     }
@@ -181,7 +179,7 @@ export function usePushNotifications() {
 
       await refresh();
     } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : "That device could not be removed.";
+      error.value = cause instanceof Error ? cause.message : $ts("notification.couldNotRemove");
     } finally {
       busy.value = false;
     }
@@ -200,7 +198,8 @@ export function usePushNotifications() {
       await api.put("/api/me/preferences/hide-push-content", { hide });
       hideContent.value = hide;
     } catch (cause) {
-      error.value = cause instanceof Error ? cause.message : "That setting could not be saved.";
+      error.value =
+        cause instanceof Error ? cause.message : $ts("notification.couldNotSaveSetting");
       throw cause;
     }
   }
