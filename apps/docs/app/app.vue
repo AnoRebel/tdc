@@ -3,20 +3,15 @@
  * Replaces the layer's app.vue for one reason: the sidebar. The guides are
  * flat files in docs/, so the layer would list them alphabetically; this
  * groups and orders them the way the application's help centre does, from the
- * same catalogue (lib/guides.ts). Internationalisation and the AI assistant
+ * same catalogue (lib/sidebar.ts). Internationalisation and the AI assistant
  * the layer's version also wires up are not used here.
  */
-import type { ContentNavigationItem } from "@nuxt/content";
+import { readingOrder, sidebar, type SidebarCatalogue } from "~~/lib/sidebar";
 
 const appConfig = useAppConfig();
 const { seo } = appConfig;
 const site = useSiteConfig();
-const { tdc } = appConfig as unknown as {
-  tdc: {
-    guides: { slug: string; group: string; title: string }[];
-    groups: { id: string; title: string; icon: string }[];
-  };
-};
+const { tdc } = appConfig as unknown as { tdc: SidebarCatalogue };
 
 useDocusShortcuts();
 
@@ -26,44 +21,18 @@ useHead({
 });
 
 useSeoMeta({
-  titleTemplate: seo.titleTemplate,
+  titleTemplate: "%s · TDC docs",
   title: seo.title,
   description: seo.description,
   ogSiteName: site.name,
   twitterCard: "summary_large_image",
 });
 
-function grouped(pages: ContentNavigationItem[]): ContentNavigationItem[] {
-  const byPath = new Map(pages.map((page) => [page.path, page]));
-  const placed = new Set<string>();
-
-  const groups = tdc.groups.map((group) => ({
-    title: group.title,
-    icon: group.icon,
-    path: `/${group.id}`,
-    children: tdc.guides
-      .filter((guide) => guide.group === group.id)
-      .flatMap((guide) => {
-        const page = byPath.get(`/${guide.slug}`);
-        if (!page) return [];
-        placed.add(page.path);
-        return [{ ...page, title: guide.title }];
-      }),
-  }));
-
-  // A file in docs/ the help centre does not list yet still has a place here.
-  const rest = pages.filter((page) => !placed.has(page.path));
-  if (rest.length)
-    groups.push({ title: "More", icon: "i-lucide-files", path: "/more", children: rest });
-
-  return groups.filter((group) => group.children.length);
-}
-
 const { data: navigation } = await useAsyncData(
   "navigation_docs",
   () => queryCollectionNavigation("docs"),
   {
-    transform: grouped,
+    transform: (pages) => sidebar(pages, tdc),
   },
 );
 
@@ -76,7 +45,7 @@ provide("navigation", navigation);
  */
 const route = useRoute();
 const { open: openSearch } = useContentSearch();
-const order = computed(() => (navigation.value ?? []).flatMap((group) => group.children ?? []));
+const order = computed(() => readingOrder(navigation.value ?? []));
 
 function step(by: number) {
   const index = order.value.findIndex((page) => page.path === route.path);
