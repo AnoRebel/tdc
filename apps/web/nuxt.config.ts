@@ -37,7 +37,14 @@ export default defineNuxtConfig({
        * offered to add it to a home screen, which looks like the feature not
        * existing rather than a missing line.
        */
-      link: [{ rel: "manifest", href: "/manifest.webmanifest" }],
+      link: [
+        { rel: "manifest", href: "/manifest.webmanifest" },
+        // The two speech bubbles, the same mark the desktop application and
+        // the documentation site carry.
+        { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+        { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+        { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      ],
       meta: [
         {
           name: "description",
