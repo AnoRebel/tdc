@@ -187,7 +187,7 @@ const listId = "new-message-people";
               <!-- The people chosen, then the box for the next one, on one
                    line that wraps — the shape of an address line. -->
               <div
-                class="flex flex-wrap items-center gap-1.5 rounded-lg border border-input bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/40"
+                class="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/40"
               >
                 <TransitionGroup name="motion-list">
                   <span
