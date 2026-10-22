@@ -205,6 +205,9 @@ func (s *Server) handleJoinCall(c *echo.Context) error {
 	if decision := currentPermissions(c).AllowsChannel(needed, roomID); !decision.Allowed {
 		return echo.NewHTTPError(http.StatusForbidden, decision.Error())
 	}
+	if err := s.mayCallInEvent(c, roomID, needed == authz.PermCallStart); err != nil {
+		return err
+	}
 
 	limit := int(s.settings.Int(ctx, settings.CallsMaxParticipants))
 	call, started, err := s.rooms.JoinCall(ctx, roomID, user.ID, request.Audio, request.Video, limit)

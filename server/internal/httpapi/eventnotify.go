@@ -1,7 +1,10 @@
 package httpapi
 
 import (
+	"net/http"
+
 	"context"
+	"github.com/labstack/echo/v5"
 	"strings"
 	"time"
 
@@ -152,4 +155,56 @@ func (s *Server) eventChannelFor(ctx context.Context, entry dbgen.Event) (uuid.U
 		return uuid.Nil, false
 	}
 	return *event.ChannelID, true
+}
+
+/*
+mayCallInEvent applies what an event adds to its conversation's call: there is
+a call only for an event hosted online, and only somebody running it — its
+creator, a host, or somebody who manages events there — starts it. Anybody in
+the conversation joins once it has. Every other room is left alone.
+*/
+func (s *Server) mayCallInEvent(c *echo.Context, roomID uuid.UUID, starting bool) error {
+	if s.calendar == nil {
+		return nil
+	}
+	ctx := c.Request().Context()
+	event, err := s.calendar.Queries().GetCalendarEvent(ctx, roomID)
+	if err != nil {
+		return nil // not an event's conversation
+	}
+	if !event.Online || event.CancelledAt != nil {
+		return echo.NewHTTPError(http.StatusConflict, "this event is not hosted in a call here")
+	}
+	if !starting {
+		return nil
+	}
+	viewer, err := s.viewerOf(c)
+	if err != nil {
+		return err
+	}
+	if !viewer.Runs(event) && !viewer.Manages(event) {
+		return echo.NewHTTPError(http.StatusForbidden, "the event's hosts start its call")
+	}
+	return nil
+}
+
+/*
+coverVisible reports whether an attachment is the cover of an event somebody may
+see, which lets them see it without being in the event's conversation.
+*/
+func (s *Server) coverVisible(c *echo.Context, attachmentID uuid.UUID) bool {
+	if s.calendar == nil {
+		return false
+	}
+	ctx := c.Request().Context()
+	eventID, err := s.calendar.Queries().IsCalendarCover(ctx, &attachmentID)
+	if err != nil {
+		return false
+	}
+	viewer, err := s.viewerOf(c)
+	if err != nil {
+		return false
+	}
+	_, err = s.calendar.Get(ctx, viewer, eventID)
+	return err == nil
 }
