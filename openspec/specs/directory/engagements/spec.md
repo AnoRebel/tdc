@@ -126,6 +126,42 @@ The agreement record MUST be immutable, and both parties MUST be able to export 
 - **WHEN** either party exports the agreement
 - **THEN** they receive its full content in a documented, machine-readable format
 
+### Requirement: Revising an agreement
+
+Once an agreement is recorded, either party SHALL be able to propose a revision of it — a reason and amended terms — while the engagement is in agreement, active, or awaiting completion confirmation, and not once it is completed or withdrawn.
+
+A revision MUST follow the agreement's own rules: its terms are immutable versions, either party may accept, decline, request changes to a part, or send a counter-version, and a new agreement MUST be recorded only when both parties accept the same version. Until then the agreement already recorded MUST remain the one in force. At most one revision MAY be open at a time, and while one is open the work MUST NOT be recorded as complete. Every revision, version, answer and outcome MUST be visible to both parties, notified to the other party, included in the export, and refused any later change.
+
+#### Scenario: Revision is not in force until both accept
+
+- **WHEN** one party has accepted a version of a revision and the other has not
+- **THEN** the agreement in force is unchanged
+
+#### Scenario: Revision comes into force on mutual acceptance
+
+- **WHEN** both parties accept the same version of a revision
+- **THEN** a new agreement is recorded for that version with both acceptance times, beside the earlier agreements, and becomes the one in force
+
+#### Scenario: Revision can be declined or withdrawn
+
+- **WHEN** either party declines an open revision, or the party who opened it withdraws it
+- **THEN** the revision ends and the agreement in force is unchanged
+
+#### Scenario: One revision at a time
+
+- **WHEN** a revision is open
+- **THEN** another cannot be proposed, and the work cannot be marked or confirmed complete
+
+#### Scenario: No answer on another's behalf
+
+- **WHEN** an answer to a version is recorded
+- **THEN** it is recorded as the authenticated party's, and an answer by anybody not party to the engagement is refused
+
+#### Scenario: Export carries the history
+
+- **WHEN** either party exports the agreement after a revision
+- **THEN** the export holds the agreement in force, every agreement recorded, and every revision with its versions, answers and outcome
+
 ### Requirement: The platform is not a party
 
 The server SHALL make clear that it records what the parties agreed and does not itself provide escrow, payment, guarantees, or dispute resolution unless an operator has explicitly enabled such an integration.
