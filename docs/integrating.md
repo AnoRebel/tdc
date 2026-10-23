@@ -540,6 +540,43 @@ resulting message rather than 200 or 204. Deleting leaves a placeholder rather
 than removing the event: a deleted message leaves evidence that something was
 there.
 
+### Replying in a thread
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/threads/$MESSAGE/replies" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"body":"Deployed.","clientToken":"3f9a2c7e-2"}'
+```
+
+**A reply takes exactly what a message takes** — `body`, `clientToken`,
+`attachmentIds` and `actions` — and is refused for the same reasons, through
+the same code: a ban or posting restriction, the content filter, files that are
+not yours to attach, buttons that do not check out. It answers **201** with the
+reply, whose `threadRoot` names the thread. Replying to a reply joins the same
+thread rather than nesting.
+
+A reply never appears in `/timeline`. `GET /api/rooms/:id/threads/:eventId`
+returns `{root, replies, readSequence, following}`, where `replies` is every
+event in the thread oldest first — replies, and the edits, deletions and
+controls updates of them, which carry `threadRoot` too and are folded the way
+a timeline is. Asked with a reply's id, it answers with the thread that reply
+is in. `GET /api/rooms/:id/threads` gives `{replyCount, lastReplyAt, unread}`
+per thread, where `unread` counts only in threads the caller follows. On the
+live connection an event with `threadRoot` belongs to that thread.
+
+Starting a thread or replying in one follows it; `PUT` and `DELETE` on
+`/api/rooms/:id/threads/:eventId/follow` follow or stop following explicitly,
+which later replies do not override. A reply notifies the thread's followers
+and the people it mentions, nobody else. `POST
+/api/rooms/:id/threads/:eventId/read` with `{"sequence": n}` records how far
+the caller has read; it never moves backwards. Reactions on a thread are
+`GET /api/rooms/:id/reactions?thread=:eventId`. Typing in a thread is
+`POST /api/rooms/:id/typing` with `{"threadRoot": ":eventId"}`, and the typing
+list names the thread for anybody writing in one.
+
+A channel's unread count leaves replies out; each thread keeps its own.
+
 ### Offering a choice
 
 A message may carry buttons:

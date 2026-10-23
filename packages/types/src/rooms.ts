@@ -90,6 +90,11 @@ export interface Message {
   redacted: boolean;
   /** When this message will be removed, where it has been given a lifetime. */
   lifetime?: MessageLifetime;
+  /**
+   * The thread this belongs to, for a reply and for anything done to one.
+   * Absent for a message in the channel itself.
+   */
+  threadRoot?: string;
 }
 
 /** The payload of an event, by type. */
@@ -411,6 +416,8 @@ export interface ThreadSummary {
   replyCount: number;
   /** Milliseconds since the epoch, so a client can order by recent activity. */
   lastReplyAt: number;
+  /** Replies the reader has not read, counted only in threads they follow. */
+  unread: number;
 }
 
 /** Why somebody was notified. */

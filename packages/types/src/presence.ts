@@ -65,6 +65,8 @@ export interface NotificationPreferences {
 export interface TypingPerson {
   userId: string;
   displayName: string;
+  /** The thread they are replying in, when they are writing a reply. */
+  threadRoot?: string;
 }
 
 /** Unread counts, keyed by room identifier. */
@@ -73,5 +75,13 @@ export type UnreadCounts = Record<string, number>;
 /** A thread: the message that began it and the replies under it. */
 export interface Thread {
   root: import("./rooms").Message;
+  /**
+   * Everything in the thread, oldest first: the replies, and the edits,
+   * deletions and updates made to them, folded the same way a channel is.
+   */
   replies: import("./rooms").Message[];
+  /** How far the reader has read this thread, as a room sequence; 0 if never. */
+  readSequence: number;
+  /** Whether the reader hears about new replies here. */
+  following: boolean;
 }

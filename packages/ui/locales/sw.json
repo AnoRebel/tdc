@@ -373,7 +373,18 @@
     "searchConversations": "Tafuta mazungumzo",
     "nowhereToForward": "Hakuna mahali pengine pa kusambaza hili. Jiunge na mazungumzo mengine kwanza.",
     "addReaction": "Ongeza hisia",
-    "namesAndMore": "{names} na wengine {count}"
+    "namesAndMore": "{names} na wengine {count}",
+    "newReplies": "{count} mapya",
+    "newRepliesDivider": "Mapya",
+    "mentionSomebody": "Watu wa kumtaja",
+    "dropToAttach": "Achilia ili kuambatisha kwenye ujumbe wako katika {room}",
+    "dropToAttachReply": "Achilia ili kuambatisha kwenye jibu lako",
+    "couldNotFollow": "Imeshindikana kubadilisha kama unafuatilia mjadala huu.",
+    "followThread": "Fuatilia mjadala huu",
+    "stopFollowingThread": "Acha kufuatilia mjadala huu",
+    "followThreadHint": "Hufuatilii. Fuatilia ili uarifiwe kuhusu majibu mapya.",
+    "followingThreadHint": "Unafuatilia. Unaarifiwa kuhusu majibu mapya.",
+    "replyPlaceholder": "Jibu…"
   },
   "channel": {
     "create": "Kipindi kipya",

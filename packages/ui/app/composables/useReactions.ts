@@ -7,15 +7,19 @@ import type { Reaction } from "@tdc/types";
  * a timeline draws every message it has, and a request each would be one
  * request per message.
  */
-export function useReactions(roomId: Ref<string>) {
+export function useReactions(roomId: Ref<string>, threadRoot?: Ref<string | undefined>) {
   const api = useApi();
 
   const byEvent = ref<Record<string, Reaction[]>>({});
 
+  // A thread's replies are not in the channel's timeline, so a thread asks for
+  // its own: the root and every reply under it.
   async function refresh() {
+    const thread = threadRoot?.value;
     try {
       byEvent.value = await api.get<Record<string, Reaction[]>>(
-        `/api/rooms/${roomId.value}/reactions`,
+        `/api/rooms/${roomId.value}/reactions` +
+          (thread ? `?thread=${encodeURIComponent(thread)}` : ""),
       );
     } catch {
       // Reactions are decoration on a timeline that has already loaded.

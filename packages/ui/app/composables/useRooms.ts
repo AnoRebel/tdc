@@ -218,16 +218,30 @@ export function useRooms() {
     return api.get<Record<string, ThreadSummary>>(`/api/rooms/${roomId}/threads`);
   }
 
+  /** Posts a reply in a thread. It takes what a message does, files included. */
   function reply(
     roomId: string,
     rootId: string,
     body: string,
     clientToken: string,
+    attachmentIds: string[] = [],
   ): Promise<Message> {
     return api.post<Message>(`/api/rooms/${roomId}/threads/${rootId}/replies`, {
       body,
       clientToken,
+      attachmentIds,
     });
+  }
+
+  /** Records how far the person has read one thread. */
+  function markThreadRead(roomId: string, rootId: string, sequence: number): Promise<void> {
+    return api.post(`/api/rooms/${roomId}/threads/${rootId}/read`, { sequence });
+  }
+
+  /** Follows a thread, or stops following it. */
+  function followThread(roomId: string, rootId: string, following: boolean): Promise<void> {
+    const path = `/api/rooms/${roomId}/threads/${rootId}/follow`;
+    return following ? api.put(path, {}) : api.delete(path);
   }
 
   /** Opens the conversation with these people, or returns the existing one. */
@@ -256,9 +270,12 @@ export function useRooms() {
     return api.get<TypingPerson[]>(`/api/rooms/${roomId}/typing`);
   }
 
-  /** Announces that the person is composing. The server expires it on its own. */
-  function startTyping(roomId: string): Promise<void> {
-    return api.post(`/api/rooms/${roomId}/typing`);
+  /**
+   * Announces that the person is composing — in a thread, when given its root.
+   * The server expires it on its own.
+   */
+  function startTyping(roomId: string, threadRoot?: string): Promise<void> {
+    return api.post(`/api/rooms/${roomId}/typing`, threadRoot ? { threadRoot } : undefined);
   }
 
   return {
@@ -276,6 +293,8 @@ export function useRooms() {
     remove,
     thread,
     threadSummaries,
+    markThreadRead,
+    followThread,
     forward,
     pressAction,
     report,
