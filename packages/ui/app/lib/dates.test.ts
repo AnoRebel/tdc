@@ -13,6 +13,8 @@ import {
   onDayAtTime,
   onWeekdayAtTime,
   todayIn,
+  wallClockIn,
+  wallClockOf,
   whenBriefly,
 } from "./dates";
 
@@ -285,5 +287,26 @@ describe("date formatting across both applications", () => {
       offenders.sort(),
       "these ask the runtime for a locale, which the two clients do not always agree on",
     ).toEqual([]);
+  });
+});
+
+/*
+ * A window chosen in one zone means that zone's clock, whatever zone the
+ * machine runs in — the trap on a machine set to UTC for somebody in Dar es
+ * Salaam, three hours ahead.
+ */
+describe("wall-clock times in a zone", () => {
+  it("reads a typed time in the chosen zone, and back", () => {
+    expect(wallClockIn("2026-11-03T09:00", "Africa/Dar_es_Salaam")).toBe(
+      "2026-11-03T06:00:00.000Z",
+    );
+    expect(wallClockIn("2026-11-03T09:00", "UTC")).toBe("2026-11-03T09:00:00.000Z");
+    expect(wallClockOf("2026-11-03T06:00:00.000Z", "Africa/Dar_es_Salaam")).toBe(
+      "2026-11-03T09:00",
+    );
+  });
+
+  it("has nothing to say about an empty field", () => {
+    expect(wallClockIn("", "UTC")).toBeUndefined();
   });
 });

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Message, Thread } from "@tdc/types";
+import type { Message, MessageVia, Thread } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { SendHorizontal, X } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
@@ -68,6 +68,11 @@ async function send() {
 
 function bodyOf(message: Message): string {
   return message.redacted ? $ts("room.messageRemoved") : (message.content.body ?? "");
+}
+
+/** What kind of program, if any, a reply came from. */
+function viaKindOf(message: Message): MessageVia["kind"] | undefined {
+  return (message.content as { via?: MessageVia }).via?.kind;
 }
 
 function shortName(address: string): string {
@@ -155,6 +160,21 @@ function when(value: string): string {
             <p class="mb-0.5 flex items-baseline gap-2 leading-tight">
               <span class="text-xs font-semibold">
                 {{ reply.sender === selfAddress ? $t("room.you") : shortName(reply.sender) }}
+              </span>
+              <!-- Said in words, as in the conversation: a program's reply or an
+                   automatic one is never read as somebody typing. -->
+              <span
+                v-if="viaKindOf(reply)"
+                class="rounded border border-border px-1 text-[0.625rem] font-medium tracking-wide text-muted-foreground uppercase"
+                data-sender-kind
+              >
+                {{
+                  viaKindOf(reply) === "automatic"
+                    ? $t("autoReply.badge")
+                    : viaKindOf(reply) === "bot"
+                      ? $t("integrations.bot")
+                      : $t("integrations.webhook")
+                }}
               </span>
               <time class="text-[0.6875rem] text-muted-foreground">{{ when(reply.sentAt) }}</time>
             </p>

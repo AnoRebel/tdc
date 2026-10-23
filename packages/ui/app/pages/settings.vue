@@ -369,6 +369,11 @@ function deviceName(userAgent: string): string {
         </div>
       </section>
 
+      <!-- What the server says for you while you are away, beside the status
+           most replies are tied to. Loaded on its own, so the form and its
+           validation cost nothing to anybody who never opens settings. -->
+      <LazyAutomaticReplies />
+
       <!-- Both are about who can reach this account, and both come before the
            list of devices that already do. The second factor first, since it is
            the one that protects the password everybody already has. -->

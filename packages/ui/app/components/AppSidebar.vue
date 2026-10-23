@@ -103,12 +103,15 @@ const statusLine = computed(() => {
   if (own.invisible) parts.push(ownStatus.labelOf(appearOfflineKey));
   else if (own.status !== "available") parts.push(ownStatus.labelOf(own.status));
   if (own.statusText) parts.push(own.statusText);
-  if (!parts.length) return null;
+  if (!parts.length && !own.automaticReply) return null;
 
   if (own.expiresAt) {
     const left = remaining(new Date(own.expiresAt), now.value);
     if (left) parts.push($ts(`status.left.${left.unit}`, { count: left.count }));
   }
+  // Said where the status is, so nobody forgets the server is answering for
+  // them — the reason an automatic reply left on is noticed and turned off.
+  if (own.automaticReply) parts.push($ts("autoReply.on"));
   return parts.join(" · ");
 });
 
@@ -440,8 +443,17 @@ function isCurrent(roomId: string): boolean {
         </span>
         <span class="min-w-0 flex-1">
           <span class="block truncate text-xs font-medium">{{ user?.displayName }}</span>
-          <span class="block truncate text-[0.6875rem] text-muted-foreground">
-            {{ statusLine ?? user?.address }}
+          <span class="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
+            <!-- Visible however much of the line the width cuts off; the
+                 words are in the line and the button's name. -->
+            <Icon
+              v-if="ownStatus.own.value.automaticReply"
+              name="lucide:message-square-reply"
+              class="size-3 shrink-0 text-primary"
+              aria-hidden="true"
+              data-automatic-reply-on
+            />
+            <span class="truncate">{{ statusLine ?? user?.address }}</span>
           </span>
         </span>
       </button>

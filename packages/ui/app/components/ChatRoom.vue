@@ -1010,7 +1010,11 @@ const grouped = computed(() => {
 
   for (const message of visible.value) {
     const previous = groups.at(-1);
-    const sameSender = previous?.sender === message.sender;
+    // An automatic reply is its own turn even beside the person's own
+    // messages, so its mark is never read as covering what they typed.
+    const sameSender =
+      previous?.sender === message.sender &&
+      viaOf(previous)?.kind === (message.content as { via?: MessageVia } | undefined)?.via?.kind;
     const soonAfter =
       previous &&
       new Date(message.sentAt).getTime() - new Date(previous.items.at(-1)!.sentAt).getTime() <
@@ -2240,7 +2244,8 @@ watch(roomId, load, { immediate: true });
                   }}
                 </span>
                 <!-- A program is named as one, in words, so nobody reads a
-                     webhook's or a bot's message as a person's. -->
+                     webhook's or a bot's message as a person's, nor an automatic reply as
+                     somebody typing. -->
                 <span
                   v-if="viaOf(group)"
                   class="rounded border border-border px-1 text-[0.625rem] font-medium tracking-wide text-muted-foreground uppercase"
@@ -2249,7 +2254,9 @@ watch(roomId, load, { immediate: true });
                   {{
                     viaOf(group)!.kind === "bot"
                       ? $t("integrations.bot")
-                      : $t("integrations.webhook")
+                      : viaOf(group)!.kind === "automatic"
+                        ? $t("autoReply.badge")
+                        : $t("integrations.webhook")
                   }}
                 </span>
                 <time class="text-[0.6875rem] text-muted-foreground">{{ when(group.at) }}</time>
