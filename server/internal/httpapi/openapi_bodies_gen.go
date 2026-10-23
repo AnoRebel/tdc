@@ -45,6 +45,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/calendar/subscriptions/:subscriptionId": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/calls/:callId": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -409,6 +414,11 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/calendar/public.ics": {
 		Raw: map[int]string{
 			200: "text/calendar; charset=utf-8",
+		},
+	},
+	"GET /api/calendar/subscriptions": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]subscriptionView]()},
 		},
 	},
 	"GET /api/call-links/:secret": {
@@ -1257,6 +1267,23 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"POST /api/calendar/subscriptions": {
+		Request: reflect.TypeFor[struct {
+			URL        string "json:\"url\""
+			Label      string "json:\"label\""
+			ChannelID  string "json:\"channelId\""
+			Visibility string "json:\"visibility\""
+			Kind       string "json:\"kind\""
+		}](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[subscriptionView]()},
+		},
+	},
+	"POST /api/calendar/subscriptions/:subscriptionId/refresh": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
 	"POST /api/call-links/:secret/join": {
 		Request: reflect.TypeFor[useLinkRequest](),
 		Responses: []responseBody{
@@ -1402,6 +1429,18 @@ var routeBodies = map[string]routeBodySet{
 			Users    []string "json:\"users\""
 			Channels []string "json:\"channels\""
 		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/events/import": {
+		Request: reflect.TypeFor[importRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]int]()},
+		},
+	},
+	"POST /api/events/import/preview": {
+		Request: reflect.TypeFor[importRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},

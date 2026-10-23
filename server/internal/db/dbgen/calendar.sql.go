@@ -10,7 +10,6 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addCalendarEventPerson = `-- name: AddCalendarEventPerson :exec
@@ -176,7 +175,7 @@ func (q *Queries) ClaimCalendarReminder(ctx context.Context, arg ClaimCalendarRe
 }
 
 const claimDueCalendarSubscription = `-- name: ClaimDueCalendarSubscription :one
-UPDATE calendar_subscriptions SET next_fetch_at = NOW() + $1::interval
+UPDATE calendar_subscriptions SET next_fetch_at = NOW() + make_interval(secs => $1::int)
 WHERE id = (
     SELECT id FROM calendar_subscriptions
     WHERE paused_at IS NULL AND next_fetch_at <= NOW()
@@ -189,8 +188,8 @@ RETURNING id, url, label, channel_id, visibility, kind, created_by, created_at, 
 
 // One subscription whose turn has come, pushed into the future as it is
 // claimed, so another node looking at the same moment finds nothing to do.
-func (q *Queries) ClaimDueCalendarSubscription(ctx context.Context, hold pgtype.Interval) (CalendarSubscription, error) {
-	row := q.db.QueryRow(ctx, claimDueCalendarSubscription, hold)
+func (q *Queries) ClaimDueCalendarSubscription(ctx context.Context, holdSeconds int32) (CalendarSubscription, error) {
+	row := q.db.QueryRow(ctx, claimDueCalendarSubscription, holdSeconds)
 	var i CalendarSubscription
 	err := row.Scan(
 		&i.ID,

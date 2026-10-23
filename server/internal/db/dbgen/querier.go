@@ -9,7 +9,6 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
@@ -90,7 +89,7 @@ type Querier interface {
 	ClaimCalendarReminder(ctx context.Context, arg ClaimCalendarReminderParams) (int64, error)
 	// One subscription whose turn has come, pushed into the future as it is
 	// claimed, so another node looking at the same moment finds nothing to do.
-	ClaimDueCalendarSubscription(ctx context.Context, hold pgtype.Interval) (CalendarSubscription, error)
+	ClaimDueCalendarSubscription(ctx context.Context, holdSeconds int32) (CalendarSubscription, error)
 	ClaimDueNotificationDigests(ctx context.Context, limit int32) ([]NotificationDigest, error)
 	// What is ready to send, claimed by whoever asked.
 	//

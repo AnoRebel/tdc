@@ -442,6 +442,8 @@ func (s *Server) Run(ctx context.Context) error {
 	// Reminders of events people are going to. Every node runs a pass and
 	// claims what it sends.
 	go s.RunEventReminders(ctx)
+	// Calendars followed from elsewhere, fetched again as each comes due.
+	go s.RunCalendarSubscriptions(ctx)
 
 	// Summaries of missed activity, mailed to whoever chose one. Every node
 	// runs a pass for the same reason, and claims what it sends the same way.

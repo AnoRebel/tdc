@@ -143,6 +143,15 @@ func (s *Service) create(
 	if err := draft.Normalise(channelVisibility); err != nil {
 		return Created{}, err
 	}
+	return s.insert(ctx, actor, draft, subscription, uid, channelName, channelVisibility)
+}
+
+// insert writes a checked, normalised event, its conversation and its first
+// log entry, together.
+func (s *Service) insert(
+	ctx context.Context, actor dbgen.User, draft Draft,
+	subscription *uuid.UUID, uid, channelName, channelVisibility string,
+) (Created, error) {
 	lastEnd, err := Series{
 		Start: draft.StartsAt, End: draft.EndsAt, Zone: mustZone(draft.TimeZone),
 		Rule: draft.Recurrence, Exceptions: draft.Exceptions,

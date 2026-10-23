@@ -265,7 +265,7 @@ DELETE FROM calendar_subscriptions WHERE id = $1;
 -- name: ClaimDueCalendarSubscription :one
 -- One subscription whose turn has come, pushed into the future as it is
 -- claimed, so another node looking at the same moment finds nothing to do.
-UPDATE calendar_subscriptions SET next_fetch_at = NOW() + sqlc.arg(hold)::interval
+UPDATE calendar_subscriptions SET next_fetch_at = NOW() + make_interval(secs => sqlc.arg(hold_seconds)::int)
 WHERE id = (
     SELECT id FROM calendar_subscriptions
     WHERE paused_at IS NULL AND next_fetch_at <= NOW()
