@@ -70,15 +70,17 @@ SELECT * FROM server_statuses ORDER BY sort_order, label;
 SELECT * FROM server_statuses WHERE key = $1;
 
 -- name: StartTyping :exec
-INSERT INTO typing_indicators (room_id, user_id, expires_at)
-VALUES ($1, $2, $3)
-ON CONFLICT (room_id, user_id) DO UPDATE SET expires_at = EXCLUDED.expires_at;
+INSERT INTO typing_indicators (room_id, user_id, expires_at, thread_root_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (room_id, user_id)
+DO UPDATE SET expires_at = EXCLUDED.expires_at, thread_root_id = EXCLUDED.thread_root_id;
 
 -- name: StopTyping :exec
 DELETE FROM typing_indicators WHERE room_id = $1 AND user_id = $2;
 
 -- name: ListTyping :many
-SELECT typing_indicators.user_id, users.username, users.display_name
+SELECT typing_indicators.user_id, users.username, users.display_name,
+       typing_indicators.thread_root_id
 FROM typing_indicators
 JOIN users ON users.id = typing_indicators.user_id
 WHERE typing_indicators.room_id = $1 AND typing_indicators.expires_at > NOW();

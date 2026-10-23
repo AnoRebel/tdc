@@ -243,6 +243,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/rooms/:id/threads/:eventId/follow": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/views/:id": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -876,6 +881,7 @@ var routeBodies = map[string]routeBodySet{
 		},
 	},
 	"GET /api/rooms/:id/reactions": {
+		Query: []string{"thread"},
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string][]reactionResponse]()},
 		},
@@ -1732,13 +1738,20 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 201, Type: reflect.TypeFor[scheduledResponse]()},
 		},
 	},
+	"POST /api/rooms/:id/threads/:eventId/read": {
+		Request: reflect.TypeFor[markReadRequest](),
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"POST /api/rooms/:id/threads/:eventId/replies": {
-		Request: reflect.TypeFor[replyRequest](),
+		Request: reflect.TypeFor[sendMessageRequest](),
 		Responses: []responseBody{
 			{Status: 201, Type: reflect.TypeFor[messageResponse]()},
 		},
 	},
 	"POST /api/rooms/:id/typing": {
+		Request: reflect.TypeFor[startTypingRequest](),
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
 		},
@@ -1990,6 +2003,11 @@ var routeBodies = map[string]routeBodySet{
 	},
 	"PUT /api/rooms/:id/messages/:eventId/reactions": {
 		Request: reflect.TypeFor[reactionRequest](),
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"PUT /api/rooms/:id/threads/:eventId/follow": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
 		},

@@ -373,7 +373,18 @@
     "searchConversations": "Search conversations",
     "nowhereToForward": "There is nowhere else to forward this. Join another conversation first.",
     "addReaction": "Add a reaction",
-    "namesAndMore": "{names} and {count} more"
+    "namesAndMore": "{names} and {count} more",
+    "newReplies": "{count} new",
+    "newRepliesDivider": "New",
+    "mentionSomebody": "People to mention",
+    "dropToAttach": "Drop to attach to your message in {room}",
+    "dropToAttachReply": "Drop to attach to your reply",
+    "couldNotFollow": "Could not change whether you follow this thread.",
+    "followThread": "Follow this thread",
+    "stopFollowingThread": "Stop following this thread",
+    "followThreadHint": "Not following. Follow to be told about new replies.",
+    "followingThreadHint": "Following. You are told about new replies.",
+    "replyPlaceholder": "Reply…"
   },
   "channel": {
     "create": "New channel",

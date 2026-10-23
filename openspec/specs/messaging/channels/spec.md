@@ -128,6 +128,38 @@ Any message SHALL be able to serve as the root of a thread, with replies grouped
 
 A thread MUST inherit the permissions and visibility of the channel containing its root message.
 
+A reply SHALL be a message in every respect. Posting one MUST accept the same inputs as posting to the channel — text, uploaded attachments, an idempotency token, and a program's buttons — and MUST pass the same checks: the posting permission, channel bans and posting restrictions, the content filter, attachment validation, and any rate limit. Everything that can be done to a message SHALL be possible on a reply: formatting, mentions, reactions, editing and deleting, reporting, pinning, forwarding, filing an issue from it, giving it a lifetime, marking its files sensitive, and pressing its buttons. A reply SHALL be indexed for search, and a reply can be scheduled to send later. An edit, deletion or update of a reply SHALL belong to the thread, not the channel timeline.
+
+A person SHALL follow a thread automatically when they start it or reply in it, and MAY follow or stop following any thread explicitly; an explicit choice is not overridden by later participation. Each person's read position in a thread SHALL be recorded separately from the channel's, and replies SHALL NOT count towards the channel's unread count.
+
+#### Scenario: A reply carries what a message carries
+
+- **WHEN** a member replies in a thread with text and uploaded files
+- **THEN** the reply is stored with those files attached, exactly as a message would be
+- **AND** a reply naming files that are not the sender's uploads in that room is refused before anything is stored
+
+#### Scenario: A reply passes the checks a message does
+
+- **WHEN** a person who is banned from a channel, restricted from posting, or whose text the content filter blocks, replies in one of its threads
+- **THEN** the reply is refused for the same reason a message would be
+
+#### Scenario: Editing a reply stays in its thread
+
+- **WHEN** somebody edits or deletes their reply
+- **THEN** the thread shows the change
+- **AND** the channel timeline shows nothing of it
+
+#### Scenario: Unread replies in a followed thread
+
+- **WHEN** a reply is posted in a thread a person follows, and they have not opened the thread since
+- **THEN** the channel shows that the thread has new replies for them
+- **AND** opening the thread marks where the new replies begin and records them as read
+
+#### Scenario: Opening a reply from elsewhere
+
+- **WHEN** a search result, a pin or a notification names a reply
+- **THEN** the client opens the reply's thread with the reply brought into view
+
 #### Scenario: Replies group under the root
 
 - **WHEN** a user replies in a thread
@@ -143,6 +175,13 @@ A thread MUST inherit the permissions and visibility of the channel containing i
 
 - **WHEN** a reply is added to a thread
 - **THEN** users participating in or following that thread are notified according to their preferences
+- **AND** a member who neither follows the thread nor is mentioned in the reply is not notified of it, whatever their channel notification level
+
+#### Scenario: Leaving a thread
+
+- **WHEN** a person stops following a thread
+- **THEN** further replies in it do not notify them unless they are mentioned
+- **AND** replying in it again does not make them follow it again
 
 ### Requirement: Direct messages
 

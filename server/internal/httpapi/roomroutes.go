@@ -130,6 +130,10 @@ type messageResponse struct {
 		on a timer can see that it is on one before they answer.
 	*/
 	Lifetime *lifetimeResponse `json:"lifetime,omitempty"`
+
+	// ThreadRoot is the message whose thread this belongs to: a reply, or an
+	// edit, deletion or update of one. Absent in the channel itself.
+	ThreadRoot string `json:"threadRoot,omitempty"`
 }
 
 // lifetimeResponse is a message's expiry as a reader needs to understand it.
@@ -149,7 +153,7 @@ type lifetimeResponse struct {
 }
 
 func messageResponseOf(event dbgen.Event) messageResponse {
-	return messageResponse{
+	response := messageResponse{
 		ID:       event.ID,
 		Type:     event.Type,
 		Sender:   event.SenderAddress,
@@ -158,6 +162,10 @@ func messageResponseOf(event dbgen.Event) messageResponse {
 		SentAt:   time.UnixMilli(event.CreatedAt),
 		Redacted: event.RedactedAt != nil,
 	}
+	if event.ThreadRootID != nil {
+		response.ThreadRoot = *event.ThreadRootID
+	}
+	return response
 }
 
 // withAttachments fills in a message's attachments.
@@ -359,21 +367,35 @@ func (s *Server) handleRoomTimeline(c *echo.Context) error {
 		return roomError(err)
 	}
 
-	response := make([]messageResponse, 0, len(timeline))
-	eventIDs := make([]string, 0, len(timeline))
-	for _, event := range timeline {
+	response, err := s.messagesFor(ctx, user.ID, timeline)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, response)
+}
+
+/*
+messagesFor renders events as a reader sees them: with their files, and with
+their lifetimes, so a reader can see what is on a timer before they answer it.
+The channel's timeline and a thread are drawn by this one function, so a reply
+can never come to show less than a message does.
+*/
+func (s *Server) messagesFor(ctx context.Context, readerID uuid.UUID, page []dbgen.Event) ([]messageResponse, error) {
+	response := make([]messageResponse, 0, len(page))
+	eventIDs := make([]string, 0, len(page))
+	for _, event := range page {
 		response = append(response, s.withAttachments(ctx, messageResponseOf(event)))
 		if event.RedactedAt == nil {
 			eventIDs = append(eventIDs, event.ID)
 		}
 	}
 
-	// Lifetimes, so a reader can see what is on a timer before they answer it.
 	// One query for the page rather than one per message.
 	if s.moderation != nil && len(eventIDs) > 0 {
 		lifetimes, err := s.moderation.LifetimesFor(ctx, eventIDs)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for i, message := range response {
 			if lifetime, ok := lifetimes[message.ID]; ok {
@@ -391,13 +413,13 @@ func (s *Server) handleRoomTimeline(c *echo.Context) error {
 			that acts on it runs minutes later regardless.
 		*/
 		s.inBackground(ctx, "record message views", func(ctx context.Context) {
-			if err := s.moderation.RecordViews(ctx, user.ID, eventIDs); err != nil {
+			if err := s.moderation.RecordViews(ctx, readerID, eventIDs); err != nil {
 				s.log.Error("cannot record message views", "error", err)
 			}
 		})
 	}
 
-	return c.JSON(http.StatusOK, response)
+	return response, nil
 }
 
 type sendMessageRequest struct {
@@ -421,7 +443,6 @@ type sendMessageRequest struct {
 
 func (s *Server) handleSendMessage(c *echo.Context) error {
 	user, _ := currentUser(c)
-	ctx := c.Request().Context()
 
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -435,6 +456,26 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
+
+	return s.postMessage(c, roomID, user, request, "")
+}
+
+/*
+postMessage posts a message to a room, or a reply into one of its threads when
+threadRoot names one.
+
+One path for both, so a reply is checked exactly as a message is — its files,
+its buttons, the content filter — and is followed by everything a message is.
+A thread that skipped one of these would be the way around it.
+*/
+func (s *Server) postMessage(
+	c *echo.Context,
+	roomID uuid.UUID,
+	user dbgen.User,
+	request sendMessageRequest,
+	threadRoot string,
+) error {
+	ctx := c.Request().Context()
 
 	// Checked before the message is accepted, so a refusal does not leave a
 	// message posted with its files missing.
@@ -452,16 +493,22 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		The operator's content filter, applied before the message is accepted.
 
 		Blocking returns here, so a refused message is never stored. Masking
-		changes what is stored, which is why this runs before SendMessage
-		rather than after: a message stored and then edited would have existed
-		unmasked, and anything watching the timeline would have seen it.
+		changes what is stored, which is why this runs before the message is
+		written rather than after: a message stored and then edited would have
+		existed unmasked, and anything watching the timeline would have seen it.
 	*/
 	filtered, err := s.applyContentFilter(ctx, request.Body)
 	if err != nil {
 		return err
 	}
 
-	event, err := s.rooms.SendMessage(ctx, roomID, user.ID, filtered.Body, request.ClientToken, request.Actions...)
+	var event dbgen.Event
+	if threadRoot == "" {
+		event, err = s.rooms.SendMessage(ctx, roomID, user.ID, filtered.Body, request.ClientToken, request.Actions...)
+	} else {
+		event, err = s.rooms.ReplyInThread(ctx, roomID, user.ID,
+			threadRoot, filtered.Body, request.ClientToken, request.Actions...)
+	}
 	if err != nil {
 		return roomError(err)
 	}
@@ -481,6 +528,12 @@ func (s *Server) handleSendMessage(c *echo.Context) error {
 		}
 	}
 
+	// Sending clears any typing indication, so it does not linger after the
+	// message it announced has arrived.
+	if err := s.presence.StopTyping(ctx, roomID, user.ID); err != nil {
+		s.log.Error("cannot withdraw typing indication", "error", err)
+	}
+
 	s.afterMessage(ctx, event, request.Body)
 
 	return c.JSON(http.StatusCreated, s.withAttachments(ctx, messageResponseOf(event)))
@@ -494,6 +547,15 @@ body is what the sender wrote, before any masking, which is what search and
 mentions are worked out from.
 */
 func (s *Server) afterMessage(ctx context.Context, event dbgen.Event, body string) {
+	// A reply follows its thread for whoever wrote it and whoever started
+	// it, before anybody is notified: the thread's author must be among the
+	// followers this very reply reaches.
+	if event.ThreadRootID != nil {
+		if err := s.rooms.TookPart(ctx, event); err != nil {
+			s.log.Error("cannot record taking part in a thread", "eventId", event.ID, "error", err)
+		}
+	}
+
 	// Neither of these blocks the response. The message is already stored,
 	// which is the part that matters; making somebody wait for a search index
 	// and a set of badges before their message appears is a cost paid on every
@@ -939,7 +1001,17 @@ func (s *Server) notifyRecipients(
 	// A direct conversation notifies whoever is in it regardless of their
 	// level: somebody set to "mentions" should still hear from a person
 	// speaking to them privately.
-	s.notify.ForMessageIn(ctx, event, body, members, room.Kind == "direct", about)
+	direct := room.Kind == "direct"
+	if event.ThreadRootID == nil {
+		s.notify.ForMessageIn(ctx, event, body, members, direct, about)
+		return
+	}
+
+	followers, err := s.rooms.ThreadFollowers(ctx, *event.ThreadRootID)
+	if err != nil {
+		s.log.Error("cannot read a thread's followers", "eventId", event.ID, "error", err)
+	}
+	s.notify.ForReplyIn(ctx, event, body, members, direct, about, followers)
 }
 
 /*

@@ -223,7 +223,35 @@ visibility — there is no way for a thread to be more open than the channel it 
 in.
 
 The conversation shows how many replies each thread has, so you can see what is
-worth opening without opening it.
+worth opening without opening it. Under a thread you follow it also says how
+many of those replies are new to you.
+
+**A reply is a message.** The box at the foot of a thread is the same one as
+the channel's: attach files by picking them, pasting a screenshot or dropping
+them anywhere on the panel; add a GIF or an emoji; format with the toolbar or
+the shortcuts; mention somebody by typing `@` and choosing them from the list;
+send it later. Each reply has the same menu as a message — react, edit, delete,
+copy, forward, pin, report, file an issue from it, give it a lifetime — and
+shows its files, its link's preview and any buttons a program put on it. The
+up arrow in an empty reply box edits your last reply, as it does in the
+channel. On a phone the thread opens over the conversation; Escape or the close
+button goes back.
+
+**Following.** You follow a thread when you start it or reply in it, and you
+can follow or stop following any thread with the bell in its header. A reply
+notifies the people who follow the thread and anybody it mentions — not
+everybody in the channel, even those who asked to hear about every message
+there. Once you stop following a thread, replying in it again does not make you
+follow it again; the bell does.
+
+**Read state.** Opening a thread marks where the replies you have not read
+begin, and records them as read on every device. Replies do not count towards
+the channel's own unread badge — a busy thread you do not follow should not
+make a quiet channel look busy. Somebody typing a reply is shown in the thread,
+not under the channel.
+
+A search result, a pinned reply or a notification about a reply opens its
+thread, with the reply brought into view.
 
 ![A thread open in a panel beside the golang channel, showing the original question and four replies](images/using-tdc/thread.webp)
 
@@ -589,8 +617,9 @@ than instantaneously.
 
 You are notified about direct messages and mentions of you, about reactions,
 replies and forwards of your messages, and about a message being pinned or
-somebody joining. A reply notifies whoever started the thread. Never your own
-actions.
+somebody joining. A reply notifies the people following its thread — whoever
+started it and whoever has replied, unless they stopped following — and anybody
+it mentions. Never your own actions.
 
 ![The notification list opened from the bell at the bottom of the sidebar, with one entry per conversation](images/using-tdc/notifications.webp)
 
@@ -661,7 +690,9 @@ unread and still there when you open it; muting stops interruptions, not
 reading. It is on or off, not for a set time, and it follows you to every
 device.
 
-Following a thread you were not part of is not implemented.
+Replies in a thread reach you only when you follow it or are mentioned, even
+with **Every new message** chosen. Any thread can be followed from the bell in
+its header, including one you were not part of.
 
 ### Search
 

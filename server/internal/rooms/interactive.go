@@ -218,7 +218,7 @@ func (s *Service) UpdateMessage(ctx context.Context, update Update) (dbgen.Event
 		refused as stale, which is the safe direction to be wrong in. The
 		reverse order could announce an update that then lost its race.
 	*/
-	event, err := s.append(ctx, room, author, events.TypeMessageUpdated, content, "")
+	event, err := s.appendIn(ctx, room, author, events.TypeMessageUpdated, content, "", target.ThreadRootID)
 	if err != nil {
 		return dbgen.Event{}, Controls{}, err
 	}

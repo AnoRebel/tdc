@@ -918,10 +918,19 @@ type SkillAlias struct {
 	SkillID     uuid.UUID
 }
 
+type ThreadRead struct {
+	RootEventID  string
+	UserID       uuid.UUID
+	ReadSequence int64
+	Following    bool
+	Chosen       bool
+}
+
 type TypingIndicator struct {
-	RoomID    uuid.UUID
-	UserID    uuid.UUID
-	ExpiresAt time.Time
+	RoomID       uuid.UUID
+	UserID       uuid.UUID
+	ExpiresAt    time.Time
+	ThreadRootID *string
 }
 
 type User struct {

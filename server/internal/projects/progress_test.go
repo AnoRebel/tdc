@@ -77,8 +77,13 @@ func TestProgressIsWhatTheHistorySays(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	from, _ := projects.ParseDay(dayFrom(now, -2))
-	to, _ := projects.ParseDay(dayFrom(now, 5))
+	// Days in the project's own calendar, which is what progress is reported
+	// in: on this machine's clock a UTC day and a local one differ for three
+	// hours every night, and a test built from one and read in the other fails
+	// only then.
+	zone := projects.Zone(access.Project)
+	from, _ := projects.ParseDay(dayIn(now, zone, -2))
+	to, _ := projects.ParseDay(dayIn(now, zone, 5))
 	for _, scope := range []struct {
 		name                string
 		scope               projects.ProgressScope
@@ -102,7 +107,7 @@ func TestProgressIsWhatTheHistorySays(t *testing.T) {
 				last.Completed, last.Total, progress.Completed, progress.Total)
 		}
 		// The future is not reported: the trend stops at today.
-		if progress.To != dayFrom(now.In(projects.Zone(access.Project)), 0) || len(progress.Trend) != 3 {
+		if progress.To != dayIn(now, zone, 0) || len(progress.Trend) != 3 {
 			t.Errorf("%s runs to %s with %d points", scope.name, progress.To, len(progress.Trend))
 		}
 	}
@@ -173,4 +178,9 @@ func TestTheTrendIsReplayedAtEachMoment(t *testing.T) {
 			t.Errorf("after event %d the history says %+v, want %+v", i, counts[i], want[i])
 		}
 	}
+}
+
+// dayIn is the calendar day a number of days from now, in a zone.
+func dayIn(now time.Time, zone *time.Location, days int) string {
+	return now.In(zone).AddDate(0, 0, days).Format(time.DateOnly)
 }

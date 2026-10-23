@@ -216,16 +216,18 @@ func (q *Queries) ListServerStatuses(ctx context.Context) ([]ServerStatus, error
 }
 
 const listTyping = `-- name: ListTyping :many
-SELECT typing_indicators.user_id, users.username, users.display_name
+SELECT typing_indicators.user_id, users.username, users.display_name,
+       typing_indicators.thread_root_id
 FROM typing_indicators
 JOIN users ON users.id = typing_indicators.user_id
 WHERE typing_indicators.room_id = $1 AND typing_indicators.expires_at > NOW()
 `
 
 type ListTypingRow struct {
-	UserID      uuid.UUID
-	Username    string
-	DisplayName string
+	UserID       uuid.UUID
+	Username     string
+	DisplayName  string
+	ThreadRootID *string
 }
 
 func (q *Queries) ListTyping(ctx context.Context, roomID uuid.UUID) ([]ListTypingRow, error) {
@@ -237,7 +239,12 @@ func (q *Queries) ListTyping(ctx context.Context, roomID uuid.UUID) ([]ListTypin
 	items := []ListTypingRow{}
 	for rows.Next() {
 		var i ListTypingRow
-		if err := rows.Scan(&i.UserID, &i.Username, &i.DisplayName); err != nil {
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Username,
+			&i.DisplayName,
+			&i.ThreadRootID,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -366,19 +373,26 @@ func (q *Queries) SetTypingPreference(ctx context.Context, arg SetTypingPreferen
 }
 
 const startTyping = `-- name: StartTyping :exec
-INSERT INTO typing_indicators (room_id, user_id, expires_at)
-VALUES ($1, $2, $3)
-ON CONFLICT (room_id, user_id) DO UPDATE SET expires_at = EXCLUDED.expires_at
+INSERT INTO typing_indicators (room_id, user_id, expires_at, thread_root_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (room_id, user_id)
+DO UPDATE SET expires_at = EXCLUDED.expires_at, thread_root_id = EXCLUDED.thread_root_id
 `
 
 type StartTypingParams struct {
-	RoomID    uuid.UUID
-	UserID    uuid.UUID
-	ExpiresAt time.Time
+	RoomID       uuid.UUID
+	UserID       uuid.UUID
+	ExpiresAt    time.Time
+	ThreadRootID *string
 }
 
 func (q *Queries) StartTyping(ctx context.Context, arg StartTypingParams) error {
-	_, err := q.db.Exec(ctx, startTyping, arg.RoomID, arg.UserID, arg.ExpiresAt)
+	_, err := q.db.Exec(ctx, startTyping,
+		arg.RoomID,
+		arg.UserID,
+		arg.ExpiresAt,
+		arg.ThreadRootID,
+	)
 	return err
 }
 

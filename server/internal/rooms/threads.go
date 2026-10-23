@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/actions"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
 )
@@ -27,10 +28,15 @@ func (s *Service) ReplyInThread(
 	ctx context.Context,
 	roomID, senderID uuid.UUID,
 	rootEventID, body, clientToken string,
+	offered ...actions.Action,
 ) (dbgen.Event, error) {
 	trimmed := strings.TrimSpace(body)
 	if trimmed == "" {
 		return dbgen.Event{}, ErrEmptyMessage
+	}
+	// A reply is a message, and its buttons are checked as a message's are.
+	if err := actions.Check(offered); err != nil {
+		return dbgen.Event{}, err
 	}
 	if len(trimmed) > MaxMessageLength {
 		return dbgen.Event{}, fmt.Errorf("%w: limit is %d characters", ErrMessageTooLong, MaxMessageLength)
@@ -88,6 +94,9 @@ func (s *Service) ReplyInThread(
 		"body":       trimmed,
 		"threadRoot": rootID,
 	}
+	if len(offered) > 0 {
+		reply["actions"] = offered
+	}
 	if err := s.markIfProgram(ctx, sender, reply); err != nil {
 		return dbgen.Event{}, err
 	}
@@ -96,72 +105,7 @@ func (s *Service) ReplyInThread(
 		return dbgen.Event{}, fmt.Errorf("encode reply: %w", err)
 	}
 
-	return s.appendThreaded(ctx, room, sender, events.TypeMessageSent, content, clientToken, &rootID)
-}
-
-// appendThreaded stores an event that belongs to a thread.
-func (s *Service) appendThreaded(
-	ctx context.Context,
-	room dbgen.Room,
-	sender dbgen.User,
-	eventType events.Type,
-	content json.RawMessage,
-	clientToken string,
-	threadRootID *string,
-) (dbgen.Event, error) {
-	sequence, err := s.nextSequence(ctx, room)
-	if err != nil {
-		return dbgen.Event{}, fmt.Errorf("allocate sequence: %w", err)
-	}
-
-	nonce, err := events.NewNonce()
-	if err != nil {
-		return dbgen.Event{}, err
-	}
-
-	event := events.Event{
-		Room:      s.RoomAddress(room),
-		Sender:    s.UserAddress(sender.Username),
-		Origin:    s.serverName,
-		Type:      eventType,
-		CreatedAt: events.Now(),
-		Nonce:     nonce,
-		Content:   content,
-	}
-	if err := s.keyring.Sign(&event); err != nil {
-		return dbgen.Event{}, fmt.Errorf("sign event: %w", err)
-	}
-
-	stored, err := s.store.AppendThreadedEvent(ctx, dbgen.AppendThreadedEventParams{
-		ID:            event.ID,
-		RoomID:        room.ID,
-		Sequence:      sequence,
-		SenderID:      &sender.ID,
-		SenderAddress: event.Sender,
-		RoomAddress:   event.Room,
-		OriginServer:  event.Origin,
-		Type:          string(event.Type),
-		Content:       content,
-		CreatedAt:     event.CreatedAt,
-		Nonce:         event.Nonce,
-		Signature:     event.Signature,
-		KeyID:         event.KeyID,
-		ThreadRootID:  threadRootID,
-	})
-	if err != nil {
-		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
-	}
-	s.told(ctx, stored)
-
-	if clientToken != "" {
-		if err := s.store.RecordIdempotentSubmission(ctx, dbgen.RecordIdempotentSubmissionParams{
-			SenderID: sender.ID, ClientToken: clientToken, EventID: stored.ID,
-		}); err != nil {
-			return dbgen.Event{}, fmt.Errorf("record submission: %w", err)
-		}
-	}
-
-	return stored, nil
+	return s.appendIn(ctx, room, sender, events.TypeMessageSent, content, clientToken, &rootID)
 }
 
 // Thread returns a thread's root and its replies.
@@ -185,7 +129,16 @@ func (s *Service) Thread(
 		return dbgen.Event{}, nil, ErrRoomNotFound
 	}
 
-	replies, err := s.store.ListThreadReplies(ctx, &rootEventID)
+	// Asked for by one of its replies — a search result, a pin, a
+	// notification — the thread is the one that reply is in.
+	if root.ThreadRootID != nil {
+		root, err = s.store.GetEventByID(ctx, *root.ThreadRootID)
+		if err != nil {
+			return dbgen.Event{}, nil, fmt.Errorf("read thread root: %w", err)
+		}
+	}
+
+	replies, err := s.store.ListThreadReplies(ctx, &root.ID)
 	if err != nil {
 		return dbgen.Event{}, nil, fmt.Errorf("read thread replies: %w", err)
 	}
@@ -198,6 +151,9 @@ type ThreadSummary struct {
 	RootID      string
 	ReplyCount  int64
 	LastReplyAt int64
+	// Unread is replies by others the reader has not read, in a thread they
+	// follow. Zero from ThreadSummaries, which has no reader.
+	Unread int64
 }
 
 // ThreadSummaries returns reply counts for a set of messages, so a timeline
@@ -236,9 +192,11 @@ Authorisation is the caller's to make — it has the room and the person.
 */
 func (s *Service) RoomThreadSummaries(
 	ctx context.Context,
-	roomID uuid.UUID,
+	roomID, readerID uuid.UUID,
 ) (map[string]ThreadSummary, error) {
-	rows, err := s.store.ListRoomThreadSummaries(ctx, roomID)
+	rows, err := s.store.ListRoomThreadSummaries(ctx, dbgen.ListRoomThreadSummariesParams{
+		RoomID: roomID, UserID: readerID,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("read room thread summaries: %w", err)
 	}
@@ -252,10 +210,110 @@ func (s *Service) RoomThreadSummaries(
 			RootID:      *row.ThreadRootID,
 			ReplyCount:  row.ReplyCount,
 			LastReplyAt: row.LastReplyAt,
+			Unread:      row.Unread,
 		}
 	}
 
 	return summaries, nil
+}
+
+// ThreadReading is where one person stands with one thread.
+type ThreadReading struct {
+	ReadSequence int64
+	Following    bool
+}
+
+// ThreadReadingFor reads it, as nothing read and not following when the
+// person has never touched the thread.
+func (s *Service) ThreadReadingFor(ctx context.Context, userID uuid.UUID, rootID string) (ThreadReading, error) {
+	row, err := s.store.GetThreadRead(ctx, dbgen.GetThreadReadParams{UserID: userID, RootEventID: rootID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ThreadReading{}, nil
+	}
+	if err != nil {
+		return ThreadReading{}, fmt.Errorf("read thread position: %w", err)
+	}
+	return ThreadReading{ReadSequence: row.ReadSequence, Following: row.Following}, nil
+}
+
+// threadRootIn resolves a thread a member names, by its root or a reply.
+func (s *Service) threadRootIn(ctx context.Context, roomID, userID uuid.UUID, eventID string) (string, error) {
+	if _, err := s.RequireMembership(ctx, roomID, userID); err != nil {
+		return "", err
+	}
+	event, err := s.EventInRoom(ctx, roomID, eventID)
+	if err != nil {
+		return "", err
+	}
+	if event.ThreadRootID != nil {
+		return *event.ThreadRootID, nil
+	}
+	return event.ID, nil
+}
+
+// MarkThreadRead records how far a member has read a thread. Never backwards.
+func (s *Service) MarkThreadRead(ctx context.Context, roomID, userID uuid.UUID, eventID string, sequence int64) error {
+	rootID, err := s.threadRootIn(ctx, roomID, userID, eventID)
+	if err != nil {
+		return err
+	}
+	if err := s.store.MarkThreadRead(ctx, dbgen.MarkThreadReadParams{
+		UserID: userID, RootEventID: rootID, ReadSequence: sequence,
+	}); err != nil {
+		return fmt.Errorf("record thread position: %w", err)
+	}
+	return nil
+}
+
+// SetThreadFollowing is a member's own decision to follow a thread or not,
+// which taking part in it afterwards does not override.
+func (s *Service) SetThreadFollowing(ctx context.Context, roomID, userID uuid.UUID, eventID string, following bool) error {
+	rootID, err := s.threadRootIn(ctx, roomID, userID, eventID)
+	if err != nil {
+		return err
+	}
+	if err := s.store.ChooseThreadFollowing(ctx, dbgen.ChooseThreadFollowingParams{
+		UserID: userID, RootEventID: rootID, Following: following,
+	}); err != nil {
+		return fmt.Errorf("record following: %w", err)
+	}
+	return nil
+}
+
+/*
+TookPart records what a reply means for who follows its thread: whoever
+replied, and whoever started it, follow it unless they decided otherwise, and
+the replier has read up to their own reply.
+*/
+func (s *Service) TookPart(ctx context.Context, reply dbgen.Event) error {
+	if reply.ThreadRootID == nil || reply.SenderID == nil {
+		return nil
+	}
+	rootID := *reply.ThreadRootID
+
+	followers := []uuid.UUID{*reply.SenderID}
+	if root, err := s.store.GetEventByID(ctx, rootID); err == nil && root.SenderID != nil {
+		followers = append(followers, *root.SenderID)
+	}
+	for _, id := range followers {
+		if err := s.store.FollowThreadByTakingPart(ctx, dbgen.FollowThreadByTakingPartParams{
+			UserID: id, RootEventID: rootID,
+		}); err != nil {
+			return fmt.Errorf("follow thread: %w", err)
+		}
+	}
+	return s.store.MarkThreadRead(ctx, dbgen.MarkThreadReadParams{
+		UserID: *reply.SenderID, RootEventID: rootID, ReadSequence: reply.Sequence,
+	})
+}
+
+// ThreadFollowers is everybody following a thread.
+func (s *Service) ThreadFollowers(ctx context.Context, rootID string) ([]uuid.UUID, error) {
+	followers, err := s.store.ListThreadFollowers(ctx, rootID)
+	if err != nil {
+		return nil, fmt.Errorf("read thread followers: %w", err)
+	}
+	return followers, nil
 }
 
 // participantKey identifies a direct conversation by who is in it.

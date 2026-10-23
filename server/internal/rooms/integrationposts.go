@@ -118,7 +118,7 @@ func (s *Service) PostAs(
 		return dbgen.Event{}, fmt.Errorf("encode message: %w", err)
 	}
 
-	return s.appendAs(ctx, room, nil, s.UserAddress(localPart), events.TypeMessageSent, content, "")
+	return s.appendAs(ctx, room, nil, s.UserAddress(localPart), events.TypeMessageSent, content, "", nil)
 }
 
 /*

@@ -224,7 +224,7 @@ func (s *Service) PressAction(ctx context.Context, press Press) (dbgen.Event, er
 		return dbgen.Event{}, fmt.Errorf("encode the press: %w", err)
 	}
 
-	return s.append(ctx, room, presser, events.TypeActionPressed, content, "")
+	return s.appendIn(ctx, room, presser, events.TypeActionPressed, content, "", target.ThreadRootID)
 }
 
 /*
