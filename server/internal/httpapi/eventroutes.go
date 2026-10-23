@@ -27,10 +27,9 @@ loaded once per request; a refusal to act on something the caller can see is a
 */
 func init() {
 	registerRoutes(func(s *Server) {
-		if s.db == nil || s.rooms == nil {
+		if !s.ensureCalendar() {
 			return
 		}
-		s.calendar = calendar.NewService(s.db, s.rooms, s.log)
 
 		feature := s.requireFeature(settings.FeatureEvents)
 		group := s.echo.Group("/api/events", requireAuthentication, feature)
@@ -52,6 +51,21 @@ func init() {
 		"POST /api/events/:eventId/cancel": {Summary: "Cancel an event", Authentication: "session or token", Permission: "its creator, a host, or event.manage.any"},
 		"PUT /api/events/:eventId/cover":   {Summary: "Set or clear an event's cover image", Authentication: "session or token", Permission: "its creator, a host, or event.manage.any"},
 	})
+}
+
+/*
+ensureCalendar builds the calendar the first time any of its routes are
+mounted, whichever file's registration runs first; false on a server with no
+database to keep events in.
+*/
+func (s *Server) ensureCalendar() bool {
+	if s.db == nil || s.rooms == nil {
+		return false
+	}
+	if s.calendar == nil {
+		s.calendar = calendar.NewService(s.db, s.rooms, s.log)
+	}
+	return true
 }
 
 // viewerOf is who is asking, with what decides what of the calendar they see.

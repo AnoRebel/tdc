@@ -16,7 +16,7 @@ Answering events, who is going, and invitations.
 */
 func init() {
 	registerRoutes(func(s *Server) {
-		if s.calendar == nil {
+		if !s.ensureCalendar() {
 			return
 		}
 		group := s.echo.Group("/api/events/:eventId", requireAuthentication, s.requireFeature(settings.FeatureEvents))
