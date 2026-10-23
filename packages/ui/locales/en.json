@@ -2084,7 +2084,10 @@
       "revoke": "Withdraw {name}",
       "couldNotMake": "Could not make the link.",
       "usesNumber": "A whole number, or empty for unlimited.",
-      "passcodeShort": "A passcode needs at least four characters."
+      "passcodeShort": "A passcode needs at least four characters.",
+      "guests": "Let people without an account join",
+      "guestsHint": "As guests of this call only, where the server allows guests.",
+      "withGuests": "guests"
     },
     "lobby": {
       "title": "Waiting to join",
@@ -2103,7 +2106,13 @@
       "waiting": "Waiting for somebody in the call to let you in…",
       "stopWaiting": "Stop waiting",
       "turnedAway": "You were not let into this call.",
-      "inCall": "You are in the call."
+      "inCall": "You are in the call.",
+      "signIn": "Sign in to join",
+      "guestNote": "Or join without an account, as a guest of this call only.",
+      "guestName": "Your name, as people in the call will see it",
+      "joinAsGuest": "Join as a guest",
+      "ended": "The call has ended.",
+      "guestNameNeeded": "Give a name for people in the call to see you by."
     },
     "stage": {
       "share": "Share your screen",
@@ -2136,7 +2145,8 @@
       "bright": "Bright",
       "pulse": "Pulse",
       "low": "Low"
-    }
+    },
+    "guest": "Guest"
   },
   "names": {
     "title": "Your name",

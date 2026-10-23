@@ -32,7 +32,7 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [x] 3.1 `call.link` permission (granted to nobody by default) and `call_links` with hashed tokens, public or protected, passcode and/or lobby, expiry, use limit, revocation, all audited; verify an expired, used-up or revoked link refuses
 - [x] 3.2 The link page and joining by link as a call participant who is not a room member; verify every room route still refuses them and they see nothing of the conversation but its name and who is in the call
 - [x] 3.3 Protected links: constant-time passcode check with failures limited per link and per address and recorded; a lobby that people in the call admit from; verify a wrong passcode past the limit is refused even with the right one
-- [ ] 3.4 Guests (`calls.guests`, off by default): a pass valid for one call only, a chosen name and a guest label, expiring with their leaving or the call's end; verify a guest pass opens nothing but that call's routes and connection
+- [x] 3.4 Guests (`calls.guests`, off by default): a pass valid for one call only, a chosen name and a guest label, expiring with their leaving or the call's end; verify a guest pass opens nothing but that call's routes and connection
 - [ ] **MILESTONE 3** — Demonstrate: a protected link with a lobby admits a signed-in person from elsewhere on the server and, with guests allowed, a guest without an account, neither of whom can see the conversation. Tag `v1.51.0-dev`.
 
 ## 4. Phase 4 — Calls across servers

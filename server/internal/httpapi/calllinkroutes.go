@@ -235,7 +235,11 @@ func (s *Server) handleReadCallLink(c *echo.Context) error {
 	if call, err := s.rooms.OpenCallIn(ctx, link.RoomID); err == nil {
 		target.Started = true
 		for _, participant := range call.Participants {
-			target.People = append(target.People, participant.Username)
+			name := participant.Username
+			if participant.Guest {
+				name = participant.DisplayName
+			}
+			target.People = append(target.People, name)
 		}
 	}
 	return c.JSON(http.StatusOK, target)

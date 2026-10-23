@@ -59,6 +59,7 @@ const linkRules = v.pipe(
     protect: v.boolean(),
     passcode: v.string(),
     lobby: v.boolean(),
+    guests: v.boolean(),
     expiry: v.string(),
     maxUses: v.pipe(v.string(), v.regex(/^\d*$/, $ts("calls.links.usesNumber"))),
   }),
@@ -80,6 +81,7 @@ const form = useForm({
     protect: false,
     passcode: "",
     lobby: true,
+    guests: false,
     expiry: "24",
     maxUses: "",
   },
@@ -92,6 +94,7 @@ const form = useForm({
         label: value.label.trim(),
         passcode: value.protect ? value.passcode : "",
         lobby: value.lobby,
+        guests: value.guests,
         expiresInHours: Number(value.expiry) || 0,
         maxUses: Number(value.maxUses) || 0,
       });
@@ -150,6 +153,23 @@ async function revoke(link: CallLink) {
             <Switch
               :model-value="field.state.value"
               :label="$ts('calls.links.lobby')"
+              @update:model-value="field.handleChange($event)"
+            />
+          </label>
+        </template>
+      </form.Field>
+      <form.Field name="guests">
+        <template #default="{ field }">
+          <label class="flex items-center justify-between gap-2">
+            <span>
+              {{ $t("calls.links.guests") }}
+              <span class="block text-[0.6875rem] text-muted-foreground">
+                {{ $t("calls.links.guestsHint") }}
+              </span>
+            </span>
+            <Switch
+              :model-value="field.state.value"
+              :label="$ts('calls.links.guests')"
               @update:model-value="field.handleChange($event)"
             />
           </label>
@@ -261,6 +281,7 @@ async function revoke(link: CallLink) {
             · {{ $t("calls.links.used", { count: link.uses }) }}
             <template v-if="link.protected"> · {{ $t("calls.links.protected") }}</template>
             <template v-if="link.lobby"> · {{ $t("calls.links.withLobby") }}</template>
+            <template v-if="link.guests"> · {{ $t("calls.links.withGuests") }}</template>
             <template v-if="link.expiresAt">
               · {{ $t("calls.links.until", { when: onDayAtTime(link.expiresAt) }) }}</template
             >

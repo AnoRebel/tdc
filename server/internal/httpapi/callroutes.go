@@ -943,7 +943,7 @@ func (s *Server) handleCallReaction(c *echo.Context) error {
 	}
 	payload, _ := json.Marshal(map[string]string{
 		"call": call.ID.String(), "roomId": call.RoomID.String(),
-		"from": user.ID.String(), "username": user.Username, "kind": request.Kind,
+		"from": user.ID.String(), "username": shownUsername(user), "kind": request.Kind,
 	})
 	frame := realtime.Frame{Type: realtime.FrameCallReaction, Payload: payload}
 	if s.hub != nil {
@@ -973,4 +973,13 @@ func (s *Server) dismissRemaining(ctx context.Context, roomID uuid.UUID, call ro
 		here := s.hub.SendToUser(participant.UserID, frame)
 		s.whisperElsewhere(ctx, participant.UserID, frame, here)
 	}
+}
+
+// shownUsername is the name to show somebody by in a call: a guest's generated
+// username means nothing to anybody, so a guest is shown by the name they gave.
+func shownUsername(user dbgen.User) string {
+	if user.GuestCall != nil {
+		return user.DisplayName
+	}
+	return user.Username
 }

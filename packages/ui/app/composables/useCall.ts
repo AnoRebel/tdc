@@ -525,7 +525,10 @@ export const useCall = createGlobalState(() => {
    * shown shows another we are holding, still held: nobody is put back on
    * the air without choosing to be.
    */
-  async function leave(room: string | null = roomId.value, options: { keepMedia?: boolean } = {}) {
+  async function leave(
+    room: string | null = roomId.value,
+    options: { keepMedia?: boolean; local?: boolean } = {},
+  ) {
     if (!room || !calls.value[room]) return;
     if (screen.value && room === roomId.value) await stopSharing();
     const path = callPath(room);
@@ -544,6 +547,7 @@ export const useCall = createGlobalState(() => {
       if (next && !holding.value.includes(next)) holding.value = [...holding.value, next];
     }
     if (!Object.keys(rest).length && !options.keepMedia) stopLocal();
+    if (options.local) return;
     try {
       await api.delete(path);
     } catch {
@@ -822,6 +826,12 @@ export const useCall = createGlobalState(() => {
   function onState(state: Call) {
     const mine = calls.value[state.roomId];
     if (!mine || mine.id !== state.id) return;
+    // A call that no longer lists us has let us go — it ended, or the server
+    // took us out — so it is put down here too, without asking the server.
+    if (!state.participants.some((each) => each.userId === user.value?.id)) {
+      void leave(state.roomId, { local: true });
+      return;
+    }
     calls.value = { ...calls.value, [state.roomId]: state };
     reconcile(state.roomId);
   }

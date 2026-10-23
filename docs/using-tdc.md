@@ -1002,6 +1002,15 @@ and joins the call — only the call: the conversation, its messages and members
 stay closed to them. Links already made are listed below the form, with a
 button to withdraw each. A link to a call that has not started waits for it.
 
+**Guests.** Where the server's operator allows it, a link can also let in
+people with no account here — a speaker from elsewhere, a client. Switch on
+_Let people without an account join_ when making the link. Whoever opens it is
+offered **Sign in to join** and, below, **Join as a guest** with a name to be
+shown by. A guest is in the call and nowhere else: they cannot open its
+conversation or anything else on the server, everybody in the call sees them
+marked _Guest_, and when the last person who belongs to the conversation
+leaves, the call ends for the guests too. Guests join from a web browser.
+
 **Calling from a profile.** The phone and camera buttons on somebody's
 directory profile, and beside people in a channel's member list, open your
 direct conversation with them — or the one you already have — and ring them.

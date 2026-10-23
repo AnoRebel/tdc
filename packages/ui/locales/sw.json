@@ -2084,7 +2084,10 @@
       "revoke": "Ondoa {name}",
       "couldNotMake": "Imeshindwa kutengeneza kiungo.",
       "usesNumber": "Nambari kamili, au acha wazi kwa bila kikomo.",
-      "passcodeShort": "Nambari ya siri inahitaji angalau herufi nne."
+      "passcodeShort": "Nambari ya siri inahitaji angalau herufi nne.",
+      "guests": "Waruhusu watu wasio na akaunti wajiunge",
+      "guestsHint": "Kama wageni wa simu hii pekee, pale seva inaporuhusu wageni.",
+      "withGuests": "wageni"
     },
     "lobby": {
       "title": "Wanasubiri kujiunga",
@@ -2103,7 +2106,13 @@
       "waiting": "Unasubiri mtu aliye kwenye simu akuruhusu…",
       "stopWaiting": "Acha kusubiri",
       "turnedAway": "Hukuruhusiwa kuingia kwenye simu hii.",
-      "inCall": "Uko kwenye simu."
+      "inCall": "Uko kwenye simu.",
+      "signIn": "Ingia ili ujiunge",
+      "guestNote": "Au jiunge bila akaunti, kama mgeni wa simu hii pekee.",
+      "guestName": "Jina lako, kama watu kwenye simu watakavyoliona",
+      "joinAsGuest": "Jiunge kama mgeni",
+      "ended": "Simu imekwisha.",
+      "guestNameNeeded": "Toa jina ambalo watu kwenye simu watakuona nalo."
     },
     "stage": {
       "share": "Shiriki skrini yako",
@@ -2136,7 +2145,8 @@
       "bright": "Angavu",
       "pulse": "Mapigo",
       "low": "Nzito"
-    }
+    },
+    "guest": "Mgeni"
   },
   "names": {
     "title": "Jina lako",

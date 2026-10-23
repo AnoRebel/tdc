@@ -19,6 +19,8 @@ export interface User {
    * the address they were sent under, and are still theirs.
    */
   formerAddresses?: string[];
+  /** Let into one call without an account; reaches that call and nothing else. */
+  guest?: boolean;
 }
 
 /** Whether somebody may change their username now, and what it will ask. */

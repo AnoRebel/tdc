@@ -9,6 +9,10 @@ export interface CallParticipant {
   held: boolean;
   /** Presenting their screen. */
   screen: boolean;
+  /** The name to show them by. */
+  displayName?: string;
+  /** In the call without an account here. */
+  guest?: boolean;
   /** When they raised their hand, while it is up. */
   handRaisedAt?: string;
   joinedAt: string;

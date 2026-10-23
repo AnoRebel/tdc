@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shownName } from "#layers/ui/app/lib/call-names";
 import { Hand, X } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
 
@@ -33,13 +34,13 @@ const mayLower = computed(
         class="flex items-center gap-2 rounded px-1"
       >
         <span class="w-4 text-right text-muted-foreground tabular-nums">{{ index + 1 }}</span>
-        <span class="min-w-0 flex-1 truncate">{{ person.username }}</span>
+        <span class="min-w-0 flex-1 truncate">{{ shownName(person) }}</span>
         <Button
           v-if="mayLower && person.userId !== user?.id"
           variant="ghost"
           size="icon"
           class="size-6"
-          :label="$ts('calls.reactions.lowerWhose', { name: person.username })"
+          :label="$ts('calls.reactions.lowerWhose', { name: shownName(person) })"
           @click="c.setHand(false, person.userId)"
         >
           <X class="size-3" />

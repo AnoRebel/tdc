@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shownName } from "#layers/ui/app/lib/call-names";
 import type { Call } from "@tdc/types";
 import { Maximize2, Mic, Phone, Play, TriangleAlert, Video } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -19,7 +20,7 @@ const here = computed(() => c.isIn(props.roomId));
 // In it, but talking in another call, or holding every call.
 const held = computed(() => here.value && c.holding.value.includes(props.roomId));
 const names = computed(() =>
-  (props.call?.participants ?? []).map((each) => each.username).join(", "),
+  (props.call?.participants ?? []).map((each) => shownName(each)).join(", "),
 );
 
 const errorText = computed(() => {

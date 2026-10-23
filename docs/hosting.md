@@ -960,6 +960,15 @@ Links are stored hashed; a protected link's passcode is stored as a password
 is, and guessing is limited per address and per link and recorded in the audit
 log.
 
+**Guests in calls.** `calls.guests` (off by default) lets people without an
+account join a call through a link made to allow them. A guest gets an account
+row for that one call — no password, unable to sign in, absent from people
+search, the list of people and every account count — and a session that reaches
+that call's routes and the live connection and nothing else, ending with the
+call. Guests are limited to five per address every ten minutes, each one
+admitted is in the audit log as `call.guest.admitted` against the link, and a
+second-factor requirement does not apply to them.
+
 **Ringing.** People can ring each other into calls; a ring reaches every
 device of the person rung, by the live connection, and by web push where the
 server has push configured, so a browser in the background still rings.
