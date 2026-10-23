@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Message, Thread } from "@tdc/types";
 import { isApiError } from "@tdc/types";
-import { SendHorizontal, X } from "lucide-vue-next";
+import { Languages, SendHorizontal, X } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Bubble } from "#layers/ui/app/components/ui/bubble";
 import { Separator } from "#layers/ui/app/components/ui/separator";
@@ -9,8 +9,9 @@ import { Skeleton } from "#layers/ui/app/components/ui/skeleton";
 import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { atTime } from "#layers/ui/app/lib/dates";
+import TranslationBody from "#layers/ui/app/components/translation/TranslationBody.vue";
 
-const { $t } = useI18n();
+const { $t, $ts } = useI18n();
 
 /**
  * A thread, opened beside the channel.
@@ -29,11 +30,24 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; replied: [] }>();
 
 const roomsApi = useRooms();
+// Replies translate the way the channel does, by the same rules.
+const translation = useTranslation();
 
 const thread = ref<Thread | null>(null);
 const draft = ref("");
 const error = ref<string | null>(null);
 const sending = ref(false);
+
+/** Somebody else's words, which the reader may want in their own language. */
+function translatable(message: Message): boolean {
+  return translation.available.value && !message.redacted && message.sender !== props.selfAddress;
+}
+
+function toggleLabel(message: Message): string {
+  return translation.showsTranslation(message.id, props.roomId, false)
+    ? $ts("translation.showOriginal")
+    : $ts("translation.translate");
+}
 
 async function load() {
   try {
@@ -120,9 +134,27 @@ function when(value: string): string {
                 <time class="text-[0.6875rem] text-muted-foreground">
                   {{ when(thread.root.sentAt) }}
                 </time>
+                <Button
+                  v-if="translatable(thread.root)"
+                  variant="ghost"
+                  size="icon"
+                  class="ml-auto size-6"
+                  :label="toggleLabel(thread.root)"
+                  :aria-pressed="translation.showsTranslation(thread.root.id, roomId, false)"
+                  @click="translation.toggle(roomId, thread.root.id, bodyOf(thread.root), false)"
+                >
+                  <Languages class="size-3.5" />
+                </Button>
               </p>
               <Bubble :variant="thread.root.redacted ? 'redacted' : 'default'" class="max-w-full">
-                <MessageBody :body="bodyOf(thread.root)" />
+                <MessageBody v-if="thread.root.redacted" :body="bodyOf(thread.root)" />
+                <TranslationBody
+                  v-else
+                  :body="bodyOf(thread.root)"
+                  :message-id="thread.root.id"
+                  :room-id="roomId"
+                  :mine="thread.root.sender === selfAddress"
+                />
               </Bubble>
             </div>
           </div>
@@ -145,6 +177,17 @@ function when(value: string): string {
                 {{ reply.sender === selfAddress ? "You" : shortName(reply.sender) }}
               </span>
               <time class="text-[0.6875rem] text-muted-foreground">{{ when(reply.sentAt) }}</time>
+              <Button
+                v-if="translatable(reply)"
+                variant="ghost"
+                size="icon"
+                class="ml-auto size-6"
+                :label="toggleLabel(reply)"
+                :aria-pressed="translation.showsTranslation(reply.id, roomId, false)"
+                @click="translation.toggle(roomId, reply.id, bodyOf(reply), false)"
+              >
+                <Languages class="size-3.5" />
+              </Button>
             </p>
             <Bubble
               :variant="
@@ -152,7 +195,14 @@ function when(value: string): string {
               "
               class="max-w-full"
             >
-              <MessageBody :body="bodyOf(reply)" />
+              <MessageBody v-if="reply.redacted" :body="bodyOf(reply)" />
+              <TranslationBody
+                v-else
+                :body="bodyOf(reply)"
+                :message-id="reply.id"
+                :room-id="roomId"
+                :mine="reply.sender === selfAddress"
+              />
             </Bubble>
           </div>
         </article>

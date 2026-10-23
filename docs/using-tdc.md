@@ -409,6 +409,57 @@ at. That depends on two things: whether your operator has link previews on at
 all, and whether you want them — there is a setting of your own. With either
 off, the server makes no outbound request for your links.
 
+### Translation
+
+A message in a language you do not read can be translated where it is. Point
+at it and press **Translate** (or choose it from the message's menu); it is
+replaced by the translation, marked "Translated from Swahili · Show original",
+and **Show original** puts the words back as written. Threads work the same
+way.
+
+You can also have translation happen without asking:
+
+- **Everything on this server** — in **Settings → Translation**.
+- **One conversation** — the translate button in the conversation's header
+  turns it on or off there, whatever the server-wide choice is.
+
+Your own messages are never translated automatically. A message already in your
+language is shown as it is, without a label. Code, mentions, channel names,
+links, email addresses and `:emoji:` are never sent for translation and come
+back exactly as written; the words around them are translated piece by piece,
+which occasionally costs a little fluency around inline code.
+
+**Which language.** The one you read the interface in, unless you choose another
+in **Settings → Translation**.
+
+**Where it happens, and who sees your messages.** You choose the provider. By
+default it is the first of these that works for you:
+
+| Provider             | Who sees the message text                                                                                                                                                                                                                                                                                              | Cost                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **On this device**   | Nobody. The browser translates it itself; nothing about the message leaves your computer. The browser downloads a language model once, from its maker, the first time you translate a language — and asks for a click to do it. Only some browsers have this (recent Chrome on a computer; not Firefox or Safari yet). | Free                                                     |
+| **LibreTranslate**   | Whoever runs the instance. If your operator runs one for this server, that is them; if you connect your own address, it is whoever runs that one. Public instances exist but see what you send and limit how much.                                                                                                     | Free, or the instance's terms                            |
+| **Google**           | Google, under its Cloud Translation terms.                                                                                                                                                                                                                                                                             | Your own key; Google bills you beyond its free allowance |
+| **Microsoft** (Bing) | Microsoft, under its Translator terms.                                                                                                                                                                                                                                                                                 | Your own key and, for most keys, its Azure region        |
+| **DeepL**            | DeepL, under its API terms. Free keys end in `:fx`.                                                                                                                                                                                                                                                                    | Your own key                                             |
+
+Choosing anything other than **On this device** sends the text of the messages
+you translate — including other people's messages — to that provider, through
+this server. It is the same as pasting them into that provider's website, without
+leaving the conversation. Your operator may allow only some providers, or turn
+translation off.
+
+**Your keys.** A key you connect is stored encrypted on this server, used only to
+translate messages you ask for, and **never shown again** — not to you, not to
+an administrator. Replace it by connecting again; **Remove** deletes it. A
+translation, once made, is kept on the server and shared with anybody else here
+who can read the same message and asks for the same language from the same
+provider, so the same message is not paid for twice; it is deleted when the
+message is edited or removed.
+
+Your preferences belong to your account on this server. The desktop application,
+which can hold several servers, keeps a separate set for each.
+
 ## Files
 
 Files are uploaded to the conversation and then sent with a message, which is

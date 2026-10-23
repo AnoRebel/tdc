@@ -282,6 +282,19 @@ their own privacy policy governs what they do with them.
 
 `[This server uses GIF search from PROVIDER / does not use GIF search.]`
 
+**Only if you choose it — translation.** You can have messages translated. On
+this device, nothing leaves your computer. Through this server's own translation
+instance, the text of the messages you translate goes to `[NAME / LOCATION OF
+THE INSTANCE]`. If you connect a provider with your own key — LibreTranslate,
+Google, Microsoft or DeepL — the text of the messages you translate, which may
+be other people's, is sent to that provider through this server, and their own
+privacy policy governs what they do with it. Your key is stored encrypted and is
+never shown again; translations are kept so the same message is not translated
+twice, and deleted when the message is edited or removed.
+
+`[This server offers translation through: on-device / OUR INSTANCE / members' own
+providers — or: does not offer translation.]`
+
 **Only if enabled — push notifications.** If you allow notifications, your
 browser gives this server an endpoint at a push service chosen by your browser
 vendor (Google, Mozilla, Apple, Microsoft — whoever makes your browser). We

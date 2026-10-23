@@ -65,6 +65,7 @@ const groupTitles: Record<string, string> = {
   brand: $ts("admin.howThisServerLooks"),
   audit: $ts("moderation.auditLog"),
   accounts: $ts("names.adminGroup"),
+  translation: $ts("translation.adminGroup"),
 };
 
 /*

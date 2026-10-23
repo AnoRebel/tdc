@@ -174,7 +174,10 @@ export type Capability =
   | "directory"
   // Emailed summaries of missed activity, for people who choose them. Absent
   // on a server that cannot send mail, whatever its toggle says.
-  | "notification-digests";
+  | "notification-digests"
+  // Translating messages inline, each person with the provider they chose.
+  // On unless an operator switches it off.
+  | "translation";
 
 /** Health of a running server, for operators and uptime checks. */
 export interface HealthStatus {

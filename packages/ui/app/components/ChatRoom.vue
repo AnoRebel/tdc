@@ -33,6 +33,7 @@ import {
   Globe,
   Hash,
   Image as ImageIcon,
+  Languages,
   Lock,
   Maximize2,
   Menu,
@@ -71,6 +72,8 @@ import { isMac } from "#layers/ui/app/lib/platform";
 import { isOwnAddress } from "#layers/ui/app/lib/names";
 import IssueFromMessage from "#layers/ui/app/components/projects/IssueFromMessage.vue";
 import IssueLinks from "#layers/ui/app/components/projects/IssueLinks.vue";
+import TranslationBody from "#layers/ui/app/components/translation/TranslationBody.vue";
+import TranslationRoomToggle from "#layers/ui/app/components/translation/TranslationRoomToggle.vue";
 
 const { $t, $ts } = useI18n();
 
@@ -114,6 +117,8 @@ const filePicker = ref<HTMLInputElement | null>(null);
 // refusal costs only the transfer and a failed send does not lose the file.
 const uploads = useUploads();
 const fetchMedia = useMediaFetch();
+// Translation offered inline, with whichever provider this person chose.
+const translation = useTranslation();
 const outbox = useOutbox();
 
 /** What this conversation is still holding, oldest first. */
@@ -1544,6 +1549,15 @@ function menuFor(
     });
   }
 
+  if (!mine && !message.removed && translation.available.value) {
+    const showing = translation.showsTranslation(message.id, roomId.value, false);
+    items.push({
+      label: showing ? $ts("translation.showOriginal") : $ts("translation.translate"),
+      icon: Languages,
+      action: () => translation.toggle(roomId.value, message.id, message.body, false),
+    });
+  }
+
   if (room.value?.member && !message.removed) {
     items.push({
       label: $ts("room.replyInThread"),
@@ -2002,6 +2016,8 @@ watch(roomId, load, { immediate: true });
             <Video class="size-3.5" />
           </Button>
 
+          <TranslationRoomToggle :room-id="roomId" />
+
           <ChannelSettings :room="room" :events="messages" @changed="room = $event" />
 
           <!-- Only for whoever moderates: a ban that can only be issued is a
@@ -2232,6 +2248,21 @@ watch(roomId, load, { immediate: true });
                   >
                     <MessageSquareText class="size-3.5" />
                   </Button>
+                  <!-- Somebody else's words, in the reader's language or back. -->
+                  <Button
+                    v-if="!group.mine && translation.available.value"
+                    variant="ghost"
+                    size="icon"
+                    :label="
+                      translation.showsTranslation(message.id, roomId, false)
+                        ? $ts('translation.showOriginal')
+                        : $ts('translation.translate')
+                    "
+                    :aria-pressed="translation.showsTranslation(message.id, roomId, false)"
+                    @click="translation.toggle(roomId, message.id, message.body, false)"
+                  >
+                    <Languages class="size-3.5" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -2331,7 +2362,13 @@ watch(roomId, load, { immediate: true });
 
                     <template v-else>
                       <template v-if="message.removed">{{ $t("room.messageRemoved") }}</template>
-                      <MessageBody v-else :body="message.body" />
+                      <TranslationBody
+                        v-else
+                        :body="message.body"
+                        :message-id="message.id"
+                        :room-id="roomId"
+                        :mine="group.mine"
+                      />
                       <!-- The buttons this message offers. Real buttons, so a
                            keyboard reaches them and a screen reader says
                            "button"; the outcome is announced rather than only
