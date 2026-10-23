@@ -839,6 +839,64 @@ detected type is what governs.
 Downloading is `GET /api/attachments/:id`, authenticated and authorised —
 knowing where a file is stored grants nothing on its own.
 
+### Automatic replies
+
+A person can have the server answer for them while they are away. The replies
+are theirs to keep under `/api/me/automatic-replies`, with a session or a
+token:
+
+```sh
+# Answer direct messages and mentions while my status is Away.
+curl -X POST "http://localhost:8080/api/me/automatic-replies" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"Away until **Monday** — ask @amina meanwhile.",
+       "statuses":["away"],
+       "replyToDirect":true,"replyToGroups":false,"replyToMentions":true}'
+```
+
+Answers **201** with the reply, including `active`: whether it would answer
+right now. The fields:
+
+- `message` — Markdown, 1 to 500 characters; what a direct message is answered
+  with. `mentionMessage` is what a mention is answered with, and empty means the
+  same text.
+- `statuses` — status keys (`GET /api/statuses`) that turn it on. Empty means
+  whatever the status is.
+- `startsAt`, `endsAt` — RFC 3339 instants; leave either out for an open end
+  (no `endsAt` is "until I change it"). `timeZone` is the IANA zone the window
+  was chosen in, kept so a client can show it back as it was meant; the window
+  itself is the instants.
+- `replyToDirect`, `replyToGroups`, `replyToMentions` — which kinds of message
+  it answers: one-to-one conversations, direct conversations with more people,
+  and being named in a channel. At least one.
+- `enabled` — `false` keeps it without it answering.
+
+`GET` lists them oldest first, `PUT /api/me/automatic-replies/:id` replaces one
+with the same fields, `DELETE` removes it; at most ten per person. A status
+that is not configured, a window that ends before it starts, or an unknown zone
+is refused with **400**. `GET /api/me/status` carries `automaticReply`, true
+while one of them would answer.
+
+Where more than one applies, the first made answers. **A reply is posted as the
+person, in the conversation for a direct message and in the thread of the
+message for a mention**, and its content carries
+`"via": {"kind": "automatic", "id": "<their user id>", "name": "<their display name>"}`
+— set by the server, so it is distinguishable from the person typing in every
+client, export and delivery. It goes to each sender once per conversation per
+day, and to at most twenty conversations an hour per person. Nothing that
+carries a `via` — a webhook, a bot, another automatic reply — is ever answered,
+nor is a message the person sent themselves, an edit, or a message in a room
+another server holds. Somebody either side has blocked, or whom the person's
+own setting would not let start a conversation with them, gets nothing; and a
+reply tied to a status stays silent while the person appears offline, since
+that status is withheld from everybody then.
+
+**An integration that reads messages should treat `via.kind == "automatic"` as
+not the person speaking.** It is not an answer to a question the bot asked, and
+replying to it starts a loop the server will not answer but other programs
+might.
+
 ## The live connection
 
 One WebSocket at `/api/live` carries messages, presence, typing and read state
