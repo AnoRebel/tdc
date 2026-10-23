@@ -325,6 +325,11 @@ func (s *Server) routes() {
 		s.requirePosting())
 	rooms.GET("/:id/threads/:eventId", s.handleThread, requireChannelPermission(authz.PermChannelRead))
 	rooms.POST("/:id/threads/:eventId/replies", s.handleReplyInThread, s.requirePosting())
+	// Where somebody stands with one thread: how far they have read it, and
+	// whether its replies reach them. Their own, so only membership is asked.
+	rooms.POST("/:id/threads/:eventId/read", s.handleMarkThreadRead)
+	rooms.PUT("/:id/threads/:eventId/follow", s.handleFollowThread)
+	rooms.DELETE("/:id/threads/:eventId/follow", s.handleUnfollowThread)
 	rooms.POST("/:id/read", s.handleMarkRead)
 	rooms.GET("/:id/presence", s.handleRoomPresence, requireChannelPermission(authz.PermChannelRead))
 	rooms.POST("/:id/typing", s.handleStartTyping)

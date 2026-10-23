@@ -365,7 +365,7 @@ func (s *Service) ForMessage(
 	recipients []dbgen.ListRoomMembersRow,
 	directRoom bool,
 ) {
-	s.forMessage(ctx, event, body, recipients, directRoom, Delivery{})
+	s.forMessage(ctx, event, body, recipients, directRoom, Delivery{}, nil)
 }
 
 /*
@@ -384,9 +384,35 @@ func (s *Service) ForMessageIn(
 	directRoom bool,
 	about Delivery,
 ) {
-	s.forMessage(ctx, event, body, recipients, directRoom, about)
+	s.forMessage(ctx, event, body, recipients, directRoom, about, nil)
 }
 
+/*
+ForReplyIn is ForMessageIn for a reply in a thread.
+
+A reply reaches the people it names, everybody in a direct conversation, and
+the thread's followers — and nobody else. Somebody set to hear everything in a
+channel asked for its conversation, not for every aside in every thread of it;
+a busy thread would otherwise bury them.
+*/
+func (s *Service) ForReplyIn(
+	ctx context.Context,
+	event dbgen.Event,
+	body string,
+	recipients []dbgen.ListRoomMembersRow,
+	directRoom bool,
+	about Delivery,
+	followers []uuid.UUID,
+) {
+	following := make(map[uuid.UUID]bool, len(followers))
+	for _, id := range followers {
+		following[id] = true
+	}
+	s.forMessage(ctx, event, body, recipients, directRoom, about, following)
+}
+
+// forMessage notifies about a message; following is nil for a message in the
+// channel, and the thread's followers for a reply.
 func (s *Service) forMessage(
 	ctx context.Context,
 	event dbgen.Event,
@@ -394,6 +420,7 @@ func (s *Service) forMessage(
 	recipients []dbgen.ListRoomMembersRow,
 	directRoom bool,
 	about Delivery,
+	following map[uuid.UUID]bool,
 ) {
 	mentioned := MentionsIn(body)
 
@@ -404,7 +431,7 @@ func (s *Service) forMessage(
 		}
 
 		reason, wanted := s.reasonFor(
-			ctx, member.ID, member.Username, event.RoomID, mentioned, directRoom)
+			ctx, member.ID, member.Username, event.RoomID, mentioned, directRoom, following)
 		if !wanted {
 			continue
 		}
@@ -466,6 +493,7 @@ func (s *Service) reasonFor(
 	roomID uuid.UUID,
 	mentioned []string,
 	directRoom bool,
+	following map[uuid.UUID]bool,
 ) (Reason, bool) {
 	preference := s.preferenceFor(ctx, userID, roomID)
 
@@ -482,6 +510,12 @@ func (s *Service) reasonFor(
 
 	if namedIn(username, mentioned) {
 		return ReasonMention, preference.Level != LevelNone
+	}
+
+	// A reply: its thread's followers, and nobody the rules above did not
+	// already reach.
+	if following != nil {
+		return ReasonReply, following[userID] && preference.Level != LevelNone
 	}
 
 	if preference.Level == LevelAll {

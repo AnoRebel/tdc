@@ -11,76 +11,27 @@ import (
 	uuid "github.com/google/uuid"
 )
 
-const appendThreadedEvent = `-- name: AppendThreadedEvent :one
-INSERT INTO events (
-    id, room_id, sequence, sender_id, sender_address, room_address,
-    origin_server, type, content, created_at, nonce, signature, key_id,
-    thread_root_id
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash
+const chooseThreadFollowing = `-- name: ChooseThreadFollowing :exec
+INSERT INTO thread_reads (user_id, root_event_id, following, chosen)
+VALUES ($1, $2, $3, true)
+ON CONFLICT (user_id, root_event_id)
+DO UPDATE SET following = EXCLUDED.following, chosen = true
 `
 
-type AppendThreadedEventParams struct {
-	ID            string
-	RoomID        uuid.UUID
-	Sequence      int64
-	SenderID      *uuid.UUID
-	SenderAddress string
-	RoomAddress   string
-	OriginServer  string
-	Type          string
-	Content       []byte
-	CreatedAt     int64
-	Nonce         string
-	Signature     string
-	KeyID         string
-	ThreadRootID  *string
+type ChooseThreadFollowingParams struct {
+	UserID      uuid.UUID
+	RootEventID string
+	Following   bool
 }
 
-// A reply carries the identifier of the message that started the thread.
-func (q *Queries) AppendThreadedEvent(ctx context.Context, arg AppendThreadedEventParams) (Event, error) {
-	row := q.db.QueryRow(ctx, appendThreadedEvent,
-		arg.ID,
-		arg.RoomID,
-		arg.Sequence,
-		arg.SenderID,
-		arg.SenderAddress,
-		arg.RoomAddress,
-		arg.OriginServer,
-		arg.Type,
-		arg.Content,
-		arg.CreatedAt,
-		arg.Nonce,
-		arg.Signature,
-		arg.KeyID,
-		arg.ThreadRootID,
-	)
-	var i Event
-	err := row.Scan(
-		&i.ID,
-		&i.RoomID,
-		&i.Sequence,
-		&i.SenderID,
-		&i.SenderAddress,
-		&i.RoomAddress,
-		&i.OriginServer,
-		&i.Type,
-		&i.Content,
-		&i.CreatedAt,
-		&i.Signature,
-		&i.KeyID,
-		&i.RedactedAt,
-		&i.RedactedBy,
-		&i.Nonce,
-		&i.ThreadRootID,
-		&i.ContentHash,
-	)
-	return i, err
+// Somebody deciding for themselves, which participation never overrides.
+func (q *Queries) ChooseThreadFollowing(ctx context.Context, arg ChooseThreadFollowingParams) error {
+	_, err := q.db.Exec(ctx, chooseThreadFollowing, arg.UserID, arg.RootEventID, arg.Following)
+	return err
 }
 
 const countThreadReplies = `-- name: CountThreadReplies :one
-SELECT COUNT(*) FROM events WHERE thread_root_id = $1
+SELECT COUNT(*) FROM events WHERE thread_root_id = $1 AND type = 'message.sent'
 `
 
 func (q *Queries) CountThreadReplies(ctx context.Context, threadRootID *string) (int64, error) {
@@ -98,6 +49,8 @@ WHERE events.room_id = $1
   AND room_members.user_id = $2
   AND events.sequence > COALESCE(room_members.read_sequence, 0)
   AND events.type = 'message.sent'
+  -- Replies have their own read position, per thread.
+  AND events.thread_root_id IS NULL
   AND (events.sender_id IS NULL OR events.sender_id <> $2)
 `
 
@@ -187,6 +140,46 @@ func (q *Queries) FindDirectRoom(ctx context.Context, participantKey *string) (R
 	return i, err
 }
 
+const followThreadByTakingPart = `-- name: FollowThreadByTakingPart :exec
+INSERT INTO thread_reads (user_id, root_event_id, following)
+VALUES ($1, $2, true)
+ON CONFLICT (user_id, root_event_id)
+DO UPDATE SET following = true WHERE NOT thread_reads.chosen
+`
+
+type FollowThreadByTakingPartParams struct {
+	UserID      uuid.UUID
+	RootEventID string
+}
+
+// Following because of taking part, unless the person has already decided.
+func (q *Queries) FollowThreadByTakingPart(ctx context.Context, arg FollowThreadByTakingPartParams) error {
+	_, err := q.db.Exec(ctx, followThreadByTakingPart, arg.UserID, arg.RootEventID)
+	return err
+}
+
+const getThreadRead = `-- name: GetThreadRead :one
+SELECT root_event_id, user_id, read_sequence, following, chosen FROM thread_reads WHERE user_id = $1 AND root_event_id = $2
+`
+
+type GetThreadReadParams struct {
+	UserID      uuid.UUID
+	RootEventID string
+}
+
+func (q *Queries) GetThreadRead(ctx context.Context, arg GetThreadReadParams) (ThreadRead, error) {
+	row := q.db.QueryRow(ctx, getThreadRead, arg.UserID, arg.RootEventID)
+	var i ThreadRead
+	err := row.Scan(
+		&i.RootEventID,
+		&i.UserID,
+		&i.ReadSequence,
+		&i.Following,
+		&i.Chosen,
+	)
+	return i, err
+}
+
 const listDirectRoomsForUser = `-- name: ListDirectRoomsForUser :many
 SELECT rooms.id, rooms.slug, rooms.slug_folded, rooms.name, rooms.topic, rooms.kind, rooms.visibility, rooms.home_server, rooms.created_by, rooms.created_at, rooms.updated_at, rooms.archived_at, rooms.archived_by, rooms.message_ttl_seconds, rooms.participant_key, rooms.federated
 FROM rooms
@@ -233,18 +226,30 @@ func (q *Queries) ListDirectRoomsForUser(ctx context.Context, userID uuid.UUID) 
 }
 
 const listRoomThreadSummaries = `-- name: ListRoomThreadSummaries :many
-SELECT thread_root_id,
+SELECT e.thread_root_id,
        COUNT(*)::bigint AS reply_count,
-       MAX(created_at)::bigint AS last_reply_at
-FROM events
-WHERE room_id = $1 AND thread_root_id IS NOT NULL
-GROUP BY thread_root_id
+       MAX(e.created_at)::bigint AS last_reply_at,
+       COUNT(*) FILTER (
+           WHERE COALESCE(r.following, false)
+             AND e.sequence > COALESCE(r.read_sequence, 0)
+             AND (e.sender_id IS NULL OR e.sender_id <> $1::uuid)
+       )::bigint AS unread
+FROM events e
+LEFT JOIN thread_reads r ON r.root_event_id = e.thread_root_id AND r.user_id = $1::uuid
+WHERE e.room_id = $2::uuid AND e.thread_root_id IS NOT NULL AND e.type = 'message.sent'
+GROUP BY e.thread_root_id
 `
+
+type ListRoomThreadSummariesParams struct {
+	UserID uuid.UUID
+	RoomID uuid.UUID
+}
 
 type ListRoomThreadSummariesRow struct {
 	ThreadRootID *string
 	ReplyCount   int64
 	LastReplyAt  int64
+	Unread       int64
 }
 
 // Reply counts for every thread in a room, in one query.
@@ -253,8 +258,11 @@ type ListRoomThreadSummariesRow struct {
 // counts for what it is drawing, and asking per message meant one request per
 // message. Replies are counted against the room they were sent to, so a root
 // that has scrolled out of the loaded window still reports correctly.
-func (q *Queries) ListRoomThreadSummaries(ctx context.Context, roomID uuid.UUID) ([]ListRoomThreadSummariesRow, error) {
-	rows, err := q.db.Query(ctx, listRoomThreadSummaries, roomID)
+//
+// Unread is counted only in threads the reader follows: every thread in a busy
+// channel showing a badge would be a badge nobody reads.
+func (q *Queries) ListRoomThreadSummaries(ctx context.Context, arg ListRoomThreadSummariesParams) ([]ListRoomThreadSummariesRow, error) {
+	rows, err := q.db.Query(ctx, listRoomThreadSummaries, arg.UserID, arg.RoomID)
 	if err != nil {
 		return nil, err
 	}
@@ -262,7 +270,12 @@ func (q *Queries) ListRoomThreadSummaries(ctx context.Context, roomID uuid.UUID)
 	items := []ListRoomThreadSummariesRow{}
 	for rows.Next() {
 		var i ListRoomThreadSummariesRow
-		if err := rows.Scan(&i.ThreadRootID, &i.ReplyCount, &i.LastReplyAt); err != nil {
+		if err := rows.Scan(
+			&i.ThreadRootID,
+			&i.ReplyCount,
+			&i.LastReplyAt,
+			&i.Unread,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -325,6 +338,30 @@ func (q *Queries) ListRoomTimelineExcludingReplies(ctx context.Context, arg List
 	return items, nil
 }
 
+const listThreadFollowers = `-- name: ListThreadFollowers :many
+SELECT user_id FROM thread_reads WHERE root_event_id = $1 AND following
+`
+
+func (q *Queries) ListThreadFollowers(ctx context.Context, rootEventID string) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listThreadFollowers, rootEventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var user_id uuid.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listThreadReplies = `-- name: ListThreadReplies :many
 SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash FROM events
 WHERE thread_root_id = $1
@@ -372,7 +409,7 @@ func (q *Queries) ListThreadReplies(ctx context.Context, threadRootID *string) (
 const listThreadSummaries = `-- name: ListThreadSummaries :many
 SELECT thread_root_id, COUNT(*)::bigint AS reply_count, MAX(created_at)::bigint AS last_reply_at
 FROM events
-WHERE thread_root_id = ANY($1::text[])
+WHERE thread_root_id = ANY($1::text[]) AND type = 'message.sent'
 GROUP BY thread_root_id
 `
 
@@ -411,6 +448,7 @@ FROM room_members
 LEFT JOIN events ON events.room_id = room_members.room_id
     AND events.sequence > COALESCE(room_members.read_sequence, 0)
     AND events.type = 'message.sent'
+    AND events.thread_root_id IS NULL
     AND (events.sender_id IS NULL OR events.sender_id <> room_members.user_id)
 WHERE room_members.user_id = $1
 GROUP BY room_members.room_id
@@ -441,4 +479,23 @@ func (q *Queries) ListUnreadCounts(ctx context.Context, userID uuid.UUID) ([]Lis
 		return nil, err
 	}
 	return items, nil
+}
+
+const markThreadRead = `-- name: MarkThreadRead :exec
+INSERT INTO thread_reads (user_id, root_event_id, read_sequence)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, root_event_id)
+DO UPDATE SET read_sequence = GREATEST(thread_reads.read_sequence, EXCLUDED.read_sequence)
+`
+
+type MarkThreadReadParams struct {
+	UserID       uuid.UUID
+	RootEventID  string
+	ReadSequence int64
+}
+
+// Never backwards: a view that is behind cannot resurface replies already read.
+func (q *Queries) MarkThreadRead(ctx context.Context, arg MarkThreadReadParams) error {
+	_, err := q.db.Exec(ctx, markThreadRead, arg.UserID, arg.RootEventID, arg.ReadSequence)
+	return err
 }

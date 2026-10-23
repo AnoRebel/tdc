@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -9,45 +8,23 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
-	"github.com/AnoRebel/tdc/server/internal/notify"
 )
 
-type replyRequest struct {
-	Body        string `json:"body"`
-	ClientToken string `json:"clientToken"`
-}
-
-// threadResponse is a thread's root and its replies.
+// threadResponse is a thread's root and its replies, with where the reader
+// stands in it.
 type threadResponse struct {
-	Root    messageResponse   `json:"root"`
+	Root messageResponse `json:"root"`
+	// Replies is every event in the thread, oldest first: the replies, and
+	// the edits, deletions and updates of them, folded by the client as the
+	// channel's timeline is.
 	Replies []messageResponse `json:"replies"`
+	// ReadSequence is how far the reader has read this thread, zero if never.
+	ReadSequence int64 `json:"readSequence"`
+	// Following is whether replies here notify the reader.
+	Following bool `json:"following"`
 }
 
 func (s *Server) handleThread(c *echo.Context) error {
-	user, _ := currentUser(c)
-
-	roomID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "no such room")
-	}
-
-	root, replies, err := s.rooms.Thread(c.Request().Context(), roomID, user.ID, eventIDParam(c))
-	if err != nil {
-		return roomError(err)
-	}
-
-	response := threadResponse{
-		Root:    messageResponseOf(root),
-		Replies: make([]messageResponse, 0, len(replies)),
-	}
-	for _, reply := range replies {
-		response.Replies = append(response.Replies, messageResponseOf(reply))
-	}
-
-	return c.JSON(http.StatusOK, response)
-}
-
-func (s *Server) handleReplyInThread(c *echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
 
@@ -56,37 +33,97 @@ func (s *Server) handleReplyInThread(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
-	var request replyRequest
-	if err := c.Bind(&request); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
-	}
-
-	// A reply is a message, and a filter that stopped at the top level would
-	// leave every thread unfiltered.
-	filtered, err := s.applyContentFilter(ctx, request.Body)
-	if err != nil {
-		return err
-	}
-
-	reply, err := s.rooms.ReplyInThread(ctx, roomID, user.ID,
-		eventIDParam(c), filtered.Body, request.ClientToken)
+	root, replies, err := s.rooms.Thread(ctx, roomID, user.ID, eventIDParam(c))
 	if err != nil {
 		return roomError(err)
 	}
 
-	if filtered.Flagged {
-		s.flagForReview(c, roomID, reply.ID,
-			s.rooms.UserAddress(user.Username), filtered.Matched, filtered.Body)
+	// The root and its replies, drawn as the timeline draws messages.
+	rendered, err := s.messagesFor(ctx, user.ID, append([]dbgen.Event{root}, replies...))
+	if err != nil {
+		return err
 	}
 
-	// Sending clears any typing indication, so it does not linger after the
-	// message it announced has arrived.
-	if err := s.presence.StopTyping(ctx, roomID, user.ID); err != nil {
-		s.log.Error("cannot withdraw typing indication", "error", err)
+	reading, err := s.rooms.ThreadReadingFor(ctx, user.ID, root.ID)
+	if err != nil {
+		return err
 	}
 
-	s.afterReply(ctx, reply, user.ID, s.rooms.UserAddress(user.Username))
-	return c.JSON(http.StatusCreated, messageResponseOf(reply))
+	return c.JSON(http.StatusOK, threadResponse{
+		Root:         rendered[0],
+		Replies:      rendered[1:],
+		ReadSequence: reading.ReadSequence,
+		Following:    reading.Following,
+	})
+}
+
+/*
+handleReplyInThread posts a reply under a message.
+
+A reply is a message, so it takes the same request and goes through the same
+path as posting to the channel: its files, its buttons, the content filter and
+everything that follows a message.
+*/
+func (s *Server) handleReplyInThread(c *echo.Context) error {
+	user, _ := currentUser(c)
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	var request sendMessageRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	return s.postMessage(c, roomID, user, request, eventIDParam(c))
+}
+
+// handleMarkThreadRead records how far the reader has read one thread.
+func (s *Server) handleMarkThreadRead(c *echo.Context) error {
+	user, _ := currentUser(c)
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	var request markReadRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+
+	if err := s.rooms.MarkThreadRead(c.Request().Context(), roomID, user.ID,
+		eventIDParam(c), request.Sequence); err != nil {
+		return roomError(err)
+	}
+	return c.NoContent(http.StatusNoContent)
+}
+
+// handleFollowThread and handleUnfollowThread are the reader's own choice,
+// which replying afterwards does not override.
+func (s *Server) handleFollowThread(c *echo.Context) error {
+	return s.setFollowing(c, true)
+}
+
+func (s *Server) handleUnfollowThread(c *echo.Context) error {
+	return s.setFollowing(c, false)
+}
+
+func (s *Server) setFollowing(c *echo.Context, following bool) error {
+	user, _ := currentUser(c)
+
+	roomID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no such room")
+	}
+
+	if err := s.rooms.SetThreadFollowing(c.Request().Context(), roomID, user.ID,
+		eventIDParam(c), following); err != nil {
+		return roomError(err)
+	}
+	return c.NoContent(http.StatusNoContent)
 }
 
 type openDirectRequest struct {
@@ -396,6 +433,12 @@ func (s *Server) handleListStatuses(c *echo.Context) error {
 	return c.JSON(http.StatusOK, response)
 }
 
+// startTypingRequest is optional: an empty body is typing in the channel.
+type startTypingRequest struct {
+	// ThreadRoot names the thread being replied in.
+	ThreadRoot string `json:"threadRoot,omitempty"`
+}
+
 func (s *Server) handleStartTyping(c *echo.Context) error {
 	user, _ := currentUser(c)
 	ctx := c.Request().Context()
@@ -405,10 +448,24 @@ func (s *Server) handleStartTyping(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
+	var request startTypingRequest
+	if c.Request().ContentLength != 0 {
+		if err := c.Bind(&request); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+		}
+	}
+
 	if _, err := s.rooms.RequireMembership(ctx, roomID, user.ID); err != nil {
 		return roomError(err)
 	}
-	if err := s.presence.StartTyping(ctx, roomID, user.ID); err != nil {
+	// Only a message in this room, so the thread a writer is shown in is one
+	// the readers of the room can open.
+	if request.ThreadRoot != "" {
+		if _, err := s.rooms.EventInRoom(ctx, roomID, request.ThreadRoot); err != nil {
+			return roomError(err)
+		}
+	}
+	if err := s.presence.StartTypingIn(ctx, roomID, user.ID, request.ThreadRoot); err != nil {
 		return err
 	}
 
@@ -435,10 +492,15 @@ func (s *Server) handleListTyping(c *echo.Context) error {
 
 	response := make([]map[string]string, 0, len(typing))
 	for _, row := range typing {
-		response = append(response, map[string]string{
+		entry := map[string]string{
 			"userId":      row.UserID.String(),
 			"displayName": row.DisplayName,
-		})
+		}
+		// Absent for the channel itself, so each view shows its own writers.
+		if row.ThreadRootID != nil {
+			entry["threadRoot"] = *row.ThreadRootID
+		}
+		response = append(response, entry)
 	}
 	return c.JSON(http.StatusOK, response)
 }
@@ -447,6 +509,9 @@ func (s *Server) handleListTyping(c *echo.Context) error {
 type threadSummary struct {
 	ReplyCount  int64 `json:"replyCount"`
 	LastReplyAt int64 `json:"lastReplyAt"`
+	// Unread is replies by others the reader has not read, in a thread they
+	// follow; zero in one they do not.
+	Unread int64 `json:"unread"`
 }
 
 /*
@@ -474,7 +539,7 @@ func (s *Server) handleThreadSummaries(c *echo.Context) error {
 		return roomError(err)
 	}
 
-	summaries, err := s.rooms.RoomThreadSummaries(ctx, roomID)
+	summaries, err := s.rooms.RoomThreadSummaries(ctx, roomID, user.ID)
 	if err != nil {
 		return err
 	}
@@ -484,25 +549,9 @@ func (s *Server) handleThreadSummaries(c *echo.Context) error {
 		response[rootID] = threadSummary{
 			ReplyCount:  summary.ReplyCount,
 			LastReplyAt: summary.LastReplyAt,
+			Unread:      summary.Unread,
 		}
 	}
 
 	return c.JSON(http.StatusOK, response)
-}
-
-// afterReply is what follows a reply in a thread being stored, however it was
-// sent — by somebody now, or by the scheduler on their behalf.
-func (s *Server) afterReply(ctx context.Context, reply dbgen.Event, senderID uuid.UUID, senderAddress string) {
-	// Whoever started the thread hears about a reply in it, which is the
-	// notification a threaded conversation lives on: without it a thread is
-	// only found by going back and looking.
-	if s.notify != nil && reply.ThreadRootID != nil {
-		if root, err := s.rooms.EventInRoom(ctx, reply.RoomID, *reply.ThreadRootID); err == nil &&
-			root.SenderID != nil {
-			s.notify.About(ctx, *root.SenderID, senderID, senderAddress,
-				reply.RoomID, reply.ID, notify.ReasonReply, "")
-		}
-	}
-
-	s.publishEvent(ctx, reply)
 }

@@ -74,10 +74,6 @@ func (s *Server) scheduledDelivery() rooms.ScheduledDelivery {
 	delivery := rooms.ScheduledDelivery{
 		MayPost: s.mayStillPost,
 		Sent: func(ctx context.Context, event dbgen.Event, row dbgen.ScheduledMessage) {
-			if event.ThreadRootID != nil {
-				s.afterReply(ctx, event, row.SenderID, row.SenderAddress)
-				return
-			}
 			s.afterMessage(ctx, event, row.Body)
 		},
 	}

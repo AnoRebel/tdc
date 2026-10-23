@@ -1,27 +1,17 @@
--- name: AppendThreadedEvent :one
--- A reply carries the identifier of the message that started the thread.
-INSERT INTO events (
-    id, room_id, sequence, sender_id, sender_address, room_address,
-    origin_server, type, content, created_at, nonce, signature, key_id,
-    thread_root_id
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING *;
-
 -- name: ListThreadReplies :many
 SELECT * FROM events
 WHERE thread_root_id = $1
 ORDER BY sequence;
 
 -- name: CountThreadReplies :one
-SELECT COUNT(*) FROM events WHERE thread_root_id = $1;
+SELECT COUNT(*) FROM events WHERE thread_root_id = $1 AND type = 'message.sent';
 
 -- name: ListThreadSummaries :many
 -- How many replies each of a set of messages has, and when the latest arrived,
 -- so a timeline can show "3 replies" without fetching them.
 SELECT thread_root_id, COUNT(*)::bigint AS reply_count, MAX(created_at)::bigint AS last_reply_at
 FROM events
-WHERE thread_root_id = ANY($1::text[])
+WHERE thread_root_id = ANY($1::text[]) AND type = 'message.sent'
 GROUP BY thread_root_id;
 
 -- name: ListRoomTimelineExcludingReplies :many
@@ -57,6 +47,8 @@ WHERE events.room_id = $1
   AND room_members.user_id = $2
   AND events.sequence > COALESCE(room_members.read_sequence, 0)
   AND events.type = 'message.sent'
+  -- Replies have their own read position, per thread.
+  AND events.thread_root_id IS NULL
   AND (events.sender_id IS NULL OR events.sender_id <> $2);
 
 -- name: ListUnreadCounts :many
@@ -68,6 +60,7 @@ FROM room_members
 LEFT JOIN events ON events.room_id = room_members.room_id
     AND events.sequence > COALESCE(room_members.read_sequence, 0)
     AND events.type = 'message.sent'
+    AND events.thread_root_id IS NULL
     AND (events.sender_id IS NULL OR events.sender_id <> room_members.user_id)
 WHERE room_members.user_id = $1
 GROUP BY room_members.room_id;
@@ -79,9 +72,45 @@ GROUP BY room_members.room_id;
 -- counts for what it is drawing, and asking per message meant one request per
 -- message. Replies are counted against the room they were sent to, so a root
 -- that has scrolled out of the loaded window still reports correctly.
-SELECT thread_root_id,
+--
+-- Unread is counted only in threads the reader follows: every thread in a busy
+-- channel showing a badge would be a badge nobody reads.
+SELECT e.thread_root_id,
        COUNT(*)::bigint AS reply_count,
-       MAX(created_at)::bigint AS last_reply_at
-FROM events
-WHERE room_id = $1 AND thread_root_id IS NOT NULL
-GROUP BY thread_root_id;
+       MAX(e.created_at)::bigint AS last_reply_at,
+       COUNT(*) FILTER (
+           WHERE COALESCE(r.following, false)
+             AND e.sequence > COALESCE(r.read_sequence, 0)
+             AND (e.sender_id IS NULL OR e.sender_id <> @user_id::uuid)
+       )::bigint AS unread
+FROM events e
+LEFT JOIN thread_reads r ON r.root_event_id = e.thread_root_id AND r.user_id = @user_id::uuid
+WHERE e.room_id = @room_id::uuid AND e.thread_root_id IS NOT NULL AND e.type = 'message.sent'
+GROUP BY e.thread_root_id;
+
+-- name: GetThreadRead :one
+SELECT * FROM thread_reads WHERE user_id = $1 AND root_event_id = $2;
+
+-- name: MarkThreadRead :exec
+-- Never backwards: a view that is behind cannot resurface replies already read.
+INSERT INTO thread_reads (user_id, root_event_id, read_sequence)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, root_event_id)
+DO UPDATE SET read_sequence = GREATEST(thread_reads.read_sequence, EXCLUDED.read_sequence);
+
+-- name: ChooseThreadFollowing :exec
+-- Somebody deciding for themselves, which participation never overrides.
+INSERT INTO thread_reads (user_id, root_event_id, following, chosen)
+VALUES ($1, $2, $3, true)
+ON CONFLICT (user_id, root_event_id)
+DO UPDATE SET following = EXCLUDED.following, chosen = true;
+
+-- name: FollowThreadByTakingPart :exec
+-- Following because of taking part, unless the person has already decided.
+INSERT INTO thread_reads (user_id, root_event_id, following)
+VALUES ($1, $2, true)
+ON CONFLICT (user_id, root_event_id)
+DO UPDATE SET following = true WHERE NOT thread_reads.chosen;
+
+-- name: ListThreadFollowers :many
+SELECT user_id FROM thread_reads WHERE root_event_id = $1 AND following;

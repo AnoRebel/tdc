@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
@@ -108,9 +109,20 @@ func (s *Server) handleRoomReactions(c *echo.Context) error {
 		return roomError(err)
 	}
 
-	events, err := s.rooms.Timeline(ctx, roomID, user.ID, 0)
-	if err != nil {
-		return roomError(err)
+	// One thread's, when asked: replies are not in the channel's timeline,
+	// so the thread a reader has open asks for its own.
+	var events []dbgen.Event
+	if thread := c.QueryParam("thread"); thread != "" {
+		root, replies, err := s.rooms.Thread(ctx, roomID, user.ID, thread)
+		if err != nil {
+			return roomError(err)
+		}
+		events = append([]dbgen.Event{root}, replies...)
+	} else {
+		events, err = s.rooms.Timeline(ctx, roomID, user.ID, 0)
+		if err != nil {
+			return roomError(err)
+		}
 	}
 
 	ids := make([]string, 0, len(events))

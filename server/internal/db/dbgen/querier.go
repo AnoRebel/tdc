@@ -48,8 +48,6 @@ type Querier interface {
 	AllocateIssueNumber(ctx context.Context, id uuid.UUID) (int64, error)
 	AppendAuditEntry(ctx context.Context, arg AppendAuditEntryParams) (AuditEntry, error)
 	AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error)
-	// A reply carries the identifier of the message that started the thread.
-	AppendThreadedEvent(ctx context.Context, arg AppendThreadedEventParams) (Event, error)
 	ApproveApplication(ctx context.Context, arg ApproveApplicationParams) (Application, error)
 	ApproveSkill(ctx context.Context, arg ApproveSkillParams) (int64, error)
 	// Closing an engagement's conversation to new messages, keeping what was said.
@@ -81,6 +79,8 @@ type Querier interface {
 	// cancelling it: the sender's, unsent, not failed, and not being sent. Either
 	// may be left out to keep it as it was.
 	ChangeScheduledMessage(ctx context.Context, arg ChangeScheduledMessageParams) (ScheduledMessage, error)
+	// Somebody deciding for themselves, which participation never overrides.
+	ChooseThreadFollowing(ctx context.Context, arg ChooseThreadFollowingParams) error
 	ClaimDueNotificationDigests(ctx context.Context, limit int32) ([]NotificationDigest, error)
 	// What is ready to send, claimed by whoever asked.
 	//
@@ -378,6 +378,8 @@ type Querier interface {
 	// Consumed when the second factor is accepted, so a ticket buys one session.
 	FinishPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
 	FinishWebhookAttempt(ctx context.Context, arg FinishWebhookAttemptParams) error
+	// Following because of taking part, unless the person has already decided.
+	FollowThreadByTakingPart(ctx context.Context, arg FollowThreadByTakingPartParams) error
 	// The per-request lookup, joined to the account so one query answers both
 	// "is this token good" and "who is it".
 	//
@@ -477,6 +479,7 @@ type Querier interface {
 	GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error)
 	GetSkill(ctx context.Context, id uuid.UUID) (Skill, error)
 	GetTOTPCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
+	GetThreadRead(ctx context.Context, arg GetThreadReadParams) (ThreadRead, error)
 	// Which introductions this person has already been given.
 	//
 	// Read whole and written whole: the structure is small, and a partial update
@@ -800,7 +803,10 @@ type Querier interface {
 	// counts for what it is drawing, and asking per message meant one request per
 	// message. Replies are counted against the room they were sent to, so a root
 	// that has scrolled out of the loaded window still reports correctly.
-	ListRoomThreadSummaries(ctx context.Context, roomID uuid.UUID) ([]ListRoomThreadSummariesRow, error)
+	//
+	// Unread is counted only in threads the reader follows: every thread in a busy
+	// channel showing a badge would be a badge nobody reads.
+	ListRoomThreadSummaries(ctx context.Context, arg ListRoomThreadSummariesParams) ([]ListRoomThreadSummariesRow, error)
 	// The main timeline: replies live in their thread, not in the channel, unless
 	// explicitly surfaced.
 	ListRoomTimelineExcludingReplies(ctx context.Context, arg ListRoomTimelineExcludingRepliesParams) ([]Event, error)
@@ -826,6 +832,7 @@ type Querier interface {
 	// The vocabulary for somebody choosing: every active skill matching what they
 	// typed, and their own proposals, which only they can attach.
 	ListSkills(ctx context.Context, arg ListSkillsParams) ([]Skill, error)
+	ListThreadFollowers(ctx context.Context, rootEventID string) ([]uuid.UUID, error)
 	ListThreadReplies(ctx context.Context, threadRootID *string) ([]Event, error)
 	// How many replies each of a set of messages has, and when the latest arrived,
 	// so a timeline can show "3 replies" without fetching them.
@@ -907,6 +914,8 @@ type Querier interface {
 	MarkRoomNotificationsReadForUser(ctx context.Context, arg MarkRoomNotificationsReadForUserParams) error
 	MarkScheduledMessageFailed(ctx context.Context, arg MarkScheduledMessageFailedParams) error
 	MarkScheduledMessageSent(ctx context.Context, arg MarkScheduledMessageSentParams) error
+	// Never backwards: a view that is behind cannot resurface replies already read.
+	MarkThreadRead(ctx context.Context, arg MarkThreadReadParams) error
 	// A moderator replacing what a profile says — in practice, clearing it. The
 	// visibility can be lowered in the same change, so abusive content can be
 	// taken out of the directory while it is dealt with.

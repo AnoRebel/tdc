@@ -293,3 +293,35 @@ func TestReadPositionAdvancesAndDoesNotRegress(t *testing.T) {
 		t.Errorf("unread = %d after a stale device reported an older position, want 0", counts[room.ID])
 	}
 }
+
+// A reply is stored with the digest of what was signed, as every other event
+// is: without it, a redacted reply can no longer be verified, and an intact one
+// is verified against content Postgres has already re-encoded.
+func TestARepliesContentDigestIsKept(t *testing.T) {
+	service, queries, _ := newTestService(t)
+	ctx := context.Background()
+
+	author := makeUser(t, queries, "amina")
+	room := makeRoom(t, service, author.ID, "general")
+
+	root, err := service.SendMessage(ctx, room.ID, author.ID, "a question", "")
+	if err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	reply, err := service.ReplyInThread(ctx, room.ID, author.ID, root.ID, "an answer", "")
+	if err != nil {
+		t.Fatalf("ReplyInThread: %v", err)
+	}
+	if reply.ContentHash == nil || *reply.ContentHash == "" {
+		t.Error("a reply was stored without its content digest")
+	}
+
+	// And an edit of the reply stays in its thread.
+	edit, err := service.EditMessage(ctx, room.ID, author.ID, reply.ID, "a better answer")
+	if err != nil {
+		t.Fatalf("EditMessage: %v", err)
+	}
+	if edit.ThreadRootID == nil || *edit.ThreadRootID != root.ID {
+		t.Errorf("an edit of a reply is in thread %v, want %s", edit.ThreadRootID, root.ID)
+	}
+}

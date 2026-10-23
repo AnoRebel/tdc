@@ -250,6 +250,17 @@ func (s *Service) Statuses(ctx context.Context) ([]dbgen.ServerStatus, error) {
 // withdraw it, so someone who closes their laptop mid-sentence does not leave
 // an indicator on permanently.
 func (s *Service) StartTyping(ctx context.Context, roomID, userID uuid.UUID) error {
+	return s.StartTypingIn(ctx, roomID, userID, "")
+}
+
+// StartTypingIn records that a person is composing in one thread of a room,
+// or in the channel itself when threadRoot is empty.
+func (s *Service) StartTypingIn(ctx context.Context, roomID, userID uuid.UUID, threadRoot string) error {
+	var thread *string
+	if threadRoot != "" {
+		thread = &threadRoot
+	}
+
 	user, err := s.store.GetUserByID(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("read user: %w", err)
@@ -260,9 +271,10 @@ func (s *Service) StartTyping(ctx context.Context, roomID, userID uuid.UUID) err
 	}
 
 	if err := s.store.StartTyping(ctx, dbgen.StartTypingParams{
-		RoomID:    roomID,
-		UserID:    userID,
-		ExpiresAt: time.Now().Add(TypingLifetime),
+		RoomID:       roomID,
+		UserID:       userID,
+		ExpiresAt:    time.Now().Add(TypingLifetime),
+		ThreadRootID: thread,
 	}); err != nil {
 		return fmt.Errorf("record typing: %w", err)
 	}

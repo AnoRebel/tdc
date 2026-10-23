@@ -22,9 +22,10 @@ digest computed from the column would be of something nobody signed.
 */
 INSERT INTO events (
     id, room_id, sequence, sender_id, sender_address, room_address,
-    origin_server, type, content, content_hash, created_at, nonce, signature, key_id
+    origin_server, type, content, content_hash, created_at, nonce, signature, key_id,
+    thread_root_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash
 `
 
@@ -43,6 +44,7 @@ type AppendEventParams struct {
 	Nonce         string
 	Signature     string
 	KeyID         string
+	ThreadRootID  *string
 }
 
 func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (Event, error) {
@@ -61,6 +63,7 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) (Event
 		arg.Nonce,
 		arg.Signature,
 		arg.KeyID,
+		arg.ThreadRootID,
 	)
 	var i Event
 	err := row.Scan(

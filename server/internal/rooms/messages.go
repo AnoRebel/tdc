@@ -39,7 +39,25 @@ func (s *Service) append(
 	content json.RawMessage,
 	clientToken string,
 ) (dbgen.Event, error) {
-	return s.appendAs(ctx, room, &sender.ID, s.UserAddress(sender.Username), eventType, content, clientToken)
+	return s.appendIn(ctx, room, sender, eventType, content, clientToken, nil)
+}
+
+/*
+appendIn is append for an event that belongs to a thread: a reply, or anything
+acting on one — its edit, its deletion, a program replacing its controls, a
+press on it. Carrying the root is what keeps all of these in the thread rather
+than the channel, live and on replay alike. threadRootID nil is the channel.
+*/
+func (s *Service) appendIn(
+	ctx context.Context,
+	room dbgen.Room,
+	sender dbgen.User,
+	eventType events.Type,
+	content json.RawMessage,
+	clientToken string,
+	threadRootID *string,
+) (dbgen.Event, error) {
+	return s.appendAs(ctx, room, &sender.ID, s.UserAddress(sender.Username), eventType, content, clientToken, threadRootID)
 }
 
 /*
@@ -56,6 +74,7 @@ func (s *Service) appendAs(
 	eventType events.Type,
 	content json.RawMessage,
 	clientToken string,
+	threadRootID *string,
 ) (dbgen.Event, error) {
 	sequence, err := s.nextSequence(ctx, room)
 	if err != nil {
@@ -92,11 +111,12 @@ func (s *Service) appendAs(
 		Content:       content,
 		// The digest of what was signed, before Postgres normalises the
 		// content and makes it un-hashable back to the same value.
-		ContentHash: pointerTo(events.HashContent(content)),
-		CreatedAt:   event.CreatedAt,
-		Nonce:       event.Nonce,
-		Signature:   event.Signature,
-		KeyID:       event.KeyID,
+		ContentHash:  pointerTo(events.HashContent(content)),
+		CreatedAt:    event.CreatedAt,
+		Nonce:        event.Nonce,
+		Signature:    event.Signature,
+		KeyID:        event.KeyID,
+		ThreadRootID: threadRootID,
 	})
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
@@ -283,7 +303,7 @@ func (s *Service) EditMessageAs(
 		return dbgen.Event{}, fmt.Errorf("encode edit: %w", err)
 	}
 
-	return s.append(ctx, room, sender, events.TypeMessageEdited, content, "")
+	return s.appendIn(ctx, room, sender, events.TypeMessageEdited, content, "", target.ThreadRootID)
 }
 
 // DeleteMessage removes a message's content.
@@ -358,7 +378,7 @@ func (s *Service) DeleteMessage(
 		return dbgen.Event{}, fmt.Errorf("encode deletion: %w", err)
 	}
 
-	return s.append(ctx, room, actor, events.TypeMessageDeleted, content, "")
+	return s.appendIn(ctx, room, actor, events.TypeMessageDeleted, content, "", target.ThreadRootID)
 }
 
 // Timeline returns a room's most recent events.
