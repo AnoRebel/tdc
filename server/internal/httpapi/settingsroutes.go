@@ -273,8 +273,9 @@ Redaction happens when the configuration is described, before it reaches this
 package, so a credential has no path to this response even by mistake.
 */
 func (s *Server) handleInspectConfiguration(c *echo.Context) error {
-	values := make([]configurationValue, 0, len(s.config.EffectiveConfiguration))
-	for _, setting := range s.config.EffectiveConfiguration {
+	current := s.liveConfig()
+	values := make([]configurationValue, 0, len(current.configuration))
+	for _, setting := range current.configuration {
 		values = append(values, configurationValue{
 			Key:    setting.Key,
 			Value:  setting.Value,
@@ -283,7 +284,7 @@ func (s *Server) handleInspectConfiguration(c *echo.Context) error {
 		})
 	}
 
-	warnings := s.config.ConfigurationWarnings
+	warnings := current.warnings
 	if warnings == nil {
 		warnings = []string{}
 	}

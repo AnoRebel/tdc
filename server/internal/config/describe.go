@@ -64,6 +64,8 @@ var secretKeys = map[string]bool{
 	// The cache's password. Whoever holds it can read and rewrite every
 	// rate-limit counter on the server.
 	"cache.password": true,
+	// Opens every scheduled backup, which holds everything else on this list.
+	"backup.passphrase": true,
 }
 
 /*
@@ -118,6 +120,50 @@ func (c Config) Describe(path string) []Setting {
 		}
 	}
 
+	values := c.values()
+
+	settings := make([]Setting, 0, len(values))
+	for _, v := range values {
+		settings = append(settings, Setting{
+			Key:    v.key,
+			Value:  Redact(v.key, v.current),
+			Source: sourceOf(v.key, fileValues),
+			Secret: isSecret(v.key),
+		})
+	}
+
+	sort.Slice(settings, func(i, j int) bool { return settings[i].Key < settings[j].Key })
+	return settings
+}
+
+/*
+Changed lists the settings whose values differ between two configurations, by
+key and never by value, so a secret that changed is named without being shown.
+*/
+func Changed(before, after Config) []string {
+	old := map[string]string{}
+	for _, v := range before.values() {
+		old[v.key] = v.current
+	}
+	var changed []string
+	seen := map[string]bool{}
+	for _, v := range after.values() {
+		seen[v.key] = true
+		if previous, ok := old[v.key]; !ok || previous != v.current {
+			changed = append(changed, v.key)
+		}
+	}
+	for key := range old {
+		if !seen[key] {
+			changed = append(changed, key)
+		}
+	}
+	sort.Strings(changed)
+	return changed
+}
+
+// values lists every setting with its current and default values.
+func (c Config) values() []settingValue {
 	defaults := Default()
 	values := []settingValue{
 		{"server.name", c.Server.Name, defaults.Server.Name},
@@ -167,6 +213,17 @@ func (c Config) Describe(path string) []Setting {
 		{"gifs.api_key", c.GIFs.APIKey, defaults.GIFs.APIKey},
 		{"log.level", c.Log.Level, defaults.Log.Level},
 		{"log.format", c.Log.Format, defaults.Log.Format},
+		{"server.restart_method", c.Server.RestartMethod, defaults.Server.RestartMethod},
+		{"backup.passphrase", c.Backup.Passphrase, defaults.Backup.Passphrase},
+		{"backup.work_directory", c.Backup.WorkDirectory, defaults.Backup.WorkDirectory},
+		{"server.keepalive", c.Server.Keepalive.String(), defaults.Server.Keepalive.String()},
+		{"server.secure_cookies", fmt.Sprint(c.Server.SecureCookies), fmt.Sprint(defaults.Server.SecureCookies)},
+		{"server.session_lifetime", c.Server.SessionLifetime.String(), defaults.Server.SessionLifetime.String()},
+		{"server.web_root", c.Server.WebRoot, defaults.Server.WebRoot},
+		{"server.allowed_origins", strings.Join(c.Server.AllowedOrigins, ","), ""},
+		{"attachments.scanner_address", c.Attachments.ScannerAddress, defaults.Attachments.ScannerAddress},
+		{"attachments.link_previews", fmt.Sprint(c.Attachments.LinkPreviews), fmt.Sprint(defaults.Attachments.LinkPreviews)},
+		{"attachments.media_sidecar_address", c.Attachments.MediaSidecarAddress, defaults.Attachments.MediaSidecarAddress},
 	}
 
 	/*
@@ -190,18 +247,7 @@ func (c Config) Describe(path string) []Setting {
 		)
 	}
 
-	settings := make([]Setting, 0, len(values))
-	for _, v := range values {
-		settings = append(settings, Setting{
-			Key:    v.key,
-			Value:  Redact(v.key, v.current),
-			Source: sourceOf(v.key, fileValues),
-			Secret: isSecret(v.key),
-		})
-	}
-
-	sort.Slice(settings, func(i, j int) bool { return settings[i].Key < settings[j].Key })
-	return settings
+	return values
 }
 
 func sourceOf(key string, fileValues map[string]string) string {

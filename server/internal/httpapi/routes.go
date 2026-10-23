@@ -623,6 +623,10 @@ func registerRoutes(register func(*Server)) {
 type healthResponse struct {
 	Status string            `json:"status"`
 	Checks map[string]string `json:"checks"`
+	// Maintenance is set while a restore runs. The status stays "ok": the
+	// node is working, and an orchestrator that killed it would kill the
+	// restore with it.
+	Maintenance bool `json:"maintenance,omitempty"`
 }
 
 const (
@@ -653,7 +657,11 @@ func (s *Server) handleHealth(c *echo.Context) error {
 		code = http.StatusServiceUnavailable
 	}
 
-	return c.JSON(code, healthResponse{Status: status, Checks: checks})
+	response := healthResponse{Status: status, Checks: checks}
+	if s.backups != nil && status == statusOK {
+		response.Maintenance = s.backups.Maintenance(c.Request().Context()).Active
+	}
+	return c.JSON(code, response)
 }
 
 func (s *Server) handleVersion(c *echo.Context) error {

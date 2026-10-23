@@ -377,11 +377,11 @@ func (s *Server) handleICEServers(c *echo.Context) error {
 		servers = append(servers, iceServer{URLs: stun})
 	}
 	turn := settings.ListOf(s.settings.Get(ctx, settings.CallsTURNURLs))
-	if len(turn) > 0 && s.config.TURNSecret != "" {
-		username, credential := turnCredential(s.config.TURNSecret, user.ID, time.Now().Add(turnCredentialLifetime))
+	if len(turn) > 0 && s.liveConfig().turnSecret != "" {
+		username, credential := turnCredential(s.liveConfig().turnSecret, user.ID, time.Now().Add(turnCredentialLifetime))
 		servers = append(servers, iceServer{URLs: turn, Username: username, Credential: credential})
 	}
-	return c.JSON(http.StatusOK, map[string]any{"iceServers": servers, "relay": len(turn) > 0 && s.config.TURNSecret != ""})
+	return c.JSON(http.StatusOK, map[string]any{"iceServers": servers, "relay": len(turn) > 0 && s.liveConfig().turnSecret != ""})
 }
 
 // turnCredential mints a relay username and password valid until expiry.

@@ -229,6 +229,31 @@ const (
 	ActionCallLinkCreated        Action = "call.link.created"
 	ActionCallLinkRevoked        Action = "call.link.revoked"
 	ActionCallLinkPasscodeFailed Action = "call.link.passcode_failed"
+
+	/*
+		Operating the server.
+
+		Each is recorded when asked for and again when it ends, because the
+		question asked afterwards is usually about the gap between the two: a
+		restore that was started and never finished, a restart that never came
+		back. A backup's download is recorded too — an archive holds everything
+		on the server, and taking a copy away is the act worth accounting for.
+	*/
+	ActionBackupRequested  Action = "server.backup.requested"
+	ActionBackupCreated    Action = "server.backup.created"
+	ActionBackupFailed     Action = "server.backup.failed"
+	ActionBackupDownloaded Action = "server.backup.downloaded"
+	ActionBackupDeleted    Action = "server.backup.deleted"
+	ActionBackupUploaded   Action = "server.backup.uploaded"
+	ActionRestoreRequested Action = "server.restore.requested"
+	ActionRestoreCompleted Action = "server.restore.completed"
+	ActionRestoreFailed    Action = "server.restore.failed"
+	ActionOperationCancel  Action = "server.operation.cancelled"
+	ActionMaintenance      Action = "server.maintenance.changed"
+	ActionReloaded         Action = "server.reload"
+	ActionRestartRequested Action = "server.restart.requested"
+	ActionRestartRefused   Action = "server.restart.refused"
+	ActionRestartCompleted Action = "server.restart.completed"
 )
 
 // Entry describes an action to record.

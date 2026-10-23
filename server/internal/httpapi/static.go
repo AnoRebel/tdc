@@ -53,10 +53,9 @@ func (s *Server) mountWebApp(root string) {
 		shell carries the built runtime configuration, so the symptom is an
 		application calling the address it was built with rather than the one
 		it is served from — which looks like a networking fault and is not.
-		Deploying the web root is therefore a restart, which the README says
-		under "Upgrading".
+		Deploying the web root is therefore a reload or a restart.
 	*/
-	s.shell = shell
+	s.shell.Store(&shell)
 
 	/*
 		Everything no real route claimed.
@@ -114,7 +113,7 @@ func (s *Server) serveWebFile(c *echo.Context, files fs.FS) error {
 		hashed assets for the version it was built with, so a stale one asks
 		for files that no longer exist.
 	*/
-	return s.serveShellWithMeta(c, s.shell, request.URL.Path)
+	return s.serveShellWithMeta(c, *s.shell.Load(), request.URL.Path)
 }
 
 /*

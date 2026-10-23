@@ -15,6 +15,9 @@ type Querier interface {
 	AcceptCompanyMembership(ctx context.Context, arg AcceptCompanyMembershipParams) (int64, error)
 	// Who has accepted one version, and when.
 	AcceptancesOf(ctx context.Context, versionID uuid.UUID) ([]AcceptancesOfRow, error)
+	// Accepts a piece only in order, so two requests for one piece cannot both
+	// be counted and a gap cannot be skipped over.
+	AddBackupPiece(ctx context.Context, arg AddBackupPieceParams) (Backup, error)
 	// Whoever creates a company is its first administrator, accepted from the
 	// start: they are consenting by creating it.
 	AddCompanyFounder(ctx context.Context, arg AddCompanyFounderParams) error
@@ -89,6 +92,7 @@ type Querier interface {
 	// Claiming by the state the client already holds, for a client with no browser
 	// to receive the redirect. Consumed as it is read, exactly as the handle is.
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
+	ClaimOperation(ctx context.Context, id uuid.UUID) (int64, error)
 	ClaimWebhookDeliveries(ctx context.Context, capacity int32) ([]WebhookDelivery, error)
 	// Clears presenters who are no longer in their call.
 	ClearAbsentPresenters(ctx context.Context) error
@@ -108,6 +112,7 @@ type Querier interface {
 	// Collected once: the row is deleted as it is read, so a handle presented twice
 	// yields nothing the second time.
 	CollectOAuthOutcome(ctx context.Context, handleHash []byte) (OauthOutcome, error)
+	CompleteBackup(ctx context.Context, arg CompleteBackupParams) error
 	CompleteNotificationDigest(ctx context.Context, arg CompleteNotificationDigestParams) error
 	CompleteWebhookDelivery(ctx context.Context, arg CompleteWebhookDeliveryParams) error
 	ConfirmEmail(ctx context.Context, arg ConfirmEmailParams) (User, error)
@@ -153,6 +158,7 @@ type Querier interface {
 	// gap and telling the client to resynchronise.
 	CountEventsSince(ctx context.Context, arg CountEventsSinceParams) (int64, error)
 	CountMilestoneIssues(ctx context.Context, projectID uuid.UUID) ([]CountMilestoneIssuesRow, error)
+	CountOpenCalls(ctx context.Context) (int64, error)
 	CountOpenReports(ctx context.Context) (int64, error)
 	// Cycles of the project sharing any instant with [starts_at, ends_at), apart
 	// from the one being changed.
@@ -198,6 +204,8 @@ type Querier interface {
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
 	CreateApplicationToken(ctx context.Context, arg CreateApplicationTokenParams) (CreateApplicationTokenRow, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
+	// Backups, restores, reloads and restarts: see 000429_operations.
+	CreateBackup(ctx context.Context, arg CreateBackupParams) (Backup, error)
 	CreateCallLink(ctx context.Context, arg CreateCallLinkParams) (CallLink, error)
 	CreateCompanyProfile(ctx context.Context, arg CreateCompanyProfileParams) (CompanyProfile, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
@@ -229,6 +237,7 @@ type Querier interface {
 	// hearing about; the same person reacting twice is one.
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) error
 	CreateOAuthCredential(ctx context.Context, arg CreateOAuthCredentialParams) (Credential, error)
+	CreateOperation(ctx context.Context, arg CreateOperationParams) (Operation, error)
 	CreatePasskeyCredential(ctx context.Context, arg CreatePasskeyCredentialParams) (Credential, error)
 	// Projects, their membership, their states and their issues.
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
@@ -248,6 +257,7 @@ type Querier interface {
 	CreateWebhookSubscription(ctx context.Context, arg CreateWebhookSubscriptionParams) (WebhookSubscription, error)
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
+	DeleteBackup(ctx context.Context, id uuid.UUID) error
 	DeleteCompanyProfile(ctx context.Context, id uuid.UUID) error
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
 	DeleteCycle(ctx context.Context, id uuid.UUID) error
@@ -354,6 +364,10 @@ type Querier interface {
 	// re-scan everything before it. The id is the order entries were written, so
 	// an export is the log as it happened.
 	ExportAuditEntries(ctx context.Context, arg ExportAuditEntriesParams) ([]AuditEntry, error)
+	FailBackup(ctx context.Context, arg FailBackupParams) error
+	// Jobs whose node stopped saying it was working on them. Whoever notices
+	// first marks them, so a node that died does not hold the lock for ever.
+	FailStaleOperations(ctx context.Context, afterSeconds int32) ([]Operation, error)
 	// Finds a federated room by the address an event names, which is how an
 	// incoming event says which room it belongs to.
 	FederatedRoomByAddress(ctx context.Context, slugFolded *string) (Room, error)
@@ -361,9 +375,11 @@ type Querier interface {
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)
 	FindInvitationByTokenHash(ctx context.Context, tokenHash []byte) (Invitation, error)
+	FinishOperation(ctx context.Context, arg FinishOperationParams) error
 	// Consumed when the second factor is accepted, so a ticket buys one session.
 	FinishPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
 	FinishWebhookAttempt(ctx context.Context, arg FinishWebhookAttemptParams) error
+	ForgetNodes(ctx context.Context, arg ForgetNodesParams) error
 	// The per-request lookup, joined to the account so one query answers both
 	// "is this token good" and "who is it".
 	//
@@ -386,6 +402,7 @@ type Querier interface {
 	// The application an account acts for, if it acts for one.
 	GetApplicationByAccount(ctx context.Context, accountID *uuid.UUID) (Application, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
+	GetBackup(ctx context.Context, id uuid.UUID) (Backup, error)
 	GetCallPolicy(ctx context.Context, userID uuid.UUID) (GetCallPolicyRow, error)
 	// For the company's own administrators, whatever its visibility.
 	GetCompanyBySlug(ctx context.Context, slug string) (CompanyProfile, error)
@@ -415,11 +432,13 @@ type Querier interface {
 	GetIssueMilestone(ctx context.Context, issueID uuid.UUID) (Milestone, error)
 	GetIssueState(ctx context.Context, id uuid.UUID) (IssueState, error)
 	GetLinkPreviewPreference(ctx context.Context, id uuid.UUID) (bool, error)
+	GetMaintenance(ctx context.Context) (Maintenance, error)
 	// A message's controls as its program last left them. No row means the
 	// message is as it was posted.
 	GetMessageInteraction(ctx context.Context, eventID string) (MessageInteraction, error)
 	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
 	GetMilestone(ctx context.Context, id uuid.UUID) (Milestone, error)
+	GetNode(ctx context.Context, id string) (ServerNode, error)
 	GetNotificationDigest(ctx context.Context, userID uuid.UUID) (NotificationDigest, error)
 	// The preference that applies to one conversation.
 	//
@@ -428,6 +447,7 @@ type Querier interface {
 	// means: a channel setting beats the default rather than merging with it.
 	GetNotificationPreference(ctx context.Context, arg GetNotificationPreferenceParams) (GetNotificationPreferenceRow, error)
 	GetOAuthCredential(ctx context.Context, arg GetOAuthCredentialParams) (Credential, error)
+	GetOperation(ctx context.Context, id uuid.UUID) (Operation, error)
 	// The company associations a profile can have verified: accepted ones.
 	GetOwnCompanyClaims(ctx context.Context, userID uuid.UUID) ([]GetOwnCompanyClaimsRow, error)
 	// The owner's own profile, all of it. Only ever called with the signed-in
@@ -533,6 +553,7 @@ type Querier interface {
 	LatestMessageEdit(ctx context.Context, arg LatestMessageEditParams) (Event, error)
 	LatestProposalVersion(ctx context.Context, engagementID uuid.UUID) (ProposalVersion, error)
 	LatestRoomSequence(ctx context.Context, roomID uuid.UUID) (int64, error)
+	LatestScheduledBackup(ctx context.Context) (Backup, error)
 	LeaveCall(ctx context.Context, arg LeaveCallParams) (int64, error)
 	LeaveCallLobby(ctx context.Context, arg LeaveCallLobbyParams) (uuid.UUID, error)
 	// Takes out of their calls everybody with no live connection left, so a
@@ -578,6 +599,7 @@ type Querier interface {
 	// Filters are optional: a NULL argument matches everything, so one query
 	// serves the whole administrative view rather than one per filter combination.
 	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)
+	ListBackups(ctx context.Context) ([]Backup, error)
 	// Who somebody has blocked, which only they can see.
 	ListBlocked(ctx context.Context, blockerID uuid.UUID) ([]ListBlockedRow, error)
 	// A project's board: its states as columns, each a page of small cards.
@@ -658,11 +680,13 @@ type Querier interface {
 	// Visibility is joined, not filtered afterwards: an assignment in a private
 	// project somebody has since left is never fetched, so it cannot be shown.
 	ListMyIssues(ctx context.Context, arg ListMyIssuesParams) ([]ListMyIssuesRow, error)
+	ListNodes(ctx context.Context) ([]ServerNode, error)
 	ListNotificationPreferences(ctx context.Context, userID uuid.UUID) ([]ListNotificationPreferencesRow, error)
 	ListOAuthCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	// The moderation queue: oldest first, so nothing waits indefinitely behind
 	// newer arrivals.
 	ListOpenReports(ctx context.Context, limit int32) ([]Report, error)
+	ListOperations(ctx context.Context, limit int32) ([]Operation, error)
 	// Attachments that never became part of a message, oldest first.
 	ListOrphanedAttachments(ctx context.Context, arg ListOrphanedAttachmentsParams) ([]Attachment, error)
 	// Somebody's own skills, proposals included, so they can see what is waiting.
@@ -903,6 +927,8 @@ type Querier interface {
 	OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, error)
 	ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomeParams) (OauthOutcome, error)
 	PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomPeer, error)
+	// Reloads and restarts another node asked of this one.
+	PendingOperationsFor(ctx context.Context, node string) ([]Operation, error)
 	// Pinning something already pinned updates who pinned it and when, rather than
 	// failing: the second person's intent is the current one.
 	PinMessage(ctx context.Context, arg PinMessageParams) error
@@ -935,6 +961,7 @@ type Querier interface {
 	// name.
 	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
 	RecordApplicationRateLimited(ctx context.Context, id uuid.UUID) error
+	RecordBackupManifest(ctx context.Context, arg RecordBackupManifestParams) error
 	// Counts a wrong passcode, starting a fresh window once the last has passed.
 	RecordCallLinkFailure(ctx context.Context, arg RecordCallLinkFailureParams) (int32, error)
 	RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error)
@@ -996,7 +1023,10 @@ type Querier interface {
 	RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, error)
 	RenameUser(ctx context.Context, arg RenameUserParams) (User, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
+	// The heartbeat and the cancellation check in one round trip.
+	ReportOperationProgress(ctx context.Context, arg ReportOperationProgressParams) (bool, error)
 	RequestCompletion(ctx context.Context, arg RequestCompletionParams) (int64, error)
+	RequestOperationCancel(ctx context.Context, id uuid.UUID) (int64, error)
 	// Clears presence for connections that ended without a clean close, which is
 	// what makes an ungraceful disconnect expire rather than persist.
 	ResetStalePresence(ctx context.Context, lastSeenAt time.Time) error
@@ -1007,6 +1037,8 @@ type Querier interface {
 	ResolveReport(ctx context.Context, arg ResolveReportParams) (Report, error)
 	// A name, or another spelling of one, to the skill it means.
 	ResolveSkill(ctx context.Context, folded string) (Skill, error)
+	// Restarts of this host that a new process has not yet reported back from.
+	RestartsAwaitingReturn(ctx context.Context, host string) ([]Operation, error)
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RestrictPosting(ctx context.Context, arg RestrictPostingParams) (PostingRestriction, error)
 	// An operator's decision to try an abandoned peer again.
@@ -1035,6 +1067,7 @@ type Querier interface {
 	// The peers participating in a room, for delivery and for showing an operator
 	// who can see it.
 	RoomPeers(ctx context.Context, roomID uuid.UUID) ([]RoomPeer, error)
+	RunningJob(ctx context.Context) (Operation, error)
 	// Creates the profile or replaces what it says. One statement for both, so a
 	// person saving twice from two tabs cannot end up with two profiles or with
 	// one half-written.
@@ -1049,6 +1082,9 @@ type Querier interface {
 	// notification twice. The failure count resets, since a resubscription is the
 	// browser saying this endpoint works.
 	SavePushSubscription(ctx context.Context, arg SavePushSubscriptionParams) (PushSubscription, error)
+	// Scheduled archives past the newest few, for retention. Archives made by
+	// hand or uploaded are never returned.
+	ScheduledBackupsBeyond(ctx context.Context, offset int32) ([]Backup, error)
 	SearchDirectoryProfiles(ctx context.Context, arg SearchDirectoryProfilesParams) ([]SearchDirectoryProfilesRow, error)
 	// What was said about issues: messages in the discussions of issues the
 	// searcher may see, optionally one issue's alone.
@@ -1144,6 +1180,7 @@ type Querier interface {
 	SetIssueStatePosition(ctx context.Context, arg SetIssueStatePositionParams) error
 	SetIssueTitle(ctx context.Context, arg SetIssueTitleParams) (Issue, error)
 	SetLinkPreviewPreference(ctx context.Context, arg SetLinkPreviewPreferenceParams) error
+	SetMaintenance(ctx context.Context, arg SetMaintenanceParams) error
 	// Gives a message a lifetime, or replaces one it already has.
 	//
 	// expires_at is supplied by the caller for 'after_sending', which knows it at
@@ -1193,6 +1230,7 @@ type Querier interface {
 	// second insert finds the first's row instead of failing.
 	StartCall(ctx context.Context, arg StartCallParams) (Call, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)
+	StartOperation(ctx context.Context, id uuid.UUID) error
 	StartPendingSignIn(ctx context.Context, arg StartPendingSignInParams) (PendingSignIn, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error
 	StartWebauthnCeremony(ctx context.Context, arg StartWebauthnCeremonyParams) (WebauthnCeremony, error)
@@ -1220,6 +1258,7 @@ type Querier interface {
 	// see in a list that shows "last used yesterday".
 	TouchAPIToken(ctx context.Context, arg TouchAPITokenParams) error
 	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
+	TouchNode(ctx context.Context, arg TouchNodeParams) error
 	TouchPresence(ctx context.Context, userID uuid.UUID) error
 	TouchSession(ctx context.Context, id uuid.UUID) error
 	// Moves an issue between states, only if it is still in the state the mover

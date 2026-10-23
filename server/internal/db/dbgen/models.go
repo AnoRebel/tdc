@@ -100,6 +100,21 @@ type AuditEntry struct {
 	Detail     []byte
 }
 
+type Backup struct {
+	ID          uuid.UUID
+	Origin      string
+	Status      string
+	StorageKey  string
+	SizeBytes   int64
+	Pieces      int32
+	Manifest    []byte
+	Summary     []byte
+	CreatedBy   string
+	CreatedAt   time.Time
+	CompletedAt *time.Time
+	Error       string
+}
+
 type Call struct {
 	ID           uuid.UUID
 	RoomID       uuid.UUID
@@ -447,6 +462,15 @@ type IssueState struct {
 	CreatedAt    time.Time
 }
 
+type Maintenance struct {
+	ID              bool
+	Active          bool
+	Reason          string
+	OperationID     *uuid.UUID
+	RestartRequired bool
+	Since           time.Time
+}
+
 type MessageInteraction struct {
 	EventID   string
 	RoomID    uuid.UUID
@@ -547,6 +571,25 @@ type OauthOutcome struct {
 	CreatedAt  time.Time
 	ExpiresAt  time.Time
 	StateHash  []byte
+}
+
+type Operation struct {
+	ID              uuid.UUID
+	Kind            string
+	Status          string
+	Node            string
+	Host            string
+	BackupID        *uuid.UUID
+	RequestedBy     string
+	RequestedAt     time.Time
+	StartedAt       *time.Time
+	FinishedAt      *time.Time
+	HeartbeatAt     time.Time
+	CancelRequested bool
+	Request         []byte
+	Progress        []byte
+	Result          []byte
+	Error           string
 }
 
 type PendingSignIn struct {
@@ -854,6 +897,15 @@ type ServerConfig struct {
 	IsSecret  bool
 	UpdatedAt time.Time
 	UpdatedBy *string
+}
+
+type ServerNode struct {
+	ID          string
+	Host        string
+	Version     string
+	StartedAt   time.Time
+	LastSeen    time.Time
+	Connections int32
 }
 
 type ServerStatus struct {

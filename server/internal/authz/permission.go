@@ -30,6 +30,12 @@ const (
 	PermServerAdminister Permission = "server.administer"
 	PermServerConfigure  Permission = "server.configure"
 	PermServerViewAudit  Permission = "server.audit.read"
+	// Operating the server: taking archives of it, putting them back, and
+	// reloading or restarting it. Separate from configuring it, and from each
+	// other: restoring overwrites what backing up only reads.
+	PermServerBackup  Permission = "server.backup"
+	PermServerRestore Permission = "server.restore"
+	PermServerRestart Permission = "server.restart"
 
 	// User and role management.
 	PermUserInvite  Permission = "user.invite"
@@ -101,6 +107,24 @@ var catalogue = map[Permission]Definition{
 	PermServerViewAudit: {
 		Name:           PermServerViewAudit,
 		Description:    "Read the audit log",
+		Scopes:         []Scope{ScopeServer},
+		Administrative: true,
+	},
+	PermServerBackup: {
+		Name:           PermServerBackup,
+		Description:    "Take, download, upload and delete backups of the server, which hold everything on it",
+		Scopes:         []Scope{ScopeServer},
+		Administrative: true,
+	},
+	PermServerRestore: {
+		Name:           PermServerRestore,
+		Description:    "Restore the server, or parts of it, from a backup",
+		Scopes:         []Scope{ScopeServer},
+		Administrative: true,
+	},
+	PermServerRestart: {
+		Name:           PermServerRestart,
+		Description:    "Reload the server's configuration and restart it",
 		Scopes:         []Scope{ScopeServer},
 		Administrative: true,
 	},

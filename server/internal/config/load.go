@@ -211,6 +211,8 @@ func Load(path string) (Config, error) {
 	cfg.Server.SessionLifetime = l.duration("server.session_lifetime", d.Server.SessionLifetime)
 	cfg.Server.Keepalive = l.duration("server.keepalive", d.Server.Keepalive)
 	cfg.Server.MultiNode = l.boolean("server.multi_node", d.Server.MultiNode)
+	cfg.Server.RestartMethod = l.oneOf("server.restart_method", d.Server.RestartMethod,
+		"auto", "exec", "supervisor", "off")
 
 	cfg.Database.URL = l.str("database.url", d.Database.URL)
 	cfg.Database.MaxConnections = l.int32Value("database.max_connections", d.Database.MaxConnections)
@@ -264,6 +266,9 @@ func Load(path string) (Config, error) {
 	cfg.Attachments.MediaSidecarTimeout = l.duration("attachments.media_sidecar_timeout", d.Attachments.MediaSidecarTimeout)
 
 	cfg.OAuth = l.oauth()
+
+	cfg.Backup.Passphrase = l.str("backup.passphrase", d.Backup.Passphrase)
+	cfg.Backup.WorkDirectory = l.str("backup.work_directory", d.Backup.WorkDirectory)
 
 	cfg.Log.Level = l.oneOf("log.level", d.Log.Level, "debug", "info", "warn", "error")
 	cfg.Log.Format = l.oneOf("log.format", d.Log.Format, "json", "text")
@@ -367,6 +372,17 @@ func (c Config) validate() []Problem {
 		}
 	default:
 		add("storage.backend", "must be local, s3-aws, or s3-minio (got %q)", backend)
+	}
+
+	// The same floor an administrator's passphrase is held to: this one
+	// opens every scheduled archive.
+	if c.Backup.Passphrase != "" && len([]rune(c.Backup.Passphrase)) < 12 {
+		add("backup.passphrase", "must be at least 12 characters")
+	}
+	if dir := strings.TrimSpace(c.Backup.WorkDirectory); dir != "" {
+		if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+			add("backup.work_directory", "%q is not a directory", dir)
+		}
 	}
 
 	if c.Database.MinConnections > c.Database.MaxConnections {
