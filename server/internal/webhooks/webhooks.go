@@ -486,23 +486,19 @@ entitled decides, at the moment of sending, whether a delivery's owner may still
 be told about it: they can read the room it happened in, or — for an event in
 no room — they hold the permission its type needs.
 
-Read from the payload's room rather than the subscription's, because they
-differ for a comment, which happens in a discussion and is delivered to the
-project's subscribers, and for a server subscription, which has no room. Every
-version of the payload carries the room as room.id; one that did not would
-fail here closed, delivering nothing.
+Read from the event's room rather than the subscription's, because they differ
+for a comment, which happens in a discussion and is delivered to the project's
+subscribers, and for a server subscription, which has no room. From the stored
+event rather than the payload, so that no payload version can change the
+answer. An event since removed is not sent.
 */
 func (s *Service) entitled(ctx context.Context, subscription dbgen.WebhookSubscription, claimed dbgen.WebhookDelivery) bool {
-	var payload struct {
-		Room *struct {
-			ID uuid.UUID `json:"id"`
-		} `json:"room"`
-	}
-	if err := json.Unmarshal(claimed.Payload, &payload); err != nil {
-		return false
-	}
-	if payload.Room != nil {
-		return s.config.CanRead(ctx, payload.Room.ID, subscription.OwnerID)
+	if claimed.EventID != nil {
+		event, err := s.store.GetEventByID(ctx, *claimed.EventID)
+		if err != nil {
+			return false
+		}
+		return s.config.CanRead(ctx, event.RoomID, subscription.OwnerID)
 	}
 	definition, known := Lookup(claimed.Kind)
 	return known && definition.Permission != "" && s.holds(ctx, subscription.OwnerID, definition.Permission)
