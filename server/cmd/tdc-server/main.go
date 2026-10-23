@@ -22,6 +22,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
+	"github.com/AnoRebel/tdc/server/internal/backup"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/config"
@@ -51,22 +52,46 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	restart, err := run()
+	if err != nil {
 		// Configuration problems are reported in full, one per line, so an
 		// operator can fix every one before restarting.
 		fmt.Fprintf(os.Stderr, "tdc-server: %v\n", err)
 		os.Exit(1)
 	}
+	// Shut down cleanly to come back: everything run held is closed by now.
+	if restart.operation != uuid.Nil {
+		if err := comeBack(restart.method, restart.operation); err != nil {
+			fmt.Fprintf(os.Stderr, "tdc-server: %v\n", err)
+			os.Exit(1)
+		}
+	}
 }
 
-func run() error {
+// restartRequest is a restart that shutdown was for.
+type restartRequest struct {
+	operation uuid.UUID
+	method    string
+}
+
+func run() (restartRequest, error) {
 	var (
 		configPath  = flag.String("config", "", "path to the configuration file (optional; environment alone is enough)")
 		showVersion = flag.Bool("version", false, "print the version and exit")
 		pushKeys    = flag.Bool("push-keys", false,
 			"generate a push notification key pair and exit")
+		checkOnly = flag.Bool("check", false,
+			"check the configuration and the database this server would start with, change nothing, and exit")
 	)
 	flag.Parse()
+
+	if *checkOnly {
+		if err := check(*configPath); err != nil {
+			return restartRequest{}, err
+		}
+		fmt.Println("tdc-server: the configuration and database are ready")
+		return restartRequest{}, nil
+	}
 
 	/*
 		Generating the keys push needs, so enabling it requires nothing but
@@ -79,7 +104,7 @@ func run() error {
 	if *pushKeys {
 		keys, err := push.GenerateKeys()
 		if err != nil {
-			return err
+			return restartRequest{}, err
 		}
 
 		fmt.Println("# Notifications to closed browsers. Keep the private key secret:")
@@ -89,7 +114,7 @@ func run() error {
 		fmt.Printf("TDC_PUSH_VAPID_PRIVATE=%s\n", keys.Private)
 		fmt.Println("# A way for a push service to reach you about a problem:")
 		fmt.Println("TDC_PUSH_SUBJECT=mailto:you@example.org")
-		return nil
+		return restartRequest{}, nil
 	}
 
 	if *showVersion {
@@ -98,15 +123,18 @@ func run() error {
 		if info.Commit != "" {
 			fmt.Printf("commit %s built %s\n", info.Commit, info.BuildTime)
 		}
-		return nil
+		return restartRequest{}, nil
 	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		return err
+		return restartRequest{}, err
 	}
 
-	log := newLogger(cfg.Log)
+	level := &slog.LevelVar{}
+	level.Set(parseLevel(cfg.Log.Level))
+	log := newLogger(cfg.Log, level)
+	startedAt := time.Now()
 
 	for _, warning := range cfg.Warnings() {
 		log.Warn(warning)
@@ -117,7 +145,7 @@ func run() error {
 
 	if cfg.Database.AutoMigrate {
 		if err := db.Migrate(ctx, cfg.Database.URL, log); err != nil {
-			return err
+			return restartRequest{}, err
 		}
 	}
 
@@ -130,7 +158,7 @@ func run() error {
 		MaxConnIdleTime: cfg.Database.MaxConnIdleTime,
 	}, log)
 	if err != nil {
-		return err
+		return restartRequest{}, err
 	}
 	defer pool.Close()
 
@@ -156,13 +184,13 @@ func run() error {
 	if cfg.Cache.Address != "" {
 		valkeyCache, err := cache.NewValkey(cfg.Cache)
 		if err != nil {
-			return err
+			return restartRequest{}, err
 		}
 		pingCtx, cancelPing := context.WithTimeout(ctx, 5*time.Second)
 		err = valkeyCache.Ping(pingCtx)
 		cancelPing()
 		if err != nil {
-			return fmt.Errorf("the configured cache at %s: %w", cfg.Cache.Address, err)
+			return restartRequest{}, fmt.Errorf("the configured cache at %s: %w", cfg.Cache.Address, err)
 		}
 
 		log.Info("counting rate limits in the shared cache", "address", cfg.Cache.Address)
@@ -180,7 +208,7 @@ func run() error {
 	// invalidate every signature it had ever produced.
 	signingKey, err := loadOrCreateSigningKey(ctx, queries)
 	if err != nil {
-		return err
+		return restartRequest{}, err
 	}
 
 	presenceService := presence.NewService(queries)
@@ -207,7 +235,7 @@ func run() error {
 	})
 	if err != nil {
 		log.Error("attachment storage is unavailable", "error", err)
-		return err
+		return restartRequest{}, err
 	}
 	defer objectStore.Close()
 
@@ -218,6 +246,28 @@ func run() error {
 	moderationService := moderation.NewService(pool, log)
 	settingsService := settings.NewService(pool, log)
 	auditRecorder := audit.NewRecorder(queries, log)
+
+	/*
+		Who this process is, to the other nodes and to a restart.
+
+		The node identifier is new for each process; the host is what stays the
+		same across a restart, which is how a process started by a supervisor —
+		told nothing by the one before it — finds the restart it completes.
+	*/
+	node := realtime.NodeID()
+	hostname, _ := os.Hostname()
+	host := hostname + " " + cfg.Server.Address
+
+	backups := backup.NewService(pool.Pool, objectStore, backup.Config{
+		Node: node, Host: host, ServerName: serverName(cfg), ServerVersion: buildinfo.Version,
+		WorkDirectory:      cfg.Backup.WorkDirectory,
+		SchedulePassphrase: cfg.Backup.Passphrase,
+		MaxBytes:           func(ctx context.Context) int64 { return settingsService.Int(ctx, settings.BackupMaxBytes) },
+		Interval: func(ctx context.Context) time.Duration {
+			return time.Duration(settingsService.Int(ctx, settings.BackupIntervalHours)) * time.Hour
+		},
+		Keep: func(ctx context.Context) int { return int(settingsService.Int(ctx, settings.BackupKeep)) },
+	}, log)
 
 	// Off unless the operator generated keys, which is a working state: a
 	// notification still exists and is shown, it simply does not reach a
@@ -248,7 +298,7 @@ func run() error {
 		Origins:          cfg.Server.AllowedOrigins,
 	}, queries, log)
 	if err != nil {
-		return err
+		return restartRequest{}, err
 	}
 
 	/*
@@ -297,7 +347,6 @@ func run() error {
 	*/
 	var broker realtime.Broker = realtime.Alone{}
 	if cfg.Server.MultiNode {
-		node := realtime.NodeID()
 		log.Info("expecting other nodes; events will be shared through the database",
 			"node", node)
 		broker = realtime.NewPostgresBroker(pool.Pool, node, log)
@@ -358,6 +407,7 @@ func run() error {
 		SecondFactor: secondFactorService,
 		Mail:         mailService,
 		Recovery:     recoveryService,
+		Backups:      backups,
 	}
 
 	server := httpapi.New(httpapi.Config{
@@ -384,13 +434,51 @@ func run() error {
 		Keepalive:              cfg.Server.Keepalive,
 	}, pool, services, log)
 
-	return server.Run(ctx)
+	control := &controller{
+		configPath: *configPath, level: level, log: log, server: server,
+		settings: settingsService, stop: stop, current: cfg,
+	}
+	resumed, _ := uuid.Parse(os.Getenv(restartOperationVariable))
+	_ = os.Unsetenv(restartOperationVariable)
+	server.SetLifecycle(httpapi.Lifecycle{
+		Node: node, Host: host, StartedAt: startedAt,
+		Reload:           control.reload,
+		PlanRestart:      control.plan,
+		Describe:         control.describe,
+		Restart:          control.begin,
+		ResumedOperation: resumed,
+	})
+
+	// SIGHUP reloads, as daemons conventionally do.
+	hangups := make(chan os.Signal, 1)
+	signal.Notify(hangups, syscall.SIGHUP)
+	defer signal.Stop(hangups)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-hangups:
+				log.Info("reloading on SIGHUP")
+				server.ReloadFromSignal(ctx)
+			}
+		}
+	}()
+
+	if err := server.Run(ctx); err != nil {
+		return restartRequest{}, err
+	}
+	if operation := control.restarting(); operation != uuid.Nil {
+		return restartRequest{operation: operation, method: control.describe().Method}, nil
+	}
+	return restartRequest{}, nil
 }
 
 // newLogger builds the logger described by the configuration. JSON suits log
 // aggregation; text suits a terminal during development.
-func newLogger(cfg config.LogConfig) *slog.Logger {
-	options := &slog.HandlerOptions{Level: parseLevel(cfg.Level)}
+func newLogger(cfg config.LogConfig, level *slog.LevelVar) *slog.Logger {
+	// A variable rather than a value, so a reload can change it in place.
+	options := &slog.HandlerOptions{Level: level}
 
 	var handler slog.Handler
 	if cfg.Format == "text" {

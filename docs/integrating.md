@@ -1583,6 +1583,40 @@ Direct conversations are not readable through any of these. An administrator
 querying ordinary endpoints cannot read other people's direct messages, and that
 is enforced rather than merely undocumented.
 
+### Backups, restores, reload and restart
+
+Three permissions, held by administrators and nobody else unless granted:
+`server.backup`, `server.restore` and `server.restart`. What they do and the
+archive format are described in [hosting](hosting.md#backup); this is the API.
+
+| Endpoint                                           | Permission                          | What it is                                                                                                       |
+| -------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `GET /api/admin/backups`                           | `server.backup` or `server.restore` | Archives, the parts a backup can hold (`needs`, `needsEveryChannel`, `notPartial`), the running job, maintenance |
+| `POST /api/admin/backups`                          | `server.backup`                     | `{ "parts": [...], "rooms": [...], "passphrase": "…" }`; answers 202 with the operation                          |
+| `GET /api/admin/backups/channels`                  | `server.backup` or `server.restore` | Every channel, for choosing                                                                                      |
+| `GET /api/admin/backups/:id/download`              | `server.backup`                     | The encrypted archive; honours `Range`, or redirects to the object store                                         |
+| `DELETE /api/admin/backups/:id`                    | `server.backup`                     | Delete an archive                                                                                                |
+| `POST /api/admin/backups/uploads`                  | `server.backup`                     | Begin uploading an archive from elsewhere                                                                        |
+| `PUT /api/admin/backups/uploads/:id/pieces/:piece` | `server.backup`                     | `{ "data": "<base64>" }`, at most 8 MB, numbered from 0, in order; the archive's `pieces` says what to send next |
+| `POST /api/admin/backups/uploads/:id/finish`       | `server.backup`                     | Join the pieces                                                                                                  |
+| `POST /api/admin/backups/:id/restore`              | `server.restore`                    | `{ "mode": "replace" or "merge", "parts", "rooms", "passphrase", "dryRun" }`; 202 with the operation             |
+| `GET /api/admin/operations` and `/:id`             | any of the three                    | Backups, restores, reloads and restarts, with `progress` while running and `result` once done                    |
+| `POST /api/admin/operations/:id/cancel`            | `server.backup` or `server.restore` | Stop a backup or restore; nothing is left half-applied                                                           |
+| `GET` and `DELETE /api/admin/maintenance`          | any of the three; `server.restore`  | Whether the server is in maintenance; leave it                                                                   |
+| `GET /api/admin/nodes`                             | `server.restart`                    | The nodes, people connected to each, calls in progress, and how this node would restart                          |
+| `POST /api/admin/nodes/:node/reload`               | `server.restart`                    | Reload a node (`this` for the one answering); 422 with every problem if the configuration is invalid             |
+| `POST /api/admin/nodes/:node/restart`              | `server.restart`                    | Restart a node; 422 with the reason when the check of the next process fails or restarting would only stop it    |
+
+Backups and restores are jobs: poll the operation until its `status` is no longer
+`pending` or `running`. One runs at a time across every node; asking for another
+answers 409 naming the one running. A replace restore signs everybody out, so a
+program following one sees 401 when it ends. A restart's operation is completed
+by the process that replaces the old one; poll it, through any node, until it
+says `succeeded`.
+
+During maintenance every other `/api` request answers 503 with `Retry-After`,
+and `/api/health` still answers 200 with `"maintenance": true`.
+
 ## A worked example
 
 A program that asks a channel a question and acts on the answer. It is short

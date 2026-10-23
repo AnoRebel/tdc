@@ -766,3 +766,7 @@ func define(additions map[Key]definition) {
 		definitions[key] = described
 	}
 }
+
+// Invalidate drops the cached settings, so the next read fetches them. A
+// reload uses it; a write already does it.
+func (s *Service) Invalidate() { s.invalidate() }

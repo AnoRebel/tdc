@@ -18,6 +18,16 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/admin/backups/:id": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"DELETE /api/admin/maintenance": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/admin/restrictions/:restrictionId": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -282,6 +292,29 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/admin/audit/export": {
 		Query: []string{"since", "until"},
 	},
+	"GET /api/admin/backups": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[backupsResponse]()},
+		},
+	},
+	"GET /api/admin/backups/:id": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[backupResponse]()},
+		},
+	},
+	"GET /api/admin/backups/:id/download": {
+		Responses: []responseBody{
+			{Status: 302, Type: nil},
+		},
+		Raw: map[int]string{
+			200: "application/octet-stream",
+		},
+	},
+	"GET /api/admin/backups/channels": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]backupChannel]()},
+		},
+	},
 	"GET /api/admin/configuration": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[configurationResponse]()},
@@ -295,6 +328,27 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/admin/invitations": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]invitationResponse]()},
+		},
+	},
+	"GET /api/admin/maintenance": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[maintenanceResponse]()},
+		},
+	},
+	"GET /api/admin/nodes": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[nodesResponse]()},
+		},
+	},
+	"GET /api/admin/operations": {
+		Query: []string{"limit"},
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]operationResponse]()},
+		},
+	},
+	"GET /api/admin/operations/:id": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[operationResponse]()},
 		},
 	},
 	"GET /api/admin/permissions": {
@@ -1075,6 +1129,28 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
+	"POST /api/admin/backups": {
+		Request: reflect.TypeFor[createBackupRequest](),
+		Responses: []responseBody{
+			{Status: 202, Type: reflect.TypeFor[operationResponse]()},
+		},
+	},
+	"POST /api/admin/backups/:id/restore": {
+		Request: reflect.TypeFor[restoreRequest](),
+		Responses: []responseBody{
+			{Status: 202, Type: reflect.TypeFor[operationResponse]()},
+		},
+	},
+	"POST /api/admin/backups/uploads": {
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[backupResponse]()},
+		},
+	},
+	"POST /api/admin/backups/uploads/:id/finish": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[backupResponse]()},
+		},
+	},
 	"POST /api/admin/federation/adopt": {
 		Request: reflect.TypeFor[struct {
 			Slug       string "json:\"slug\""
@@ -1099,6 +1175,22 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[issueInvitationRequest](),
 		Responses: []responseBody{
 			{Status: 201, Type: reflect.TypeFor[invitationResponse]()},
+		},
+	},
+	"POST /api/admin/nodes/:node/reload": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[operationResponse]()},
+			{Status: 202, Type: reflect.TypeFor[operationResponse]()},
+		},
+	},
+	"POST /api/admin/nodes/:node/restart": {
+		Responses: []responseBody{
+			{Status: 202, Type: reflect.TypeFor[operationResponse]()},
+		},
+	},
+	"POST /api/admin/operations/:id/cancel": {
+		Responses: []responseBody{
+			{Status: 202, Type: nil},
 		},
 	},
 	"POST /api/admin/restrictions": {
@@ -1778,6 +1870,12 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[invocationRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[invocationResponse]()},
+		},
+	},
+	"PUT /api/admin/backups/uploads/:id/pieces/:piece": {
+		Request: reflect.TypeFor[uploadPieceRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[backupResponse]()},
 		},
 	},
 	"PUT /api/admin/features/:feature": {

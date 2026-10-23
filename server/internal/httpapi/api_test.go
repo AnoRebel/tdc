@@ -17,6 +17,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
+	"github.com/AnoRebel/tdc/server/internal/backup"
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/config"
 	"github.com/AnoRebel/tdc/server/internal/db"
@@ -273,6 +274,9 @@ func newTestAPIConfigured(
 			// Tokens cascade from users; cleared anyway, since one surviving
 			// into the next test is a way into an account it did not create.
 			"DELETE FROM recovery_tokens",
+			// Operating the server: none of it belongs to a user or a room.
+			"DELETE FROM operations", "DELETE FROM backups", "DELETE FROM server_nodes",
+			"UPDATE maintenance SET active = FALSE, restart_required = FALSE",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {
 				t.Errorf("clean: %v", err)
@@ -364,6 +368,9 @@ func newTestAPIConfigured(
 		*/
 		Mail:     postboxForTest,
 		Recovery: recoveryForTest(queries, logger),
+		Backups: backup.NewService(pool.Pool, testStore(t), backup.Config{
+			Node: "test-node", Host: "test-host", ServerName: "tdc.test", ServerVersion: "test",
+		}, logger),
 	}, logger)
 
 	t.Cleanup(func() {

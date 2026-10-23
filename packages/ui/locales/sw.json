@@ -2457,7 +2457,10 @@
       "server_configure": "Kubadilisha mipangilio ya seva kama vikomo, sera ya usajili na chapa",
       "user_invite": "Kualika watu kwenye seva hii",
       "user_read_all": "Kuorodhesha kila akaunti kwenye seva, zilizosimamishwa zikiwemo — kamwe si anwani zao za barua pepe",
-      "user_suspend": "Kusimamisha akaunti na kuzirejesha"
+      "user_suspend": "Kusimamisha akaunti na kuzirejesha",
+      "server_backup": "Kutengeneza, kupakua, kupakia na kufuta nakala rudufu za seva, ambazo zina kila kitu kilichomo",
+      "server_restart": "Kupakia upya usanidi wa seva na kuiwasha upya",
+      "server_restore": "Kurejesha seva, au sehemu zake, kutoka nakala rudufu"
     }
   },
   "conversation": {
@@ -2606,6 +2609,155 @@
       "role": "Majukumu",
       "server": "Seva",
       "other": "Nyingine"
+    }
+  },
+  "operations": {
+    "title": "Nakala rudufu",
+    "cannotSee": "Nakala rudufu zinahitaji ruhusa ya server.backup au server.restore, ambazo wasimamizi pekee wanazo.",
+    "cancel": "Ghairi",
+    "progress": "Maendeleo",
+    "progressDetail": "Majedwali {tables} kati ya {total}, faili {files}, MB {size} zimeandikwa",
+    "passphrase": "Kauli siri",
+    "passphraseShort": "Kauli siri inahitaji angalau herufi {length}.",
+    "history": "Shughuli za hivi karibuni",
+    "kind": {
+      "backup": "Nakala rudufu",
+      "restore": "Urejeshaji",
+      "reload": "Kupakia upya",
+      "restart": "Kuwasha upya"
+    },
+    "status": {
+      "pending": "inasubiri",
+      "running": "inaendelea",
+      "succeeded": "imekamilika",
+      "failed": "imeshindwa",
+      "cancelled": "imeghairiwa",
+      "refused": "imekataliwa"
+    },
+    "done": {
+      "backup": "Nakala rudufu iko tayari.",
+      "restore": "Urejeshaji umekamilika.",
+      "reload": "Imepakiwa upya.",
+      "restart": "Imewashwa upya."
+    },
+    "part": {
+      "settings": "Mipangilio na utambulisho wa seva",
+      "accounts": "Akaunti na majukumu",
+      "channels": "Vituo na ujumbe",
+      "files": "Faili zilizoambatishwa",
+      "projects": "Miradi na masuala",
+      "directory": "Saraka",
+      "integrations": "Miunganisho, webhooks na programu",
+      "audit": "Kumbukumbu ya ukaguzi"
+    },
+    "notPartial": {
+      "accounts": "akaunti zimefungamana na kila ruhusa, uanachama na ujumbe; kurudisha baadhi kando ya zilizopo kungechanganya mawazo ya seva mbili kuhusu mtu ni nani.",
+      "projects": "miradi na masuala ni vyumba vinavyorejeleana, kwa hiyo sehemu yake ingeelekeza kwenye vitu visivyokuwepo.",
+      "directory": "wasifu, makubaliano ya kazi na mikataba hurejelea miradi, vyumba na kila kimoja, na mikataba haiwezi kubadilika baada ya kufanywa.",
+      "integrations": "tokeni na webhooks ni za akaunti na vituo kama vilivyokuwa; zikirudishwa peke yake zingeweza kutoa ruhusa kwa kitu kingine.",
+      "audit": "kumbukumbu ya ukaguzi huongezeka tu, kwa mpangilio; maingizo ya zamani hayawezi kuchomekwa katikati ya mapya."
+    },
+    "origin": {
+      "manual": "imetengenezwa kwa mkono",
+      "scheduled": "iliyoratibiwa",
+      "uploaded": "iliyopakiwa"
+    },
+    "backupStatus": {
+      "creating": "Inaandikwa…",
+      "uploading": "Upakiaji haujakamilika",
+      "ready": "Iko tayari",
+      "failed": "Imeshindwa"
+    },
+    "create": {
+      "title": "Tengeneza nakala rudufu",
+      "hint": "Kila kitu kimechaguliwa mwanzoni. Kumbukumbu husimbwa kila mara kwa kauli siri unayotoa, na seva hii haiihifadhi: bila hiyo hakuna mtu, wewe ukiwemo, anayeweza kuifungua.",
+      "choosePart": "Chagua angalau kitu kimoja cha kuhifadhi.",
+      "passphrasesDiffer": "Kauli siri mbili hazifanani.",
+      "chooseChannel": "Chagua angalau kituo kimoja.",
+      "failed": "Nakala rudufu haikuweza kuanzishwa.",
+      "whatToKeep": "Cha kuhifadhi",
+      "neededByAnother": "Imejumuishwa kwa sababu kitu ulichochagua kinakihitaji.",
+      "onlySomeChannels": "Baadhi ya vituo tu",
+      "someNotAllowed": "Haiwezekani pamoja na miradi, saraka au miunganisho, ambavyo vinahitaji kila kituo.",
+      "whichChannels": "Vituo vipi",
+      "passphraseHint": "Iandike mahali salama. Haiwezi kurejeshwa.",
+      "confirmPassphrase": "Kauli siri tena",
+      "start": "Anza nakala rudufu"
+    },
+    "schedule": {
+      "on": "Nakala rudufu zilizoratibiwa hufanyika kila saa {hours}, zikihifadhi {keep} za karibuni zaidi.",
+      "off": "Nakala rudufu zilizoratibiwa zimezimwa. Zinahitaji backup.passphrase kwenye usanidi na backup.interval_hours kwenye mipangilio ya seva."
+    },
+    "list": {
+      "title": "Kumbukumbu",
+      "upload": "Pakia kumbukumbu",
+      "uploading": "Inapakia… {percent}%",
+      "none": "Bado hakuna nakala rudufu.",
+      "someChannels": "vituo {count}",
+      "contentsUnknown": "Yaliyomo yatajulikana kauli siri ikitolewa",
+      "download": "Pakua",
+      "delete": "Futa",
+      "deleteTitle": "Ufute nakala rudufu hii?",
+      "deleteDetail": "Kumbukumbu inaondolewa kwenye hifadhi ya seva. Nakala uliyopakua haiathiriwi.",
+      "deleteFailed": "Nakala rudufu haikuweza kufutwa.",
+      "uploadFailed": "Upakiaji ulisimama. Kupakia faili hiyo hiyo tena kunaanza upakiaji mpya."
+    },
+    "maintenance": {
+      "on": "Seva iko katika matengenezo: wanachama hawawezi kuitumia hadi hili liishe.",
+      "leave": "Toka kwenye matengenezo",
+      "couldNotLeave": "Matengenezo hayakuweza kumalizwa."
+    },
+    "restore": {
+      "open": "Rejesha…",
+      "how": "Jinsi ya kurejesha",
+      "replace": "Badilisha kila kitu",
+      "replaceHint": "Kila kitu kwenye seva kinakuwa kilichomo kwenye kumbukumbu, kwa hatua moja inayotenduliwa ikishindwa. Kila mtu anatolewa, na seva lazima iwashwe upya baadaye.",
+      "replaceNeedsEverything": "Inawezekana tu kutoka kwenye kumbukumbu ya kila kitu.",
+      "merge": "Ongeza kilichokosekana",
+      "mergeHint": "Inarudisha kilichopotea, kama ujumbe uliofutwa, na haibadilishi chochote kilichopo bado. Mipangilio inachukua thamani za kumbukumbu.",
+      "whatToRestore": "Cha kurejesha",
+      "notPartialTitle": "Kwa nini baadhi ya sehemu hurudi tu kwa kubadilisha kila kitu",
+      "passphraseNeeded": "Toa kauli siri ya kumbukumbu.",
+      "previewFirst": "Hakiki urejeshaji kwanza, kwa machaguo yale yale.",
+      "previewFailed": "Uhakiki haukukamilika.",
+      "failed": "Urejeshaji haukuweza kuanzishwa.",
+      "previewTitle": "Urejeshaji huu ungefanya nini",
+      "restartWarning": "Baadaye seva inabaki katika matengenezo hadi iwashwe upya.",
+      "table": "Jedwali",
+      "inArchive": "Kwenye kumbukumbu",
+      "now": "Kilichopo sasa",
+      "added": "Kingeongezwa",
+      "skipped": "Kilirukwa",
+      "files": "Faili: {written} za kuandika, {present} zipo tayari.",
+      "preview": "Hakiki",
+      "apply": "Rejesha",
+      "confirmTitle": "Urejeshe kutoka nakala rudufu hii?",
+      "confirmReplace": "Kila kitu kwenye seva hii kitabadilishwa na kumbukumbu na kila mtu atatolewa, wewe ukiwemo: ingia tena kwa akaunti kutoka kwenye nakala rudufu. Seva inabaki katika matengenezo hadi iwashwe upya.",
+      "confirmMerge": "Kilichoorodheshwa na uhakiki kitaongezwa. Seva iko katika matengenezo wakati hilo likifanyika.",
+      "doneRestart": "Urejeshaji umekamilika. Washa seva upya ili iondoke kwenye matengenezo.",
+      "signedOut": "Urejeshaji umekamilika na kila mtu ametolewa, wewe ukiwemo. Ingia tena kwa akaunti kutoka kwenye nakala rudufu, kisha washa seva upya kutoka Mipangilio ya seva ili kumaliza matengenezo."
+    },
+    "server": {
+      "title": "Pakia upya na washa upya",
+      "hint": "Kupakia upya kunasoma usanidi tena bila kumtenganisha mtu yeyote. Kuwasha upya kunakagua kwamba seva ingewaka, kisha kuisimamisha kwa utaratibu na kuiwasha tena.",
+      "thisNode": "hii",
+      "gone": "haijibu",
+      "nodeDetail": "Toleo {version}, inaendesha tangu {started}, {people} wameunganishwa",
+      "reload": "Pakia upya",
+      "restart": "Washa upya",
+      "reloaded": "Imepakiwa upya. Kilichotumika: {applied}. Kilichobadilika lakini kinahitaji kuwasha upya: {restart}.",
+      "reloadFailed": "Kupakia upya hakukufaulu.",
+      "restarting": "Inawashwa upya… ukurasa huu utasema seva ikirudi.",
+      "didNotReturn": "Seva haijarudi ndani ya dakika moja na nusu. Kumbukumbu zake za mfumo zitaeleza kwa nini.",
+      "restarted": "Seva imerudi: toleo {version}, imewashwa {started}.",
+      "restartFailed": "Kuwasha upya hakukufaulu.",
+      "bySupervisor": "Inawashwa upya kwa kujifunga ili {supervisor} iiwashe tena.",
+      "inPlace": "Inawashwa upya kwa kujibadilisha yenyewe mahali pake.",
+      "recovers": "Mchakato mpya ukishindwa kuwaka, unawashwa tena.",
+      "mayNotRecover": "Mchakato mpya ukishindwa kuwaka, hakuna kitakachouwasha tena, kwa hiyo kuwasha upya kunakaguliwa kwanza.",
+      "confirmDetail": "Watu {people} wameunganishwa na simu {calls} zinaendelea. Kila mtu anatenganishwa kwa sekunde chache na simu zinaisha.",
+      "confirmTitle": "Uwashe upya {host}?",
+      "recent": "Upakiaji upya na uwashaji upya wa karibuni"
     }
   }
 }

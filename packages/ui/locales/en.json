@@ -2457,7 +2457,10 @@
       "server_configure": "Change server settings such as limits, registration policy and branding",
       "user_invite": "Invite people to this server",
       "user_read_all": "List every account on the server, suspended ones included — never their email addresses",
-      "user_suspend": "Suspend and reinstate accounts"
+      "user_suspend": "Suspend and reinstate accounts",
+      "server_backup": "Take, download, upload and delete backups of the server, which hold everything on it",
+      "server_restart": "Reload the server's configuration and restart it",
+      "server_restore": "Restore the server, or parts of it, from a backup"
     }
   },
   "conversation": {
@@ -2606,6 +2609,155 @@
       "role": "Roles",
       "server": "Server",
       "other": "Other"
+    }
+  },
+  "operations": {
+    "title": "Backups",
+    "cannotSee": "Backups need the server.backup or server.restore permission, which only administrators hold.",
+    "cancel": "Cancel",
+    "progress": "Progress",
+    "progressDetail": "{tables} of {total} tables, {files} files, {size} MB written",
+    "passphrase": "Passphrase",
+    "passphraseShort": "A passphrase needs at least {length} characters.",
+    "history": "Recent operations",
+    "kind": {
+      "backup": "Backup",
+      "restore": "Restore",
+      "reload": "Reload",
+      "restart": "Restart"
+    },
+    "status": {
+      "pending": "waiting",
+      "running": "running",
+      "succeeded": "finished",
+      "failed": "failed",
+      "cancelled": "cancelled",
+      "refused": "refused"
+    },
+    "done": {
+      "backup": "The backup is ready.",
+      "restore": "The restore is finished.",
+      "reload": "Reloaded.",
+      "restart": "Restarted."
+    },
+    "part": {
+      "settings": "Server settings and branding",
+      "accounts": "Accounts and roles",
+      "channels": "Channels and messages",
+      "files": "Attached files",
+      "projects": "Projects and issues",
+      "directory": "Directory",
+      "integrations": "Integrations, webhooks and applications",
+      "audit": "Audit log"
+    },
+    "notPartial": {
+      "accounts": "accounts are tied to every grant, membership and message; putting some back beside the ones here would mix two servers' idea of who somebody is.",
+      "projects": "projects and issues are rooms that refer to each other, so part of them would point at things that are not there.",
+      "directory": "profiles, engagements and agreements refer to projects, rooms and each other, and agreements cannot change once made.",
+      "integrations": "tokens and webhooks belong to accounts and channels as they were; restored alone they could grant access to something else.",
+      "audit": "the audit log only ever grows, in order; old entries cannot be slotted in among new ones."
+    },
+    "origin": {
+      "manual": "made by hand",
+      "scheduled": "scheduled",
+      "uploaded": "uploaded"
+    },
+    "backupStatus": {
+      "creating": "Being written…",
+      "uploading": "Upload not finished",
+      "ready": "Ready",
+      "failed": "Failed"
+    },
+    "create": {
+      "title": "Take a backup",
+      "hint": "Everything is chosen to begin with. An archive is always encrypted with the passphrase you give, and this server does not keep it: without it nobody, including you, can open the archive.",
+      "choosePart": "Choose at least one thing to back up.",
+      "passphrasesDiffer": "The two passphrases are not the same.",
+      "chooseChannel": "Choose at least one channel.",
+      "failed": "The backup could not be started.",
+      "whatToKeep": "What to keep",
+      "neededByAnother": "Included because something you chose needs it.",
+      "onlySomeChannels": "Only some channels",
+      "someNotAllowed": "Not with projects, the directory or integrations, which need every channel.",
+      "whichChannels": "Which channels",
+      "passphraseHint": "Write it down somewhere safe. It cannot be recovered.",
+      "confirmPassphrase": "Passphrase again",
+      "start": "Start the backup"
+    },
+    "schedule": {
+      "on": "Scheduled backups run every {hours} hours, keeping the newest {keep}.",
+      "off": "Scheduled backups are off. They need backup.passphrase in the configuration and backup.interval_hours in the server settings."
+    },
+    "list": {
+      "title": "Archives",
+      "upload": "Upload an archive",
+      "uploading": "Uploading… {percent}%",
+      "none": "There are no backups yet.",
+      "someChannels": "{count} channels",
+      "contentsUnknown": "Contents known once the passphrase is given",
+      "download": "Download",
+      "delete": "Delete",
+      "deleteTitle": "Delete this backup?",
+      "deleteDetail": "The archive is removed from the server's storage. A copy you downloaded is not affected.",
+      "deleteFailed": "The backup could not be deleted.",
+      "uploadFailed": "The upload stopped. Uploading the same file again starts a new upload."
+    },
+    "maintenance": {
+      "on": "The server is in maintenance: members cannot use it until this ends.",
+      "leave": "Leave maintenance",
+      "couldNotLeave": "Maintenance could not be ended."
+    },
+    "restore": {
+      "open": "Restore…",
+      "how": "How to restore",
+      "replace": "Replace everything",
+      "replaceHint": "Everything on the server becomes what is in the archive, in one step that is undone if it fails. Everybody is signed out, and the server must be restarted afterwards.",
+      "replaceNeedsEverything": "Only possible from an archive of everything.",
+      "merge": "Add what is missing",
+      "mergeHint": "Puts back what has gone, such as deleted messages, and changes nothing that is still here. Settings take the archive's values.",
+      "whatToRestore": "What to restore",
+      "notPartialTitle": "Why some parts can only come back by replacing everything",
+      "passphraseNeeded": "Give the archive's passphrase.",
+      "previewFirst": "Preview the restore first, with the same choices.",
+      "previewFailed": "The preview did not finish.",
+      "failed": "The restore could not be started.",
+      "previewTitle": "What this restore would do",
+      "restartWarning": "Afterwards the server stays in maintenance until it is restarted.",
+      "table": "Table",
+      "inArchive": "In the archive",
+      "now": "Here now",
+      "added": "Would be added",
+      "skipped": "Skipped",
+      "files": "Files: {written} to write, {present} already here.",
+      "preview": "Preview",
+      "apply": "Restore",
+      "confirmTitle": "Restore from this backup?",
+      "confirmReplace": "Everything on this server will be replaced by the archive and everybody will be signed out, you included: sign in again with an account from the backup. The server stays in maintenance until it is restarted.",
+      "confirmMerge": "What the preview listed will be added. The server is in maintenance while it happens.",
+      "doneRestart": "The restore is finished. Restart the server to bring it out of maintenance.",
+      "signedOut": "The restore is finished and everybody has been signed out, you included. Sign in again with an account from the backup, then restart the server from Server settings to end maintenance."
+    },
+    "server": {
+      "title": "Reload and restart",
+      "hint": "Reload reads the configuration again without disconnecting anybody. Restart checks the server would start, then stops it cleanly and starts it again.",
+      "thisNode": "this one",
+      "gone": "not responding",
+      "nodeDetail": "Version {version}, running since {started}, {people} connected",
+      "reload": "Reload",
+      "restart": "Restart",
+      "reloaded": "Reloaded. Applied: {applied}. Changed but needing a restart: {restart}.",
+      "reloadFailed": "The reload did not succeed.",
+      "restarting": "Restarting… this page will say when the server is back.",
+      "didNotReturn": "The server has not come back within a minute and a half. Its log will say why.",
+      "restarted": "The server is back: version {version}, started {started}.",
+      "restartFailed": "The restart did not succeed.",
+      "bySupervisor": "It restarts by exiting for {supervisor} to start it again.",
+      "inPlace": "It restarts by replacing itself in place.",
+      "recovers": "If the new process fails to start, it is started again.",
+      "mayNotRecover": "If the new process fails to start, nothing starts it again, so the restart is checked first.",
+      "confirmDetail": "{people} people are connected and {calls} calls are in progress. Everybody is disconnected for a few seconds and calls end.",
+      "confirmTitle": "Restart {host}?",
+      "recent": "Recent reloads and restarts"
     }
   }
 }

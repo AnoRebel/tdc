@@ -24,6 +24,24 @@ type Config struct {
 	Mail        MailConfig
 	Cache       CacheConfig
 	Calls       CallsConfig
+	Backup      BackupConfig
+}
+
+/*
+BackupConfig is what backups need that must not live in the database.
+
+The passphrase scheduled backups are encrypted with is configuration rather than
+a setting: a setting is stored in the database the archive protects, and a
+backup whose key sits beside the data it locks is not protected from whoever
+reads that database. Backups taken by hand are encrypted with a passphrase
+the administrator types, which is never stored at all.
+*/
+type BackupConfig struct {
+	// Passphrase encrypts scheduled backups. Empty is no scheduled backups.
+	Passphrase string
+	// WorkDirectory is where an archive is put together before it is stored.
+	// It needs room for one archive and its largest table.
+	WorkDirectory string
 }
 
 /*
@@ -358,6 +376,19 @@ type ServerConfig struct {
 	// because the right interval depends on what sits between client and
 	// server, and because a phone on metered data pays for every one.
 	Keepalive time.Duration
+
+	/*
+		RestartMethod is how this process comes back when an administrator
+		restarts it.
+
+		"exec" — it replaces itself with its own binary after shutting down,
+		which keeps its process identifier and needs nothing outside it.
+		"supervisor" — it exits with status 75 for systemd, or whatever runs
+		it, to start again; refused unless one is detected or this is set.
+		"auto" — supervisor under systemd, exec otherwise.
+		"off" — restarting from the interface is refused.
+	*/
+	RestartMethod string
 }
 
 // DatabaseConfig describes the connection to Postgres.
@@ -408,6 +439,7 @@ func Default() Config {
 			SecureCookies:   true,
 			SessionLifetime: 30 * 24 * time.Hour,
 			Keepalive:       45 * time.Second,
+			RestartMethod:   "auto",
 		},
 		Database: DatabaseConfig{
 			URL:             "",
@@ -462,5 +494,9 @@ func Default() Config {
 			Level:  "info",
 			Format: "json",
 		},
+
+		// Scheduled backups are off: a schedule needs a passphrase nobody
+		// types, and that is the operator's to choose.
+		Backup: BackupConfig{},
 	}
 }

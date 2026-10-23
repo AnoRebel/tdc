@@ -1,7 +1,8 @@
 # Hosting a TDC server
 
 Everything needed to run a TDC server for other people: getting it up, putting
-TLS in front of it, backing it up, restoring it, and keeping it current.
+TLS in front of it, backing it up, restoring it, reloading and restarting it,
+and keeping it current.
 
 The premise throughout is that this costs nothing to run. A working server needs
 Docker and a machine; it needs no account with anybody, no API key and no paid
@@ -1111,19 +1112,116 @@ allowance becomes everybody's.
 
 ## Backup
 
-There are two things to back up, and they want different schedules.
+There are two ways to take one: from the administration area, which needs
+nothing but a browser, and with `pg_dump` and `tar` on the host, which needs a
+shell. They suit different things.
 
-**The database** holds accounts, messages, channels, permissions, the audit log,
-runtime policy and the server's signing key. It is small and changes constantly.
+**From the application** (Settings → Backups, or `/api/admin/backups`) takes the
+whole server or chosen parts of it, encrypts the result, and keeps it in the
+server's storage, where it can be downloaded. It is the one to use for
+"keep a copy of this channel", "everything except the files", a backup before a
+risky change, and restoring parts of a server. It needs the `server.backup`
+permission, which administrators hold and nobody else does unless granted it.
 
-**The attachments** are large and are written once. In the default
-configuration they are in the `attachments` volume; with an S3 backend they are
-wherever that store is, and backing them up is that store's business.
+**`pg_dump`** is the whole database exactly as Postgres holds it, restorable by
+Postgres's own tools whatever happens to TDC. It is the one to use for disaster
+recovery you want independent of the application, and for moving to a new
+Postgres version. Both are worth having; neither replaces keeping a copy on
+another machine.
 
-The compose file keeps them in separate volumes precisely so that they can be
-backed up on different schedules.
+### What a backup can hold
 
-### The database
+| Part                                    | What is in it                                                                                                            | Brings with it               |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
+| Server settings and branding            | Runtime policy, feature switches, statuses, the legal documents, the server's signing key                                | —                            |
+| Accounts and roles                      | Accounts, password hashes and second factors, roles and grants, privacy settings, blocks                                 | —                            |
+| Channels and messages                   | Every room (or chosen channels) and everything in it: members, messages, reactions, pins, calls held, attachment records | Accounts                     |
+| Attached files                          | The bytes of those attachments and their previews                                                                        | Channels                     |
+| Projects and issues                     | Projects, issues, states, cycles, milestones, views                                                                      | Accounts, every channel      |
+| Directory                               | Profiles, companies, skills, enquiries, engagements and agreements                                                       | Accounts, channels, projects |
+| Integrations, webhooks and applications | Applications, tokens, incoming webhooks, subscriptions and their delivery history                                        | Accounts, every channel      |
+| Audit log                               | The whole log                                                                                                            | Accounts                     |
+
+A part brings what it cannot be restored without: a message names its sender,
+so channels bring accounts. Choosing only some channels is allowed with parts
+that do not refer to every channel — not with projects, the directory or
+integrations. Every archive can therefore be restored into an empty server.
+
+What is never in a backup: sessions, sign-ins and recovery links in progress,
+presence and typing, and the record of backups and restarts themselves. Each
+either lapses within minutes or describes the running server rather than the
+community. After a restore everybody signs in again.
+
+### The archive
+
+An archive is a tar stream, compressed with gzip, encrypted with
+[age](https://age-encryption.org) using a passphrase:
+
+```
+manifest.json                  what this is: format, version, schema version, server, time, parts, channels
+tables/<part>/<table>.ndjson   one JSON object per row, as Postgres's row_to_json writes it
+files/<storage key>            the bytes of an attachment or preview
+summary.json                   rows per table, files written, files that were missing
+```
+
+`formatVersion` changes only when an older reader could not read what is
+written, and a server refuses a version it does not know. Every table is read
+from one consistent snapshot, so the archive is the database at a single
+instant: a message and its reactions, a role and who holds it. A file deleted
+while the backup runs (by retention, usually) is listed as missing in the
+summary rather than failing the backup.
+
+The standard `age` tool opens one without TDC:
+
+```sh
+age -d tdc-2026-10-23-181052.tdcbackup | tar xz
+```
+
+**It is always encrypted.** An archive holds password hashes, second-factor
+secrets, webhook signing secrets and the server's signing key, so there is no
+option to leave encryption off. The passphrase needs at least twelve
+characters, is used and forgotten — it is in no log, no audit entry and no
+response — and cannot be recovered. Lose it and the archive is noise.
+
+Writing one, the server spools each table and then the archive to a working
+directory (`backup.work_directory`, the system's temporary directory by
+default) before storing it, so that directory needs room for one archive and
+its largest table. Reading the snapshot holds one transaction open for as long
+as the backup takes, which delays vacuuming until it ends; on a community-sized
+server that is minutes.
+
+### Keeping them
+
+Archives live in the configured storage backend under `backups/`, beside the
+attachments — on the `attachments` volume by default, in the bucket with S3.
+That protects against a deleted row, not against losing the disk: download the
+ones that matter, or copy that directory or bucket elsewhere. Downloads resume
+where they stopped. An archive kept elsewhere can be uploaded back from the
+same page; it is sent in pieces, so an interrupted upload resumes too.
+
+`backup.max_bytes` bounds an archive being written or uploaded; zero, the
+default, is no limit.
+
+**Scheduled backups** need a passphrase nobody types, so it is configuration,
+not a setting — a setting lives in the database the archive protects:
+
+| Setting                 | Where         | What it does                                           |
+| ----------------------- | ------------- | ------------------------------------------------------ |
+| `backup.passphrase`     | configuration | Encrypts scheduled backups; empty means none are taken |
+| `backup.work_directory` | configuration | Where archives are put together                        |
+| `backup.interval_hours` | settings      | Hours between scheduled backups; 0 is none             |
+| `backup.keep`           | settings      | Scheduled archives kept (default 7); 0 keeps them all  |
+| `backup.max_bytes`      | settings      | The largest archive written or accepted; 0 is no limit |
+
+Scheduled backups are of everything. Only scheduled archives are deleted by
+`backup.keep`; ones made by hand or uploaded stay until somebody deletes them.
+Every node looks for a backup that is due, and one backup or restore runs at a
+time across every node, so a schedule never runs twice.
+
+Creating, downloading, uploading, deleting and restoring are each recorded in
+the audit log, and limited per person.
+
+### With pg_dump
 
 ```sh
 docker compose exec -T database \
@@ -1134,13 +1232,10 @@ docker compose exec -T database rm /tmp/tdc.dump
 ```
 
 `--format=custom` rather than plain SQL, because it restores with `pg_restore`,
-can be restored selectively, and is compressed.
+can be restored selectively, and is compressed. A dump taken while the server
+is running is consistent; there is no need to stop the server.
 
-A dump taken while the server is running is consistent — `pg_dump` takes a
-snapshot, and nothing written during the dump appears half-way. There is no need
-to stop the server.
-
-### The attachments
+The attachments, which `pg_dump` does not see:
 
 ```sh
 docker run --rm \
@@ -1149,20 +1244,86 @@ docker run --rm \
   alpine tar czf /backup/tdc-attachments-$(date +%F).tar.gz -C /data .
 ```
 
-The volume is named for the compose project, which the file sets to `tdc`.
+The volume is named for the compose project, which the file sets to `tdc`. A
+dump is not encrypted: keep it somewhere only you can read.
 
 ### What a backup is worth
 
-Nothing, until it has been restored. Take a dump, restore it into a throwaway
-stack, sign in, and read a message. Do that once when you set the server up, and
-again after any change to how the backup is taken. A backup nobody has restored
-is a belief rather than a backup.
+Nothing, until it has been restored. Take one, restore it into a throwaway
+stack, sign in, and read a message. Do that once when you set the server up,
+and again after any change to how the backup is taken. A backup nobody has
+restored is a belief rather than a backup.
 
-Keep at least one copy on a different machine. A snapshot of the volume on the
-same disk protects against somebody deleting the wrong row and not against the
-disk.
+Keep at least one copy on a different machine. A copy on the same disk protects
+against somebody deleting the wrong row and not against the disk.
 
 ## Restore
+
+### From the application
+
+Open the archive on the Backups page, choose how, give its passphrase, and
+**preview** first. Restoring needs `server.restore`.
+
+**Replace everything** makes the server what the archive holds. It needs an
+archive of everything — every part, every channel — taken at the same schema
+version. All of it happens in one database transaction: if anything fails, the
+server is exactly as it was before. Afterwards everybody is signed out,
+including you (sign in with an account from the backup), files are written back
+to storage, and the server stays in **maintenance** until it is restarted —
+running processes hold things the restore changed, such as the signing key.
+Restart it from Server settings; with several nodes, restart each.
+
+This is also how a new server is brought back from a backup: start it, complete
+first-run setup, upload the archive, and replace. The setup account is replaced
+with the ones in the archive.
+
+**Add what is missing** puts back settings, or channels (all in the archive, or
+chosen ones) with their files, beside what is there. Nothing existing is
+overwritten: a deleted message comes back, an edited one keeps its edit. A row
+that needs something no longer there — a message whose sender's account was
+deleted — is skipped, and the preview counts it. A channel whose name another
+has taken since is skipped with everything in it. Settings are the exception:
+the archive's value replaces the current one, apart from the signing key, which
+a running server keeps.
+
+**What cannot be restored partially**, and why:
+
+- **Accounts** are tied to every grant, membership, session and message; putting
+  some back beside the ones there would mix two servers' idea of who somebody is.
+- **Projects and issues** are rooms that refer to each other; part of them would
+  point at states, cycles and projects that are not there.
+- **The directory** refers to projects, rooms and itself, and agreements cannot
+  change once made.
+- **Integrations** carry tokens and webhooks belonging to accounts and channels as
+  they were; alone they could grant access to whatever now has the same
+  identifiers.
+- **The audit log** only grows, in order; old entries cannot be slotted in among
+  new ones.
+
+These come back with a replace — or into a server that holds none of that part
+yet.
+
+**The preview** of adding what is missing is the restore itself, performed and
+rolled back, so its counts — rows in the archive, rows that would be added, rows
+skipped — are what the restore will do. The preview of a replace reads the
+archive through and sets its counts beside the server's current ones, without
+touching the database.
+
+**Maintenance mode.** Applying any restore puts every node into maintenance
+first. Every API request is refused with 503 and an explanation, apart from
+health, the server's identity, signing in, and the pages an administrator
+watches the restore from; live connections are closed. `/api/health` still
+answers 200, with `"maintenance": true`, so an orchestrator does not kill the
+node doing the restore. Other nodes notice within two seconds, and the restore
+waits three before it writes. A restore can be cancelled while it runs, which
+rolls it back. If a node dies part way, another marks the job failed within two
+minutes and maintenance ends; nothing was committed.
+
+**Archives from another release.** An archive records the schema version it was
+taken at, and a restore refuses any other. To restore an older archive, run the
+release that made it (named in the refusal), restore, then upgrade.
+
+### With pg_restore
 
 Restoring is into an **empty** database. Restoring over a populated one produces
 conflicts on every row that already exists and leaves a mixture of the two.
@@ -1194,13 +1355,73 @@ docker run --rm \
 
 Restore both from the same point in time where you can. A database that knows
 about an attachment whose file is missing shows a message with a file that will
-not download; a file with no row is invisible and takes up disk. Neither is
-fatal, and neither is pleasant to explain.
+not download; a file with no row is invisible and takes up disk.
 
 **Restore the database with the same release that made the dump, or a newer
 one.** An older binary refuses to start against a schema newer than it
 understands, which is the behaviour that makes rolling back safe. See
 [upgrading](upgrading.md).
+
+## Reload and restart
+
+Settings change while the server runs. Configuration — the file and the
+environment — is read at startup; two things refresh it without a deployment.
+Both need `server.restart`, are on the Server settings page, and are recorded
+in the audit log when asked for and when they end.
+
+**Reload** reads the configuration again and applies what a running process can
+change, without disconnecting anybody: `log.level`, `calls.turn_secret`, the web
+application's shell from `server.web_root` (so deploying a new web build needs
+no restart), what the configuration page shows, and the settings cache. Anything
+else that changed is listed as needing a restart. An invalid configuration
+changes nothing and is reported with every problem. Sending the process
+`SIGHUP` does the same.
+
+**A container configured by environment sees no change on reload or restart**:
+its environment is fixed when the container is created. Changing a value in
+`compose.yaml` takes `docker compose up -d`, which recreates the container.
+Reload and restart matter for a configuration file, a new binary, a new web
+build, and after a restore.
+
+**Restart** stops the node cleanly — live connections closed, background work
+finished, requests drained within `server.shutdown_timeout` — and starts it
+again. Before stopping anything it runs its own binary as `tdc-server -check`
+with the same arguments and environment: that loads the configuration, connects
+to the database, and checks the schema is one it can run against, changing
+nothing. If the check fails, the restart is refused and what it found is shown,
+so a broken configuration file cannot take the server down. Before you confirm,
+the page says how many people are connected and how many calls are running.
+
+How the process comes back is `server.restart_method`:
+
+| Value        | What happens                                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `auto`       | `supervisor` under systemd, `exec` otherwise (the default)                                                            |
+| `exec`       | The process replaces itself with its own binary, keeping its process ID — right for a container and for systemd alike |
+| `supervisor` | The process exits with status 75 for whatever runs it to start again                                                  |
+| `off`        | Restarting from the application is refused                                                                            |
+
+Under `exec` nothing outside the process is involved, which is why it is the
+default in a container. What it cannot do is recover from a new process that
+fails after the check passed — a port taken in the moment between, say. With a
+supervisor (systemd, or Docker's `restart: unless-stopped`, which the shipped
+compose file sets) a failed start is retried; without one, the server stays
+down until somebody starts it, and the page says which applies before you
+confirm. `supervisor` is refused unless systemd is detected or the method was
+chosen explicitly, because exiting with nothing to restart the process would
+only stop the server. Under systemd, a restart by exit also re-reads the unit's
+`EnvironmentFile`.
+
+The new process records that the restart completed once it is listening, and
+the page reports the version and start time it came back with, or after a
+minute and a half that it did not come back and that the log will say why.
+
+**Several nodes.** Each node records itself every fifteen seconds, and the page
+lists them with who is connected to each. Reload and restart name a node; the
+node a request reaches passes it on to the one named, which acts within a few
+seconds. Restart several one at a time, waiting for each to come back before
+the next: with a load balancer in front, the others carry everybody while one
+is away. There is no automatic rolling restart.
 
 ## Upgrading
 
@@ -1267,8 +1488,8 @@ difference is worth finding before people notice it.
 
 ## Things that catch people out
 
-**The web assets are read once at startup.** Replacing them means restarting the
-server. The application shell is held in memory and served on every navigation,
+**The web application's shell is read once at startup.** Replacing the web
+assets means reloading or restarting the server. The application shell is held in memory and served on every navigation,
 and it carries the configuration it was built with — so a server still running
 against an old shell serves an application that calls the address it was built
 for rather than the one it is served from. The symptom looks like a networking

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
+	"github.com/AnoRebel/tdc/server/internal/backup"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/config"
@@ -168,8 +170,17 @@ type Server struct {
 	projects *projects.Service
 
 	// shell is the built application's index.html, held in memory so social
-	// metadata can be inserted per request.
-	shell []byte
+	// metadata can be inserted per request. Replaced by a reload.
+	shell atomic.Pointer[[]byte]
+
+	// backups runs backups and restores, and holds maintenance mode. Nil on
+	// a server built without it, which then offers neither.
+	backups *backup.Service
+	// lifecycle is the command's reload and restart, lent to this layer.
+	lifecycle Lifecycle
+	// live is what a reload can change while the server runs.
+	liveMu sync.RWMutex
+	live   live
 
 	// background counts work detached from requests — notifications and search
 	// indexing — so shutdown can wait for it rather than cutting it off.
@@ -223,6 +234,8 @@ type Services struct {
 	// not enabled notifications to closed browsers. That is a working state:
 	// notifications are still stored and shown in the application.
 	Push *push.Service
+	// Backups runs backups, restores and maintenance mode. Nil offers none.
+	Backups *backup.Service
 }
 
 // New builds a server with the health and version routes mounted. It does not
@@ -265,7 +278,21 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		presence:     services.Presence,
 		broker:       services.Broker,
 		push:         services.Push,
+		backups:      services.Backups,
 		config:       cfg,
+		live: live{
+			turnSecret:    cfg.TURNSecret,
+			configuration: cfg.EffectiveConfiguration,
+			warnings:      cfg.ConfigurationWarnings,
+		},
+	}
+
+	if services.Backups != nil {
+		services.Backups.SetHooks(backup.Hooks{
+			Finished:    s.auditOperation,
+			Restored:    s.RecordRestoreInTransaction,
+			Maintenance: s.onMaintenance,
+		})
 	}
 
 	// How long a username somebody gave up stays theirs is the operator's to
@@ -341,6 +368,9 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		route rather than of the ones somebody remembered to mark.
 	*/
 	e.Use(s.requireSecondFactorEnrolment)
+	// Last, so whoever is refused during maintenance is refused knowing who
+	// they are: an administrator watching a restore still gets through.
+	e.Use(s.refuseDuringMaintenance)
 
 	s.routes()
 
@@ -438,12 +468,21 @@ func (s *Server) Run(ctx context.Context) error {
 	// runs a pass for the same reason, and claims what it sends the same way.
 	go s.RunDigests(ctx)
 
+	// This node's heartbeat, and reloads and restarts other nodes ask of it.
+	go s.runNodeLoop(ctx)
+	// Scheduled backups, where a passphrase for them is configured.
+	if s.backups != nil {
+		go s.backups.RunSchedule(ctx)
+	}
+
 	serveErr := make(chan error, 1)
 	go func() {
 		s.log.Info("server listening",
 			slog.String("address", listener.Addr().String()),
 			slog.String("version", buildinfo.Version),
 		)
+		// Listening is what a restart was waiting for.
+		go s.completeRestart(ctx)
 		if err := s.http.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serveErr <- err
 			return
@@ -472,6 +511,11 @@ func (s *Server) Run(ctx context.Context) error {
 	// for, so the server does not exit with a notification half-written. Each
 	// piece carries its own deadline, so this cannot wait indefinitely.
 	s.WaitForBackground()
+	// A backup or restore running here is cancelled by the same context and
+	// rolls back; waiting means it has recorded that before the pool closes.
+	if s.backups != nil {
+		s.backups.Wait()
+	}
 
 	if err := s.http.Shutdown(shutdownCtx); err != nil {
 		// Shutdown returning an error means in-flight requests outlasted the
