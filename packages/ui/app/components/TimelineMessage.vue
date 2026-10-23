@@ -2,6 +2,7 @@
 import type { MessageLifetime } from "@tdc/types";
 import {
   EyeOff,
+  Languages,
   MessageSquareText,
   MoreVertical,
   Pencil,
@@ -15,6 +16,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
 import { Message as MessageRow } from "#layers/ui/app/components/ui/message";
 import IssueLinks from "#layers/ui/app/components/projects/IssueLinks.vue";
+import TranslationBody from "#layers/ui/app/components/translation/TranslationBody.vue";
 import { messageKeys } from "#layers/ui/app/lib/composer-keys";
 import type { ShownMessage } from "#layers/ui/app/lib/timeline";
 import type { useReactions } from "#layers/ui/app/composables/useReactions";
@@ -42,6 +44,11 @@ const props = defineProps<{
 
 const { $t, $ts } = useI18n();
 const context = useMessageContext();
+// Translation offered inline, with whichever provider this person chose.
+const translation = useTranslation();
+const translated = computed(() =>
+  translation.showsTranslation(props.message.id, context.roomId.value, props.mine),
+);
 
 const editField = ref<HTMLTextAreaElement | null>(null);
 
@@ -139,6 +146,17 @@ function lifetimeExplanation(lifetime: MessageLifetime): string {
       >
         <MessageSquareText class="size-3.5" />
       </Button>
+      <!-- Somebody else's words, in the reader's language or back. -->
+      <Button
+        v-if="!mine && !message.removed && translation.available.value"
+        variant="ghost"
+        size="icon"
+        :label="translated ? $ts('translation.showOriginal') : $ts('translation.translate')"
+        :aria-pressed="translated"
+        @click="translation.toggle(context.roomId.value, message.id, message.body, mine)"
+      >
+        <Languages class="size-3.5" />
+      </Button>
       <Button
         v-if="mine"
         variant="ghost"
@@ -223,7 +241,13 @@ function lifetimeExplanation(lifetime: MessageLifetime): string {
 
         <template v-else>
           <template v-if="message.removed">{{ $t("room.messageRemoved") }}</template>
-          <MessageBody v-else :body="message.body" />
+          <TranslationBody
+            v-else
+            :body="message.body"
+            :message-id="message.id"
+            :room-id="context.roomId.value"
+            :mine="mine"
+          />
           <!-- The buttons this message offers. Real buttons, so a keyboard
                reaches them; the outcome is announced rather than only shown. -->
           <MessageActions

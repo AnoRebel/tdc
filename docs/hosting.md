@@ -864,6 +864,65 @@ copied there: it is each project's own history, in the event log.
 
 [Projects and issues](projects.md) covers the rest.
 
+### Translation
+
+Members can translate messages inline. The `translation` feature is **on by
+default**, because by itself it sends nothing anywhere: a member's browser can
+translate on the device (recent Chrome), and anything else needs either an
+instance you configure or a key the member connects themselves.
+
+**Give everybody a free provider.** Run [LibreTranslate](https://libretranslate.com)
+(open source; a container beside TDC is enough) and point the server at it:
+
+```sh
+TDC_TRANSLATION_LIBRETRANSLATE_URL=http://libretranslate:5000
+TDC_TRANSLATION_LIBRETRANSLATE_API_KEY=   # only if your instance requires one
+```
+
+This address is yours, so it may be on a private network; it is reached directly.
+Message text then goes to your instance and nowhere else. TDC talks to it over
+its HTTP API and includes none of its code.
+
+**Let members connect their own keys.** Google Cloud Translation, Microsoft
+Translator and DeepL need a member's own key, as can a LibreTranslate instance a
+member chooses. Keys are encrypted with a key only you hold:
+
+```sh
+tdc-server -translation-key   # prints TDC_TRANSLATION_SECRET_KEY=…
+```
+
+Without it members cannot save keys (the settings screen says so), and on-device
+translation and your instance still work. Keep it with your other secrets and
+back it up: if it is lost, saved keys cannot be read and members must connect
+again. There is no rotation; to change it, set a new one and ask members to
+reconnect. It is redacted from `/api/admin/configuration`, as is the instance key.
+
+| Setting                              | Default |                                             |
+| ------------------------------------ | ------- | ------------------------------------------- |
+| `translation.libretranslate_url`     | —       | Your LibreTranslate instance, for everybody |
+| `translation.libretranslate_api_key` | —       | Its key, if it needs one                    |
+| `translation.secret_key`             | —       | Base64 of 32 bytes; encrypts members' keys  |
+| `translation.timeout`                | `10s`   | Bounds one call to a provider               |
+
+Policy, in **Administration** while the server runs:
+
+- `translation.providers` — which providers members may use: `device`,
+  `libretranslate`, `google`, `microsoft`, `deepl` (all, by default). Remove the
+  commercial ones if you do not want members' messages — which include other
+  people's — going to those companies.
+- `translation.requests_per_hour` — per person, 120 by default. A request is up
+  to 50 messages, and translations already made are served from a shared cache
+  without counting.
+
+**What the server guarantees.** It translates only messages the person may
+read; refuses a member's address that is not `https` or is a private address,
+and checks again when it connects, so a name that resolves into your network is
+refused; never logs message text or a provider's reply; and deletes cached
+translations when a message is edited or removed.
+
+If translation is enabled with anything but on-device and your instance, say so
+in your [privacy policy](privacy-policy.md#what-leaves-this-server).
+
 ### Calls
 
 Voice and video calls are **off by default**. Turn them on while the server
@@ -1151,6 +1210,12 @@ What is never in a backup: sessions, sign-ins and recovery links in progress,
 presence and typing, and the record of backups and restarts themselves. Each
 either lapses within minutes or describes the running server rather than the
 community. After a restore everybody signs in again.
+
+Translations already made are left out too, being made again when asked for, and
+so are the keys people connected for outside translation services: they are
+sealed with this server's own key, and carrying somebody's credentials for
+another service to wherever an archive goes is not a backup's to do. After a
+restore, people who used their own provider connect it again.
 
 ### The archive
 

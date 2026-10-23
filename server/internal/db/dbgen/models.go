@@ -522,6 +522,17 @@ type MessageSearch struct {
 	SearchVector  interface{}
 }
 
+type MessageTranslation struct {
+	MessageID      string
+	SourceEventID  string
+	TargetLanguage string
+	Provider       string
+	BodyHash       []byte
+	TranslatedBody string
+	SourceLanguage string
+	CreatedAt      time.Time
+}
+
 type MessageView struct {
 	EventID  string
 	ViewerID uuid.UUID
@@ -976,6 +987,30 @@ type ThreadRead struct {
 	ReadSequence int64
 	Following    bool
 	Chosen       bool
+}
+
+type TranslationConnection struct {
+	UserID    uuid.UUID
+	Provider  string
+	SealedKey []byte
+	Endpoint  string
+	Region    string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type TranslationPreference struct {
+	UserID         uuid.UUID
+	Provider       string
+	TargetLanguage string
+	AutoTranslate  bool
+	UpdatedAt      time.Time
+}
+
+type TranslationRoomRule struct {
+	UserID        uuid.UUID
+	RoomID        uuid.UUID
+	AutoTranslate bool
 }
 
 type TypingIndicator struct {

@@ -67,6 +67,7 @@ const groupTitles: Record<string, string> = {
   audit: $ts("moderation.auditLog"),
   accounts: $ts("names.adminGroup"),
   backup: $ts("operations.title"),
+  translation: $ts("translation.adminGroup"),
 };
 
 /*

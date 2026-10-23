@@ -205,6 +205,22 @@ Without it, sending a GIF still works — it uploads like any other file and
 animates in the conversation. Only searching a library from inside the app is
 missing.
 
+**Message translation** — `translation.*`
+
+On by default, and needs nothing: members can translate on their own device
+where the browser can. Add an instance everybody may use, and a key that lets
+members save their own provider keys:
+
+| Setting                              | Default | What it does                                                     |
+| ------------------------------------ | ------- | ---------------------------------------------------------------- |
+| `translation.libretranslate_url`     | —       | Your LibreTranslate instance, used by anybody here.              |
+| `translation.libretranslate_api_key` | —       | Its key, if it needs one.                                        |
+| `translation.secret_key`             | —       | Encrypts members' keys; `tdc-server -translation-key` makes one. |
+| `translation.timeout`                | `10s`   | Bounds one call to a provider.                                   |
+
+Which providers members may use, and how often, are policy settings; see
+[Translation](docs/hosting.md#translation) in the hosting guide.
+
 ### Link previews of this server
 
 A public channel's address, and the server's own, carry the metadata that link

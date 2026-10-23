@@ -1294,6 +1294,57 @@ Nothing you can put in `q` produces a syntax error. The text is treated as words
 to find rather than as a query language, so a caller passing through whatever a
 user typed does not need to sanitise it.
 
+## Translation
+
+Present when the server advertises the `translation` capability; every endpoint
+answers 404 otherwise.
+
+| Endpoint                                           | What it does                                                                                                                 |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/me/translation`                          | The caller's providers, preferences and per-conversation rules                                                               |
+| `PUT /api/me/translation/preferences`              | `{ provider, targetLanguage, autoTranslate }`; an empty provider means the default, an empty language the interface language |
+| `PUT /api/me/translation/connections/:provider`    | `{ apiKey, endpoint, region }` for `libretranslate`, `google`, `microsoft` or `deepl`                                        |
+| `DELETE /api/me/translation/connections/:provider` | Removes a connection and its key                                                                                             |
+| `PUT /api/me/translation/rooms/:id`                | `{ autoTranslate }` for one conversation                                                                                     |
+| `DELETE /api/me/translation/rooms/:id`             | Returns the conversation to the server-wide choice                                                                           |
+| `POST /api/rooms/:id/translations`                 | Translates messages                                                                                                          |
+
+A key is accepted and never returned: the overview says `hasKey`, and nothing
+else about it. Sending a connection with a blank `apiKey` keeps the saved one. A
+`libretranslate` endpoint must be an `https` address on the public internet.
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/translations" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"messages": ["$abc…", "$def…"], "targetLanguage": "sw", "provider": "libretranslate"}'
+```
+
+```json
+{
+  "provider": "libretranslate",
+  "targetLanguage": "sw",
+  "translations": [
+    { "messageId": "$abc…", "body": "Habari za asubuhi", "sourceLanguage": "en", "skipped": false }
+  ],
+  "missing": ["$def…"]
+}
+```
+
+Up to 50 messages per request. `body` is Markdown, like a message's own body,
+with code, mentions, links and addresses exactly as written. `skipped` means the
+message is already in the target language, and `body` is then the original.
+`missing` lists messages the caller may not have translated — not in that room,
+not readable, removed, or not a message — without saying which.
+
+| Status | Meaning                                                                                                                                          |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 400    | A bad language code, or `device` (on-device translation happens in the client)                                                                   |
+| 403    | The operator does not allow that provider                                                                                                        |
+| 404    | The room does not exist or the caller cannot read it                                                                                             |
+| 409    | The provider needs a connection the caller has not made, or a saved key can no longer be read                                                    |
+| 429    | The caller's hourly allowance is spent; see `Retry-After`. Only requests that reach a provider count — translations already made are served free |
+| 502    | The provider could not be reached or refused; its own message is not passed on                                                                   |
+
 ## Cross-origin requests
 
 A browser-based integration served from another origin needs that origin in

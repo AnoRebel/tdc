@@ -30,6 +30,7 @@ import {
   Forward,
   Globe,
   Hash,
+  Languages,
   Lock,
   Menu,
   MessageSquareText,
@@ -60,6 +61,7 @@ import { plainText } from "#layers/ui/app/lib/formatting";
 import { foldMessages, groupMessages } from "#layers/ui/app/lib/timeline";
 import { isOwnAddress } from "#layers/ui/app/lib/names";
 import IssueFromMessage from "#layers/ui/app/components/projects/IssueFromMessage.vue";
+import TranslationRoomToggle from "#layers/ui/app/components/translation/TranslationRoomToggle.vue";
 
 const { $t, $ts } = useI18n();
 
@@ -129,6 +131,8 @@ const threadPanel = ref<{ receive: (event: Message) => void; reload: () => Promi
   null,
 );
 const outbox = useOutbox();
+// Translation offered inline, with whichever provider this person chose.
+const translation = useTranslation();
 
 /** What this conversation is still holding, oldest first. */
 const waiting = computed(() => outbox.waitingIn(roomId.value));
@@ -1140,6 +1144,15 @@ function menuFor(
     });
   }
 
+  if (!mine && !message.removed && translation.available.value) {
+    const showing = translation.showsTranslation(message.id, roomId.value, false);
+    items.push({
+      label: showing ? $ts("translation.showOriginal") : $ts("translation.translate"),
+      icon: Languages,
+      action: () => translation.toggle(roomId.value, message.id, message.body, false),
+    });
+  }
+
   if (room.value?.member && !message.removed) {
     // In a thread already, a reply goes in the box below it.
     if (!inThread) {
@@ -1601,6 +1614,8 @@ watch(roomId, load, { immediate: true });
           >
             <Video class="size-3.5" />
           </Button>
+
+          <TranslationRoomToggle :room-id="roomId" />
 
           <ChannelSettings :room="room" :events="messages" @changed="room = $event" />
 

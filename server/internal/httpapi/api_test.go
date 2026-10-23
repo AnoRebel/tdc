@@ -371,6 +371,7 @@ func newTestAPIConfigured(
 		Backups: backup.NewService(pool.Pool, testStore(t), backup.Config{
 			Node: "test-node", Host: "test-host", ServerName: "tdc.test", ServerVersion: "test",
 		}, logger),
+		Translation: translationForTest(t, logger),
 	}, logger)
 
 	t.Cleanup(func() {

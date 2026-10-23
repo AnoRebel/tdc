@@ -150,6 +150,16 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/me/translation/connections/:provider": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"DELETE /api/me/translation/rooms/:id": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/me/webhooks/:id": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -718,6 +728,11 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/me/tokens": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]tokenView]()},
+		},
+	},
+	"GET /api/me/translation": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[translationOverviewResponse]()},
 		},
 	},
 	"GET /api/me/unread": {
@@ -1842,6 +1857,12 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 201, Type: reflect.TypeFor[messageResponse]()},
 		},
 	},
+	"POST /api/rooms/:id/translations": {
+		Request: reflect.TypeFor[translateRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[translateResponse]()},
+		},
+	},
 	"POST /api/rooms/:id/typing": {
 		Request: reflect.TypeFor[startTypingRequest](),
 		Responses: []responseBody{
@@ -2035,6 +2056,24 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[setStatusRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[ownStatusResponse]()},
+		},
+	},
+	"PUT /api/me/translation/connections/:provider": {
+		Request: reflect.TypeFor[translationConnectionRequest](),
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"PUT /api/me/translation/preferences": {
+		Request: reflect.TypeFor[translationPreferences](),
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"PUT /api/me/translation/rooms/:id": {
+		Request: reflect.TypeFor[translationRoomRuleRequest](),
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
 		},
 	},
 	"PUT /api/me/username": {

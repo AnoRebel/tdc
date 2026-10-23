@@ -48,6 +48,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/secondfactor"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/AnoRebel/tdc/server/internal/storage"
+	"github.com/AnoRebel/tdc/server/internal/translation"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
 
@@ -82,6 +83,8 @@ func run() (restartRequest, error) {
 			"generate a push notification key pair and exit")
 		checkOnly = flag.Bool("check", false,
 			"check the configuration and the database this server would start with, change nothing, and exit")
+		translationKey = flag.Bool("translation-key", false,
+			"generate the key that encrypts members' translation provider keys, and exit")
 	)
 	flag.Parse()
 
@@ -114,6 +117,19 @@ func run() (restartRequest, error) {
 		fmt.Printf("TDC_PUSH_VAPID_PRIVATE=%s\n", keys.Private)
 		fmt.Println("# A way for a push service to reach you about a problem:")
 		fmt.Println("TDC_PUSH_SUBJECT=mailto:you@example.org")
+		return restartRequest{}, nil
+	}
+
+	// The key members' translation keys are sealed with, generated here for
+	// the same reason the push keys are: enabling it needs nothing else.
+	if *translationKey {
+		key, err := translation.GenerateSecretKey()
+		if err != nil {
+			return restartRequest{}, err
+		}
+		fmt.Println("# Encrypts the keys members connect translation providers with.")
+		fmt.Println("# Keep it secret, and keep it: without it saved keys cannot be read.")
+		fmt.Printf("TDC_TRANSLATION_SECRET_KEY=%s\n", key)
 		return restartRequest{}, nil
 	}
 
@@ -352,6 +368,22 @@ func run() (restartRequest, error) {
 		broker = realtime.NewPostgresBroker(pool.Pool, node, log)
 	}
 
+	/*
+		Translation through a provider. The operator's own instance is reached
+		directly — it is theirs, and often beside this server on a private
+		network — and everything else through the dialer that refuses private
+		addresses, because a member can type the address of their own.
+	*/
+	translationService, err := translation.NewService(translation.Settings{
+		LibreTranslateURL:    cfg.Translation.LibreTranslateURL,
+		LibreTranslateAPIKey: cfg.Translation.LibreTranslateAPIKey,
+		SecretKey:            cfg.Translation.SecretKey,
+		Timeout:              cfg.Translation.Timeout,
+	}, unfurl.DialContext, log)
+	if err != nil {
+		return restartRequest{}, err
+	}
+
 	services := httpapi.Services{
 		Identity: identity.NewService(queries, log),
 		Authz:    authz.NewService(queries),
@@ -396,6 +428,7 @@ func run() (restartRequest, error) {
 			// should never resolve to a private address, and the day one does
 			// is the day this matters.
 		}, unfurl.DialContext, log),
+		Translation: translationService,
 		Unfurl: unfurl.NewService(sharedCache,
 			unfurl.Settings{Enabled: cfg.Attachments.LinkPreviews}, log),
 		Presence: presenceService,

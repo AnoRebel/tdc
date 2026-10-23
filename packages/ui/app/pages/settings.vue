@@ -510,6 +510,10 @@ function deviceName(userAgent: string): string {
            server can send mail; it draws nothing where it cannot. -->
       <DigestPreferences />
 
+      <!-- Translating messages, where the server offers it. Lazy: the
+           provider forms and their validation are needed only here. -->
+      <LazyTranslationSettings v-if="serverOffers('translation')" />
+
       <!-- How calls ring on this device, where the server offers calls. -->
       <section v-if="serverOffers('calls')" class="space-y-2">
         <h2 class="text-sm font-semibold">{{ $t("calls.ringtones") }}</h2>
