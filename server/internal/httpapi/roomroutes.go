@@ -504,6 +504,11 @@ func (s *Server) afterMessage(ctx context.Context, event dbgen.Event, body strin
 	s.inBackground(ctx, "notify", func(ctx context.Context) {
 		s.notifyRecipients(ctx, event, body, event.RoomID)
 	})
+	// Answered on behalf of whoever it reached and is away; see
+	// answerAutomatically for when that is.
+	s.inBackground(ctx, "automatic replies", func(ctx context.Context) {
+		s.answerAutomatically(ctx, event)
+	})
 
 	// Delivered after it is stored, so a client that misses the live frame
 	// still finds the message on reconnection. This one stays on the request

@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/AnoRebel/tdc/server/internal/autoreply"
+
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
@@ -135,8 +137,10 @@ type Server struct {
 	recovery     *recovery.Service
 	queries      *dbgen.Queries
 	presence     *presence.Service
-	push         *push.Service
-	hub          *realtime.Hub
+	// The automatic replies people set for while they are away.
+	autoreplies *autoreply.Service
+	push        *push.Service
+	hub         *realtime.Hub
 	/*
 		How this node tells the others about an event, and hears about theirs.
 
@@ -267,6 +271,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		push:         services.Push,
 		config:       cfg,
 	}
+	s.autoreplies = autoreply.NewService(s.queries)
 
 	// How long a username somebody gave up stays theirs is the operator's to
 	// change while the server runs, so it is read at the moment it matters.

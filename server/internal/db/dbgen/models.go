@@ -120,6 +120,30 @@ type AuditEntry struct {
 	Detail     []byte
 }
 
+type AutomaticReply struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	Enabled         bool
+	Message         string
+	MentionMessage  string
+	Statuses        []string
+	StartsAt        *time.Time
+	EndsAt          *time.Time
+	TimeZone        string
+	ReplyToDirect   bool
+	ReplyToGroups   bool
+	ReplyToMentions bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type AutomaticReplyLog struct {
+	UserID   uuid.UUID
+	RoomID   uuid.UUID
+	SenderID uuid.UUID
+	SentAt   time.Time
+}
+
 type Call struct {
 	ID           uuid.UUID
 	RoomID       uuid.UUID
