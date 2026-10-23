@@ -55,6 +55,13 @@ var secretKeys = map[string]bool{
 		redacted for the same reason the storage credentials are.
 	*/
 	"gifs.api_key": true,
+	// The operator's translation instance key, billed or limited to them.
+	"translation.libretranslate_api_key": true,
+	/*
+		The key members' provider keys are sealed with. Whoever holds it and a
+		copy of the database holds every key a member connected.
+	*/
+	"translation.secret_key": true,
 	/*
 		The mail account's password. Whoever holds it can send mail as this
 		server, which for a server that sends recovery links is the whole
@@ -165,6 +172,10 @@ func (c Config) Describe(path string) []Setting {
 		{"mail.timeout", c.Mail.Timeout.String(), defaults.Mail.Timeout.String()},
 		{"gifs.provider", c.GIFs.Provider, defaults.GIFs.Provider},
 		{"gifs.api_key", c.GIFs.APIKey, defaults.GIFs.APIKey},
+		{"translation.libretranslate_url", c.Translation.LibreTranslateURL, defaults.Translation.LibreTranslateURL},
+		{"translation.libretranslate_api_key", c.Translation.LibreTranslateAPIKey, defaults.Translation.LibreTranslateAPIKey},
+		{"translation.secret_key", c.Translation.SecretKey, defaults.Translation.SecretKey},
+		{"translation.timeout", c.Translation.Timeout.String(), defaults.Translation.Timeout.String()},
 		{"log.level", c.Log.Level, defaults.Log.Level},
 		{"log.format", c.Log.Format, defaults.Log.Format},
 	}

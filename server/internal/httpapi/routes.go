@@ -415,6 +415,20 @@ func (s *Server) routes() {
 	s.echo.GET("/api/gifs", s.handleSearchGifs, requireAuthentication,
 		s.requireFeature(settings.FeatureGifSearch))
 
+	/*
+		Inline translation. Preferences and connections are a person's own;
+		the proxy checks the room like every room route and each message
+		besides, so it translates only what the person may already read.
+	*/
+	translate := s.requireFeature(settings.FeatureTranslation)
+	s.echo.GET("/api/me/translation", s.handleTranslationOverview, requireAuthentication, translate)
+	s.echo.PUT("/api/me/translation/preferences", s.handleSetTranslationPreferences, requireAuthentication, translate)
+	s.echo.PUT("/api/me/translation/connections/:provider", s.handleConnectTranslation, requireAuthentication, translate)
+	s.echo.DELETE("/api/me/translation/connections/:provider", s.handleDisconnectTranslation, requireAuthentication, translate)
+	s.echo.PUT("/api/me/translation/rooms/:id", s.handleSetTranslationRoomRule, requireAuthentication, translate)
+	s.echo.DELETE("/api/me/translation/rooms/:id", s.handleClearTranslationRoomRule, requireAuthentication, translate)
+	s.echo.POST("/api/rooms/:id/translations", s.handleTranslateMessages, requireAuthentication, translate)
+
 	s.echo.GET("/api/search", s.handleSearch, requireAuthentication)
 	// One box, one question: messages, conversations and people together,
 	// rather than three requests resolving at different times.

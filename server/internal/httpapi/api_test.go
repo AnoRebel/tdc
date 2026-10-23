@@ -362,8 +362,9 @@ func newTestAPIConfigured(
 			been sent. Off unless a test asked for it, which is the ordinary
 			server: nothing configured, and recovery not offered.
 		*/
-		Mail:     postboxForTest,
-		Recovery: recoveryForTest(queries, logger),
+		Mail:        postboxForTest,
+		Recovery:    recoveryForTest(queries, logger),
+		Translation: translationForTest(t, logger),
 	}, logger)
 
 	t.Cleanup(func() {

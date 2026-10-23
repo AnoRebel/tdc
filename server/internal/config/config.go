@@ -19,6 +19,7 @@ type Config struct {
 	Attachments AttachmentsConfig
 	Log         LogConfig
 	GIFs        GIFsConfig
+	Translation TranslationConfig
 	Push        PushConfig
 	OAuth       OAuthConfig
 	Mail        MailConfig
@@ -256,6 +257,33 @@ type GIFsConfig struct {
 	Timeout time.Duration
 }
 
+/*
+TranslationConfig is what message translation needs from the operator.
+
+Nothing here is required. Members can translate on their own devices where the
+browser can, and connect providers with their own keys, with all of this empty;
+these add an instance everybody may use, and the key that lets this server keep
+members' keys at all.
+*/
+type TranslationConfig struct {
+	// LibreTranslateURL is the operator's own LibreTranslate instance, which
+	// everybody on this server may use. Empty for none.
+	LibreTranslateURL string
+	// LibreTranslateAPIKey is that instance's key, when it asks for one.
+	LibreTranslateAPIKey string
+	/*
+		SecretKey encrypts the keys members connect providers with: base64 of
+		32 random bytes, from "tdc-server -translation-key".
+
+		Kept here rather than in the database so that a copy of the database
+		on its own does not reveal anybody's key. Empty means members cannot
+		save keys; losing it means they connect again.
+	*/
+	SecretKey string
+	// Timeout bounds one call to a provider.
+	Timeout time.Duration
+}
+
 // StorageConfig says where uploaded files are kept.
 //
 // The default keeps them in a directory, so a small deployment needs no object
@@ -456,6 +484,10 @@ func Default() Config {
 			Provider: "",
 			APIKey:   "",
 			Timeout:  5 * time.Second,
+		},
+
+		Translation: TranslationConfig{
+			Timeout: 10 * time.Second,
 		},
 
 		Log: LogConfig{

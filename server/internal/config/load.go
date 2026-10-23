@@ -1,9 +1,11 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -260,6 +262,10 @@ func Load(path string) (Config, error) {
 	cfg.GIFs.APIKey = l.str("gifs.api_key", d.GIFs.APIKey)
 	cfg.GIFs.ContentFilter = l.str("gifs.content_filter", d.GIFs.ContentFilter)
 	cfg.GIFs.Timeout = l.duration("gifs.timeout", d.GIFs.Timeout)
+	cfg.Translation.LibreTranslateURL = l.str("translation.libretranslate_url", d.Translation.LibreTranslateURL)
+	cfg.Translation.LibreTranslateAPIKey = l.str("translation.libretranslate_api_key", d.Translation.LibreTranslateAPIKey)
+	cfg.Translation.SecretKey = l.str("translation.secret_key", d.Translation.SecretKey)
+	cfg.Translation.Timeout = l.duration("translation.timeout", d.Translation.Timeout)
 	cfg.Attachments.MediaSidecarAddress = l.str("attachments.media_sidecar_address", d.Attachments.MediaSidecarAddress)
 	cfg.Attachments.MediaSidecarTimeout = l.duration("attachments.media_sidecar_timeout", d.Attachments.MediaSidecarTimeout)
 
@@ -343,6 +349,22 @@ func (c Config) validate() []Problem {
 		add("gifs.api_key", "is required when a provider is set")
 	case provider != "" && provider != "tenor" && provider != "giphy":
 		add("gifs.provider", `must be "tenor" or "giphy"`)
+	}
+
+	/*
+		A translation secret key that is not one is refused at startup, rather
+		than discovered by the first member who tries to save a key.
+	*/
+	if key := strings.TrimSpace(c.Translation.SecretKey); key != "" {
+		if decoded, err := base64.StdEncoding.DecodeString(key); err != nil || len(decoded) != 32 {
+			add("translation.secret_key", "must be base64 of 32 bytes; generate one with tdc-server -translation-key")
+		}
+	}
+	if address := strings.TrimSpace(c.Translation.LibreTranslateURL); address != "" {
+		if parsed, err := url.Parse(address); err != nil ||
+			(parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+			add("translation.libretranslate_url", "must be an http or https address")
+		}
 	}
 
 	switch backend := strings.TrimSpace(c.Storage.Backend); backend {

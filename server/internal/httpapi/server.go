@@ -40,6 +40,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/secondfactor"
 	"github.com/AnoRebel/tdc/server/internal/settings"
+	"github.com/AnoRebel/tdc/server/internal/translation"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
 
@@ -126,6 +127,7 @@ type Server struct {
 	notify       *notify.Service
 	moderation   *moderation.Service
 	gifs         *gifs.Service
+	translation  *translation.Service
 	settings     *settings.Service
 	invitations  *invitations.Service
 	oauth        *oauth.Service
@@ -195,6 +197,8 @@ type Services struct {
 	Notify      *notify.Service
 	Moderation  *moderation.Service
 	GIFs        *gifs.Service
+	// Translation calls translation providers on members' behalf.
+	Translation *translation.Service
 	Settings    *settings.Service
 	Invitations *invitations.Service
 	Presence    *presence.Service
@@ -254,6 +258,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		notify:       services.Notify,
 		moderation:   services.Moderation,
 		gifs:         services.GIFs,
+		translation:  services.Translation,
 		settings:     services.Settings,
 		invitations:  services.Invitations,
 		oauth:        services.OAuth,

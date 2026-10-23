@@ -292,6 +292,8 @@ type Querier interface {
 	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
 	DeleteTOTPCredential(ctx context.Context, userID uuid.UUID) error
+	DeleteTranslationConnection(ctx context.Context, arg DeleteTranslationConnectionParams) error
+	DeleteTranslationRoomRule(ctx context.Context, arg DeleteTranslationRoomRuleParams) error
 	// Scoped to its owner, so a subscription cannot be removed by guessing.
 	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) (WebhookSubscription, error)
 	// Only an active one, so the owner is told once rather than at every failure
@@ -416,6 +418,7 @@ type Querier interface {
 	// message is as it was posted.
 	GetMessageInteraction(ctx context.Context, eventID string) (MessageInteraction, error)
 	GetMessageLifetime(ctx context.Context, eventID string) (MessageLifetime, error)
+	GetMessageTranslation(ctx context.Context, arg GetMessageTranslationParams) (MessageTranslation, error)
 	GetMilestone(ctx context.Context, id uuid.UUID) (Milestone, error)
 	GetNotificationDigest(ctx context.Context, userID uuid.UUID) (NotificationDigest, error)
 	// The preference that applies to one conversation.
@@ -462,6 +465,8 @@ type Querier interface {
 	// Read whole and written whole: the structure is small, and a partial update
 	// would mean the database knowing what a tour is.
 	GetTourProgress(ctx context.Context, id uuid.UUID) ([]byte, error)
+	GetTranslationConnection(ctx context.Context, arg GetTranslationConnectionParams) (TranslationConnection, error)
+	GetTranslationPreferences(ctx context.Context, userID uuid.UUID) (TranslationPreference, error)
 	// Only the account holding the name now: whether a name is free to take.
 	GetUserByCurrentUsername(ctx context.Context, usernameFolded string) (User, error)
 	GetUserByEmail(ctx context.Context, emailFolded *string) (User, error)
@@ -799,6 +804,8 @@ type Querier interface {
 	// so a timeline can show "3 replies" without fetching them.
 	ListThreadSummaries(ctx context.Context, dollar_1 []string) ([]ListThreadSummariesRow, error)
 	ListTransitions(ctx context.Context, engagementID uuid.UUID) ([]EngagementTransition, error)
+	ListTranslationConnections(ctx context.Context, userID uuid.UUID) ([]TranslationConnection, error)
+	ListTranslationRoomRules(ctx context.Context, userID uuid.UUID) ([]TranslationRoomRule, error)
 	ListTyping(ctx context.Context, roomID uuid.UUID) ([]ListTypingRow, error)
 	// Issues still in a cycle whose state does not mean done, in number order.
 	ListUnfinishedIssuesInCycle(ctx context.Context, cycleID uuid.UUID) ([]Issue, error)
@@ -1161,6 +1168,9 @@ type Querier interface {
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
 	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
 	SetTourProgress(ctx context.Context, arg SetTourProgressParams) error
+	SetTranslationConnection(ctx context.Context, arg SetTranslationConnectionParams) error
+	SetTranslationPreferences(ctx context.Context, arg SetTranslationPreferencesParams) error
+	SetTranslationRoomRule(ctx context.Context, arg SetTranslationRoomRuleParams) error
 	SetTypingPreference(ctx context.Context, arg SetTypingPreferenceParams) error
 	// Whether two people are in the same open call now.
 	ShareAnOpenCall(ctx context.Context, arg ShareAnOpenCallParams) (bool, error)
@@ -1190,6 +1200,9 @@ type Querier interface {
 	StartWebauthnCeremony(ctx context.Context, arg StartWebauthnCeremonyParams) (WebauthnCeremony, error)
 	StopTyping(ctx context.Context, arg StopTypingParams) error
 	StoreForeignEvent(ctx context.Context, arg StoreForeignEventParams) (int64, error)
+	// Older translations of the same message, of a body it no longer has, go:
+	// an edited message's earlier words should not stay behind in the cache.
+	StoreMessageTranslation(ctx context.Context, arg StoreMessageTranslationParams) error
 	SuspendUser(ctx context.Context, arg SuspendUserParams) error
 	// Taking the authorization consumes it: the row is deleted as it is read, so a
 	// state value cannot be presented twice even if two callbacks arrive at once.

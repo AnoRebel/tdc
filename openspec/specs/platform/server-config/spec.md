@@ -110,6 +110,12 @@ Disabling a capability MUST NOT delete data belonging to it, so the change is re
 - **WHEN** a capability is disabled and later re-enabled
 - **THEN** the data it held is intact
 
+#### Scenario: Translation settings
+
+- **WHEN** an operator configures translation
+- **THEN** the `translation` toggle (on by default), the allowed providers and the per-person hourly limit change without a restart
+- **AND** the operator's LibreTranslate instance and the key that seals members' provider keys are configuration, redacted wherever configuration is shown
+
 ### Requirement: Configuration changes are auditable and safe
 
 Changing server configuration SHALL be recorded in the audit log with the actor and the previous and new values.
