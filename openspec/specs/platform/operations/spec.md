@@ -95,7 +95,7 @@ The replacement MUST happen in one transaction, so that a failure leaves the ser
 
 An administrator holding `server.restore` SHALL be able to restore settings, or all or chosen channels with their messages and files, from any archive that holds them.
 
-A selective restore MUST only add what is missing and MUST NOT overwrite existing rows, except settings, where the archive's value replaces the current one and the server's signing key is never changed. Rows whose required references are missing MUST be skipped, and the number skipped reported. Accounts, projects, the directory, integrations and the audit log MUST NOT be restorable partially, and the interface MUST say so and why.
+A selective restore MUST only add what is missing and MUST NOT overwrite existing rows, except settings, where the archive's value replaces the current one and the server's signing key is never changed. Rows whose required references are missing MUST be skipped, and the number skipped reported. Accounts, projects, the directory, integrations and the audit log MUST NOT be restorable partially into a server that already holds any of that part, and the interface MUST say so and why.
 
 #### Scenario: A deleted message comes back
 

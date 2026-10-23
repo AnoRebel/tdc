@@ -45,6 +45,12 @@ docker compose cp database:/tmp/tdc.dump ./before-upgrade.dump
 docker compose exec -T database rm /tmp/tdc.dump
 ```
 
+Or take one from the application — Settings → Backups, everything — and download
+it. Either works for going back; a dump is restored with Postgres's own tools,
+and an archive from the application is restored by the release that made it
+(an archive refuses a server at another schema version), so roll back the
+release first and then restore. See [hosting](hosting.md#backup).
+
 The reason is in the next section: a schema change is not automatically
 reversible, and the dump is what makes going back possible at all. It takes
 seconds on a community-sized database, and the one time it is needed it is the
@@ -158,7 +164,7 @@ served from, and the browser shows requests going somewhere unexpected.
 
 `docker compose up -d` recreates the container and therefore rereads it, so the
 ordinary upgrade is unaffected. It matters when web assets are replaced
-underneath a running server by any other route: restart the server afterwards.
+underneath a running server by any other route: reload or restart the server afterwards (Server settings, or `SIGHUP`).
 
 ## Upgrading Postgres itself
 

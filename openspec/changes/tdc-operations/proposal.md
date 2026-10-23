@@ -30,6 +30,6 @@ Neither of the manual procedures can take part of a server either: there is no w
 ## Impact
 
 - **Dependencies:** `filippo.io/age` (BSD-3-Clause) for encryption. Nothing else new.
-- **Schema:** a migration adding `backups`, `operations`, `server_nodes` and `maintenance`. None of the four is in any backup: they describe the server's operation, not its community.
+- **Schema:** migration 000429, adding `backups`, `operations`, `server_nodes` and `maintenance`. None of the four is in any backup: they describe the server's operation, not its community.
 - **Operators:** archives are spooled to a working directory before storage, so the disk needs room for one archive and the largest table. A full restore signs everybody out and requires a restart, which the interface offers.
 - **Security:** archives are never written unencrypted; the passphrase is never stored except where the operator put it in configuration for scheduled backups; every operation is permission-gated, rate-limited and audited before and after.
