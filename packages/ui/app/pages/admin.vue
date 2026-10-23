@@ -25,6 +25,7 @@ definePageMeta({ middleware: "auth", layout: "app" });
 useHead({ title: $ts("admin.serverSettings") });
 
 const admin = useServerAdmin();
+const { can } = useAuth();
 
 const error = ref<string | null>(null);
 const saving = ref<string | null>(null);
@@ -65,6 +66,7 @@ const groupTitles: Record<string, string> = {
   brand: $ts("admin.howThisServerLooks"),
   audit: $ts("moderation.auditLog"),
   accounts: $ts("names.adminGroup"),
+  backup: $ts("operations.title"),
 };
 
 /*
@@ -174,8 +176,10 @@ function bytes(value: number): string {
     </header>
 
     <div class="max-w-3xl space-y-8 px-4 py-6">
+      <OperationsServerControl v-if="can('server.restart')" @restarted="admin.refresh()" />
+
       <div
-        v-if="admin.failed.value"
+        v-if="admin.failed.value && !can('server.restart')"
         class="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/8 p-4"
         role="alert"
       >
@@ -190,7 +194,7 @@ function bytes(value: number): string {
         </div>
       </div>
 
-      <template v-else>
+      <template v-else-if="!admin.failed.value">
         <p
           v-if="error"
           class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"

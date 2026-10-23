@@ -4,6 +4,7 @@ import { isApiError } from "@tdc/types";
 import {
   ArrowLeft,
   Compass,
+  DatabaseBackup,
   Flag,
   KeyRound,
   LogOut,
@@ -685,6 +686,9 @@ function deviceName(userAgent: string): string {
           can('server.audit.read') ||
           can('moderation.review') ||
           can('server.configure') ||
+          can('server.restart') ||
+          can('server.backup') ||
+          can('server.restore') ||
           can('user.suspend') ||
           can('user.invite') ||
           can('role.manage') ||
@@ -694,12 +698,20 @@ function deviceName(userAgent: string): string {
         <h2 class="text-sm font-semibold">{{ $t("nav.administration") }}</h2>
         <div class="mt-3 flex flex-wrap gap-2">
           <NuxtLink
-            v-if="can('server.configure')"
+            v-if="can('server.configure') || can('server.restart')"
             :to="localeRoute({ name: 'admin' })"
             class="btn btn-outline"
           >
             <SlidersHorizontal class="size-3.5" />
             {{ $t("settings.serverSettings") }}
+          </NuxtLink>
+          <NuxtLink
+            v-if="can('server.backup') || can('server.restore')"
+            :to="localeRoute({ name: 'backups' })"
+            class="btn btn-outline"
+          >
+            <DatabaseBackup class="size-3.5" />
+            {{ $t("operations.title") }}
           </NuxtLink>
           <NuxtLink
             v-if="can('user.suspend') || can('user.invite')"
