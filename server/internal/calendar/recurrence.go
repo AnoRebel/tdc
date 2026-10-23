@@ -48,7 +48,7 @@ func NormaliseRule(rule string) (string, error) {
 	}
 	option, err := rrule.StrToROption(rule)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrRecurrence, err)
+		return "", fmt.Errorf("%w: %w", ErrRecurrence, err)
 	}
 	if err := supported(option); err != nil {
 		return "", err
@@ -107,7 +107,7 @@ type Occurrence struct {
 func (s Series) rule() (*rrule.RRule, error) {
 	option, err := rrule.StrToROptionInLocation(s.Rule, s.Zone)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRecurrence, err)
+		return nil, fmt.Errorf("%w: %w", ErrRecurrence, err)
 	}
 	option.Dtstart = s.Start.In(s.Zone)
 	return rrule.NewRRule(*option)
