@@ -46,6 +46,20 @@ An application MUST be restrictable to specific channels or projects.
 - **WHEN** an application is restricted to certain channels and attempts to act in another
 - **THEN** the action is refused
 
+### Requirement: Applications subscribe to events
+
+An application SHALL be able to subscribe an endpoint to events through the same outgoing subscriptions a person uses, held at every delivery to what its grant lets it read: a channel only if it is one of its own and its grant allows reading there; a project or an issue's discussion only if the application was made a member of the project; an event in no room only if its grant holds the permission that event needs.
+
+#### Scenario: A channel it was not given is refused
+
+- **WHEN** an application subscribes to a public channel it was not given
+- **THEN** the subscription is refused as not found
+
+#### Scenario: A server subscription hears only its channels
+
+- **WHEN** an application holding a server subscription is outside a channel where a message is posted
+- **THEN** nothing is delivered to it
+
 ### Requirement: Credentials
 
 Each application SHALL hold its own credentials, distinct from any user's, which are revocable independently and MUST be displayed only once at creation.

@@ -48,8 +48,71 @@ A subscription MUST be limited to events the subscribing user is permitted to se
 
 #### Scenario: Lost permission stops delivery
 
-- **WHEN** the subscribing user loses access to a channel
-- **THEN** delivery of that channel's events to their subscription stops
+- **WHEN** the subscribing user loses access to a channel or project
+- **THEN** delivery of its events to their subscription stops
+
+### Requirement: Subscription scopes
+
+An outgoing subscription SHALL listen to exactly one of: a channel, a project, or the whole server.
+
+A channel or project subscription MUST be refused, as though it did not exist, when its owner cannot read the channel or see the project. An event type MUST be refused where it cannot happen — an issue's events on a channel, a message's on a project — and a channel named as a project, or a project as a channel, MUST be refused. A server subscription MUST receive an event in a room only while its owner can read that room, checked when the event is queued and again when it is sent.
+
+#### Scenario: A project's events reach a subscriber who may see it
+
+- **WHEN** somebody who can see a project subscribes to it and an issue in it is filed, moved, closed, reopened or commented on
+- **THEN** each is delivered with the project and, for a comment, the issue named in the payload
+
+#### Scenario: A private project is not heard from outside
+
+- **WHEN** somebody outside a private project subscribes to it, or subscribes to the whole server
+- **THEN** the first is refused as not found, and the second receives nothing about the project
+
+#### Scenario: A server subscription hears only readable rooms
+
+- **WHEN** a private channel is made, or a message posted in it, by somebody else
+- **THEN** a server subscription whose owner is not in it receives nothing, while a public channel's creation reaches them
+
+#### Scenario: A type that cannot happen there is refused
+
+- **WHEN** a subscription asks for an issue's events on a channel, or a message's events on a project
+- **THEN** it is refused as a bad request
+
+### Requirement: Event catalogue
+
+The server SHALL publish the catalogue of event types a subscription can ask for, each with its group, the scopes it can be asked for in, any permission it needs, and whether the caller could ask for it now. Every type in the catalogue MUST be documented with what it carries.
+
+The catalogue MUST include messages, membership, channel lifecycle, calls, directory engagements, projects and their members and states, issues and their changes, cycles and milestones, and the server's people. A comment on an issue, an issue being closed and an issue being reopened MUST be offered as types of their own, named by the server from the event they are, and a subscriber asking for both names MUST receive both.
+
+Every event the server stores MUST be offered to subscriptions from the one place it is stored, so that no route that stores one can omit it.
+
+#### Scenario: Joins and leaves are delivered
+
+- **WHEN** somebody joins or leaves a channel with a subscription for those types
+- **THEN** both are delivered
+
+#### Scenario: The catalogue says what is available
+
+- **WHEN** somebody without a type's permission reads the catalogue
+- **THEN** that type is listed as not available to them
+
+### Requirement: Events that belong to no room
+
+The server SHALL deliver a new account and a change of somebody's role to server subscriptions whose owner holds `user.read.all`, checked when queued and again when sent. Such an event MUST NOT carry anybody's email address, and MUST NOT be asked for without the permission.
+
+#### Scenario: A new account is announced to whoever may read every account
+
+- **WHEN** an account is created
+- **THEN** a server subscription of somebody holding `user.read.all` receives it with the account's name and address, and no email address
+
+#### Scenario: Losing the permission stops it
+
+- **WHEN** a subscriber loses `user.read.all` and an account is then created
+- **THEN** nothing is delivered to them
+
+#### Scenario: Asking without the permission is refused
+
+- **WHEN** somebody without `user.read.all` subscribes to new accounts
+- **THEN** the subscription is refused as forbidden
 
 ### Requirement: Delivery signing
 

@@ -12,7 +12,15 @@ import {
   Webhook,
 } from "lucide-vue-next";
 
-import type { CreatedWebhook, Room, WebhookHistory, WebhookSubscription } from "@tdc/types";
+import type {
+  CreatedWebhook,
+  Project,
+  Room,
+  WebhookEventType,
+  WebhookHistory,
+  WebhookScope,
+  WebhookSubscription,
+} from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
@@ -23,7 +31,8 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { howLongAgo, onDayAtTime } from "#layers/ui/app/lib/dates";
 
 /**
- * Outgoing webhooks: an endpoint told about a channel's events as they happen.
+ * Outgoing webhooks: an endpoint told about a channel's, a project's or the
+ * whole server's events as they happen.
  *
  * Everything an owner needs to answer "is it working?" without reading a log:
  * whether the subscription is on, how many attempts have failed since the last
@@ -34,10 +43,12 @@ import { howLongAgo, onDayAtTime } from "#layers/ui/app/lib/dates";
 const { $t, $ts } = useI18n();
 const integrations = useIntegrations();
 const rooms = useRooms();
+const projectsApi = useProjects();
 
 const subscriptions = ref<WebhookSubscription[]>([]);
 const channels = ref<Room[]>([]);
-const eventTypes = ref<string[]>([]);
+const projects = ref<Project[]>([]);
+const catalogue = ref<WebhookEventType[]>([]);
 const loading = ref(true);
 const error = ref<string | null>(null);
 
@@ -55,16 +66,19 @@ const removing = ref<WebhookSubscription | null>(null);
 async function refresh() {
   error.value = null;
   try {
-    const [owned, visible, types] = await Promise.all([
+    const [owned, visible, types, readable] = await Promise.all([
       integrations.webhooks(),
       rooms.list(),
       integrations.eventTypes(),
+      // A server without projects answers with an error; it has none to offer.
+      projectsApi.list().catch(() => [] as Project[]),
     ]);
     subscriptions.value = owned;
     // Channels only: a direct conversation is not something to point a
     // program at, and the server refuses nothing it could not read anyway.
     channels.value = visible.filter((room) => room.kind === "channel" && !room.archived);
-    eventTypes.value = types.eventTypes;
+    projects.value = readable;
+    catalogue.value = types.catalogue;
   } catch (cause) {
     error.value = isApiError(cause) ? cause.message : $ts("integrations.couldNotLoad");
   } finally {
@@ -74,10 +88,42 @@ async function refresh() {
 
 onMounted(() => void refresh());
 
-function channelName(roomId: string): string {
-  const room = channels.value.find((candidate) => candidate.id === roomId);
+/** What a subscription listens to, as a person reads it. */
+function targetName(subscription: WebhookSubscription): string {
+  if (subscription.scope === "server") return $ts("integrations.wholeServer");
+  if (subscription.scope === "project") {
+    const project = projects.value.find((candidate) => candidate.id === subscription.projectId);
+    return project ? `${project.key} · ${project.name}` : $ts("integrations.aProject");
+  }
+  const room = channels.value.find((candidate) => candidate.id === subscription.roomId);
   return room ? `#${room.name}` : $ts("integrations.aChannel");
 }
+
+/** A type's key under the catalogue's translations: message.sent → message_sent. */
+function typeKey(name: string): string {
+  return name.replaceAll(".", "_");
+}
+
+/** The types that can happen where the form is pointed, in their groups. */
+function groupsFor(scope: WebhookScope): { group: string; types: WebhookEventType[] }[] {
+  const groups: { group: string; types: WebhookEventType[] }[] = [];
+  for (const kind of catalogue.value) {
+    if (!kind.scopes.includes(scope)) continue;
+    let entry = groups.find((candidate) => candidate.group === kind.group);
+    if (!entry) {
+      entry = { group: kind.group, types: [] };
+      groups.push(entry);
+    }
+    entry.types.push(kind);
+  }
+  return groups;
+}
+
+const scopeOptions = computed(() => [
+  { value: "channel", label: $ts("integrations.scopeChannel") },
+  { value: "project", label: $ts("integrations.scopeProject") },
+  { value: "server", label: $ts("integrations.scopeServer") },
+]);
 
 async function toggleHistory(subscription: WebhookSubscription) {
   if (open.value === subscription.id) {
@@ -133,7 +179,8 @@ const schema = v.object({
     v.minLength(1, $ts("integrations.labelRequired")),
     v.maxLength(80, $ts("integrations.labelTooLong")),
   ),
-  roomId: v.pipe(v.string(), v.minLength(1, $ts("integrations.channelRequired"))),
+  scope: v.picklist(["channel", "project", "server"]),
+  target: v.string(),
   url: v.pipe(
     v.string(),
     v.trim(),
@@ -143,13 +190,42 @@ const schema = v.object({
   eventTypes: v.pipe(v.array(v.string()), v.minLength(1, $ts("integrations.eventTypeRequired"))),
 });
 
+/*
+ * What it listens to must be named, unless it is the whole server — said on the
+ * field that names it, in the words for what is missing.
+ */
+const schemaWithTarget = v.pipe(
+  schema,
+  v.forward(
+    v.partialCheck(
+      [["scope"], ["target"]],
+      (input) => input.scope === "server" || input.target.length > 0,
+      $ts("integrations.targetRequired"),
+    ),
+    ["target"],
+  ),
+);
+
 const form = useForm({
-  defaultValues: { label: "", roomId: "", url: "", eventTypes: ["message.sent"] as string[] },
-  validators: { onSubmit: schema },
+  defaultValues: {
+    label: "",
+    scope: "channel" as WebhookScope,
+    target: "",
+    url: "",
+    eventTypes: ["message.sent"] as string[],
+  },
+  validators: { onSubmit: schemaWithTarget },
   async onSubmit({ value }) {
     error.value = null;
     try {
-      created.value = await integrations.subscribe(value);
+      created.value = await integrations.subscribe({
+        scope: value.scope,
+        roomId: value.scope === "channel" ? value.target : undefined,
+        projectId: value.scope === "project" ? value.target : undefined,
+        label: value.label,
+        url: value.url,
+        eventTypes: value.eventTypes,
+      });
       form.reset();
       await refresh();
     } catch (cause) {
@@ -163,6 +239,23 @@ function firstError(field: AnyFieldApi): string | undefined {
   const [issue] = field.state.meta.errors;
   if (!issue) return undefined;
   return typeof issue === "string" ? issue : (issue as { message?: string }).message;
+}
+
+/*
+ * Pointing the form somewhere else forgets what it was pointed at, and the
+ * types that cannot happen there — rather than sending a choice the server
+ * would refuse.
+ */
+function changeScope(scope: WebhookScope) {
+  form.setFieldValue("scope", scope);
+  form.setFieldValue("target", "");
+  const possible = new Set(
+    catalogue.value.filter((kind) => kind.scopes.includes(scope)).map((kind) => kind.name),
+  );
+  form.setFieldValue(
+    "eventTypes",
+    form.getFieldValue("eventTypes").filter((kind) => possible.has(kind)),
+  );
 }
 
 function toggleType(field: AnyFieldApi, kind: string, on: boolean) {
@@ -247,7 +340,7 @@ function toggleType(field: AnyFieldApi, kind: string, on: boolean) {
               {{ subscription.url }}
             </p>
             <p class="mt-0.5 text-xs text-muted-foreground">
-              {{ channelName(subscription.roomId) }} · {{ subscription.eventTypes.join(", ") }}
+              {{ targetName(subscription) }} · {{ subscription.eventTypes.join(", ") }}
             </p>
           </div>
 
@@ -363,27 +456,68 @@ function toggleType(field: AnyFieldApi, kind: string, on: boolean) {
         </template>
       </form.Field>
 
-      <form.Field name="roomId">
+      <form.Field name="scope">
         <template #default="{ field }">
-          <Field :label="$ts('integrations.channel')" :error="firstError(field)" required>
+          <Field :label="$ts('integrations.listensTo')" :hint="$ts('integrations.listensToHint')">
             <template #default="{ id }">
               <Select
                 :id="id"
-                :model-value="field.state.value || undefined"
-                :label="$ts('integrations.channel')"
-                :placeholder="$ts('integrations.chooseChannel')"
-                :options="channels.map((room) => ({ value: room.id, label: `#${room.name}` }))"
-                @update:model-value="
-                  (value) => {
-                    field.handleChange(String(value ?? ''));
-                    field.handleBlur();
-                  }
-                "
+                :model-value="field.state.value"
+                :label="$ts('integrations.listensTo')"
+                :options="scopeOptions"
+                @update:model-value="(value) => changeScope(value as WebhookScope)"
               />
             </template>
           </Field>
         </template>
       </form.Field>
+
+      <form.Subscribe :selector="(state) => ({ scope: state.values.scope })">
+        <template #default="{ scope }">
+          <form.Field v-if="scope !== 'server'" name="target">
+            <template #default="{ field }">
+              <Field
+                :label="
+                  scope === 'project' ? $ts('integrations.project') : $ts('integrations.channel')
+                "
+                :error="firstError(field)"
+                required
+              >
+                <template #default="{ id }">
+                  <Select
+                    :id="id"
+                    :model-value="field.state.value || undefined"
+                    :label="
+                      scope === 'project'
+                        ? $ts('integrations.project')
+                        : $ts('integrations.channel')
+                    "
+                    :placeholder="
+                      scope === 'project'
+                        ? $ts('integrations.chooseProject')
+                        : $ts('integrations.chooseChannel')
+                    "
+                    :options="
+                      scope === 'project'
+                        ? projects.map((project) => ({
+                            value: project.id,
+                            label: `${project.key} · ${project.name}`,
+                          }))
+                        : channels.map((room) => ({ value: room.id, label: `#${room.name}` }))
+                    "
+                    @update:model-value="
+                      (value) => {
+                        field.handleChange(String(value ?? ''));
+                        field.handleBlur();
+                      }
+                    "
+                  />
+                </template>
+              </Field>
+            </template>
+          </form.Field>
+        </template>
+      </form.Subscribe>
 
       <form.Field name="url">
         <template #default="{ field }">
@@ -414,20 +548,50 @@ function toggleType(field: AnyFieldApi, kind: string, on: boolean) {
         <template #default="{ field }">
           <fieldset>
             <legend class="mb-1.5 text-sm font-medium">{{ $t("integrations.eventTypes") }}</legend>
-            <div class="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-              <!-- eslint-disable-next-line vuejs-accessibility/label-has-for -- the checkbox is a component, which the rule cannot see inside -->
-              <label
-                v-for="kind in eventTypes"
-                :key="kind"
-                class="flex items-center gap-2 font-mono text-xs"
-              >
-                <Checkbox
-                  :model-value="(field.state.value as string[]).includes(kind)"
-                  @update:model-value="(on: boolean) => toggleType(field, kind, on)"
-                />
-                {{ kind }}
-              </label>
-            </div>
+            <form.Subscribe :selector="(state) => ({ scope: state.values.scope })">
+              <template #default="{ scope }">
+                <div class="space-y-3">
+                  <fieldset v-for="entry in groupsFor(scope)" :key="entry.group">
+                    <legend class="mb-1 text-xs font-medium text-muted-foreground">
+                      {{ $t(`integrations.eventGroups.${entry.group}`) }}
+                    </legend>
+                    <div class="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                      <!-- eslint-disable-next-line vuejs-accessibility/label-has-for -- the checkbox is a component, which the rule cannot see inside -->
+                      <label
+                        v-for="kind in entry.types"
+                        :key="kind.name"
+                        class="flex items-start gap-2 text-xs"
+                        :class="kind.available ? '' : 'opacity-60'"
+                        :data-event-type="kind.name"
+                      >
+                        <Checkbox
+                          class="mt-0.5"
+                          :disabled="!kind.available"
+                          :model-value="(field.state.value as string[]).includes(kind.name)"
+                          @update:model-value="(on: boolean) => toggleType(field, kind.name, on)"
+                        />
+                        <span class="min-w-0">
+                          <span class="block">{{
+                            $t(`integrations.eventDescriptions.${typeKey(kind.name)}`)
+                          }}</span>
+                          <span class="block font-mono text-[0.6875rem] text-muted-foreground">
+                            {{ kind.name }}
+                          </span>
+                          <span
+                            v-if="!kind.available && kind.permission"
+                            class="block text-[0.6875rem] text-muted-foreground"
+                          >
+                            {{
+                              $t("integrations.needsPermission", { permission: kind.permission })
+                            }}
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  </fieldset>
+                </div>
+              </template>
+            </form.Subscribe>
             <p v-if="firstError(field)" class="mt-1 text-xs text-destructive" role="alert">
               {{ firstError(field) }}
             </p>

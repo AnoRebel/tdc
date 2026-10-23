@@ -11,9 +11,12 @@ request described here carries. Examples run against `http://localhost:8080`.
 
 ## Outgoing webhooks
 
-An outgoing webhook sends a channel's events to an endpoint you choose, as they
-happen. It belongs to the person who makes it: it can only be made for a channel
-they can read, and it stops delivering the moment they cannot.
+An outgoing webhook sends events to an endpoint you choose, as they happen. It
+listens to one of three things: a **channel**, a **project**, or the whole
+**server**. It belongs to the person — or the [application](#applications) —
+who makes it: it can only be made for what they can read, every event is
+checked against what they can read when it is queued and again when it is sent,
+and it stops delivering the moment they cannot.
 
 ![Outgoing webhooks in Settings → Integrations: an active webhook on the golang channel with its endpoint and events, and the form for a new one with a label, a channel, an endpoint and the events to send](images/webhooks-and-apps/outgoing.webp)
 
@@ -53,20 +56,56 @@ curl -X POST http://localhost:8080/api/me/webhooks \
 your receiver now. Nobody can retrieve it later, including you — a lost one is
 replaced by making a new webhook.
 
+A project subscription names the project instead of a channel, and a server
+subscription names nothing:
+
+```sh
+curl -X POST http://localhost:8080/api/me/webhooks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scope": "project",
+    "projectId": "'"$PROJECT"'",
+    "label": "Tracker bridge",
+    "url": "https://tracker.example.test/hooks/tdc",
+    "eventTypes": ["issue.created", "issue.closed", "issue.commented"]
+  }'
+
+curl -X POST http://localhost:8080/api/me/webhooks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scope": "server",
+    "label": "Welcome bot",
+    "url": "https://welcome.example.test/hooks/tdc",
+    "eventTypes": ["account.created", "member.joined"]
+  }'
+```
+
+`scope` is `channel` (the default, with `roomId`), `project` (with `projectId`)
+or `server` (with neither). A **server** subscription hears an event in any
+room its owner can read at that moment — every public channel, the private
+channels and conversations they are in, the projects they can see — and
+nothing from the rest. It is the way to hear about a channel being created,
+which cannot be subscribed to before it exists, and the only way to hear the
+two events that belong to no room at all.
+
 What can go wrong when subscribing, and what each looks like:
 
-| Answer  | Why                                                                        |
-| ------- | -------------------------------------------------------------------------- |
-| **404** | The channel does not exist, or you cannot read it — the two look the same  |
-| **403** | The endpoint is on a private network, which the server does not deliver to |
-| **400** | An unknown event type, no event types, no label, or not an http(s) address |
+| Answer  | Why                                                                                                       |
+| ------- | --------------------------------------------------------------------------------------------------------- |
+| **404** | The channel or project does not exist, or you cannot read it — the two look the same                      |
+| **403** | The endpoint is on a private network, or a type needs a permission you do not hold                        |
+| **400** | An unknown type, a type that cannot happen where you asked, no types, no label, or not an http(s) address |
 
-`GET /api/webhooks/event-types` lists what can be asked for. Today:
-`message.sent`, `message.edited`, `message.deleted`, `message.updated`,
-`action.pressed`, `member.joined`, `member.left`, `member.removed`,
-`room.renamed`, `room.archived`, `room.restored` and
-`room.visibility_changed` — everything somebody
-reading a channel sees happen in it, and nothing they do not.
+A type that cannot happen where you asked is an issue's on a channel, a
+message's on a project, or a channel named as a project.
+
+`GET /api/webhooks/event-types` lists what can be asked for: `eventTypes`, the
+names, and `catalogue`, each with its `group`, the `scopes` it can be asked for
+in, the `permission` it needs if any, and `available` — whether you could ask
+for it now. The [event catalogue](#the-event-catalogue) below is the same list,
+with what each carries.
 
 `GET /api/me/webhooks` lists yours, never with secrets. `DELETE
 /api/me/webhooks/{id}` removes one with its history. The interface for all of
@@ -98,13 +137,23 @@ the event type:
 }
 ```
 
-| Field            | Meaning                                                                 |
-| ---------------- | ----------------------------------------------------------------------- |
-| `version`        | The payload version this subscription was made against                  |
-| `id`             | This delivery — the same as `TDC-Delivery`, and the same across retries |
-| `occurredAt`     | When the event happened, RFC 3339 in UTC                                |
-| `event`          | The event as the timeline gives it; `createdAt` is epoch milliseconds   |
-| `event.sequence` | The event's position in its room, which is how to recover order         |
+| Field            | Meaning                                                                  |
+| ---------------- | ------------------------------------------------------------------------ |
+| `version`        | The payload version this subscription was made against                   |
+| `id`             | This delivery — the same as `TDC-Delivery`, and the same across retries  |
+| `occurredAt`     | When the event happened, RFC 3339 in UTC                                 |
+| `event`          | The event as the timeline gives it; `createdAt` is epoch milliseconds    |
+| `event.sequence` | The event's position in its room, which is how to recover order          |
+| `room`           | Where it happened; absent only for an event in no room                   |
+| `project`        | `{id, key}`, for an event in a project or one of its issues' discussions |
+| `issue`          | `{id, key}`, for a comment in an issue's discussion                      |
+
+`type` is what you asked for and `event.type` what was stored, and they differ
+for the three names the server gives an event by reading it: `issue.commented`
+carries the `message.sent` it is, and `issue.closed` and `issue.reopened` the
+`issue.state_changed`. Ask for both names and you are sent both, with one
+`event.id`. An event in no room has an `event.id` of its own, the same for every
+subscription it reaches, and no `sequence`.
 
 **Answer 2xx to accept.** Anything else — including a 3xx, since redirects are
 never followed — is a failure and is retried. Answer quickly: an attempt that
@@ -120,6 +169,155 @@ sent one at a time, oldest first, so ordinarily they arrive in order. But a
 failing delivery does not hold back the ones behind it — otherwise one bad
 payload would stall everything after it for a day — so after a retry, events
 can arrive out of order. Use `event.sequence` when order matters.
+
+### The event catalogue
+
+Every type a subscription can ask for. **Where** is what it can be asked for
+on: **C** a channel, **P** a project, **S** the server. **Needs** is what the
+subscription's owner must have, checked when it is queued and again when it is
+sent: to read the room it happened in — the channel, the project (by being in
+it, or its being public), the issue — or, for an event in no room, a permission
+held server-wide.
+
+| Type                        | Where | What it is                                                                                  | Needs                                              |
+| --------------------------- | ----- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `message.sent`              | C S   | A message, a reply in a thread, a forward                                                   | Reading the room                                   |
+| `message.edited`            | C S   | A message changed; `content.replaces` names it                                              | Reading the room                                   |
+| `message.deleted`           | C S   | A message taken down                                                                        | Reading the room                                   |
+| `message.updated`           | C S   | A program replaced its message's text or controls                                           | Reading the room                                   |
+| `action.pressed`            | C S   | Somebody pressed a button on a message                                                      | Reading the room                                   |
+| `member.joined`             | C S   | Somebody joined, or was invited — `content.invitedBy` says by whom                          | Reading the room                                   |
+| `member.left`               | C S   | Somebody left                                                                               | Reading the room                                   |
+| `member.removed`            | C S   | Somebody was removed                                                                        | Reading the room                                   |
+| `room.created`              | S     | A channel was made                                                                          | Reading it: a private one reaches its members only |
+| `room.renamed`              | C S   | Its name or topic changed                                                                   | Reading the room                                   |
+| `room.archived`             | C S   | It was archived                                                                             | Reading the room                                   |
+| `room.restored`             | C S   | It was brought back                                                                         | Reading the room                                   |
+| `room.visibility_changed`   | C S   | It was made public or private                                                               | Reading the room                                   |
+| `call.started`              | C S   | A call began in the conversation                                                            | Reading the room                                   |
+| `call.ended`                | C S   | It ended; who was in it is not recorded                                                     | Reading the room                                   |
+| `engagement.changed`        | C S   | A directory engagement moved on, in its own conversation                                    | Being in that conversation                         |
+| `project.created`           | S     | A project was started                                                                       | Seeing the project                                 |
+| `project.updated`           | P S   | Its name, description or visibility changed, each as `previous` and `new`                   | Seeing the project                                 |
+| `project.member_added`      | P S   | Somebody was added, or their role changed                                                   | Seeing the project                                 |
+| `project.member_removed`    | P S   | Somebody was taken out                                                                      | Seeing the project                                 |
+| `project.state_added`       | P S   | A state was added to its workflow                                                           | Seeing the project                                 |
+| `project.state_changed`     | P S   | A state was renamed or moved                                                                | Seeing the project                                 |
+| `project.state_removed`     | P S   | A state was removed                                                                         | Seeing the project                                 |
+| `issue.created`             | P S   | An issue was filed                                                                          | Seeing the project                                 |
+| `issue.title_changed`       | P S   | Its title changed                                                                           | Seeing the project                                 |
+| `issue.description_changed` | P S   | Its description changed                                                                     | Seeing the project                                 |
+| `issue.state_changed`       | P S   | It moved between states; `completed` and `wasCompleted` say whether each is a finishing one | Seeing the project                                 |
+| `issue.closed`              | P S   | It moved into a finishing state from one that is not                                        | Seeing the project                                 |
+| `issue.reopened`            | P S   | It moved out of a finishing state                                                           | Seeing the project                                 |
+| `issue.commented`           | P S   | A message in its discussion                                                                 | Seeing the issue                                   |
+| `issue.assigned`            | P S   | Somebody was assigned                                                                       | Seeing the project                                 |
+| `issue.unassigned`          | P S   | Somebody was unassigned                                                                     | Seeing the project                                 |
+| `issue.labeled`             | P S   | A label was put on it                                                                       | Seeing the project                                 |
+| `issue.unlabeled`           | P S   | A label was taken off                                                                       | Seeing the project                                 |
+| `issue.priority_changed`    | P S   | Its priority changed                                                                        | Seeing the project                                 |
+| `issue.related`             | P S   | It was linked to another issue                                                              | Seeing the project                                 |
+| `issue.unrelated`           | P S   | A link was removed                                                                          | Seeing the project                                 |
+| `issue.deleted`             | P S   | It was deleted                                                                              | Seeing the project                                 |
+| `issue.cycle_changed`       | P S   | It was moved into, out of or between cycles                                                 | Seeing the project                                 |
+| `issue.milestone_changed`   | P S   | It was counted towards another milestone, or none                                           | Seeing the project                                 |
+| `project.cycle_added`       | P S   | A cycle was planned                                                                         | Seeing the project                                 |
+| `project.cycle_changed`     | P S   | Its name or dates changed                                                                   | Seeing the project                                 |
+| `project.cycle_ended`       | P S   | It ended, saying what became of each unfinished issue; sent by the server                   | Seeing the project                                 |
+| `project.cycle_removed`     | P S   | It was removed                                                                              | Seeing the project                                 |
+| `project.milestone_added`   | P S   | A milestone was set                                                                         | Seeing the project                                 |
+| `project.milestone_changed` | P S   | Its name or target date changed                                                             | Seeing the project                                 |
+| `project.milestone_removed` | P S   | It was removed                                                                              | Seeing the project                                 |
+| `account.created`           | S     | A new account on the server                                                                 | `user.read.all`                                    |
+| `account.role_changed`      | S     | Somebody was given a role or had one taken away                                             | `user.read.all`                                    |
+
+Every issue event's `content` carries `issue` and `key` (`WEB-12`), and a change
+carries `field`, `previous` and `new`. **Settings → Integrations** offers them in
+the same groups: messages, members, channels, calls, the directory, projects,
+issues, planning and people. A feature that adds events of its own adds a group,
+and nothing about the ones here changes.
+
+A comment, as a project subscription receives it:
+
+```json
+{
+  "version": 1,
+  "id": "0199f7b2-…",
+  "type": "issue.commented",
+  "occurredAt": "2026-10-13T09:02:11.4Z",
+  "subscription": "0199f7a0-…",
+  "server": "chat.example.org",
+  "room": { "id": "7d0e…", "address": "7d0e…@chat.example.org" },
+  "project": { "id": "3b9a…", "key": "WEB" },
+  "issue": { "id": "7d0e…", "key": "WEB-12" },
+  "event": {
+    "id": "$Pq8…",
+    "type": "message.sent",
+    "sequence": 4,
+    "sender": "juma@chat.example.org",
+    "content": { "body": "Profiling shows the linker" },
+    "createdAt": 1791882131400
+  }
+}
+```
+
+An issue closing, with the fields every delivery carries left out:
+
+```json
+{
+  "type": "issue.closed",
+  "room": { "id": "3b9a…", "address": "3b9a…@chat.example.org" },
+  "project": { "id": "3b9a…", "key": "WEB" },
+  "event": {
+    "type": "issue.state_changed",
+    "sender": "amina@chat.example.org",
+    "content": {
+      "issue": "7d0e…",
+      "key": "WEB-12",
+      "field": "state",
+      "previousName": "In progress",
+      "newName": "Done",
+      "completed": true,
+      "wasCompleted": false
+    }
+  }
+}
+```
+
+A new account — no room, and no email address, ever:
+
+```json
+{
+  "version": 1,
+  "id": "0199f7c4-…",
+  "type": "account.created",
+  "occurredAt": "2026-10-13T09:05:40.1Z",
+  "subscription": "0199f7c0-…",
+  "server": "chat.example.org",
+  "event": {
+    "id": "$5c1f…",
+    "type": "account.created",
+    "sender": "chat.example.org",
+    "content": {
+      "account": {
+        "id": "a41e…",
+        "username": "neema",
+        "address": "neema@chat.example.org",
+        "displayName": "Neema"
+      }
+    },
+    "createdAt": 1791882340100
+  }
+}
+```
+
+`account.role_changed` carries the same `account`, the `role` as `{id, name}`,
+and `change`, `assigned` or `removed`; its `sender` is whoever made the change.
+
+Not in the catalogue, because they are not events in any log: reactions, pins,
+a directory agreement being signed, and an invitation to the server, which names
+an email address. An invitation into a channel is the `member.joined` it
+produces.
 
 ### Versions
 
@@ -244,10 +442,13 @@ commits and deliver a tenth as much.
 ### When access is lost
 
 Every delivery checks, at the moment it is sent, that the subscription's owner
-can still read the channel. Somebody removed from a private channel stops being
-told about it immediately — including about events that happened before they
-left and were still waiting. The subscription and its history are kept, marked
-with `accessLost`; deliveries resume if they regain access.
+can still read the room the event happened in — or, for an event in no room,
+still holds the permission it needs. Somebody removed from a private channel or
+project stops being told about it immediately — including about events that
+happened before they left and were still waiting. The subscription and its
+history are kept, marked with `accessLost`; deliveries resume if they regain
+access. A server subscription is not marked for a room its owner never could
+read: it simply hears nothing from there.
 
 ## Incoming webhooks
 
@@ -600,6 +801,26 @@ delivered, given up or cancelled — with how many attempts each took and the la
 status the address gave. The address's host is listed with the installed
 application for everybody, because where a press goes is part of what an
 application sends off the server.
+
+### Being told about events at an address
+
+An application subscribes to events exactly as a person does, with its own
+credential, through `POST /api/me/webhooks` — the same scopes, payloads,
+signing, retries and history. What it may be told is held to what it may read,
+by its rule rather than a person's:
+
+- **A channel** must be one of its own, with `channel.read` granted there. A
+  public channel it was not given is refused with **404**, and a server
+  subscription hears nothing from it.
+- **A project** must be one it was made a member of, by somebody who runs the
+  project (`PUT /api/projects/{key}/members/{its username}`); being public is
+  not enough, as it is not for a channel. Its issues' discussions follow.
+- **An event in no room** needs the permission in its grant — `user.read.all`
+  for `account.created` and `account.role_changed`.
+
+Over its live connection it hears its channels' events as they happen,
+including calls, joins and engagement changes; project and server events come
+only by subscription.
 
 ### Credentials, and rotating them
 

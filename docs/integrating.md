@@ -1106,10 +1106,12 @@ Bun.serve({
 
 ### Outgoing webhooks
 
-A webhook sends a channel's events to your endpoint as they happen, signed as
+A webhook sends a channel's, a project's or the whole server's events —
+messages, joins, calls, issues, milestones, new accounts — to your endpoint as
+they happen, signed as
 above, retried with backoff when your endpoint fails, and turned off — with its
 owner told — when it keeps failing. Subscribing, the payload and its versions,
-retries, limits and the delivery history are all in
+retries, limits, the delivery history and the full event catalogue are all in
 [Webhooks and applications](webhooks-and-apps.md#outgoing-webhooks).
 
 ### Incoming webhooks

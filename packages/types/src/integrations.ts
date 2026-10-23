@@ -97,7 +97,12 @@ export interface WebhookSubscription {
   id: string;
   label: string;
   url: string;
-  roomId: string;
+  /** What it listens to: one channel, one project, or the whole server. */
+  scope: WebhookScope;
+  /** The channel, or the project's stream; absent for the server. */
+  roomId?: string;
+  /** Set for a project subscription. */
+  projectId?: string;
   eventTypes: string[];
   payloadVersion: number;
   state: "active" | "disabled";
@@ -267,8 +272,27 @@ export interface GrantablePermission {
   administrative: boolean;
 }
 
+/** What a subscription listens to. */
+export type WebhookScope = "channel" | "project" | "server";
+
+/** One type a subscription may ask for, as the catalogue describes it. */
+export interface WebhookEventType {
+  name: string;
+  /** What it is about: messages, members, channels, issues, people... */
+  group: string;
+  /** Where it can be asked for. */
+  scopes: WebhookScope[];
+  /** A server permission it needs, for an event that belongs to no room. */
+  permission?: string;
+  /** Named by the server from another event, as a comment is from a message. */
+  derived?: boolean;
+  /** Whether the caller could ask for it now. */
+  available: boolean;
+}
+
 /** What a subscription may ask for. */
 export interface WebhookEventTypes {
   eventTypes: string[];
+  catalogue: WebhookEventType[];
   payloadVersion: number;
 }
