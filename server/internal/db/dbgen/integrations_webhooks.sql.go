@@ -115,20 +115,21 @@ func (q *Queries) CompleteWebhookDelivery(ctx context.Context, arg CompleteWebho
 }
 
 const createWebhookSubscription = `-- name: CreateWebhookSubscription :one
-INSERT INTO webhook_subscriptions (id, owner_id, room_id, label, url, secret, event_types, payload_version)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at
+INSERT INTO webhook_subscriptions (id, owner_id, room_id, label, url, secret, event_types, payload_version, scope)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at, scope
 `
 
 type CreateWebhookSubscriptionParams struct {
 	ID             uuid.UUID
 	OwnerID        uuid.UUID
-	RoomID         uuid.UUID
+	RoomID         *uuid.UUID
 	Label          string
 	Url            string
 	Secret         string
 	EventTypes     []string
 	PayloadVersion int32
+	Scope          string
 }
 
 func (q *Queries) CreateWebhookSubscription(ctx context.Context, arg CreateWebhookSubscriptionParams) (WebhookSubscription, error) {
@@ -141,6 +142,7 @@ func (q *Queries) CreateWebhookSubscription(ctx context.Context, arg CreateWebho
 		arg.Secret,
 		arg.EventTypes,
 		arg.PayloadVersion,
+		arg.Scope,
 	)
 	var i WebhookSubscription
 	err := row.Scan(
@@ -161,12 +163,13 @@ func (q *Queries) CreateWebhookSubscription(ctx context.Context, arg CreateWebho
 		&i.AccessLostAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Scope,
 	)
 	return i, err
 }
 
 const deleteWebhookSubscription = `-- name: DeleteWebhookSubscription :one
-DELETE FROM webhook_subscriptions WHERE id = $1 AND owner_id = $2 RETURNING id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at
+DELETE FROM webhook_subscriptions WHERE id = $1 AND owner_id = $2 RETURNING id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at, scope
 `
 
 type DeleteWebhookSubscriptionParams struct {
@@ -196,6 +199,7 @@ func (q *Queries) DeleteWebhookSubscription(ctx context.Context, arg DeleteWebho
 		&i.AccessLostAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Scope,
 	)
 	return i, err
 }
@@ -204,7 +208,7 @@ const disableWebhookSubscription = `-- name: DisableWebhookSubscription :one
 UPDATE webhook_subscriptions
 SET state = 'disabled', disabled_at = now(), disabled_reason = $2, updated_at = now()
 WHERE id = $1 AND state = 'active'
-RETURNING id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at
+RETURNING id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at, scope
 `
 
 type DisableWebhookSubscriptionParams struct {
@@ -235,6 +239,7 @@ func (q *Queries) DisableWebhookSubscription(ctx context.Context, arg DisableWeb
 		&i.AccessLostAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Scope,
 	)
 	return i, err
 }
@@ -244,7 +249,7 @@ UPDATE webhook_subscriptions
 SET state = 'active', disabled_at = NULL, disabled_reason = NULL,
     consecutive_failures = 0, updated_at = now()
 WHERE id = $1 AND owner_id = $2
-RETURNING id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at
+RETURNING id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at, scope
 `
 
 type EnableWebhookSubscriptionParams struct {
@@ -274,6 +279,7 @@ func (q *Queries) EnableWebhookSubscription(ctx context.Context, arg EnableWebho
 		&i.AccessLostAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Scope,
 	)
 	return i, err
 }
@@ -383,7 +389,7 @@ func (q *Queries) FinishWebhookAttempt(ctx context.Context, arg FinishWebhookAtt
 }
 
 const getWebhookSubscription = `-- name: GetWebhookSubscription :one
-SELECT id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at FROM webhook_subscriptions WHERE id = $1
+SELECT id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at, scope FROM webhook_subscriptions WHERE id = $1
 `
 
 func (q *Queries) GetWebhookSubscription(ctx context.Context, id uuid.UUID) (WebhookSubscription, error) {
@@ -407,16 +413,62 @@ func (q *Queries) GetWebhookSubscription(ctx context.Context, id uuid.UUID) (Web
 		&i.AccessLostAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Scope,
 	)
 	return i, err
 }
 
+const listActiveServerWebhookSubscriptions = `-- name: ListActiveServerWebhookSubscriptions :many
+SELECT id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at, scope FROM webhook_subscriptions
+WHERE scope = 'server' AND state = 'active' AND $1::text = ANY(event_types)
+`
+
+// Server-wide subscriptions that asked for this type, wherever it happened.
+func (q *Queries) ListActiveServerWebhookSubscriptions(ctx context.Context, eventType string) ([]WebhookSubscription, error) {
+	rows, err := q.db.Query(ctx, listActiveServerWebhookSubscriptions, eventType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WebhookSubscription{}
+	for rows.Next() {
+		var i WebhookSubscription
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.RoomID,
+			&i.Label,
+			&i.Url,
+			&i.Secret,
+			&i.EventTypes,
+			&i.PayloadVersion,
+			&i.State,
+			&i.DisabledAt,
+			&i.DisabledReason,
+			&i.ConsecutiveFailures,
+			&i.RateLimitedCount,
+			&i.LastRateLimitedAt,
+			&i.AccessLostAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Scope,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActiveWebhookSubscriptionsForRoom = `-- name: ListActiveWebhookSubscriptionsForRoom :many
-SELECT id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at FROM webhook_subscriptions WHERE room_id = $1 AND state = 'active'
+SELECT id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at, scope FROM webhook_subscriptions WHERE room_id = $1 AND state = 'active'
 `
 
 // What an event in this room might need delivering to.
-func (q *Queries) ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roomID uuid.UUID) ([]WebhookSubscription, error) {
+func (q *Queries) ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roomID *uuid.UUID) ([]WebhookSubscription, error) {
 	rows, err := q.db.Query(ctx, listActiveWebhookSubscriptionsForRoom, roomID)
 	if err != nil {
 		return nil, err
@@ -443,6 +495,7 @@ func (q *Queries) ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roo
 			&i.AccessLostAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Scope,
 		); err != nil {
 			return nil, err
 		}
@@ -566,7 +619,7 @@ func (q *Queries) ListWebhookHistory(ctx context.Context, arg ListWebhookHistory
 }
 
 const listWebhookSubscriptionsForOwner = `-- name: ListWebhookSubscriptionsForOwner :many
-SELECT id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at FROM webhook_subscriptions WHERE owner_id = $1 ORDER BY created_at DESC
+SELECT id, owner_id, room_id, label, url, secret, event_types, payload_version, state, disabled_at, disabled_reason, consecutive_failures, rate_limited_count, last_rate_limited_at, access_lost_at, created_at, updated_at, scope FROM webhook_subscriptions WHERE owner_id = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListWebhookSubscriptionsForOwner(ctx context.Context, ownerID uuid.UUID) ([]WebhookSubscription, error) {
@@ -596,6 +649,7 @@ func (q *Queries) ListWebhookSubscriptionsForOwner(ctx context.Context, ownerID 
 			&i.AccessLostAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Scope,
 		); err != nil {
 			return nil, err
 		}

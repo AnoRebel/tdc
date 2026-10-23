@@ -125,6 +125,7 @@ func (s *Service) appendSigned(
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
 	}
+	s.stored(ctx, q, stored)
 	return stored, nil
 }
 

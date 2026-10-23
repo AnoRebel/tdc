@@ -101,6 +101,7 @@ func (s *Service) appendAs(
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("append event: %w", err)
 	}
+	s.told(ctx, stored)
 
 	// Idempotency is per account, so a sender without one has none.
 	if clientToken != "" && senderID != nil {

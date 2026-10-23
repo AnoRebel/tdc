@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/delivery"
 	"github.com/AnoRebel/tdc/server/internal/notify"
+	"github.com/AnoRebel/tdc/server/internal/projects"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/AnoRebel/tdc/server/internal/webhooks"
 )
@@ -62,6 +64,8 @@ func (s *Server) buildIntegrations() {
 		s.integrations.webhooks = webhooks.New(s.queries, webhooks.Config{
 			Server:       s.serverName(),
 			CanRead:      s.canRead,
+			Holds:        s.holdsForWebhooks,
+			Describe:     s.describeForWebhooks,
 			AllowPrivate: s.privateDeliveriesAllowed,
 			Send: func(ctx context.Context, endpoint, id, kind string, body, secret []byte) delivery.Outcome {
 				outcome, err := s.sendSigned(ctx, endpoint, id, kind, body, secret)
@@ -131,11 +135,60 @@ func (s *Server) queueWebhooks(ctx context.Context, event dbgen.Event) {
 	})
 }
 
-// canRead is whether somebody can read a channel right now, which is what
-// every webhook decision about a channel turns on: they can see it, and
-// channel.read has not been withdrawn from them there. Without the second, a
-// webhook would go on carrying a channel to somebody it had been closed to.
+/*
+canRead is whether somebody can read a room right now, which is what every
+webhook decision about a room turns on.
+
+For a person: they can see it, and channel.read has not been withdrawn from
+them there — without the second, a webhook would go on carrying a channel to
+somebody it had been closed to. A project's stream is as readable as the
+project, which is membership or publicity and nothing a role grants.
+
+For an application, its own rule, the one every request it makes is held to:
+it reads only where it was put. A channel must be one of its own and its grant
+must allow reading there; a project, or an issue's discussion, must be one it
+was made a member of — a public project it was not put in is no more its
+business than a public channel it was not given.
+*/
 func (s *Server) canRead(ctx context.Context, roomID, userID uuid.UUID) bool {
+	room, err := s.queries.GetRoomByID(ctx, roomID)
+	if err != nil {
+		return false
+	}
+	projectID, inProject := projectOfRoom(ctx, s.queries, room)
+
+	if application, ok := s.applicationAccount(ctx, userID); ok {
+		if application.State != "approved" {
+			return false
+		}
+		if inProject {
+			if room.Kind == "issue-discussion" && !s.discussionVisible(ctx, roomID, userID) {
+				return false
+			}
+			_, err := s.queries.GetProjectMemberRole(ctx, dbgen.GetProjectMemberRoleParams{
+				ProjectID: projectID, UserID: userID,
+			})
+			return err == nil
+		}
+		service := s.applicationService()
+		if service == nil {
+			return false
+		}
+		channels, err := service.Channels(ctx, application.ID)
+		if err != nil || !slices.Contains(channels, roomID) {
+			return false
+		}
+		permissions, err := service.Permissions(ctx, application)
+		return err == nil && permissions.AllowsChannel(authz.PermChannelRead, roomID).Allowed
+	}
+
+	if room.Kind == "project" {
+		if s.projects == nil {
+			return false
+		}
+		visible, err := s.projects.Visible(ctx, roomID, userID)
+		return err == nil && visible
+	}
 	if _, err := s.rooms.Visible(ctx, roomID, userID); err != nil {
 		return false
 	}
@@ -146,14 +199,131 @@ func (s *Server) canRead(ctx context.Context, roomID, userID uuid.UUID) bool {
 	return err == nil && permissions.AllowsChannel(authz.PermChannelRead, roomID).Allowed
 }
 
+func (s *Server) discussionVisible(ctx context.Context, roomID, userID uuid.UUID) bool {
+	if s.projects == nil {
+		return false
+	}
+	visible, err := s.projects.DiscussionVisible(ctx, roomID, userID)
+	return err == nil && visible
+}
+
+// projectOfRoom is the project a room belongs to — its stream, or one of its
+// issues' discussions — if it belongs to one.
+func projectOfRoom(ctx context.Context, queries *dbgen.Queries, room dbgen.Room) (uuid.UUID, bool) {
+	switch room.Kind {
+	case "project":
+		return room.ID, true
+	case "issue-discussion":
+		issue, err := queries.GetIssueByID(ctx, room.ID)
+		if err != nil {
+			return uuid.Nil, false
+		}
+		return issue.ProjectID, true
+	}
+	return uuid.Nil, false
+}
+
+/*
+holdsForWebhooks is whether somebody holds a server permission right now, for
+the events that belong to no room. An application is asked about its grant,
+never its account's roles, as on every request it makes.
+*/
+func (s *Server) holdsForWebhooks(ctx context.Context, userID uuid.UUID, permission string) bool {
+	if application, ok := s.applicationAccount(ctx, userID); ok {
+		service := s.applicationService()
+		if service == nil || application.State != "approved" {
+			return false
+		}
+		permissions, err := service.Permissions(ctx, application)
+		return err == nil && permissions.AllowsServer(authz.Permission(permission)).Allowed
+	}
+	if s.authz == nil {
+		return false
+	}
+	permissions, err := s.authz.PermissionsFor(ctx, userID)
+	return err == nil && permissions.AllowsServer(authz.Permission(permission)).Allowed
+}
+
+// applicationAccount is the approved application an account acts for, if it
+// acts for one.
+func (s *Server) applicationAccount(ctx context.Context, userID uuid.UUID) (dbgen.Application, bool) {
+	application, err := s.queries.GetApplicationByAccount(ctx, &userID)
+	if err != nil {
+		return dbgen.Application{}, false
+	}
+	// Reported whatever its state, so that an application removed or not yet
+	// approved is refused as one rather than judged by its account's roles.
+	return application, true
+}
+
+// describeForWebhooks says what a room belongs to, so a delivery can name the
+// project and issue as well as the room.
+func (s *Server) describeForWebhooks(ctx context.Context, roomID uuid.UUID) webhooks.Source {
+	room, err := s.queries.GetRoomByID(ctx, roomID)
+	if err != nil {
+		return webhooks.Source{Kind: "channel"}
+	}
+	source := webhooks.Source{Kind: room.Kind}
+	projectID, inProject := projectOfRoom(ctx, s.queries, room)
+	if !inProject {
+		return source
+	}
+	project, err := s.queries.GetProjectByID(ctx, projectID)
+	if err != nil {
+		return source
+	}
+	source.Project = &webhooks.Ref{ID: project.ID.String(), Key: project.Key}
+	if room.Kind == "issue-discussion" {
+		if issue, err := s.queries.GetIssueByID(ctx, room.ID); err == nil {
+			source.Issue = &webhooks.Ref{ID: issue.ID.String(), Key: projects.Identifier(project, issue)}
+		}
+	}
+	return source
+}
+
+/*
+queueServerEvent hands an event that belongs to no room to the server-wide
+subscriptions that asked for it, off the request, as every webhook is.
+*/
+func (s *Server) queueServerEvent(ctx context.Context, kind, sender string, content any) {
+	service := s.webhookService()
+	if service == nil {
+		return
+	}
+	s.inBackground(ctx, "queue webhooks", func(ctx context.Context) {
+		service.EnqueueServer(ctx, kind, sender, content)
+	})
+}
+
+// accountRef is how an account appears in an event that belongs to no room:
+// who it is, and never how to reach them.
+func (s *Server) accountRef(user dbgen.User) map[string]any {
+	return map[string]any{
+		"id":          user.ID.String(),
+		"username":    user.Username,
+		"address":     s.rooms.UserAddress(user.Username),
+		"displayName": user.DisplayName,
+	}
+}
+
 // tellOwnerWebhookDisabled raises the notification that a webhook was turned
-// off, attributed to the server rather than to any person.
+// off, attributed to the server rather than to any person. A notification
+// belongs to a room and an event; a server subscription turned off over an
+// event in no room says so only in its own state.
 func (s *Server) tellOwnerWebhookDisabled(ctx context.Context, subscription dbgen.WebhookSubscription, eventID *string) {
 	if s.notify == nil || eventID == nil {
 		return
 	}
+	roomID := subscription.RoomID
+	if roomID == nil {
+		event, err := s.rooms.Event(ctx, *eventID)
+		if err != nil {
+			return
+		}
+		roomID = &event.RoomID
+	}
 	s.notify.About(ctx, subscription.OwnerID, uuid.Nil, s.rooms.UserAddress("webhooks"),
-		subscription.RoomID, *eventID, notify.ReasonWebhookDisabled, subscription.Label)
+		*roomID, *eventID, notify.ReasonWebhookDisabled, subscription.Label)
 }
 
 // privateDeliveriesAllowed reads the operator's decision, defaulting to no.

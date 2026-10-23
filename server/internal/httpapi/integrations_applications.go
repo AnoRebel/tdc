@@ -96,6 +96,15 @@ var applicationRoutes = map[string]bool{
 	"GET /api/health":                  true,
 	"GET /api/description":             true,
 	"GET /api/openapi.json":            true,
+	// Its own outgoing webhooks: how a program that holds no live connection
+	// is told about what happens where it was put, held at every delivery to
+	// what its grant lets it read.
+	"GET /api/me/webhooks":             true,
+	"POST /api/me/webhooks":            true,
+	"GET /api/me/webhooks/:id":         true,
+	"DELETE /api/me/webhooks/:id":      true,
+	"POST /api/me/webhooks/:id/enable": true,
+	"GET /api/webhooks/event-types":    true,
 }
 
 /*

@@ -60,6 +60,30 @@ type Service struct {
 	// deciders answer who may see rooms that belong to something else, by
 	// kind. See DelegateAccess.
 	deciders map[string]AccessDecider
+
+	// appended is told about every event this server stores, once it is
+	// stored. See OnAppended.
+	appended func(context.Context, dbgen.Event)
+}
+
+/*
+OnAppended sets what is told about each event once it is stored.
+
+One place every stored event passes, so that whatever must follow an event —
+an outgoing webhook, today — follows every event, rather than only the ones
+whose route remembered to ask. A join, a leave and a channel's creation are
+stored by paths that publish nothing live, and were for that reason never
+delivered to anybody subscribed to them.
+
+Called once while the server is being built, before it serves anything.
+*/
+func (s *Service) OnAppended(tell func(context.Context, dbgen.Event)) { s.appended = tell }
+
+// told hands a stored event to whatever asked to hear of it.
+func (s *Service) told(ctx context.Context, event dbgen.Event) {
+	if s.appended != nil {
+		s.appended(ctx, event)
+	}
 }
 
 // NewService builds a rooms service.

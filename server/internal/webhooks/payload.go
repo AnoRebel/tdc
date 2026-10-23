@@ -26,6 +26,21 @@ type Input struct {
 	Subscription string
 	Server       string
 	Event        dbgen.Event
+	// Kind is what the subscription asked for, when the server named it by
+	// reading Event — issue.commented for a message in a discussion. Empty
+	// means the event's own type.
+	Kind string
+	// Roomless marks an event that belongs to no room: a new account.
+	Roomless bool
+	// Project and Issue say what the room belongs to, when it belongs to one.
+	Project *Ref
+	Issue   *Ref
+}
+
+// Ref names a project or an issue: its identifier, and the key people use.
+type Ref struct {
+	ID  string `json:"id"`
+	Key string `json:"key"`
 }
 
 // Renderer turns one event into one version's payload.
@@ -80,14 +95,20 @@ func AddVersionForTest(version int32, render Renderer) func() {
 
 // payloadV1 is version 1, as documented in docs/webhooks-and-apps.md.
 type payloadV1 struct {
-	Version      int     `json:"version"`
-	ID           string  `json:"id"`
-	Type         string  `json:"type"`
-	OccurredAt   string  `json:"occurredAt"`
-	Subscription string  `json:"subscription"`
-	Server       string  `json:"server"`
-	Room         roomV1  `json:"room"`
-	Event        eventV1 `json:"event"`
+	Version      int    `json:"version"`
+	ID           string `json:"id"`
+	Type         string `json:"type"`
+	OccurredAt   string `json:"occurredAt"`
+	Subscription string `json:"subscription"`
+	Server       string `json:"server"`
+	// Room is absent only for an event that belongs to no room.
+	Room *roomV1 `json:"room,omitempty"`
+	// Project and Issue are present for an event in a project's stream or an
+	// issue's discussion. Added within version 1: a receiver ignores what it
+	// does not know.
+	Project *Ref    `json:"project,omitempty"`
+	Issue   *Ref    `json:"issue,omitempty"`
+	Event   eventV1 `json:"event"`
 }
 
 type roomV1 struct {
@@ -96,9 +117,11 @@ type roomV1 struct {
 }
 
 type eventV1 struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"`
-	Sequence int64  `json:"sequence"`
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	// Sequence is absent only for an event that belongs to no room, which has
+	// no position in one. A room's first event is at 1.
+	Sequence int64  `json:"sequence,omitempty"`
 	Sender   string `json:"sender"`
 	// Content is the event's own content, as the timeline gives it.
 	Content json.RawMessage `json:"content"`
@@ -108,16 +131,26 @@ type eventV1 struct {
 
 func renderV1(input Input) ([]byte, error) {
 	event := input.Event
+	kind := input.Kind
+	if kind == "" {
+		kind = event.Type
+	}
+	var room *roomV1
+	if !input.Roomless {
+		room = &roomV1{ID: event.RoomID.String(), Address: event.RoomAddress}
+	}
 	return json.Marshal(payloadV1{
 		Version: 1,
 		ID:      input.Delivery,
-		Type:    event.Type,
+		Type:    kind,
 		// RFC 3339 in UTC: an absolute instant a receiver in any zone reads
 		// the same way.
 		OccurredAt:   time.UnixMilli(event.CreatedAt).UTC().Format(time.RFC3339Nano),
 		Subscription: input.Subscription,
 		Server:       input.Server,
-		Room:         roomV1{ID: event.RoomID.String(), Address: event.RoomAddress},
+		Room:         room,
+		Project:      input.Project,
+		Issue:        input.Issue,
 		Event: eventV1{
 			ID:        event.ID,
 			Type:      event.Type,

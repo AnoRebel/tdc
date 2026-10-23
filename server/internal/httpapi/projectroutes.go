@@ -32,6 +32,9 @@ func init() {
 	registerRoutes(func(s *Server) {
 		if s.db != nil && s.rooms != nil {
 			s.projects = projects.NewService(s.db, s.rooms, s.log)
+			// A project's history is a room's log, so its events reach
+			// webhooks as every room's do — once committed.
+			s.projects.OnAppended(s.queueWebhooks)
 			/*
 				An issue's discussion is as visible as the issue and no more.
 

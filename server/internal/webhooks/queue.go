@@ -29,6 +29,12 @@ type Config struct {
 	Server string
 	// CanRead is asked when subscribing and before every delivery.
 	CanRead Access
+	// Holds says whether somebody holds a server permission now, for an event
+	// that belongs to no room. Nil holds that nobody does.
+	Holds func(ctx context.Context, userID uuid.UUID, permission string) bool
+	// Describe says what a room belongs to. Nil treats every room as a
+	// channel.
+	Describe func(ctx context.Context, roomID uuid.UUID) Source
 	// AllowPrivate is the operator's decision about private destinations.
 	AllowPrivate func(ctx context.Context) bool
 	// Send signs a delivery and sends it, within the operator's timeout.
@@ -164,7 +170,7 @@ func (s *Service) attempt(ctx context.Context, claimed dbgen.WebhookDelivery) {
 		removed and were still waiting to be sent. The subscription and its
 		history stay; only delivery stops.
 	*/
-	if !s.config.CanRead(ctx, subscription.RoomID, subscription.OwnerID) {
+	if !s.entitled(ctx, subscription, claimed) {
 		s.recordAccessLost(ctx, subscription.ID)
 		s.complete(ctx, claimed.ID, "cancelled")
 		return

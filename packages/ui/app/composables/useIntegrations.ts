@@ -10,6 +10,7 @@ import type {
   IssuedApplicationCredential,
   WebhookEventTypes,
   WebhookHistory,
+  WebhookScope,
   WebhookSubscription,
 } from "@tdc/types";
 
@@ -24,7 +25,12 @@ export interface NewApplication {
 
 /** What subscribing an endpoint asks for. */
 export interface NewWebhook {
-  roomId: string;
+  /** What it listens to; a channel when left out. */
+  scope?: WebhookScope;
+  /** The channel, for a channel subscription. */
+  roomId?: string;
+  /** The project, for a project subscription. */
+  projectId?: string;
   label: string;
   url: string;
   eventTypes: string[];

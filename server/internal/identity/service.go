@@ -51,6 +51,8 @@ type Service struct {
 	// formerNameHold is how long a given-up username stays its old owner's.
 	// See HoldFormerNames.
 	formerNameHold func(context.Context) time.Duration
+	// created is told about each new account. See OnCreated.
+	created func(context.Context, dbgen.User)
 }
 
 // NewService builds an identity service over the given store.
@@ -157,8 +159,21 @@ func (s *Service) CreateUser(ctx context.Context, input NewUser) (dbgen.User, er
 		}
 	}
 
+	if s.created != nil {
+		s.created(ctx, user)
+	}
 	return user, nil
 }
+
+/*
+OnCreated sets what is told about each account once it exists.
+
+Here rather than in each of the ways an account comes about — registering,
+setting up the server, signing in through a provider, an application being
+approved — so that none of them can be the one that forgot. Called once while
+the server is being built.
+*/
+func (s *Service) OnCreated(tell func(context.Context, dbgen.User)) { s.created = tell }
 
 // translateUniqueViolation converts a database uniqueness error into the
 // specific error a caller can act on, so registration can tell the person

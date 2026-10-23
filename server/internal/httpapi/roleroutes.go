@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -9,6 +10,8 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/webhooks"
 )
 
 /*
@@ -603,6 +606,7 @@ func (s *Server) handleAssignRole(c *echo.Context) error {
 	if err := s.authz.AssignRole(ctx, userID, roleID, &actor.ID); err != nil {
 		return err
 	}
+	s.announceRoleChange(ctx, actor, userID, roleID, "assigned")
 
 	if err := s.audit.Record(ctx, audit.Entry{
 		ActorID:    &actor.ID,
@@ -645,6 +649,7 @@ func (s *Server) handleRemoveRole(c *echo.Context) error {
 	case err != nil:
 		return err
 	}
+	s.announceRoleChange(ctx, actor, userID, roleID, "removed")
 
 	if err := s.audit.Record(ctx, audit.Entry{
 		ActorID:    &actor.ID,
@@ -660,4 +665,25 @@ func (s *Server) handleRemoveRole(c *echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusNoContent)
+}
+
+/*
+announceRoleChange tells server-wide webhooks that somebody's role changed,
+for whoever may read every account — which includes the roles each holds.
+*/
+func (s *Server) announceRoleChange(ctx context.Context, actor dbgen.User, userID, roleID uuid.UUID, change string) {
+	person, err := s.queries.GetUserByID(ctx, userID)
+	if err != nil {
+		return
+	}
+	role, err := s.queries.GetRoleByID(ctx, roleID)
+	if err != nil {
+		return
+	}
+	s.queueServerEvent(ctx, webhooks.TypeAccountRoleChanged, s.rooms.UserAddress(actor.Username),
+		map[string]any{
+			"account": s.accountRef(person),
+			"role":    map[string]any{"id": role.ID.String(), "name": role.Name},
+			"change":  change,
+		})
 }
