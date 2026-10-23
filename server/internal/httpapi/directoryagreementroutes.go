@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,6 +32,8 @@ func init() {
 		"POST /api/directory/engagements/:id/complete":                       {Summary: "Say the work is complete", Authentication: session},
 		"POST /api/directory/engagements/:id/confirm-completion":             {Summary: "Confirm the other party's completion", Authentication: session},
 		"GET /api/directory/engagements/:id/agreement/export":                {Summary: "Export the agreement", Authentication: session},
+		"POST /api/directory/engagements/:id/revisions":                      {Summary: "Propose a revision of the agreement in force", Authentication: session},
+		"POST /api/directory/engagements/:id/revisions/:number/withdraw":     {Summary: "Withdraw a revision you opened", Authentication: session},
 	})
 }
 
@@ -43,11 +46,16 @@ func (api *directoryAPI) mountAgreements(directoryGroup *echo.Group) {
 	engagements.POST("/:id/complete", api.handleRequestCompletion)
 	engagements.POST("/:id/confirm-completion", api.handleConfirmCompletion)
 	engagements.GET("/:id/agreement/export", api.handleExportAgreement)
+	engagements.POST("/:id/revisions", api.handleOpenRevision)
+	engagements.POST("/:id/revisions/:number/withdraw", api.handleWithdrawRevision)
 }
 
 type versionView struct {
-	ID         string               `json:"id"`
-	Version    int32                `json:"version"`
+	ID      string `json:"id"`
+	Version int32  `json:"version"`
+	// Revision is the revision the version was sent in; absent for the
+	// negotiation before the first agreement.
+	Revision   int32                `json:"revision,omitempty"`
 	SentBy     string               `json:"sentBy"`
 	Scope      string               `json:"scope"`
 	Timeline   string               `json:"timeline"`
@@ -67,17 +75,36 @@ type responseView struct {
 }
 
 type agreementView struct {
-	Version             int32       `json:"version"`
+	Version int32 `json:"version"`
+	// Revision is the revision the agreement came from, 0 for the first.
+	Revision            int32       `json:"revision"`
 	ClientAcceptedAt    string      `json:"clientAcceptedAt"`
 	DeveloperAcceptedAt string      `json:"developerAcceptedAt"`
 	Terms               versionView `json:"terms"`
 	RecordedAt          string      `json:"recordedAt"`
 }
 
+type revisionView struct {
+	Number   int32  `json:"number"`
+	OpenedBy string `json:"openedBy"`
+	Reason   string `json:"reason"`
+	OpenedAt string `json:"openedAt"`
+	// Outcome is "open", "accepted", "declined" or "withdrawn".
+	Outcome     string `json:"outcome"`
+	OutcomeBy   string `json:"outcomeBy,omitempty"`
+	OutcomeNote string `json:"outcomeNote,omitempty"`
+	OutcomeAt   string `json:"outcomeAt,omitempty"`
+}
+
 type negotiationView struct {
 	Versions  []versionView  `json:"versions"`
 	Responses []responseView `json:"responses"`
+	// Agreement is the agreement in force.
 	Agreement *agreementView `json:"agreement,omitempty"`
+	// Agreements is every agreement recorded, the first one first.
+	Agreements []agreementView `json:"agreements"`
+	// Revisions is every revision of the agreement, the first one first.
+	Revisions []revisionView `json:"revisions"`
 	// Disclosure is what the server says it is and is not, shown wherever an
 	// agreement is.
 	Disclosure string `json:"disclosure"`
@@ -91,14 +118,39 @@ func versionViewOf(version directory.ProposalVersion) versionView {
 		items = []directory.LineItem{}
 	}
 	return versionView{
-		ID: version.ID.String(), Version: version.Version, SentBy: version.SentBy,
+		ID: version.ID.String(), Version: version.Version, Revision: version.Revision, SentBy: version.SentBy,
 		Scope: version.Scope, Timeline: version.Timeline, LineItems: items,
 		Currency: version.Currency, TotalMinor: version.TotalMinor, SentAt: stamp(version.SentAt),
 	}
 }
 
+func agreementViewOf(agreement directory.Agreement) agreementView {
+	return agreementView{
+		Version: agreement.Version, Revision: agreement.Revision, ClientAcceptedAt: stamp(agreement.ClientAcceptedAt),
+		DeveloperAcceptedAt: stamp(agreement.DeveloperAcceptedAt),
+		Terms:               versionViewOf(agreement.Terms), RecordedAt: stamp(agreement.RecordedAt),
+	}
+}
+
+func revisionViewOf(revision directory.Revision) revisionView {
+	view := revisionView{
+		Number: revision.Number, OpenedBy: revision.OpenedBy, Reason: revision.Reason,
+		OpenedAt: stamp(revision.OpenedAt), Outcome: "open",
+	}
+	if !revision.Open() {
+		view.Outcome, view.OutcomeBy, view.OutcomeNote = string(revision.Outcome), revision.OutcomeBy, revision.OutcomeNote
+		if revision.OutcomeAt != nil {
+			view.OutcomeAt = stamp(*revision.OutcomeAt)
+		}
+	}
+	return view
+}
+
 func negotiationViewOf(negotiation directory.Negotiation) negotiationView {
-	view := negotiationView{Versions: []versionView{}, Responses: []responseView{}, Disclosure: directory.Disclosure}
+	view := negotiationView{
+		Versions: []versionView{}, Responses: []responseView{}, Agreements: []agreementView{},
+		Revisions: []revisionView{}, Disclosure: directory.Disclosure,
+	}
 	for _, version := range negotiation.Versions {
 		view.Versions = append(view.Versions, versionViewOf(version))
 	}
@@ -109,11 +161,14 @@ func negotiationViewOf(negotiation directory.Negotiation) negotiationView {
 		})
 	}
 	if agreement := negotiation.Agreement; agreement != nil {
-		view.Agreement = &agreementView{
-			Version: agreement.Version, ClientAcceptedAt: stamp(agreement.ClientAcceptedAt),
-			DeveloperAcceptedAt: stamp(agreement.DeveloperAcceptedAt),
-			Terms:               versionViewOf(agreement.Terms), RecordedAt: stamp(agreement.RecordedAt),
-		}
+		inForce := agreementViewOf(*agreement)
+		view.Agreement = &inForce
+	}
+	for _, agreement := range negotiation.Agreements {
+		view.Agreements = append(view.Agreements, agreementViewOf(agreement))
+	}
+	for _, revision := range negotiation.Revisions {
+		view.Revisions = append(view.Revisions, revisionViewOf(revision))
 	}
 	return view
 }
@@ -155,7 +210,11 @@ func (api *directoryAPI) handlePropose(c *echo.Context) error {
 	if err != nil {
 		return agreementError(err)
 	}
-	api.announce(ctx, engagement, user.ID, fmt.Sprintf("%s sent version %d of the proposal", user.Username, version.Version))
+	summary := fmt.Sprintf("%s sent version %d of the proposal", user.Username, version.Version)
+	if version.Revision > 0 {
+		summary = fmt.Sprintf("%s sent version %d in revision %d of the agreement", user.Username, version.Version, version.Revision)
+	}
+	api.announce(ctx, engagement, user.ID, summary)
 	return c.JSON(http.StatusCreated, versionViewOf(version))
 }
 
@@ -181,19 +240,28 @@ func (api *directoryAPI) handleRespond(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	agreed, engagement, err := api.directory.Respond(ctx, id, user.ID, user.Username, versionID,
+	answer, engagement, err := api.directory.Respond(ctx, id, user.ID, user.Username, versionID,
 		directory.ResponseKind(request.Kind), request.Part, request.Comment)
 	if err != nil {
 		return agreementError(err)
 	}
 
+	what := "the proposal"
+	if answer.Revision > 0 {
+		what = fmt.Sprintf("revision %d of the agreement", answer.Revision)
+	}
 	summary := map[directory.ResponseKind]string{
-		directory.Accept:         user.Username + " accepted the proposal",
-		directory.Decline:        user.Username + " declined the proposal",
-		directory.RequestChanges: user.Username + " asked for changes to " + request.Part + ": " + request.Comment,
+		directory.Accept:         user.Username + " accepted " + what,
+		directory.Decline:        user.Username + " declined " + what,
+		directory.RequestChanges: user.Username + " asked for changes to " + request.Part + " in " + what + ": " + request.Comment,
 	}[directory.ResponseKind(request.Kind)]
-	if agreed {
+	switch {
+	case answer.Agreed && answer.Revision > 0:
+		summary = fmt.Sprintf("Both parties accepted revision %d. The revised agreement is now in force.", answer.Revision)
+	case answer.Agreed:
 		summary = "Both parties accepted the same proposal. The agreement is recorded."
+	case answer.Closed:
+		summary += ". The agreement in force is unchanged."
 	}
 	api.announce(ctx, engagement, user.ID, summary)
 	return c.JSON(http.StatusCreated, api.engagementViewOf(engagement, user.ID))
@@ -266,13 +334,79 @@ func (api *directoryAPI) handleExportAgreement(c *echo.Context) error {
 	return c.JSON(http.StatusOK, export)
 }
 
+type openRevisionRequest struct {
+	Reason string `json:"reason"`
+	proposalRequest
+}
+
+/*
+handleOpenRevision proposes a revision of the agreement in force: why, and the
+amended terms, which become the revision's first version. The agreement in
+force stays in force until both parties accept one version of the revision.
+*/
+func (api *directoryAPI) handleOpenRevision(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	var request openRevisionRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	revision, version, engagement, err := api.directory.OpenRevision(ctx, id, user.ID, user.Username, request.Reason,
+		directory.ProposalInput{
+			Scope: request.Scope, Timeline: request.Timeline, LineItems: request.LineItems, Currency: request.Currency,
+		})
+	if err != nil {
+		return agreementError(err)
+	}
+	api.announce(ctx, engagement, user.ID, fmt.Sprintf(
+		"%s proposed revision %d of the agreement (version %d): %s. The agreement in force stands until you both accept.",
+		user.Username, revision.Number, version.Version, revision.Reason))
+	return c.JSON(http.StatusCreated, map[string]any{
+		"revision": revisionViewOf(revision), "version": versionViewOf(version),
+	})
+}
+
+type withdrawRevisionRequest struct {
+	Reason string `json:"reason"`
+}
+
+func (api *directoryAPI) handleWithdrawRevision(c *echo.Context) error {
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	id, err := engagementIDParam(c)
+	if err != nil {
+		return err
+	}
+	number, err := strconv.ParseInt(c.Param("number"), 10, 32)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, directory.ErrNoRevision.Error())
+	}
+	var request withdrawRevisionRequest
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	revision, engagement, err := api.directory.WithdrawRevision(ctx, id, user.ID, user.Username, int32(number), request.Reason)
+	if err != nil {
+		return agreementError(err)
+	}
+	api.announce(ctx, engagement, user.ID, fmt.Sprintf(
+		"%s withdrew revision %d of the agreement. The agreement in force is unchanged.", user.Username, revision.Number))
+	return c.JSON(http.StatusOK, revisionViewOf(revision))
+}
+
 func agreementError(err error) error {
 	switch {
-	case errors.Is(err, directory.ErrNoAgreement), errors.Is(err, directory.ErrNoProposal):
+	case errors.Is(err, directory.ErrNoAgreement), errors.Is(err, directory.ErrNoProposal),
+		errors.Is(err, directory.ErrNoRevision):
 		return echo.NewHTTPError(http.StatusNotFound, err.Error())
-	case errors.Is(err, directory.ErrNotLatest), errors.Is(err, directory.ErrAlreadyAccepted):
+	case errors.Is(err, directory.ErrNotLatest), errors.Is(err, directory.ErrAlreadyAccepted),
+		errors.Is(err, directory.ErrRevisionOpen):
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
-	case errors.Is(err, directory.ErrOwnCompletion):
+	case errors.Is(err, directory.ErrOwnCompletion), errors.Is(err, directory.ErrNotOpener):
 		return echo.NewHTTPError(http.StatusForbidden, err.Error())
 	}
 	return engagementError(err)

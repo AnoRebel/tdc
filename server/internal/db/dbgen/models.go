@@ -24,6 +24,26 @@ type ActionPress struct {
 	Value       *string
 }
 
+type AgreementRevision struct {
+	ID            uuid.UUID
+	EngagementID  uuid.UUID
+	Number        int32
+	OpenedBy      *uuid.UUID
+	OpenedByLabel string
+	Reason        string
+	OpenedAt      time.Time
+}
+
+type AgreementRevisionOutcome struct {
+	RevisionID   uuid.UUID
+	EngagementID uuid.UUID
+	Outcome      string
+	ActorID      *uuid.UUID
+	ActorLabel   string
+	Note         string
+	OccurredAt   time.Time
+}
+
 type ApiToken struct {
 	ID            uuid.UUID
 	UserID        uuid.UUID
@@ -285,6 +305,7 @@ type EngagementAgreement struct {
 	DeveloperAcceptedAt time.Time
 	Terms               []byte
 	RecordedAt          time.Time
+	RevisionID          *uuid.UUID
 }
 
 type EngagementTransition struct {
@@ -704,6 +725,7 @@ type ProposalVersion struct {
 	Currency     string
 	TotalMinor   int64
 	SentAt       time.Time
+	RevisionID   *uuid.UUID
 }
 
 type PushSubscription struct {

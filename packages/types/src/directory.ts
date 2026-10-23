@@ -330,6 +330,8 @@ export interface ProposalDraft {
 export interface ProposalVersion extends ProposalDraft {
   id: string;
   version: number;
+  /** The revision it was sent in; absent before the first agreement. */
+  revision?: number;
   sentBy: string;
   totalMinor: number;
   sentAt: string;
@@ -352,17 +354,39 @@ export interface ProposalResponse {
 /** The terms both parties accepted, and when each did. */
 export interface Agreement {
   version: number;
+  /** The revision it came from; 0 for the first agreement. */
+  revision: number;
   clientAcceptedAt: string;
   developerAcceptedAt: string;
   terms: ProposalVersion;
   recordedAt: string;
 }
 
+/** How a revision of an agreement ended, or that it has not. */
+export type RevisionOutcome = "open" | "accepted" | "declined" | "withdrawn";
+
+/** One revision of an agreement in force: who proposed it, why, and how it went. */
+export interface AgreementRevision {
+  number: number;
+  openedBy: string;
+  reason: string;
+  openedAt: string;
+  outcome: RevisionOutcome;
+  outcomeBy?: string;
+  outcomeNote?: string;
+  outcomeAt?: string;
+}
+
 /** Everything proposed and answered on one engagement. */
 export interface Negotiation {
   versions: ProposalVersion[];
   responses: ProposalResponse[];
+  /** The agreement in force: the latest one both accepted. */
   agreement?: Agreement;
+  /** Every agreement recorded, the first one first. */
+  agreements: Agreement[];
+  /** Every revision of the agreement, the first one first. */
+  revisions: AgreementRevision[];
   /** What the server is and is not, shown wherever an agreement is. */
   disclosure: string;
 }

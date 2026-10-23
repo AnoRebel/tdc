@@ -1474,6 +1474,40 @@ A history entry is an event from the project's stream, as recorded: `type`
 `field`, `previous` and `new`; a move also carries `previousName` and
 `newName`, the names the states had at the time. Times are RFC 3339 instants.
 
+## Directory agreements
+
+An engagement's proposals, agreement and revisions are read and answered over
+the routes [the directory guide](directory.md#over-the-api) lists; only the
+engagement's two parties get anything but `404`. Revising an agreement in force
+is three calls:
+
+```sh
+# Propose a revision: why, and the amended terms. Answers 201 with the
+# revision and its first version. 409 while another revision is open, or once
+# the work is confirmed complete; 400 when the terms change nothing.
+curl -X POST https://your-server/api/directory/engagements/$ID/revisions \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"reason":"SMS reminders were added","scope":"Booking app with SMS",
+       "timeline":"Eight weeks from agreement","currency":"TZS",
+       "lineItems":[{"description":"App","amountMinor":30000000},
+                    {"description":"SMS","amountMinor":20000000}]}'
+
+# Answer its latest version, as for any proposal: accept, decline, or
+# request_changes with a part and comment. A counter-version is an ordinary
+# POST .../proposals while the revision is open.
+curl -X POST https://your-server/api/directory/engagements/$ID/proposals/$VERSION/responses \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"kind":"accept"}'
+
+# Withdraw it, if you opened it.
+curl -X POST https://your-server/api/directory/engagements/$ID/revisions/1/withdraw \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+`GET .../proposals` then has `agreement` (the one in force, with `revision`),
+`agreements` (every one recorded) and `revisions` (each with its `outcome`).
+The revised agreement is in force only once both parties have accepted the
+same version; until then `agreement` is unchanged.
+
 ## Administration
 
 The endpoints under `/api/admin` each name the permission that governs them, and

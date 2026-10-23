@@ -9,6 +9,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
 import { fully } from "#layers/ui/app/lib/dates";
+import AgreementRevisions from "#layers/ui/app/components/directory/AgreementRevisions.vue";
 import ChangeRequestForm from "#layers/ui/app/components/directory/ChangeRequestForm.vue";
 import ProposalForm from "#layers/ui/app/components/directory/ProposalForm.vue";
 import ProposalTerms from "#layers/ui/app/components/directory/ProposalTerms.vue";
@@ -108,6 +109,11 @@ const open = computed(() => state.value === "proposal" && latest.value);
 const youAccepted = computed(() => acceptedLatest.value.includes(me.value));
 const theyAccepted = computed(() => acceptedLatest.value.includes(them.value));
 const sentByThem = computed(() => latest.value?.sentBy === them.value);
+// While a revision is open the work cannot be recorded as complete: complete
+// has to mean complete to terms both people know.
+const revising = computed(() =>
+  (negotiation.value?.revisions ?? []).some((revision) => revision.outcome === "open"),
+);
 
 function partLabel(part?: string) {
   if (!part) return "";
@@ -193,7 +199,14 @@ async function exportAgreement() {
         {{ $t("directory.agreement.agreement") }}
       </h2>
       <p class="text-xs text-muted-foreground">
-        {{ $t("directory.agreement.agreedOn", { number: negotiation.agreement.version }) }}
+        {{
+          negotiation.agreement.revision > 0
+            ? $t("directory.revision.agreedOn", {
+                number: negotiation.agreement.version,
+                revision: negotiation.agreement.revision,
+              })
+            : $t("directory.agreement.agreedOn", { number: negotiation.agreement.version })
+        }}
       </p>
       <ul class="space-y-0.5 text-xs">
         <li>
@@ -219,6 +232,14 @@ async function exportAgreement() {
         {{ $t("directory.agreement.export") }}
       </Button>
     </section>
+
+    <AgreementRevisions
+      v-if="negotiation?.agreement"
+      :engagement="props.engagement"
+      :negotiation="negotiation"
+      @changed="emit('changed', $event)"
+      @reload="load"
+    />
 
     <!-- Finishing: either starts, one says it is done, the other confirms. -->
     <section
@@ -251,7 +272,10 @@ async function exportAgreement() {
             </Field>
           </template>
         </completion.Field>
-        <Button type="submit" :disabled="busy">
+        <p v-if="revising" class="text-xs text-muted-foreground" role="status">
+          {{ $t("directory.revision.settleFirst") }}
+        </p>
+        <Button type="submit" :disabled="busy || revising">
           {{ $t("directory.agreement.complete", { name: them }) }}
         </Button>
       </form>
@@ -269,7 +293,10 @@ async function exportAgreement() {
           <p class="rounded-md bg-muted px-3 py-2 text-sm" role="status">
             {{ $t("directory.agreement.awaitingYours", { name: them }) }}
           </p>
-          <Button :disabled="busy" @click="confirm">
+          <p v-if="revising" class="text-xs text-muted-foreground" role="status">
+            {{ $t("directory.revision.settleFirst") }}
+          </p>
+          <Button :disabled="busy || revising" @click="confirm">
             <Check class="size-3.5" />
             {{ $t("directory.agreement.confirm") }}
           </Button>

@@ -389,6 +389,7 @@ type Querier interface {
 	// The one lookup a post makes. No cache in front of it, so a revocation is
 	// final for the very next call.
 	GetActiveIncomingWebhookByHash(ctx context.Context, tokenHash []byte) (IncomingWebhook, error)
+	// The agreement in force: the latest version both parties accepted.
 	GetAgreement(ctx context.Context, engagementID uuid.UUID) (EngagementAgreement, error)
 	// What this person chose the interface to look like.
 	//
@@ -442,6 +443,8 @@ type Querier interface {
 	// means: a channel setting beats the default rather than merging with it.
 	GetNotificationPreference(ctx context.Context, arg GetNotificationPreferenceParams) (GetNotificationPreferenceRow, error)
 	GetOAuthCredential(ctx context.Context, arg GetOAuthCredentialParams) (Credential, error)
+	// The revision under negotiation, if there is one.
+	GetOpenRevision(ctx context.Context, engagementID uuid.UUID) (AgreementRevision, error)
 	// The company associations a profile can have verified: accepted ones.
 	GetOwnCompanyClaims(ctx context.Context, userID uuid.UUID) ([]GetOwnCompanyClaimsRow, error)
 	// The owner's own profile, all of it. Only ever called with the signed-in
@@ -513,7 +516,11 @@ type Querier interface {
 	// The next version for the engagement. Numbered here, in the statement that
 	// inserts, so two people sending at once cannot both claim the same number:
 	// the unique key refuses the second.
+	// A version sent within a revision carries the revision; the numbering runs on
+	// across them, so "version 4" names one set of terms on the engagement.
 	InsertProposalVersion(ctx context.Context, arg InsertProposalVersionParams) (ProposalVersion, error)
+	InsertRevision(ctx context.Context, arg InsertRevisionParams) (AgreementRevision, error)
+	InsertRevisionOutcome(ctx context.Context, arg InsertRevisionOutcomeParams) error
 	InsertSkill(ctx context.Context, arg InsertSkillParams) (Skill, error)
 	InsertVerification(ctx context.Context, arg InsertVerificationParams) (ProfileVerification, error)
 	// Issuing a new one invalidates the old, so somebody who asks twice is not left
@@ -571,6 +578,8 @@ type Querier interface {
 	ListActionPressesForEvent(ctx context.Context, eventID string) ([]ActionPress, error)
 	// What an event in this room might need delivering to.
 	ListActiveWebhookSubscriptionsForRoom(ctx context.Context, roomID uuid.UUID) ([]WebhookSubscription, error)
+	// Every agreement on an engagement, the first one first.
+	ListAgreements(ctx context.Context, engagementID uuid.UUID) ([]EngagementAgreement, error)
 	// Every entry on every role, with the name of the channel or project a scoped
 	// one applies to. A project is also a room, so the project is looked for
 	// first. An entry whose channel has gone keeps an empty name.
@@ -746,6 +755,8 @@ type Querier interface {
 	// state, for showing them.
 	ListRelationsOfIssue(ctx context.Context, issueID uuid.UUID) ([]ListRelationsOfIssueRow, error)
 	ListReportsForRoom(ctx context.Context, arg ListReportsForRoomParams) ([]Report, error)
+	// Every revision of an engagement's agreement with how it ended, if it has.
+	ListRevisions(ctx context.Context, engagementID uuid.UUID) ([]ListRevisionsRow, error)
 	// Who holds a role, by name. Bounded: on a large server the role every account
 	// holds is everybody, and a list of everybody is not what a role's page is for.
 	ListRoleMembers(ctx context.Context, arg ListRoleMembersParams) ([]ListRoleMembersRow, error)
@@ -859,6 +870,10 @@ type Querier interface {
 	// Taken by whoever deals with a cycle's end, so two servers sharing a database
 	// cannot both do it. SKIP LOCKED: the other simply moves on.
 	LockCycle(ctx context.Context, id uuid.UUID) (Cycle, error)
+	// Holds an engagement still for the rest of a transaction, so that opening,
+	// answering and ending a revision, and finishing the work, happen one at a
+	// time on it.
+	LockEngagement(ctx context.Context, id uuid.UUID) error
 	// Reads an issue and holds it until the transaction ends, so a change and the
 	// event recording it are decided against a value nobody else is changing.
 	LockIssue(ctx context.Context, id uuid.UUID) (Issue, error)

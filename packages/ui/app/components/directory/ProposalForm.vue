@@ -25,9 +25,13 @@ const { $t, $ts } = useI18n();
  *
  * Prices are typed the way people write them and sent as whole minor units of
  * the chosen currency, converted on the digits rather than through a float.
+ *
+ * Revising an agreement in force is the same form, started from the terms in
+ * force, with the reason for the revision asked first: the other person reads
+ * why before what.
  */
 
-const props = defineProps<{ engagementId: string; from?: ProposalVersion }>();
+const props = defineProps<{ engagementId: string; from?: ProposalVersion; revising?: boolean }>();
 const emit = defineEmits<{ sent: [ProposalVersion]; cancel: [] }>();
 
 const directory = useDirectory();
@@ -43,6 +47,7 @@ function firstError(field: AnyFieldApi): string | undefined {
 const startingCurrency = props.from?.currency ?? "TZS";
 const form = useForm({
   defaultValues: {
+    reason: "",
     scope: props.from?.scope ?? "",
     timeline: props.from?.timeline ?? "",
     currency: startingCurrency,
@@ -54,6 +59,11 @@ const form = useForm({
   validators: {
     onSubmit: v.pipe(
       v.object({
+        reason: v.pipe(
+          v.string(),
+          v.trim(),
+          v.maxLength(1000, $ts("directory.form.tooLong", { count: 1000 })),
+        ),
         scope: v.pipe(
           v.string(),
           v.trim(),
@@ -100,23 +110,33 @@ const form = useForm({
         ),
         ["lineItems"],
       ),
+      v.forward(
+        v.check(
+          (value) => !props.revising || value.reason.trim().length > 0,
+          $ts("directory.revision.reasonRequired"),
+        ),
+        ["reason"],
+      ),
     ),
   },
   async onSubmit({ value }) {
     error.value = null;
     const currency = value.currency.trim().toUpperCase();
+    const draft = {
+      scope: value.scope.trim(),
+      timeline: value.timeline.trim(),
+      currency,
+      lineItems: value.lineItems.map((item) => ({
+        description: item.description.trim(),
+        amountMinor: parseAmount(item.amount, currency) ?? 0,
+      })),
+    };
     try {
       emit(
         "sent",
-        await directory.propose(props.engagementId, {
-          scope: value.scope.trim(),
-          timeline: value.timeline.trim(),
-          currency,
-          lineItems: value.lineItems.map((item) => ({
-            description: item.description.trim(),
-            amountMinor: parseAmount(item.amount, currency) ?? 0,
-          })),
-        }),
+        props.revising
+          ? (await directory.openRevision(props.engagementId, value.reason.trim(), draft)).version
+          : await directory.propose(props.engagementId, draft),
       );
     } catch (cause) {
       error.value = isApiError(cause) ? cause.message : $ts("directory.couldNotReach");
@@ -146,6 +166,29 @@ function totalOf(values: { currency: string; lineItems: { amount: string }[] }) 
     >
       {{ error }}
     </p>
+
+    <form.Field v-if="props.revising" name="reason">
+      <template #default="{ field }">
+        <Field
+          :label="$ts('directory.revision.reason')"
+          :hint="$ts('directory.revision.reasonHint')"
+          :error="firstError(field)"
+          required
+        >
+          <template #default="{ id, invalid, describedBy }">
+            <Textarea
+              :id="id"
+              rows="2"
+              :model-value="field.state.value"
+              :invalid="invalid"
+              :described-by="describedBy"
+              @update:model-value="field.handleChange($event)"
+              @blur="field.handleBlur"
+            />
+          </template>
+        </Field>
+      </template>
+    </form.Field>
 
     <form.Field name="scope">
       <template #default="{ field }">
@@ -300,7 +343,7 @@ function totalOf(values: { currency: string; lineItems: { amount: string }[] }) 
           <Button type="submit" class="h-9" :disabled="isSubmitting">
             <Spinner v-if="isSubmitting" size="sm" />
             <Send v-else class="size-3.5" />
-            {{ $t("directory.agreement.send") }}
+            {{ props.revising ? $t("directory.revision.send") : $t("directory.agreement.send") }}
           </Button>
         </div>
       </template>

@@ -346,11 +346,79 @@ the server records the agreement in the same step: which version, a copy of its
 terms, and when each of you accepted.
 
 **Nothing can change an agreement once recorded** — nor a sent version, nor an
-answer to one. There is no way to edit them in the application or over the API,
+answer to one. When the terms need to change, the way to change them is a
+[revision](#revising-the-agreement), which records a new agreement beside the
+old one rather than editing it. There is no way to edit them in the application or over the API,
 and the database itself refuses an attempt, even by its owner. The one change it
 allows is the one account deletion needs: if either of you deletes your account,
 the record stays for the other with your username, and only the link to your
 deleted account is cleared.
+
+### Revising the agreement
+
+Things change after two people agree: the work grows, a date moves, a price has
+to be renegotiated. Either of you can **propose a revision** from the
+engagement's **Proposal** tab. A revision is a reason — why the agreement should
+change, which the other person reads first — and the amended terms: the work,
+when, the currency and the deliverables with their prices. The form starts from
+the terms in force, so changing one price means changing one price, and a
+revision that changes nothing is refused.
+
+A revision follows the agreement's own rules:
+
+- **Its terms are a new version.** Version numbers carry on from the first
+  negotiation, so "version 4" names one set of terms on the engagement. Once
+  sent, a version is never changed.
+- **Either of you answers the latest version** — accept it, decline it, or ask
+  for a change to one part of it — and **either of you can send a
+  counter-proposal**, a new version of the same revision. A version somebody
+  asked to change cannot be accepted; it waits for a new one.
+- **It is in force only once both of you accept the same version.** One
+  acceptance records that acceptance and nothing more. When the second arrives,
+  the server records a new agreement — that version, a copy of its terms, and
+  when each of you accepted — beside the earlier ones.
+- **Until then the agreement in force stays in force**, and the page says so.
+  The work carries on in whatever state it was in; a revision never moves the
+  engagement.
+- **It ends one of three ways**: both accepted (the revised agreement is in
+  force), either of you declined it, or the person who opened it withdrew it.
+  Declined and withdrawn revisions leave the agreement in force exactly as it
+  was.
+
+The page shows what a revision changes **against the agreement in force**, part
+by part — each changed part as it was and as it would be — rather than two sets
+of terms to compare by eye. Under **How the agreement came to be** is every
+agreement and every revision: who proposed it and why, each version with what
+it changed, each answer, and how it ended, with times.
+
+**When a revision may be proposed.** Once there is an agreement and until the
+work is confirmed complete: in _Agreement_, _Work under way_ and _Completion
+awaiting confirmation_. Not before an agreement — that is the ordinary
+negotiation — and not once an engagement is completed or withdrawn.
+
+**One at a time.** While a revision is open, a second cannot be proposed; settle
+the first. And while one is open, **the work cannot be recorded as complete** —
+neither asked for nor confirmed — because complete has to mean complete to terms
+you both know. Two people acting on the same engagement at the same moment are
+taken one after the other; the second is told the engagement changed.
+
+The other person is told of every step — a revision proposed, a version sent,
+an answer, a withdrawal — in the engagement's conversation and as a
+notification, the same way as every other step of the engagement.
+
+**Nobody answers for anybody else.** An answer is always recorded as the
+signed-in person's, and the database refuses an answer from anybody who is not
+a party to the engagement, and an agreement recorded without both parties'
+acceptance of that exact version, whatever path it comes by. A revision, how it
+ended and every agreement are records like the rest: the database refuses any
+change to them.
+
+Revisions are not written to the server's audit log. That log is for
+exercises of authority, and is read by administrators; an engagement is visible
+to nobody but its two parties, and listing its revisions there would tell an
+administrator it exists. The engagement's own record — every revision, version,
+answer and outcome, with who and when, and none of it changeable — is the trail,
+and both of you can export it.
 
 ### What the server is not
 
@@ -373,19 +441,26 @@ is in.
 Either of you can **Export the agreement** as a JSON file. Both of you get the
 same document, apart from when it was exported:
 
-| Field                | What it holds                                                                  |
-| -------------------- | ------------------------------------------------------------------------------ |
-| `format`             | `tdc.directory.agreement/1`                                                    |
-| `exportedAt`         | when this copy was made                                                        |
-| `server`             | the server's address                                                           |
-| `disclosure`         | the statement above                                                            |
-| `engagementId`       | the engagement                                                                 |
-| `title`              | its title, from the enquiry's subject                                          |
-| `version`            | which version was agreed                                                       |
-| `client`/`developer` | each party's `username` and when they accepted (`acceptedAt`)                  |
-| `terms`              | `scope`, `timeline`, `lineItems`, `currency`, `totalMinor`, `sentBy`, `sentAt` |
-| `recordedAt`         | when the agreement was recorded                                                |
-| `history`            | every change of state: `from`, `to`, `actor`, `at`, and any `note`             |
+| Field                | What it holds                                                                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| `format`             | `tdc.directory.agreement/1`                                                                               |
+| `exportedAt`         | when this copy was made                                                                                   |
+| `server`             | the server's address                                                                                      |
+| `disclosure`         | the statement above                                                                                       |
+| `engagementId`       | the engagement                                                                                            |
+| `title`              | its title, from the enquiry's subject                                                                     |
+| `version`            | which version was agreed                                                                                  |
+| `client`/`developer` | each party's `username` and when they accepted (`acceptedAt`)                                             |
+| `terms`              | `scope`, `timeline`, `lineItems`, `currency`, `totalMinor`, `sentBy`, `sentAt`                            |
+| `recordedAt`         | when the agreement was recorded                                                                           |
+| `history`            | every change of state: `from`, `to`, `actor`, `at`, and any `note`                                        |
+| `revision`           | which revision the agreement in force came from; `0` for the first agreement                              |
+| `agreements`         | every agreement recorded, first first, each as above                                                      |
+| `revisions`          | every revision: `number`, `openedBy`, `reason`, `openedAt`, `outcome`, and its `versions` and `responses` |
+
+`version`, `client`, `developer`, `terms` and `recordedAt` are the agreement in
+force. A revision's `outcome` is `open`, `accepted`, `declined` or `withdrawn`;
+an ended one also has `outcomeBy`, `outcomeAt` and any `outcomeNote`.
 
 Every time is an absolute instant in UTC (`2026-10-02T09:30:00Z`); every amount
 is in minor units beside its currency. Nobody outside the engagement can export
@@ -557,48 +632,50 @@ deliberate decision, not something the protocol backs into.
 
 ## Over the API
 
-| Route                                                                | What it does                                                                                             |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `GET /api/directory/me`                                              | your own profile, all of it                                                                              |
-| `PUT /api/directory/me`                                              | create or replace your profile (the `profile` object above)                                              |
-| `GET /api/directory/search`                                          | one page of the directory; filters `q`, `skill`, `available=true`, `location`, `company`, `page`         |
-| `GET /api/directory/skills?q=`                                       | the vocabulary, and your own proposals                                                                   |
-| `POST /api/directory/skills`                                         | propose a skill; answers with the existing one where the name already means one                          |
-| `GET /api/directory/moderation/skills`                               | the review queue (`directory.skills.manage`)                                                             |
-| `POST /api/directory/moderation/skills/:id/approve`                  | approve a proposal (`directory.skills.manage`)                                                           |
-| `POST /api/directory/moderation/skills/:id/reject`                   | reject a proposal, with a `reason` (`directory.skills.manage`)                                           |
-| `POST /api/directory/moderation/skills/:id/merge`                    | merge a proposal `into` another skill (`directory.skills.manage`)                                        |
-| `GET /api/directory/moderation/profiles/:username/claims`            | the verifiable claims on a profile (`directory.verify`)                                                  |
-| `POST /api/directory/moderation/profiles/:username/verifications`    | verify one claim: `kind`, `claimId`, `note` (`directory.verify`)                                         |
-| `POST /api/directory/moderation/verifications/:id/revoke`            | revoke a verification, with a `reason` (`directory.verify`)                                              |
-| `POST /api/directory/profiles/:username/enquiries`                   | send an enquiry: `subject`, `body`                                                                       |
-| `GET /api/directory/me/enquiries`                                    | enquiries you received, or with `?box=sent` those you sent                                               |
-| `POST /api/directory/enquiries/:id/accept`                           | take up an enquiry you received; it becomes an engagement                                                |
-| `POST /api/directory/enquiries/:id/decline`                          | decline an enquiry you received                                                                          |
-| `POST /api/directory/enquiries/:id/withdraw`                         | withdraw an enquiry you sent                                                                             |
-| `GET /api/directory/me/engagements`                                  | your engagements                                                                                         |
-| `GET /api/directory/engagements/:id`                                 | an engagement you are party to, with its history                                                         |
-| `POST /api/directory/engagements/:id/withdraw`                       | withdraw before an agreement, with an optional `reason`                                                  |
-| `GET /api/directory/engagements/:id/proposals`                       | every version, every answer, the agreement if there is one, and the `disclosure`                         |
-| `POST /api/directory/engagements/:id/proposals`                      | send a version: `scope`, `timeline`, `currency`, `lineItems` of `description` and `amountMinor`          |
-| `POST /api/directory/engagements/:id/proposals/:versionId/responses` | answer the latest version: `kind` of `accept`, `decline` or `request_changes`, with `part` and `comment` |
-| `POST /api/directory/engagements/:id/start`                          | start the agreed work                                                                                    |
-| `POST /api/directory/engagements/:id/complete`                       | say the work is complete, with an optional `note`                                                        |
-| `POST /api/directory/engagements/:id/confirm-completion`             | confirm the other party's completion                                                                     |
-| `GET /api/directory/engagements/:id/agreement/export`                | the agreement as `tdc.directory.agreement/1`                                                             |
-| `DELETE /api/directory/me`                                           | delete your profile, keeping your account                                                                |
-| `GET /api/directory/me/export`                                       | your profile as `tdc.directory.profile/1`                                                                |
-| `GET /api/directory/profiles/:username`                              | a profile as you may see it; signing in is optional                                                      |
-| `GET /api/directory/me/companies`                                    | your companies, and invitations you have not answered                                                    |
-| `POST /api/directory/me/companies/:slug/accept`                      | accept a company's invitation                                                                            |
-| `DELETE /api/directory/me/companies/:slug`                           | leave a company, or decline its invitation                                                               |
-| `POST /api/directory/companies`                                      | create a company                                                                                         |
-| `GET /api/directory/companies/:slug`                                 | a company; signing in is optional                                                                        |
-| `PUT /api/directory/companies/:slug`                                 | change a company (its administrators)                                                                    |
-| `DELETE /api/directory/companies/:slug`                              | delete a company (its administrators)                                                                    |
-| `POST /api/directory/companies/:slug/members`                        | invite somebody by username (its administrators)                                                         |
-| `DELETE /api/directory/companies/:slug/members/:user`                | remove somebody (its administrators)                                                                     |
-| `GET /api/directory/moderation/profiles/:username`                   | read a profile as its owner sees it (`directory.profile.manage`)                                         |
-| `PUT /api/directory/moderation/profiles/:username`                   | change or clear a profile (`directory.profile.manage`)                                                   |
+| Route                                                                | What it does                                                                                                                                       |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/directory/me`                                              | your own profile, all of it                                                                                                                        |
+| `PUT /api/directory/me`                                              | create or replace your profile (the `profile` object above)                                                                                        |
+| `GET /api/directory/search`                                          | one page of the directory; filters `q`, `skill`, `available=true`, `location`, `company`, `page`                                                   |
+| `GET /api/directory/skills?q=`                                       | the vocabulary, and your own proposals                                                                                                             |
+| `POST /api/directory/skills`                                         | propose a skill; answers with the existing one where the name already means one                                                                    |
+| `GET /api/directory/moderation/skills`                               | the review queue (`directory.skills.manage`)                                                                                                       |
+| `POST /api/directory/moderation/skills/:id/approve`                  | approve a proposal (`directory.skills.manage`)                                                                                                     |
+| `POST /api/directory/moderation/skills/:id/reject`                   | reject a proposal, with a `reason` (`directory.skills.manage`)                                                                                     |
+| `POST /api/directory/moderation/skills/:id/merge`                    | merge a proposal `into` another skill (`directory.skills.manage`)                                                                                  |
+| `GET /api/directory/moderation/profiles/:username/claims`            | the verifiable claims on a profile (`directory.verify`)                                                                                            |
+| `POST /api/directory/moderation/profiles/:username/verifications`    | verify one claim: `kind`, `claimId`, `note` (`directory.verify`)                                                                                   |
+| `POST /api/directory/moderation/verifications/:id/revoke`            | revoke a verification, with a `reason` (`directory.verify`)                                                                                        |
+| `POST /api/directory/profiles/:username/enquiries`                   | send an enquiry: `subject`, `body`                                                                                                                 |
+| `GET /api/directory/me/enquiries`                                    | enquiries you received, or with `?box=sent` those you sent                                                                                         |
+| `POST /api/directory/enquiries/:id/accept`                           | take up an enquiry you received; it becomes an engagement                                                                                          |
+| `POST /api/directory/enquiries/:id/decline`                          | decline an enquiry you received                                                                                                                    |
+| `POST /api/directory/enquiries/:id/withdraw`                         | withdraw an enquiry you sent                                                                                                                       |
+| `GET /api/directory/me/engagements`                                  | your engagements                                                                                                                                   |
+| `GET /api/directory/engagements/:id`                                 | an engagement you are party to, with its history                                                                                                   |
+| `POST /api/directory/engagements/:id/withdraw`                       | withdraw before an agreement, with an optional `reason`                                                                                            |
+| `GET /api/directory/engagements/:id/proposals`                       | every version, every answer, the agreement in force, every `agreements` and `revisions`, and the `disclosure`                                      |
+| `POST /api/directory/engagements/:id/proposals`                      | send a version: `scope`, `timeline`, `currency`, `lineItems` of `description` and `amountMinor`; while a revision is open, a counter-version of it |
+| `POST /api/directory/engagements/:id/proposals/:versionId/responses` | answer the latest version: `kind` of `accept`, `decline` or `request_changes`, with `part` and `comment`                                           |
+| `POST /api/directory/engagements/:id/start`                          | start the agreed work                                                                                                                              |
+| `POST /api/directory/engagements/:id/complete`                       | say the work is complete, with an optional `note`                                                                                                  |
+| `POST /api/directory/engagements/:id/confirm-completion`             | confirm the other party's completion                                                                                                               |
+| `GET /api/directory/engagements/:id/agreement/export`                | the agreement as `tdc.directory.agreement/1`                                                                                                       |
+| `POST /api/directory/engagements/:id/revisions`                      | propose a revision of the agreement in force: `reason`, and the terms as for a proposal                                                            |
+| `POST /api/directory/engagements/:id/revisions/:number/withdraw`     | withdraw a revision you opened, with an optional `reason`                                                                                          |
+| `DELETE /api/directory/me`                                           | delete your profile, keeping your account                                                                                                          |
+| `GET /api/directory/me/export`                                       | your profile as `tdc.directory.profile/1`                                                                                                          |
+| `GET /api/directory/profiles/:username`                              | a profile as you may see it; signing in is optional                                                                                                |
+| `GET /api/directory/me/companies`                                    | your companies, and invitations you have not answered                                                                                              |
+| `POST /api/directory/me/companies/:slug/accept`                      | accept a company's invitation                                                                                                                      |
+| `DELETE /api/directory/me/companies/:slug`                           | leave a company, or decline its invitation                                                                                                         |
+| `POST /api/directory/companies`                                      | create a company                                                                                                                                   |
+| `GET /api/directory/companies/:slug`                                 | a company; signing in is optional                                                                                                                  |
+| `PUT /api/directory/companies/:slug`                                 | change a company (its administrators)                                                                                                              |
+| `DELETE /api/directory/companies/:slug`                              | delete a company (its administrators)                                                                                                              |
+| `POST /api/directory/companies/:slug/members`                        | invite somebody by username (its administrators)                                                                                                   |
+| `DELETE /api/directory/companies/:slug/members/:user`                | remove somebody (its administrators)                                                                                                               |
+| `GET /api/directory/moderation/profiles/:username`                   | read a profile as its owner sees it (`directory.profile.manage`)                                                                                   |
+| `PUT /api/directory/moderation/profiles/:username`                   | change or clear a profile (`directory.profile.manage`)                                                                                             |
 
 Every directory route answers `404` while the directory is switched off.
