@@ -127,6 +127,16 @@ export function describeNotification(notification: Notification): string {
       return `${who} assigned you ${notification.detail ?? ""}`.trim();
     case "missed_call":
       return `You missed a call from ${who}`;
+    case "event_invite":
+      return `${who} invited you to ${notification.detail ?? "an event"}`;
+    case "event_reminder":
+      return `${notification.detail ?? "An event"} is starting soon`;
+    case "event_changed":
+      return `${notification.detail ?? "An event"} has a new time or place`;
+    case "event_cancelled":
+      return `${notification.detail ?? "An event"} was cancelled`;
+    case "event_promoted":
+      return `A place freed up: you are going to ${notification.detail ?? "an event"}`;
     default:
       return `${who} did something`;
   }

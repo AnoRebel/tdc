@@ -19,6 +19,7 @@ import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 // somebody is. Loaded after the page, never part of the first download.
 const { offers: offersCapability } = useServerInfo();
 const callsOffered = computed(() => offersCapability("calls"));
+const eventsOffered = computed(() => offersCapability("events"));
 
 /*
  * lastSeenRoomsKey holds the conversations somebody is in.
@@ -598,6 +599,8 @@ provide("openSearch", () => {
 
     <!-- A call goes on whatever page somebody moves to. -->
     <LazyCallHost v-if="callsOffered" />
+    <!-- Reminders of events, at the corner of whatever page this is. -->
+    <LazyEventsReminderToast v-if="eventsOffered" />
 
     <SearchPalette
       v-model="searching"

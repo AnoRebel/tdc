@@ -26,6 +26,12 @@ watch(
   async (id) => {
     try {
       const room = await roomsApi.get(id);
+      // An event's conversation belongs on the event's page, where its call
+      // and its people are.
+      if ((room.kind as string) === "event") {
+        await router.replace(localeRoute({ name: "events-id", params: { id: room.id } }));
+        return;
+      }
       if ((room.kind as string) === "issue-discussion") {
         await router.replace(
           localeRoute({ name: "issues-ref", params: { ref: room.name }, query: route.query }),

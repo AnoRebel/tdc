@@ -3,6 +3,8 @@ import type { Notification } from "@tdc/types";
 import {
   AtSign,
   Bell,
+  CalendarClock,
+  CalendarX,
   CircleUserRound,
   Forward,
   MessageSquare,
@@ -44,6 +46,11 @@ const icons: Record<string, Component> = {
   forward: Forward,
   pin: Pin,
   assigned: CircleUserRound,
+  event_invite: CalendarClock,
+  event_reminder: CalendarClock,
+  event_changed: CalendarClock,
+  event_promoted: CalendarClock,
+  event_cancelled: CalendarX,
 };
 
 function iconFor(notification: Notification) {

@@ -171,7 +171,7 @@ const { offers: serverOffers } = useServerInfo();
  * deliberately: "online now" and "last here at 03:12" disclose quite different
  * things, and people who are happy with the first often are not with the second.
  */
-const disclosureOptions = [
+const disclosureOptions = computed(() => [
   {
     field: "showsPresence" as const,
     label: $t("settings.showsPresence"),
@@ -187,7 +187,16 @@ const disclosureOptions = [
     label: $t("settings.showsLastSeen"),
     detail: $t("settings.showsLastSeenHint"),
   },
-];
+  ...(serverOffers("events")
+    ? [
+        {
+          field: "showsEventAttendance" as const,
+          label: $t("events.privacy.showsAttendance"),
+          detail: $t("events.privacy.showsAttendanceHint"),
+        },
+      ]
+    : []),
+]);
 
 onMounted(() => void personal.refresh());
 
@@ -628,6 +637,8 @@ function deviceName(userAgent: string): string {
           {{ $t("settings.moderatorCanSeeDisclosure") }}
         </p>
       </section>
+
+      <LazyEventsFeedSettings v-if="serverOffers('events')" />
 
       <section>
         <h2 class="flex items-center gap-1.5 text-sm font-semibold">

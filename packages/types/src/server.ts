@@ -157,6 +157,9 @@ export type Capability =
   | "web-push"
   | "disposable-chats"
   | "projects"
+  // Meetups, talks, workshops and office hours. On unless an operator turns
+  // it off.
+  | "events"
   // Searching a third-party GIF library, which needs an operator's own API
   // key with that provider. Absent on a server that has not configured one.
   | "gif-search"
