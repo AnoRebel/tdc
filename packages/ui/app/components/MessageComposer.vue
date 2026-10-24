@@ -8,6 +8,7 @@ import {
   Maximize2,
   Music,
   Paperclip,
+  Radio,
   SendHorizontal,
   Smile,
   Type as TypeIcon,
@@ -18,6 +19,7 @@ import { Spinner } from "#layers/ui/app/components/ui/spinner";
 import { formatField, messageKeys } from "#layers/ui/app/lib/composer-keys";
 import type { Format } from "#layers/ui/app/lib/formatting";
 import { completeMention, mentionAt, type MentionQuery } from "#layers/ui/app/lib/timeline";
+import { readableSize } from "#layers/ui/app/lib/sizes";
 
 /*
  * The box a message is written in, wherever messages are written.
@@ -44,6 +46,11 @@ const props = defineProps<{
   send: (message: { body: string; attachmentIds: string[]; clientToken: string }) => Promise<void>;
   /** The up arrow in an empty box: edit the last thing sent. True if it did. */
   editLast?: () => boolean;
+  /**
+   * Whether a file may be sent straight to the other person's device, which
+   * the conversation decides: a direct one with one other person.
+   */
+  directTransfer?: boolean;
 }>();
 
 const emit = defineEmits<{ error: [message: string] }>();
@@ -163,13 +170,50 @@ async function addFiles(files: File[]) {
   }
 }
 
+/*
+ * Whether the next pick is for a direct transfer rather than an upload. The
+ * transfer itself is the transfer host's, wherever somebody goes next, so the
+ * file is handed to it rather than kept here.
+ */
+const pickingDirect = ref(false);
+
 function pickFiles(event: Event) {
   const input = event.target as HTMLInputElement;
   const files = [...(input.files ?? [])];
   // Cleared so picking the same file twice in a row still fires a change.
   input.value = "";
+  if (pickingDirect.value) {
+    pickingDirect.value = false;
+    for (const file of files) {
+      window.dispatchEvent(
+        new CustomEvent("tdc:offer-transfer", { detail: { roomId: props.roomId, file } }),
+      );
+    }
+    return;
+  }
   void addFiles(files);
 }
+
+async function pickDirect() {
+  pickingDirect.value = true;
+  await pickWith("");
+}
+
+/*
+ * What the person's files occupy against their quota, shown where they pick a
+ * file so a refusal is never the first they hear of it. Asked when the menu
+ * opens rather than with the page: most visits attach nothing.
+ */
+const quota = ref<{ quota: number; used: number } | null>(null);
+watch(attaching, async (open) => {
+  if (!open) return;
+  try {
+    const limits = await roomsApi.attachmentLimits();
+    quota.value = limits.quota > 0 ? limits : null;
+  } catch {
+    quota.value = null;
+  }
+});
 
 /*
  * A pasted screenshot is a file, not text. Only files are taken: pasting
@@ -495,7 +539,7 @@ defineExpose({
         </Button>
         <div
           v-if="attaching"
-          class="absolute bottom-full left-0 z-20 mb-1 w-44 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+          class="absolute bottom-full left-0 z-20 mb-1 w-52 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
         >
           <button
             v-for="option in attachmentOptions"
@@ -507,6 +551,24 @@ defineExpose({
             <component :is="option.icon" class="size-4 shrink-0 text-muted-foreground" />
             {{ option.label }}
           </button>
+          <button
+            v-if="directTransfer"
+            type="button"
+            class="flex w-full cursor-pointer items-center gap-2 border-t px-3 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+            :title="$ts('transfer.sendDirectlyHint')"
+            @click="pickDirect"
+          >
+            <Radio class="size-4 shrink-0 text-muted-foreground" />
+            {{ $t("transfer.sendDirectly") }}
+          </button>
+          <p v-if="quota" class="border-t px-3 pt-1.5 pb-1 text-xs text-muted-foreground">
+            {{
+              $t("attachment.quotaUsed", {
+                used: readableSize(quota.used),
+                quota: readableSize(quota.quota),
+              })
+            }}
+          </p>
         </div>
       </div>
 

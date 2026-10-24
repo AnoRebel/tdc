@@ -6,6 +6,8 @@ import type {
   CallReaction,
   CallRing,
   CallSignal,
+  DirectTransfer,
+  DirectTransferSignal,
   LiveEventPayload,
   LiveFrame,
   PrivateReply,
@@ -52,6 +54,12 @@ interface LiveHandlers {
   onCallTurnedAway?: (use: CallLinkUse) => void;
   /** Called with a passing reaction somebody in a call sent. */
   onCallReaction?: (reaction: CallReaction) => void;
+  /** Called when somebody offers this person a file directly. */
+  onTransferOffered?: (transfer: DirectTransfer) => void;
+  /** Called when a direct transfer this person is part of changes. */
+  onTransferUpdated?: (transfer: DirectTransfer) => void;
+  /** Called with the other device's part in connecting a direct transfer. */
+  onTransferSignal?: (signal: DirectTransferSignal) => void;
 }
 
 // Backoff bounds. The first retry is quick, because most disconnections are
@@ -238,6 +246,21 @@ export function useLiveConnection(handlers: LiveHandlers) {
         break;
       }
 
+      case "transfer.offered":
+      case "transfer.updated": {
+        const transfer = frame.payload as unknown as DirectTransfer | undefined;
+        if (!transfer) break;
+        if (frame.type === "transfer.offered") handlers.onTransferOffered?.(transfer);
+        else handlers.onTransferUpdated?.(transfer);
+        break;
+      }
+
+      case "transfer.signal": {
+        if (frame.payload)
+          handlers.onTransferSignal?.(frame.payload as unknown as DirectTransferSignal);
+        break;
+      }
+
       case "event.reminder": {
         /*
          * Raised for the whole page rather than handed to one view: a
@@ -337,5 +360,19 @@ export function useLiveConnection(handlers: LiveHandlers) {
     send({ action: "signal", call, to, signal: body });
   }
 
-  return { state: readonly(state), subscribe, unsubscribe, markRead, viewing, close, signal };
+  /** Sends this device's part in connecting a direct transfer. */
+  function transferSignal(transfer: string, body: DirectTransferSignal["signal"]) {
+    send({ action: "transfer", transfer, signal: body });
+  }
+
+  return {
+    state: readonly(state),
+    subscribe,
+    unsubscribe,
+    markRead,
+    viewing,
+    close,
+    signal,
+    transferSignal,
+  };
 }

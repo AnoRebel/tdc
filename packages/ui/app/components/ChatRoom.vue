@@ -97,6 +97,18 @@ const notificationPreferences = useNotificationPreferences();
 const scheduledMessages = useScheduled();
 const waitingHere = computed(() => scheduledMessages.inRoom(roomId.value));
 
+/*
+ * Whether a file may be sent straight to the other person's device: a direct
+ * conversation with one other person, on this server, which offers it.
+ */
+const directTransferOffered = computed(
+  () =>
+    room.value?.kind === "direct" &&
+    !room.value.homeServer &&
+    otherParticipants(room.value, user.value?.displayName).length === 1 &&
+    serverOffers("direct-transfers"),
+);
+
 /** Who the conversation is with, for a direct one: everybody but the reader. */
 const title = computed(() => {
   if (!room.value) return $ts("room.loading");
@@ -1065,13 +1077,12 @@ async function sendMessage(message: {
 
   try {
     /*
-     * A room hosted elsewhere takes a different path, and cannot carry
-     * attachments yet: those are stored by the server that holds the room.
-     * Nothing is added to the list here — the home server assigns the message
-     * its position and sends it back.
+     * A room hosted elsewhere takes a different path. Nothing is added to the
+     * list here — the home server assigns the message its position and sends
+     * it back, files and all.
      */
     if (room.value?.homeServer) {
-      await roomsApi.sendRemote(roomId.value, body);
+      await roomsApi.sendRemote(roomId.value, body, attachmentIds);
       return;
     }
 
@@ -1895,6 +1906,7 @@ watch(roomId, load, { immediate: true });
           :disabled="Boolean(room.archived)"
           :send="sendMessage"
           :edit-last="editLast"
+          :direct-transfer="directTransferOffered"
           @error="error = $event"
         />
 

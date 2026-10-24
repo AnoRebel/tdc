@@ -1,4 +1,5 @@
 import type {
+  AttachmentLimits,
   Message,
   PressRequest,
   Presence,
@@ -61,8 +62,14 @@ export function useRooms() {
    * is what everybody else sees rather than a local copy that might differ
    * from what was actually accepted.
    */
-  function sendRemote(roomId: string, body: string): Promise<{ id: string; sequence: number }> {
-    return api.post(`/api/rooms/${roomId}/remote/messages`, { body });
+  function sendRemote(
+    roomId: string,
+    body: string,
+    attachmentIds: string[] = [],
+  ): Promise<{ id: string; sequence: number }> {
+    // Files are uploaded here, where the person has an account, and copied
+    // from here by the home server and everybody else in the room.
+    return api.post(`/api/rooms/${roomId}/remote/messages`, { body, attachmentIds });
   }
 
   function leave(roomId: string): Promise<void> {
@@ -184,6 +191,11 @@ export function useRooms() {
     return api.post<Report>("/api/reports", filing);
   }
 
+  /** What may be uploaded, and what the person's files occupy of their quota. */
+  function attachmentLimits(): Promise<AttachmentLimits> {
+    return api.get<AttachmentLimits>("/api/attachments/limits");
+  }
+
   /** Writes a caption on one uploaded file, before the message is sent. */
   function captionAttachment(attachmentId: string, caption: string): Promise<void> {
     return api.put(`/api/attachments/${attachmentId}/caption`, { caption });
@@ -300,6 +312,7 @@ export function useRooms() {
     report,
     banFromChannel,
     captionAttachment,
+    attachmentLimits,
     schedule,
     scheduled,
     cancelScheduled,

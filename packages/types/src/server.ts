@@ -172,6 +172,9 @@ export type Capability =
   | "scheduled-messages"
   // Uploading files and images.
   | "attachments"
+  // Sending a file straight to another person's device in a direct
+  // conversation. On unless an operator turns it off.
+  | "direct-transfers"
   // The developer and company directory, enquiries and engagements. Off
   // unless an operator turns it on.
   | "directory"

@@ -470,7 +470,8 @@
       "hearts": "Mioyo",
       "work": "Kazi",
       "things": "Vitu"
-    }
+    },
+    "quotaUsed": "Faili zako zinatumia {used} kati ya {quota}"
   },
   "notification": {
     "title": "Arifa",
@@ -3134,5 +3135,29 @@
       "showsAttendanceHint": "Wengine wanakuona miongoni mwa wanaohudhuria. Waandaaji wa tukio huwaona wanaohudhuria daima."
     },
     "remindMe": "Nikumbushe kabla halijaanza"
+  },
+  "transfer": {
+    "region": "Uhamisho wa moja kwa moja",
+    "sendDirectly": "Tuma moja kwa moja…",
+    "sendDirectlyHint": "Moja kwa moja hadi kwenye kifaa chao mkiwa nyote mtandaoni, bila kuihifadhi kwenye seva",
+    "waiting": "Inasubiri akubali…",
+    "recipientOffline": "Hayupo mtandaoni. Ataiona akirudi ndani ya dakika chache zijazo.",
+    "offeredBy": "{name} anataka kukutumia hii moja kwa moja",
+    "addressWarning": "Ukikubali, kifaa chako kitaunganishwa na chao: kila mmoja wenu ataweza kuona anwani ya mtandao ya mwingine, na kipitishi pia kama kitatumika. Jina na ukubwa ni vile mtumaji anavyosema.",
+    "accept": "Kubali",
+    "decline": "Kataa",
+    "connecting": "Inaunganisha…",
+    "delivered": "Imefika",
+    "saved": "Imehifadhiwa",
+    "downloaded": "Imepokelewa — angalia vipakuliwa vyako",
+    "declined": "Amekataa",
+    "expired": "Hakuna aliyejibu kwa wakati",
+    "cancelled": "Imesimamishwa",
+    "couldNotConnect": "Vifaa vyenu havikuweza kufikiana",
+    "couldNotOffer": "Faili hii haikuweza kutolewa",
+    "incomplete": "Sehemu ya faili haikufika",
+    "sendThroughServer": "Tuma kupitia seva badala yake",
+    "uploading": "Inapakia {sent} kati ya {size}",
+    "progress": "Inatuma {name}"
   }
 }

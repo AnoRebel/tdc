@@ -470,7 +470,8 @@
       "hearts": "Hearts",
       "work": "Work",
       "things": "Things"
-    }
+    },
+    "quotaUsed": "Your files use {used} of {quota}"
   },
   "notification": {
     "title": "Notifications",
@@ -3134,5 +3135,29 @@
       "showsAttendanceHint": "Others see you among the people going. The organisers of an event always see who is coming."
     },
     "remindMe": "Remind me before it starts"
+  },
+  "transfer": {
+    "region": "Direct transfers",
+    "sendDirectly": "Send directly…",
+    "sendDirectlyHint": "Straight to their device while you are both online, without storing it on the server",
+    "waiting": "Waiting for them to accept…",
+    "recipientOffline": "They are offline. They will see this if they come back in the next few minutes.",
+    "offeredBy": "{name} wants to send you this directly",
+    "addressWarning": "Accepting connects your device to theirs: each of you can see the other's network address, and so can a relay if one is used. The name and size are what the sender says.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "connecting": "Connecting…",
+    "delivered": "Delivered",
+    "saved": "Saved",
+    "downloaded": "Received — check your downloads",
+    "declined": "They declined",
+    "expired": "Nobody answered in time",
+    "cancelled": "Stopped",
+    "couldNotConnect": "Your devices could not reach each other",
+    "couldNotOffer": "This file could not be offered",
+    "incomplete": "Part of the file did not arrive",
+    "sendThroughServer": "Send through the server instead",
+    "uploading": "Uploading {sent} of {size}",
+    "progress": "Sending {name}"
   }
 }

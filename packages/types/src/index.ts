@@ -20,5 +20,6 @@ export * from "./integrations";
 export * from "./directory";
 export * from "./projects";
 export * from "./calls";
+export * from "./transfers";
 export * from "./translation";
 export * from "./events";

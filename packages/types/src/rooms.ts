@@ -171,7 +171,11 @@ export type LiveFrameType =
   | "call.turned_away"
   | "call.reaction"
   // An event somebody is going to is about to start.
-  | "event.reminder";
+  | "event.reminder"
+  // A file offered directly; a direct transfer changed; its negotiation.
+  | "transfer.offered"
+  | "transfer.updated"
+  | "transfer.signal";
 
 /** One frame from the live connection. */
 export interface LiveFrame {
@@ -219,6 +223,13 @@ export interface Attachment {
   contentType: string;
   /** Size in bytes. */
   size: number;
+  /** The server whose member sent this, for a file from elsewhere. */
+  origin?: string;
+  /**
+   * Whether the bytes are on this server yet. A file from elsewhere is copied
+   * the first time anybody here opens it, so its first view may take a moment.
+   */
+  held?: boolean;
   /** Where to fetch the file itself. */
   url: string;
   /** Whether a client can be expected to display this inline. */
