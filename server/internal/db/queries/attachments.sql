@@ -63,8 +63,13 @@ WHERE id = $1 AND uploader_id = $2 AND event_id IS NULL;
 -- Counted by distinct stored object rather than by attachment: the same file
 -- sent twice occupies one place, so charging it twice would refuse uploads
 -- against space that is not being used.
+-- A file from another server counts once its bytes have been copied here, and
+-- not before: until then it occupies nothing.
 SELECT COALESCE(SUM(size_bytes), 0)::bigint
-FROM (SELECT DISTINCT ON (storage_key) storage_key, size_bytes FROM attachments) AS unique_objects;
+FROM (
+    SELECT DISTINCT ON (storage_key) storage_key, size_bytes FROM attachments
+    WHERE origin_server IS NULL OR fetched_at IS NOT NULL
+) AS unique_objects;
 
 -- name: MarkAttachmentSensitive :execrows
 -- Marks media so viewers see it obscured until they choose otherwise.

@@ -236,7 +236,11 @@ var excluded = map[string]string{
 	"user_presence":       "who is online, which lapses in seconds",
 	"event_idempotency":   "retry keys for messages being sent, which lapse",
 	"call_invites":        "who was let into a call in progress",
-	"call_lobby":          "who is waiting to be let into a call in progress",
+	"file_uploads": "files part way through being uploaded, whose pieces are not attachments " +
+		"and lapse within a day; whoever was sending one sends it again",
+	"direct_transfers": "offers to send a file straight between two devices, which lapse in minutes " +
+		"and whose files never touched this server",
+	"call_lobby": "who is waiting to be let into a call in progress",
 	"automatic_reply_log": "who was answered automatically today, which keeps a reply to one a day " +
 		"and lapses in a day",
 	"message_translations": "translations already made, which are made again when asked for",

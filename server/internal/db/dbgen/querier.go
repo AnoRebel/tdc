@@ -23,6 +23,12 @@ type Querier interface {
 	// Whoever creates a company is its first administrator, accepted from the
 	// start: they are consenting by creating it.
 	AddCompanyFounder(ctx context.Context, arg AddCompanyFounderParams) error
+	// Records one more piece, only if it is the next one and still fits.
+	//
+	// The count of keys is the piece number the caller sent, so a retried or
+	// concurrent attempt at a piece already recorded matches nothing; whoever
+	// loses deletes the object it stored.
+	AddFileUploadPiece(ctx context.Context, arg AddFileUploadPieceParams) (FileUpload, error)
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
 	// Reacting twice with the same emoji is the same as reacting once.
 	//
@@ -67,6 +73,9 @@ type Querier interface {
 	// person cannot claim another's upload, and an attachment cannot be moved
 	// between messages after the fact.
 	AttachToEvent(ctx context.Context, arg AttachToEventParams) (int64, error)
+	// What one person's files occupy, counted once per stored file: sending the
+	// same file twice costs no more space, so it costs no more quota.
+	AttachmentBytesBy(ctx context.Context, uploaderID *uuid.UUID) (int64, error)
 	// Re-banning somebody already banned updates the terms rather than failing:
 	// a moderator extending a ban means the new terms, not an error.
 	BanFromChannel(ctx context.Context, arg BanFromChannelParams) error
@@ -187,6 +196,7 @@ type Querier interface {
 	// How far behind a client is, so the server can decide between replaying the
 	// gap and telling the client to resynchronise.
 	CountEventsSince(ctx context.Context, arg CountEventsSinceParams) (int64, error)
+	CountFileUploadsBy(ctx context.Context, uploaderID uuid.UUID) (int64, error)
 	CountMilestoneIssues(ctx context.Context, projectID uuid.UUID) ([]CountMilestoneIssuesRow, error)
 	CountOpenCalls(ctx context.Context) (int64, error)
 	CountOpenReports(ctx context.Context) (int64, error)
@@ -255,6 +265,7 @@ type Querier interface {
 	// out too; the participant key names the enquiry, so it never collides with
 	// the ordinary direct conversation between the same two people.
 	CreateEnquiryRoom(ctx context.Context, arg CreateEnquiryRoomParams) (Room, error)
+	CreateFileUpload(ctx context.Context, arg CreateFileUploadParams) (FileUpload, error)
 	CreateGuestUser(ctx context.Context, arg CreateGuestUserParams) (User, error)
 	CreateIncomingWebhook(ctx context.Context, arg CreateIncomingWebhookParams) (IncomingWebhook, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
@@ -319,6 +330,7 @@ type Querier interface {
 	DeleteExpiredRecoveryTokens(ctx context.Context) (int64, error)
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteExpiredWebauthnCeremonies(ctx context.Context) (int64, error)
+	DeleteFileUpload(ctx context.Context, id uuid.UUID) error
 	DeleteIntegrationContext(ctx context.Context, arg DeleteIntegrationContextParams) (int64, error)
 	// Everything a program remembered, for when it is removed.
 	DeleteIntegrationContextForIntegration(ctx context.Context, integrationID uuid.UUID) (int64, error)
@@ -484,6 +496,7 @@ type Querier interface {
 	GetEngagementFor(ctx context.Context, arg GetEngagementForParams) (Engagement, error)
 	GetEnquiry(ctx context.Context, id uuid.UUID) (Enquiry, error)
 	GetEventByID(ctx context.Context, id string) (Event, error)
+	GetFileUpload(ctx context.Context, id uuid.UUID) (FileUpload, error)
 	// What one program remembers about one person in one conversation.
 	GetIntegrationContext(ctx context.Context, arg GetIntegrationContextParams) (IntegrationContext, error)
 	GetIssueByID(ctx context.Context, id uuid.UUID) (Issue, error)
@@ -647,6 +660,8 @@ type Querier interface {
 	// Never the hash. What this returns is what a person is shown, and the token
 	// itself is not recoverable by anybody, including its owner.
 	ListAPITokensForUser(ctx context.Context, userID uuid.UUID) ([]ListAPITokensForUserRow, error)
+	// Uploads nobody has added to since a moment, oldest first.
+	ListAbandonedFileUploads(ctx context.Context, arg ListAbandonedFileUploadsParams) ([]FileUpload, error)
 	// The people a company may list: those who agreed.
 	ListAcceptedCompanyMembers(ctx context.Context, companyID uuid.UUID) ([]ListAcceptedCompanyMembersRow, error)
 	// Who pressed what on one message, oldest first.
@@ -1051,6 +1066,10 @@ type Querier interface {
 	PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomPeer, error)
 	// Reloads and restarts another node asked of this one.
 	PendingOperationsFor(ctx context.Context, node string) ([]Operation, error)
+	// What uploads in progress have reserved, server-wide.
+	PendingUploadBytes(ctx context.Context) (int64, error)
+	// What one person's uploads in progress have reserved.
+	PendingUploadBytesBy(ctx context.Context, uploaderID uuid.UUID) (int64, error)
 	// Pinning something already pinned updates who pinned it and when, rather than
 	// failing: the second person's intent is the current one.
 	PinMessage(ctx context.Context, arg PinMessageParams) error
@@ -1390,6 +1409,8 @@ type Querier interface {
 	// Counted by distinct stored object rather than by attachment: the same file
 	// sent twice occupies one place, so charging it twice would refuse uploads
 	// against space that is not being used.
+	// A file from another server counts once its bytes have been copied here, and
+	// not before: until then it occupies nothing.
 	TotalAttachmentBytes(ctx context.Context) (int64, error)
 	// When it was last used, for the list where somebody decides what to revoke.
 	//

@@ -79,7 +79,7 @@ INSERT INTO attachments (
     preview_key, preview_type, preview_width, preview_height, width, height,
     caption, animated
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source
+RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source, origin_server, fetched_at
 `
 
 type CreateAttachmentParams struct {
@@ -142,6 +142,8 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 		&i.Animated,
 		&i.SensitiveBy,
 		&i.SensitiveSource,
+		&i.OriginServer,
+		&i.FetchedAt,
 	)
 	return i, err
 }
@@ -156,7 +158,7 @@ func (q *Queries) DeleteAttachment(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAttachment = `-- name: GetAttachment :one
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments WHERE id = $1
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source, origin_server, fetched_at FROM attachments WHERE id = $1
 `
 
 func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error) {
@@ -183,12 +185,14 @@ func (q *Queries) GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, 
 		&i.Animated,
 		&i.SensitiveBy,
 		&i.SensitiveSource,
+		&i.OriginServer,
+		&i.FetchedAt,
 	)
 	return i, err
 }
 
 const listAttachmentsForEvent = `-- name: ListAttachmentsForEvent :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source, origin_server, fetched_at FROM attachments
 WHERE event_id = $1
 ORDER BY created_at
 `
@@ -223,6 +227,8 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 			&i.Animated,
 			&i.SensitiveBy,
 			&i.SensitiveSource,
+			&i.OriginServer,
+			&i.FetchedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -235,7 +241,7 @@ func (q *Queries) ListAttachmentsForEvent(ctx context.Context, eventID *string) 
 }
 
 const listAttachmentsForEvents = `-- name: ListAttachmentsForEvents :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments WHERE event_id = ANY($1::text[])
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source, origin_server, fetched_at FROM attachments WHERE event_id = ANY($1::text[])
 `
 
 // The files carried by a set of messages, so expiring the messages can remove
@@ -270,6 +276,8 @@ func (q *Queries) ListAttachmentsForEvents(ctx context.Context, eventIds []strin
 			&i.Animated,
 			&i.SensitiveBy,
 			&i.SensitiveSource,
+			&i.OriginServer,
+			&i.FetchedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -282,7 +290,7 @@ func (q *Queries) ListAttachmentsForEvents(ctx context.Context, eventIds []strin
 }
 
 const listOrphanedAttachments = `-- name: ListOrphanedAttachments :many
-SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source, origin_server, fetched_at FROM attachments
 WHERE attachments.event_id IS NULL AND attachments.created_at < $1
   -- An event's cover is held by the event rather than by a message.
   AND NOT EXISTS (SELECT 1 FROM calendar_events covers WHERE covers.cover_attachment_id = attachments.id)
@@ -326,6 +334,8 @@ func (q *Queries) ListOrphanedAttachments(ctx context.Context, arg ListOrphanedA
 			&i.Animated,
 			&i.SensitiveBy,
 			&i.SensitiveSource,
+			&i.OriginServer,
+			&i.FetchedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -388,7 +398,10 @@ func (q *Queries) SetAttachmentCaption(ctx context.Context, arg SetAttachmentCap
 
 const totalAttachmentBytes = `-- name: TotalAttachmentBytes :one
 SELECT COALESCE(SUM(size_bytes), 0)::bigint
-FROM (SELECT DISTINCT ON (storage_key) storage_key, size_bytes FROM attachments) AS unique_objects
+FROM (
+    SELECT DISTINCT ON (storage_key) storage_key, size_bytes FROM attachments
+    WHERE origin_server IS NULL OR fetched_at IS NOT NULL
+) AS unique_objects
 `
 
 // Storage in use, for the operator's capacity limit.
@@ -396,6 +409,8 @@ FROM (SELECT DISTINCT ON (storage_key) storage_key, size_bytes FROM attachments)
 // Counted by distinct stored object rather than by attachment: the same file
 // sent twice occupies one place, so charging it twice would refuse uploads
 // against space that is not being used.
+// A file from another server counts once its bytes have been copied here, and
+// not before: until then it occupies nothing.
 func (q *Queries) TotalAttachmentBytes(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, totalAttachmentBytes)
 	var column_1 int64

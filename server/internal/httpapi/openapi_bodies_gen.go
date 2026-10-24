@@ -293,6 +293,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/uploads/:id": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/views/:id": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -1081,6 +1086,11 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/statuses": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]map[string]any]()},
+		},
+	},
+	"GET /api/uploads/:id": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[uploadResponse]()},
 		},
 	},
 	"GET /api/version": {
@@ -2008,10 +2018,21 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"POST /api/rooms/:id/uploads": {
+		Request: reflect.TypeFor[beginUploadRequest](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[uploadResponse]()},
+		},
+	},
 	"POST /api/setup": {
 		Request: reflect.TypeFor[registerRequest](),
 		Responses: []responseBody{
 			{Status: 201, Type: reflect.TypeFor[userResponse]()},
+		},
+	},
+	"POST /api/uploads/:id/finish": {
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[attachmentResponse]()},
 		},
 	},
 	"POST /api/views": {
@@ -2320,6 +2341,11 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[channelVisibilityRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[roomResponse]()},
+		},
+	},
+	"PUT /api/uploads/:id/pieces/:piece": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[uploadResponse]()},
 		},
 	},
 }

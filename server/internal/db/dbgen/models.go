@@ -105,6 +105,8 @@ type Attachment struct {
 	Animated        bool
 	SensitiveBy     *string
 	SensitiveSource *string
+	OriginServer    *string
+	FetchedAt       *time.Time
 }
 
 type AuditEntry struct {
@@ -375,6 +377,20 @@ type Cycle struct {
 	CreatedAt    time.Time
 }
 
+type DirectTransfer struct {
+	ID          uuid.UUID
+	RoomID      uuid.UUID
+	SenderID    uuid.UUID
+	RecipientID uuid.UUID
+	Filename    string
+	SizeBytes   int64
+	ContentType string
+	State       string
+	CreatedAt   time.Time
+	ExpiresAt   time.Time
+	EndedAt     *time.Time
+}
+
 type DirectoryProfile struct {
 	UserID                uuid.UUID
 	Headline              string
@@ -489,6 +505,19 @@ type EventIdempotency struct {
 	ClientToken string
 	EventID     string
 	CreatedAt   time.Time
+}
+
+type FileUpload struct {
+	ID            uuid.UUID
+	UploaderID    uuid.UUID
+	RoomID        uuid.UUID
+	Filename      string
+	SizeBytes     int64
+	PieceBytes    int32
+	PieceKeys     []string
+	ReceivedBytes int64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type IncomingWebhook struct {

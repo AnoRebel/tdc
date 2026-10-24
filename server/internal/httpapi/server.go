@@ -475,6 +475,9 @@ func (s *Server) Run(ctx context.Context) error {
 	// Messages written earlier and sent now. Every node runs a pass; each
 	// claims what it sends, so nothing goes out twice.
 	go s.RunScheduled(ctx)
+	// Abandoned uploads and files never sent, whose storage nobody will
+	// otherwise release.
+	go s.RunFileSweeps(ctx)
 
 	// People whose connection went without saying goodbye leave their calls.
 	go s.sweepCallsPeriodically(ctx)

@@ -17,6 +17,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
+	"github.com/AnoRebel/tdc/server/internal/settings"
 )
 
 // presignedLifetime is how long a redirect to the object store stays valid.
@@ -122,10 +123,23 @@ type limitsResponse struct {
 	MaxPerMessage  int      `json:"maxPerMessage"`
 	AllowedTypes   []string `json:"allowedTypes"`
 	BlockedTypes   []string `json:"blockedTypes"`
+	// Quota is what the caller's files may occupy, zero for no quota, and
+	// Used is what they occupy now, uploads in progress included.
+	Quota int64 `json:"quota"`
+	Used  int64 `json:"used"`
+	// PieceBytes is the size to send a file in, for the upload in pieces.
+	PieceBytes int `json:"pieceBytes"`
 }
 
 func (s *Server) handleAttachmentLimits(c *echo.Context) error {
-	limits := s.attachments.Limits()
+	ctx := c.Request().Context()
+	user, _ := currentUser(c)
+	limits := s.attachments.LimitsNow(ctx)
+
+	used, err := s.usedBy(ctx, user.ID)
+	if err != nil {
+		return err
+	}
 
 	return c.JSON(http.StatusOK, limitsResponse{
 		MaxFileSize:    limits.MaxFileSize,
@@ -133,6 +147,9 @@ func (s *Server) handleAttachmentLimits(c *echo.Context) error {
 		MaxPerMessage:  limits.MaxPerMessage,
 		AllowedTypes:   limits.AllowedTypes,
 		BlockedTypes:   limits.BlockedTypes,
+		Quota:          s.limitFor(ctx, settings.FilesQuotaPerPersonBytes),
+		Used:           used,
+		PieceBytes:     s.pieceBytes(ctx),
 	})
 }
 
@@ -165,6 +182,9 @@ func (s *Server) handleUploadAttachment(c *echo.Context) error {
 	// The size is the multipart header's, which the service verifies as it
 	// reads — this is the cheap refusal, not the authoritative one.
 	if err := s.withinStorageLimit(ctx, file.Size); err != nil {
+		return err
+	}
+	if err := s.withinPersonQuota(ctx, user.ID, file.Size); err != nil {
 		return err
 	}
 

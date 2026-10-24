@@ -11,18 +11,18 @@ Scope note: these tasks implement the file-transfer requirements of `messaging/a
 
 ## 2. Limits, quotas and resumable uploads
 
-- [ ] 2.1 Migration 000436: `file_uploads`; `attachments.origin_server` and `fetched_at`; `direct_transfers`; backup guard (both new tables excluded with reasons)
-- [ ] 2.2 Settings: `files.max_file_bytes`, `files.max_message_bytes`, `files.quota_per_person_bytes`, `files.upload_piece_bytes`, `files.abandoned_after_hours`; the attachments service reads limits from them per request
-- [ ] 2.3 Uploads in pieces: begin (membership, size, person and server quota, at most 20 in progress), piece (raw or base64, in order, bounded), status, finish (the single-upload path), abandon; only the uploader; catalogued, OpenAPI record regenerated
-- [ ] 2.4 `GET /api/attachments/limits` gains the quota, what the person uses and the piece size; the server-wide limit counts uploads in progress
-- [ ] 2.5 Sweep: abandoned uploads and their pieces, and files never sent, after `files.abandoned_after_hours`
-- [ ] 2.6 Tests: a file in pieces arrives whole and identical; out-of-order and oversized pieces are refused; another person cannot see or add to an upload; quota and server limit refuse at begin; finish applies type limits; the sweep removes pieces and orphans. Guards broken in turn
+- [x] 2.1 Migration 000436: `file_uploads`; `attachments.origin_server` and `fetched_at`; `direct_transfers`; backup guard (both new tables excluded with reasons)
+- [x] 2.2 Settings: `files.max_file_bytes`, `files.max_message_bytes`, `files.quota_per_person_bytes`, `files.upload_piece_bytes`, `files.abandoned_after_hours`; the attachments service reads limits from them per request
+- [x] 2.3 Uploads in pieces: begin (membership, size, person and server quota, at most 20 in progress), piece (raw or base64, in order, bounded), status, finish (the single-upload path), abandon; only the uploader; catalogued, OpenAPI record regenerated
+- [x] 2.4 `GET /api/attachments/limits` gains the quota, what the person uses and the piece size; the server-wide limit counts uploads in progress
+- [x] 2.5 Sweep: abandoned uploads and their pieces, and files never sent, after `files.abandoned_after_hours`
+- [x] 2.6 Tests: a file in pieces arrives whole and identical; out-of-order and oversized pieces are refused; another person cannot see or add to an upload; quota and server limit refuse at begin; finish applies type limits; the sweep removes pieces and orphans. Guards broken in turn
 
 ## 3. Clients upload in pieces
 
-- [ ] 3.1 A shared, lazily loaded upload loop: begin, send pieces with retry and backoff, resume from the server's count, finish, cancel
-- [ ] 3.2 Web: pieces as raw bytes with per-piece progress; desktop: pieces as base64 through `Send`, with progress
-- [ ] 3.3 Desktop: saving a file streams to disk through a save dialog
+- [x] 3.1 A shared, lazily loaded upload loop: begin, send pieces with retry and backoff, resume from the server's count, finish, cancel
+- [x] 3.2 Web: pieces as raw bytes with per-piece progress; desktop: pieces as base64 through `Send`, with progress
+- [x] 3.3 Desktop: saving a file streams to disk through a save dialog
 - [ ] 3.4 The composer shows the person's quota and refuses a file over it before sending
 
 ## 4. Files across servers

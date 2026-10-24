@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -289,8 +290,9 @@ func TestOversizedUploadNamesTheLimit(t *testing.T) {
 	token := completeSetup(t, handler)
 	roomID := makeRoom(t, handler, token, "general", "public")
 
-	// Past the 25 MiB default, built from a real PNG header so the file is
+	// Past a 25 MiB limit, built from a real PNG header so the file is
 	// refused for its size rather than its type.
+	setSetting(t, handler, token, "files.max_file_bytes", strconv.Itoa(25<<20))
 	oversized := append(append([]byte{}, testPNG...), bytes.Repeat([]byte{0}, (25<<20)+1024)...)
 
 	recorder := uploadFile(t, handler, token, roomID, "huge.png", oversized)

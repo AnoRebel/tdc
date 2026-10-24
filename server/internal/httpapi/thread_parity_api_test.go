@@ -92,16 +92,16 @@ func TestAReplyCarriesFiles(t *testing.T) {
 		t.Errorf("the thread has %d replies after a refusal, want 1", len(replies))
 	}
 
-	// Nor can a reply carry somebody else's upload: binding is scoped to the
-	// uploader, as it is for a message in the channel.
+	// Nor can a reply carry somebody else's upload: it is refused, as a
+	// message in the channel naming one is, rather than posted without it.
 	other := registerAndSignIn(t, handler, "amina")
 	joinRoom(t, handler, other, roomID)
 	theirs := decode(t, uploadFile(t, handler, other, roomID, "theirs.png", testPNG))
 	theirID, _ := theirs["id"].(string)
-	stolen := replyIn(t, handler, owner, roomID, rootID,
-		map[string]any{"body": "mine now", "attachmentIds": []string{theirID}})
-	if files, _ := stolen["attachments"].([]any); len(files) != 0 {
-		t.Error("a reply carried another person's upload")
+	stolen := call(t, handler, http.MethodPost, "/api/rooms/"+roomID+"/threads/"+rootID+"/replies",
+		map[string]any{"body": "mine now", "attachmentIds": []string{theirID}}, owner)
+	if stolen.Code == http.StatusCreated {
+		t.Error("a reply carrying another person's upload was posted")
 	}
 }
 

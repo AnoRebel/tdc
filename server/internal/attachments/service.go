@@ -97,6 +97,9 @@ type Service struct {
 	queries *dbgen.Queries
 	store   storage.Store
 	limits  Limits
+	// limitsNow, when set, supplies the limits per request, so an operator's
+	// change applies to the next upload without a restart.
+	limitsNow func(context.Context) Limits
 	// spoolDir is where an upload is held while it is being measured. Empty
 	// uses the operating system's temporary directory.
 	spoolDir string
@@ -153,6 +156,21 @@ func (s *Service) WithScanner(scanner Scanner, failOpen bool) *Service {
 // them before someone picks a file rather than after.
 func (s *Service) Limits() Limits { return s.limits }
 
+// WithLimits reads the limits from somewhere that can change while the server
+// runs, such as the operator's settings.
+func (s *Service) WithLimits(now func(context.Context) Limits) *Service {
+	s.limitsNow = now
+	return s
+}
+
+// LimitsNow returns the limits that apply to a request being made now.
+func (s *Service) LimitsNow(ctx context.Context) Limits {
+	if s.limitsNow != nil {
+		return s.limitsNow(ctx)
+	}
+	return s.limits
+}
+
 // Upload stores a file and records it against a room.
 //
 // The reader is not trusted to be honest about its length, so the file is
@@ -169,7 +187,7 @@ func (s *Service) Upload(
 ) (*Attachment, error) {
 	// One byte beyond the limit is enough to know the limit was exceeded, and
 	// stops a client streaming an unbounded body into the spool.
-	limit := s.limits.MaxFileSize
+	limit := s.LimitsNow(ctx).MaxFileSize
 	if limit <= 0 {
 		limit = DefaultLimits().MaxFileSize
 	}
@@ -183,7 +201,27 @@ func (s *Service) Upload(
 		os.Remove(spooled.Name())
 	}()
 
-	if err := s.limits.CheckSize(size); err != nil {
+	return s.ingest(ctx, roomID, uploaderID, uploaderAddress, declaredName, spooled, size)
+}
+
+/*
+ingest checks, stores and records a file already spooled to disk.
+
+The one path every file takes, whether it arrived in one request or in pieces:
+whatever is checked about a file is checked here, so a way of uploading cannot
+be the way around a check.
+*/
+func (s *Service) ingest(
+	ctx context.Context,
+	roomID uuid.UUID,
+	uploaderID uuid.UUID,
+	uploaderAddress string,
+	declaredName string,
+	spooled *os.File,
+	size int64,
+) (*Attachment, error) {
+	limits := s.LimitsNow(ctx)
+	if err := limits.CheckSize(size); err != nil {
 		return nil, err
 	}
 
@@ -196,7 +234,7 @@ func (s *Service) Upload(
 	}
 	contentType := DetectType(head[:read])
 
-	if err := s.limits.CheckType(contentType); err != nil {
+	if err := limits.CheckType(contentType); err != nil {
 		return nil, err
 	}
 
@@ -442,7 +480,7 @@ func (s *Service) Bind(
 		return 0, nil
 	}
 
-	if err := s.limits.CheckCount(len(ids)); err != nil {
+	if err := s.LimitsNow(ctx).CheckCount(len(ids)); err != nil {
 		return 0, err
 	}
 
@@ -464,7 +502,8 @@ func (s *Service) Bind(
 // Called before the message is accepted, so a refusal names the limit rather
 // than leaving a message posted with files missing from it.
 func (s *Service) CheckBatch(ctx context.Context, ids []uuid.UUID) error {
-	if err := s.limits.CheckCount(len(ids)); err != nil {
+	limits := s.LimitsNow(ctx)
+	if err := limits.CheckCount(len(ids)); err != nil {
 		return err
 	}
 
@@ -477,7 +516,7 @@ func (s *Service) CheckBatch(ctx context.Context, ids []uuid.UUID) error {
 		total += attachment.Size
 	}
 
-	return s.limits.CheckTotal(total)
+	return limits.CheckTotal(total)
 }
 
 func fromRow(row dbgen.Attachment) *Attachment {

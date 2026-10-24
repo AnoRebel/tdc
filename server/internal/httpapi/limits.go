@@ -81,6 +81,11 @@ func (s *Server) withinStorageLimit(ctx context.Context, adding int64) error {
 		s.log.Warn("cannot total attachment storage to enforce a limit", "error", err)
 		return nil
 	}
+	// Uploads in progress have reserved their declared size: counting them is
+	// what stops several at once together passing a limit each would pass.
+	if pending, err := s.queries.PendingUploadBytes(ctx); err == nil {
+		used += pending
+	}
 
 	if used+adding > limit {
 		return echo.NewHTTPError(http.StatusInsufficientStorage,
