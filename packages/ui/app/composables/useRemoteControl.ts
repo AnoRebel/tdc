@@ -153,6 +153,12 @@ export const useRemoteControl = createGlobalState(() => {
     const room = c.roomId.value;
     const presenter = c.call.value?.presenter;
     if (!room || !presenter || presenter === user.value?.id) return;
+    // Control travels on a channel between the two people's own
+    // connections, which a call through the forwarding unit does not have.
+    if (c.call.value?.mode === "sfu") {
+      mine.value = { room, sharer: presenter, state: "refused", reason: "forwarded" };
+      return;
+    }
     if (!c.sendControl(room, presenter, { t: "ask" })) {
       mine.value = { room, sharer: presenter, state: "refused", reason: "platform" };
       return;

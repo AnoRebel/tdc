@@ -36,6 +36,7 @@ const refusals = computed(() => ({
   "no-xtest": $ts("calls.control.refused.no-xtest", { name: who.value }),
   accessibility: $ts("calls.control.refused.accessibility", { name: who.value }),
   platform: $ts("calls.control.refused.platform", { name: who.value }),
+  forwarded: $ts("calls.control.refused.forwarded", { name: who.value }),
 }));
 const outcome = computed(() => {
   switch (state.value) {

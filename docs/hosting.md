@@ -1377,7 +1377,9 @@ relays them. Only the desktop application can be controlled, because only it
 can put input into the operating system: through X11's XTEST on Linux (not
 under Wayland, which does not allow it), `SendInput` on Windows, and Quartz
 events on macOS once the person has allowed TDC under Accessibility. Nothing
-needs installing or configuring on the server for it.
+needs installing or configuring on the server for it. Because it needs that direct
+channel, remote control is not available in a call carried by the forwarding
+unit; asking for it there says so.
 
 #### The forwarding unit
 

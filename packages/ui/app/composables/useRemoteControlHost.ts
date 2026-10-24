@@ -22,7 +22,14 @@ export interface ControlInput {
 
 /** Why this computer cannot be controlled, when it cannot. */
 export type ControlRefusal =
-  "browser" | "not-screen" | "wayland" | "no-display" | "no-xtest" | "accessibility" | "platform";
+  | "browser"
+  | "not-screen"
+  | "wayland"
+  | "no-display"
+  | "no-xtest"
+  | "accessibility"
+  | "platform"
+  | "forwarded";
 
 export interface ControlCapability {
   available: boolean;

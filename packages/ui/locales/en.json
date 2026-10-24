@@ -2292,7 +2292,8 @@
         "no-display": "{name}'s computer has no display TDC can reach.",
         "no-xtest": "{name}'s X server does not offer XTEST, which remote control needs.",
         "accessibility": "{name} has not allowed TDC to control their Mac. They can allow it in System Settings, Privacy & Security, Accessibility.",
-        "platform": "{name}'s computer cannot be controlled remotely."
+        "platform": "{name}'s computer cannot be controlled remotely.",
+        "forwarded": "This call goes through the server's forwarding unit, and remote control needs a direct connection between you and {name}. It works in calls small enough to be carried directly."
       }
     },
     "line": {

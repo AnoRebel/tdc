@@ -386,6 +386,9 @@ export const useCall = createGlobalState(() => {
       polite: true,
       makingOffer: false,
       ignoreOffer: false,
+      // Remote control needs a channel straight to the sharer; the unit
+      // carries none, and asking for control says so.
+      control: null,
     };
     void syncPeer(room, peer);
     connection.ontrack = ({ track: arrived, streams }) => {
@@ -584,6 +587,9 @@ export const useCall = createGlobalState(() => {
       const sender = peer.senders[index];
       if (!sender?.track) continue;
       const parameters = sender.getParameters();
+      // A camera sent to the forwarding unit in three copies: the unit
+      // chooses among them for each receiver, so its copies are left alone.
+      if ((parameters.encodings?.length ?? 0) > 1) continue;
       const encoding = parameters.encodings?.[0];
       if (!encoding) continue;
       for (const [key, value] of Object.entries(encodingFor(quality.value.level, slot))) {

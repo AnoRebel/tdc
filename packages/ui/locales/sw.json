@@ -2292,7 +2292,8 @@
         "no-display": "Kompyuta ya {name} haina skrini ambayo TDC inaweza kuifikia.",
         "no-xtest": "Seva ya X ya {name} haitoi XTEST, ambayo udhibiti wa mbali unahitaji.",
         "accessibility": "{name} hajairuhusu TDC kudhibiti Mac yake. Anaweza kuiruhusu katika Mipangilio ya Mfumo, Faragha na Usalama, Ufikivu.",
-        "platform": "Kompyuta ya {name} haiwezi kudhibitiwa kwa mbali."
+        "platform": "Kompyuta ya {name} haiwezi kudhibitiwa kwa mbali.",
+        "forwarded": "Simu hii inapitia kipitishi cha seva, na udhibiti wa mbali unahitaji muunganisho wa moja kwa moja kati yako na {name}. Unafanya kazi katika simu ndogo za kutosha kubebwa moja kwa moja."
       }
     },
     "line": {
