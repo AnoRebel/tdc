@@ -175,6 +175,17 @@ useIntervalFn(() => {
   if (scheduledMessages.scheduled.value.length) void scheduledMessages.refresh();
 }, 60_000);
 
+/*
+ * The status lapses, and an automatic reply's window closes, on the server's
+ * clock too — so while either could change by itself, the foot of the
+ * sidebar asks again each minute rather than going on saying "automatic reply
+ * on" for one that ended hours ago.
+ */
+useIntervalFn(() => {
+  const own = ownStatus.own.value;
+  if (own.automaticReply || own.expiresAt) void ownStatus.refresh();
+}, 60_000);
+
 async function refresh() {
   try {
     const [all, conversations, counts] = await Promise.all([
