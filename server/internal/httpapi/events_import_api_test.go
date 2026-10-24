@@ -94,7 +94,9 @@ func TestFollowingACalendar(t *testing.T) {
 	if gone["cancelledAt"] == nil {
 		t.Error("an event dropped from the followed calendar is not cancelled")
 	}
+	// Read before the pass below claims it, so a failure says what was recorded.
+	recorded := mustCall(t, handler, http.MethodGet, "/api/calendar/subscriptions", nil, admin, http.StatusOK).Body.String()
 	if fetched := serverBehind(t, handler).RefreshDueSubscriptions(context.Background()); fetched != 0 {
-		t.Errorf("a subscription just fetched was fetched again: %d", fetched)
+		t.Errorf("a subscription just fetched was fetched again: %d; recorded %s", fetched, recorded)
 	}
 }

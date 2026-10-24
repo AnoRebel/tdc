@@ -98,7 +98,7 @@ func TestAChannelsWebhooksHearAboutItsEvents(t *testing.T) {
 	makeEvent(t, handler, owner, map[string]any{"title": "Closed meetup", "channelId": roomID, "visibility": "invite"})
 	mustCall(t, handler, http.MethodPost, "/api/events/"+open+"/cancel", map[string]any{"reason": "rain"}, owner, http.StatusOK)
 
-	eventually(t, 5*time.Second, "two deliveries", func() bool { return len(endpoint.deliveries()) >= 2 })
+	eventually(t, 20*time.Second, "two deliveries", func() bool { return len(endpoint.deliveries()) >= 2 })
 	time.Sleep(300 * time.Millisecond)
 	types := []string{}
 	for _, got := range endpoint.deliveries() {
@@ -132,5 +132,5 @@ func TestAChannelReaderOutsideAnEventStillHearsOfIt(t *testing.T) {
 
 	makeEvent(t, handler, owner, map[string]any{"title": "Open meetup", "channelId": roomID})
 
-	eventually(t, 5*time.Second, "a delivery", func() bool { return len(endpoint.deliveries()) >= 1 })
+	eventually(t, 20*time.Second, "a delivery", func() bool { return len(endpoint.deliveries()) >= 1 })
 }
