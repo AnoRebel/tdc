@@ -61,6 +61,24 @@ export type CallView = "expanded" | "docked" | "minimized";
  */
 const SLOTS = ["audio", "video", "video", "audio"] as const;
 
+/**
+ * The forwarding unit, as the server names it: nobody. A call past the mesh
+ * limit, on a server that forwards, is carried by one connection to it
+ * rather than one to each other person; the call's state says which.
+ */
+const UNIT = "00000000-0000-0000-0000-000000000000";
+
+/*
+ * The camera in three copies when forwarded — a quarter, a half and the
+ * full size — so the unit can send each receiver the one their tile and
+ * their connection suit. The ceilings are the ones the unit plans with.
+ */
+const SIMULCAST: RTCRtpEncodingParameters[] = [
+  { rid: "q", scaleResolutionDownBy: 4, maxBitrate: 150_000 },
+  { rid: "h", scaleResolutionDownBy: 2, maxBitrate: 500_000 },
+  { rid: "f", maxBitrate: 1_500_000 },
+];
+
 interface Peer {
   connection: RTCPeerConnection;
   /**
@@ -258,7 +276,12 @@ export const useCall = createGlobalState(() => {
     return Object.values(calls.value).find((each) => each.id === callId)?.roomId ?? null;
   }
 
+  function forwarded(room: string): boolean {
+    return calls.value[room]?.mode === "sfu";
+  }
+
   function createPeer(room: string, other: string): Peer {
+    if (other === UNIT) return createForwardedPeer(room);
     const connection = new RTCPeerConnection({ iceServers });
     // Decided by something both sides know and agree on, so exactly one of
     // each pair yields when both offer at once.
@@ -338,10 +361,99 @@ export const useCall = createGlobalState(() => {
     return peer;
   }
 
+  /**
+   * The one connection of a forwarded call. We make its transceivers and
+   * offer first; the unit adds a track for each other person's microphone,
+   * camera and screen as they arrive, and offers those. Each arrives in a
+   * stream named for whose it is — "<user>:camera" or "<user>:screen".
+   * Polite: when both offer at once, ours yields.
+   */
+  function createForwardedPeer(room: string): Peer {
+    const connection = new RTCPeerConnection({ iceServers });
+    const current = calls.value[room];
+    // Whatever the unit holds of an earlier connection of ours goes first.
+    if (current) sendSignal(current.id, UNIT, { reset: true });
+    const senders = SLOTS.map(
+      (kind, slot) =>
+        connection.addTransceiver(kind, {
+          direction: "sendonly",
+          ...(slot === 1 ? { sendEncodings: SIMULCAST } : {}),
+        }).sender,
+    );
+    const peer: Peer = {
+      connection,
+      senders,
+      polite: true,
+      makingOffer: false,
+      ignoreOffer: false,
+    };
+    void syncPeer(room, peer);
+    connection.ontrack = ({ track: arrived, streams }) => {
+      const [person, what] = (streams[0]?.id ?? "").split(":");
+      if (!person) return;
+      const store = what === "screen" ? remoteScreens : remotes;
+      const streamsHere = new Map(store.get(room));
+      const into = streamsHere.get(person) ?? new MediaStream();
+      into.addTrack(arrived);
+      streamsHere.set(person, into);
+      store.set(room, streamsHere);
+    };
+    connection.onicecandidate = ({ candidate }) => {
+      const now = calls.value[room];
+      if (now) sendSignal(now.id, UNIT, { candidate: candidate?.toJSON() ?? null });
+    };
+    connection.onnegotiationneeded = async () => {
+      try {
+        peer.makingOffer = true;
+        await connection.setLocalDescription();
+        const now = calls.value[room];
+        if (now && connection.localDescription) {
+          sendSignal(now.id, UNIT, { description: connection.localDescription.toJSON() });
+        }
+      } finally {
+        peer.makingOffer = false;
+      }
+    };
+    connection.onconnectionstatechange = () => {
+      // The node forwarding the call went away: connect again, to whichever
+      // node takes it over.
+      if (connection.connectionState === "failed" && calls.value[room]) {
+        closePeer(room, UNIT);
+        reconcile(room);
+      }
+    };
+    if (!peers.has(room)) peers.set(room, new Map());
+    peers.get(room)!.set(UNIT, peer);
+    return peer;
+  }
+
+  /** The copy of each person's camera we ask the unit for, by how large we show them. */
+  const asked = new Map<string, string>();
+  function askForLayers(room: string) {
+    const current = calls.value[room];
+    if (!current) return;
+    const others = current.participants.filter((each) => each.userId !== user.value?.id);
+    const size = others.length <= 2 ? "f" : others.length <= 4 ? "h" : "q";
+    const layers = Object.fromEntries(
+      others.map((each) => [each.userId, current.presenter === each.userId ? "f" : size] as const),
+    );
+    const said = JSON.stringify(layers);
+    if (asked.get(room) === said) return;
+    asked.set(room, said);
+    sendSignal(current.id, UNIT, { layers });
+  }
+
   function closePeer(room: string, other: string) {
     if (peers.get(room)?.has(other)) controlListener(room, other, { t: "gone" });
     peers.get(room)?.get(other)?.connection.close();
     peers.get(room)?.delete(other);
+    if (other === UNIT) {
+      // Everything the unit was sending came on that one connection.
+      remotes.delete(room);
+      remoteScreens.delete(room);
+      asked.delete(room);
+      return;
+    }
     for (const store of [remotes, remoteScreens]) {
       const streams = store.get(room);
       if (streams?.has(other)) {
@@ -358,6 +470,22 @@ export const useCall = createGlobalState(() => {
     if (!current) return;
     const me = user.value?.id;
     const present = new Set(current.participants.map((each) => each.userId));
+    if (forwarded(room)) {
+      // Moved to the forwarding unit: the connections to each person go,
+      // one connection to the unit takes their place.
+      for (const other of [...(peers.get(room)?.keys() ?? [])]) {
+        if (other !== UNIT) closePeer(room, other);
+      }
+      if (!peers.get(room)?.has(UNIT)) createPeer(room, UNIT);
+      for (const store of [remotes, remoteScreens]) {
+        const streams = store.get(room);
+        if (streams && [...streams.keys()].some((other) => !present.has(other))) {
+          store.set(room, new Map([...streams].filter(([other]) => present.has(other))));
+        }
+      }
+      askForLayers(room);
+      return;
+    }
     for (const other of present) {
       if (other !== me && !peers.get(room)?.has(other)) createPeer(room, other);
     }
@@ -728,6 +856,7 @@ export const useCall = createGlobalState(() => {
     const path = callPath(room);
     for (const other of [...(peers.get(room)?.keys() ?? [])]) closePeer(room, other);
     peers.delete(room);
+    asked.delete(room);
     remotes.delete(room);
     remoteScreens.delete(room);
     const rest = { ...calls.value };

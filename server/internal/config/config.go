@@ -134,6 +134,23 @@ type CallsConfig struct {
 	// TURNSecret is the static-auth-secret configured on the TURN relay
 	// (coturn's use-auth-secret), from which short-lived credentials are made.
 	TURNSecret string
+
+	/*
+		The forwarding unit's place on the network, per node: each node has
+		its own addresses, so these are configuration rather than settings.
+		Whether calls are forwarded at all is the calls.sfu setting.
+	*/
+
+	// SFUUDPPorts is one UDP port every forwarded participant shares ("7882"),
+	// or a range with one port per participant ("50000-50100").
+	SFUUDPPorts string
+	// SFUPublicIPs are the addresses participants reach this node at, where
+	// it is behind a one-to-one NAT (a cloud VM, a container) and cannot see
+	// them itself.
+	SFUPublicIPs []string
+	// SFUInterfaces limits the network interfaces the unit offers. Empty is
+	// every interface.
+	SFUInterfaces []string
 }
 
 type CacheConfig struct {
@@ -450,6 +467,7 @@ type LogConfig struct {
 // production setting: anything genuinely unsafe is reported by Warnings.
 func Default() Config {
 	return Config{
+		Calls: CallsConfig{SFUUDPPorts: "7882"},
 		Server: ServerConfig{
 			Name:                 "TDC",
 			Description:          "A Tanzania Developers Community server",

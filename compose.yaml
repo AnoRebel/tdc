@@ -14,6 +14,9 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+      # The call forwarding unit's media port, used only when the calls.sfu
+      # setting is on. Nothing listens on it until a call is forwarded.
+      - "7882:7882/udp"
     environment:
       TDC_SERVER_NAME: "TDC"
       TDC_SERVER_DESCRIPTION: "A Tanzania Developers Community server"
@@ -38,6 +41,9 @@ services:
       # The secret the call relay (the turn service below) shares with this
       # server; empty means no relay is offered. Set the same value for both.
       TDC_CALLS_TURN_SECRET: "${TDC_CALLS_TURN_SECRET:-}"
+      # The forwarding unit sits behind Docker's NAT and cannot see the
+      # address people reach this host by: give it the host's public IP.
+      TDC_CALLS_SFU_PUBLIC_IPS: "${TDC_CALLS_SFU_PUBLIC_IPS:-}"
       # Where uploaded files are kept. Inside the volume mounted below, so they
       # survive a restart: without it they are written to the container's
       # writable layer and every attachment is lost the next time the image is

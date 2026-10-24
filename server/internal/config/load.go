@@ -41,6 +41,9 @@ func (e *InvalidError) Error() string {
 	return strings.Join(lines, "\n")
 }
 
+// udpPorts is the shape of calls.sfu_udp_ports; the unit checks the numbers.
+var udpPorts = regexp.MustCompile(`^[0-9]{1,5}(-[0-9]{1,5})?$`)
+
 // loader accumulates problems while reading values, so that one pass reports
 // everything rather than stopping at the first mistake.
 type loader struct {
@@ -246,6 +249,17 @@ func Load(path string) (Config, error) {
 
 	cfg.Cache.Address = l.str("cache.address", d.Cache.Address)
 	cfg.Calls.TURNSecret = l.str("calls.turn_secret", "")
+	cfg.Calls.SFUUDPPorts = l.str("calls.sfu_udp_ports", d.Calls.SFUUDPPorts)
+	if !udpPorts.MatchString(cfg.Calls.SFUUDPPorts) {
+		l.problem("calls.sfu_udp_ports", "expected a UDP port (7882) or a range (50000-50100), got %q", cfg.Calls.SFUUDPPorts)
+	}
+	cfg.Calls.SFUPublicIPs = l.list("calls.sfu_public_ips")
+	for _, address := range cfg.Calls.SFUPublicIPs {
+		if _, err := netip.ParseAddr(address); err != nil {
+			l.problem("calls.sfu_public_ips", "%q is not an IP address", address)
+		}
+	}
+	cfg.Calls.SFUInterfaces = l.list("calls.sfu_interfaces")
 	cfg.Cache.Username = l.str("cache.username", d.Cache.Username)
 	cfg.Cache.Password = l.str("cache.password", d.Cache.Password)
 	cfg.Cache.Database = l.int32OrZero("cache.database", d.Cache.Database)

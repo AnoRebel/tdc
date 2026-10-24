@@ -56,8 +56,8 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 
 ## 6. Phase 6 — Group calls
 
-- [ ] 6.1 Mesh calls up to `calls.mesh_limit`; the participant limit refused with its reason
-- [ ] 6.2 The built-in forwarding unit (Pion), off unless enabled, one peer connection per participant, simulcast layers per receiver; a call moves to it when it passes the mesh limit; verify a six-person call works with the unit on and is refused past the mesh limit with it off
+- [x] 6.1 Mesh calls up to `calls.mesh_limit`; the participant limit refused with its reason
+- [x] 6.2 The built-in forwarding unit (Pion), off unless enabled, one peer connection per participant, simulcast layers per receiver; a call moves to it when it passes the mesh limit; verify a six-person call works with the unit on and is refused past the mesh limit with it off
 - [ ] **MILESTONE 6** — Demonstrate a six-person call through the forwarding unit and a four-person mesh call without it. Tag `v1.54.0-dev`.
 
 ## 7. Phase 7 — Constrained networks and every client

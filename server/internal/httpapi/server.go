@@ -45,6 +45,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/secondfactor"
 	"github.com/AnoRebel/tdc/server/internal/settings"
+	"github.com/AnoRebel/tdc/server/internal/sfu"
 	"github.com/AnoRebel/tdc/server/internal/translation"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
@@ -55,6 +56,12 @@ type Config struct {
 	Address string
 	// TURNSecret mints call relay credentials; empty means no relay.
 	TURNSecret string
+	// Node identifies this process among the nodes sharing a database. Empty
+	// is a fresh identifier, which a server running alone is content with.
+	Node string
+	// Forwarding is where this node's forwarding unit reaches the network,
+	// should the calls.sfu setting have it forward calls.
+	Forwarding sfu.Config
 	// ReadTimeout bounds how long reading a request may take.
 	ReadTimeout time.Duration
 	// WriteTimeout bounds how long writing a response may take.
@@ -152,9 +159,13 @@ type Server struct {
 		Nil on a single-node server, where the connections that should see a
 		message are in the same memory as the code that stored it.
 	*/
-	broker   realtime.Broker
-	realtime *realtime.Server
-	config   Config
+	broker realtime.Broker
+	// node is this process's identifier; forwarding is its forwarding unit,
+	// which binds nothing until a call is forwarded here.
+	node       string
+	forwarding *sfu.Unit
+	realtime   *realtime.Server
+	config     Config
 
 	/*
 		What federation needs to hold between requests.
@@ -293,6 +304,7 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 		broker:       services.Broker,
 		push:         services.Push,
 		backups:      services.Backups,
+		node:         cfg.Node,
 		config:       cfg,
 		live: live{
 			turnSecret:    cfg.TURNSecret,
@@ -300,6 +312,11 @@ func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server
 			warnings:      cfg.ConfigurationWarnings,
 		},
 	}
+
+	if s.node == "" {
+		s.node = realtime.NodeID()
+	}
+	s.forwarding = sfu.New(cfg.Forwarding, s.sendFromForwarding, log)
 
 	if services.Backups != nil {
 		services.Backups.SetHooks(backup.Hooks{
@@ -453,13 +470,18 @@ func (s *Server) Run(ctx context.Context) error {
 				},
 				// Another node's private answer, for whoever is connected here.
 				Private: func(userID uuid.UUID, frame realtime.Frame) int {
+					// A forwarded call's negotiation, addressed to the call
+					// this node forwards rather than to a person.
+					if s.forwarding.Holds(userID) {
+						return s.receiveForwarded(userID, frame)
+					}
 					if s.hub == nil {
 						return 0
 					}
 					return s.hub.SendToUser(userID, frame)
 				},
 				Holds: func(userID uuid.UUID) bool {
-					return s.hub != nil && s.hub.Holds(userID)
+					return s.forwarding.Holds(userID) || (s.hub != nil && s.hub.Holds(userID))
 				},
 			}); err != nil && ctx.Err() == nil {
 				s.log.Error("stopped listening for events from other nodes",
@@ -540,6 +562,9 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.backups != nil {
 		s.backups.Wait()
 	}
+	// Forwarded calls end here; their people reconnect to whichever node
+	// takes them over.
+	_ = s.forwarding.Close()
 
 	if err := s.http.Shutdown(shutdownCtx); err != nil {
 		// Shutdown returning an error means in-flight requests outlasted the

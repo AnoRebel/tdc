@@ -1257,15 +1257,23 @@ every other participant (a _mesh_), so upload grows with the size of the call:
 Browsers lower video quality by themselves when a connection cannot keep up,
 and encoding one stream per other person also costs CPU — comfortable for four
 people on a laptop, hard work for a phone with video past three. That is why
-`calls.max_participants` defaults to **4**. Raise it for voice-heavy
-communities with good connections; past six, a mesh stops being a good idea for
-anybody, and calls that size wait for the forwarding unit still to come.
+`calls.mesh_limit` defaults to **4**. Past it, a call either moves to the
+server's **forwarding unit** (below), if you have turned it on, or is full: the
+next person is told the call is full because this server does not forward
+larger calls. `calls.max_participants` caps every call however it is carried.
 
-| Setting                  | Default | What it does                                                                     |
-| ------------------------ | ------- | -------------------------------------------------------------------------------- |
-| `calls.max_participants` | `4`     | The most people one call may hold; the next is told the call is full             |
-| `calls.stun_urls`        | —       | STUN servers, comma-separated (`stun:host:3478`), for finding a direct path      |
-| `calls.turn_urls`        | —       | TURN relays, comma-separated (`turn:host:3478?transport=udp`, `turns:host:5349`) |
+| Setting                  | Default | What it does                                                                                |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------- |
+| `calls.mesh_limit`       | `4`     | The most people a call holds while everybody sends to everybody                             |
+| `calls.max_participants` | `25`    | The most people one call may hold, however it is carried; the next is told the call is full |
+| `calls.sfu`              | `false` | Whether calls past the mesh limit move to the forwarding unit                               |
+| `calls.stun_urls`        | —       | STUN servers, comma-separated (`stun:host:3478`), for finding a direct path                 |
+| `calls.turn_urls`        | —       | TURN relays, comma-separated (`turn:host:3478?transport=udp`, `turns:host:5349`)            |
+
+Without the forwarding unit a call holds at most the smaller of the two limits.
+A server upgraded from before the mesh limit existed keeps whatever it had set
+`calls.max_participants` to as its mesh limit, so nothing it allowed is refused
+afterwards.
 
 And one piece of configuration, a secret rather than a setting:
 
@@ -1370,8 +1378,119 @@ under Wayland, which does not allow it), `SendInput` on Windows, and Quartz
 events on macOS once the person has allowed TDC under Accessibility. Nothing
 needs installing or configuring on the server for it.
 
-**Not yet:** calls in conversations shared with other servers; and calls of
-more than a few people through a forwarding unit.
+#### The forwarding unit
+
+A mesh suits four people. For more, turn on the forwarding unit built into the
+server — [Pion](https://github.com/pion/webrtc) (MIT licence), inside the same
+binary, nothing else to run:
+
+```sh
+curl -X PUT https://tdc.example/api/admin/settings/calls.sfu \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value": "true"}'
+```
+
+**What changes.** A call starts as a mesh. When a join takes it past
+`calls.mesh_limit`, it moves to the unit — then, while it is in progress, since
+a call starts with one person and nobody knows how large it will grow — and
+everybody in it is told. Each client drops its connections to the others and
+makes one to the server; the picture freezes for a second or two while it does.
+From then until the call ends, each person sends their microphone and camera
+**once, to the server**, and the server sends each person everybody else's. A
+call does not move back to a mesh as people leave: that would interrupt
+everybody a second time.
+
+**Cameras in three sizes.** A browser in a forwarded call sends its camera in
+three copies at once — a quarter, a half and full size (_simulcast_, capped at
+about 150 kbit/s, 500 kbit/s and 1.5 Mbit/s). The unit sends each receiver one
+copy per person: the size that suits how many people their screen shows (full
+for one or two others or for whoever is presenting, half for three or four, a
+quarter in a larger grid), stepped down when the server's estimate of the bandwidth towards that
+receiver says it will not fit — the largest picture gives way first. Voice is
+never stepped down. Nothing is decoded or re-encoded: the unit copies packets.
+
+**What it can see.** Be clear about this before turning it on, and say it to
+your members. In a mesh, media is encrypted from one person's browser to
+another's (DTLS-SRTP) and the server never has it. **Through the forwarding
+unit, encryption ends at the server**: the unit decrypts each packet to choose
+and forward it and encrypts it again for each receiver, so the audio and video
+of a forwarded call are in the clear in the TDC process's memory while they
+pass through. Nothing is written to disk or kept, and nothing in TDC records
+it — but whoever controls the server could. End-to-end encryption through the
+unit (insertable streams) is not available in every webview TDC runs in, so it
+is not offered. The relay is different: coturn forwards packets it cannot read.
+
+**Ports.** The unit listens on one UDP port, **7882** by default, which every
+forwarded participant shares — open it in the firewall and publish it from the
+container (the compose file does). Nothing listens on it until a call is
+forwarded. Or give it a range, one port per participant, if your network
+prefers that:
+
+| Configuration          | Environment                | Default | What it does                                                                                      |
+| ---------------------- | -------------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `calls.sfu_udp_ports`  | `TDC_CALLS_SFU_UDP_PORTS`  | `7882`  | One UDP port everybody shares, or a range (`50000-50100`) with a port per participant             |
+| `calls.sfu_public_ips` | `TDC_CALLS_SFU_PUBLIC_IPS` | —       | The public address(es) people reach this node at, when it is behind a one-to-one NAT              |
+| `calls.sfu_interfaces` | `TDC_CALLS_SFU_INTERFACES` | —       | Only offer these network interfaces (`eth0`), for a host with interfaces nobody outside can reach |
+
+These are configuration rather than settings because each node has its own
+addresses. **In a container, or on a cloud VM** whose public address is not on
+its own interface, set `calls.sfu_public_ips` to the host's public IP: the unit
+cannot see it, and without it offers people an address they cannot reach.
+
+People whose network blocks UDP to an unknown port — some offices, some
+carriers — reach the unit through the TURN relay, exactly as they reach each
+other in a mesh. The compose file's coturn refuses to relay to private
+addresses, so the unit must be reached at its public address: another reason to
+set `calls.sfu_public_ips`. If the unit fails to listen (the port is taken),
+the server logs it and calls stay meshes, with the mesh limit as their limit.
+
+**On several nodes.** A forwarded call's media has to meet in one process, so
+the node that moves a call to the unit holds it, and the call records which
+node that is. People connected to other nodes negotiate with it through the
+nodes' private channel (Postgres, as other private frames go), then send their
+media **straight to that node's UDP port**. So **every node that may forward
+needs its own port reachable from the internet and its own
+`calls.sfu_public_ips`**; a load balancer in front of the HTTP port does nothing
+for media. If the holding node stops — a restart, a crash — the next node a
+participant's negotiation reaches finds nobody answering for the call, takes it
+over, and everybody reconnects to it within a few seconds.
+
+**What it costs.** Upload stays modest for each person; the server pays
+instead. With _n_ people all sending video:
+
+- **Into the server:** each person's three copies and voice, about **2.2
+  Mbit/s each**, so 2.2 × _n_.
+- **Out of the server:** to each of the _n_ people, one copy of each of the
+  others, plus their voices.
+
+Worked through for the sizes the client asks for (full for up to two others,
+half up to four, a quarter beyond; voice ~50 kbit/s each):
+
+| People         | Each receives             | Server in   | Server out  | Each person's upload (mesh would be) |
+| -------------- | ------------------------- | ----------- | ----------- | ------------------------------------ |
+| 5              | 4 × half: ~2.2 Mbit/s     | ~11 Mbit/s  | ~11 Mbit/s  | ~2.2 Mbit/s (6 Mbit/s)               |
+| 6              | 5 × quarter: ~1 Mbit/s    | ~13 Mbit/s  | ~6 Mbit/s   | ~2.2 Mbit/s (7.5 Mbit/s)             |
+| 10             | 9 × quarter: ~1.8 Mbit/s  | ~22 Mbit/s  | ~18 Mbit/s  | ~2.2 Mbit/s (13.5 Mbit/s)            |
+| 25             | 24 × quarter: ~4.8 Mbit/s | ~55 Mbit/s  | ~120 Mbit/s | ~2.2 Mbit/s (36 Mbit/s)              |
+| 25, voice only | 24 voices: ~1.2 Mbit/s    | ~1.3 Mbit/s | ~30 Mbit/s  | ~50 kbit/s                           |
+
+An hour of the ten-person video call is about 10 GB in and 8 GB out; the
+25-person one about 25 GB in and 55 GB out. Most hosts include traffic like
+that; see _What an event costs_ below for prices.
+
+**CPU and memory.** Forwarding is decrypting and re-encrypting packets, no
+decoding. As a planning estimate rather than a measurement on your hardware:
+one modern core forwards a few hundred Mbit/s, so a 25-person video call needs
+about half a core and anything smaller is lost in the noise. Memory is mostly
+the history kept for resending lost packets — about a quarter of a megabyte per
+camera sent to each person — so a 10-person call holds about 25 MB and a
+25-person call about 150 MB, plus a few megabytes per person.
+
+**On each person's device**, a forwarded call is lighter than a mesh of the same
+size — one upload instead of one per person — but receiving 24 cameras is still
+24 videos to decode; phones in a call of 25 do better with cameras off.
+
+**Not yet:** calls in conversations shared with other servers.
 
 #### What an event costs
 
@@ -1381,11 +1500,11 @@ video**, because a listener receiving voice costs a fiftieth of one receiving
 video. Use this to plan; the prices are examples, and every host prices
 differently.
 
-**How the media travels decides who pays.** Today calls are a mesh — everybody
-sends to everybody — which suits four to six people and puts the cost on their
-own connections, not the server's (see the table above). An event of fifty or
-a thousand needs the **forwarding unit** (planned, not yet built): each speaker
-sends once to the server, and the server sends a copy to each listener. Then the
+**How the media travels decides who pays.** A mesh — everybody sends to
+everybody — suits four to six people and puts the cost on their own
+connections, not the server's (see the table above). An event of fifty or a
+thousand needs the **forwarding unit** (above): each speaker sends once to the
+server, and the server sends a copy to each listener. Then the
 server's outbound bandwidth is the cost, and it grows with the audience. Spread
 over **several connected servers** (also planned), each server forwards to its
 own members and receives one copy from the server hosting the event, so the

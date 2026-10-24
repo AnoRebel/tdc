@@ -40,6 +40,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/secondfactor"
 	"github.com/AnoRebel/tdc/server/internal/settings"
+	"github.com/AnoRebel/tdc/server/internal/sfu"
 	"github.com/AnoRebel/tdc/server/internal/storage"
 )
 
@@ -323,10 +324,13 @@ func newTestAPIConfigured(
 		IdleTimeout:            10 * time.Second,
 		ShutdownTimeout:        2 * time.Second,
 		ServerName:             "Test Server",
-		CanonicalAddress:       canonicalAddressForTest,
-		DefaultLanguage:        "en",
-		SessionLifetime:        time.Hour,
-		WebRoot:                webRootForTest,
+		// Any free port, on loopback too, so a forwarded call connects within
+		// the machine. Bound only by a test that forwards a call.
+		Forwarding:       sfu.Config{UDPPorts: "0", Loopback: true},
+		CanonicalAddress: canonicalAddressForTest,
+		DefaultLanguage:  "en",
+		SessionLifetime:  time.Hour,
+		WebRoot:          webRootForTest,
 		// Off so the test client's cookie jar behaves as a browser would over
 		// plain HTTP.
 		SecureCookies:  false,

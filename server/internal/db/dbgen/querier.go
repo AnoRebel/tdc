@@ -119,6 +119,9 @@ type Querier interface {
 	// longer than sending a batch takes, and short enough that a message held by a
 	// server that stopped goes out soon after.
 	ClaimDueScheduledMessages(ctx context.Context, limit int32) ([]ScheduledMessage, error)
+	// Takes over a forwarded call's forwarding from a node that no longer answers
+	// for it, unless another node already has.
+	ClaimForwarding(ctx context.Context, arg ClaimForwardingParams) (int64, error)
 	// Claiming by the state the client already holds, for a client with no browser
 	// to receive the redirect. Consumed as it is read, exactly as the handle is.
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
@@ -456,6 +459,9 @@ type Querier interface {
 	// Following because of taking part, unless the person has already decided.
 	FollowThreadByTakingPart(ctx context.Context, arg FollowThreadByTakingPartParams) error
 	ForgetNodes(ctx context.Context, arg ForgetNodesParams) error
+	// Moves a mesh call to the forwarding unit on one node. Once only: a call
+	// already forwarded keeps the node it has.
+	ForwardCall(ctx context.Context, arg ForwardCallParams) (int64, error)
 	// The per-request lookup, joined to the account so one query answers both
 	// "is this token good" and "who is it".
 	//

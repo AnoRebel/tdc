@@ -132,17 +132,21 @@ type callView struct {
 	RoomID    string `json:"roomId"`
 	StartedAt string `json:"startedAt"`
 	// Presenter is who is on the stage, if anybody.
-	Presenter    string                `json:"presenter,omitempty"`
+	Presenter string `json:"presenter,omitempty"`
+	// Mode is how the call is carried: "mesh", everybody sending to
+	// everybody, or "sfu", everybody sending to the server's forwarding unit,
+	// which a client then negotiates with in place of the others.
+	Mode         string                `json:"mode"`
 	Participants []callParticipantView `json:"participants"`
 	// Recording is who is recording the call, if anybody: shown to everybody
 	// in it, and to anybody before they join.
 	Recording []string `json:"recording,omitempty"`
 }
 
-func (s *Server) callViewOf(roomID, callID uuid.UUID, startedAt time.Time, participants []dbgen.ListCallParticipantsRow) callView {
+func (s *Server) callViewOf(call dbgen.Call, participants []dbgen.ListCallParticipantsRow) callView {
 	view := callView{
-		ID: callID.String(), RoomID: roomID.String(),
-		StartedAt:    startedAt.UTC().Format(time.RFC3339),
+		ID: call.ID.String(), RoomID: call.RoomID.String(), Mode: call.Mode,
+		StartedAt:    call.StartedAt.UTC().Format(time.RFC3339),
 		Participants: make([]callParticipantView, 0, len(participants)),
 	}
 	for _, p := range participants {
@@ -188,7 +192,7 @@ func (s *Server) handleGetCall(c *echo.Context) error {
 	if err != nil {
 		return callError(err)
 	}
-	return c.JSON(http.StatusOK, s.callViewOf(roomID, call.ID, call.StartedAt, call.Participants))
+	return c.JSON(http.StatusOK, s.callViewOf(call.Call, call.Participants))
 }
 
 /*
@@ -229,17 +233,18 @@ func (s *Server) handleJoinCall(c *echo.Context) error {
 		// the device that made it can no longer be making.
 		s.stopRecordingOf(ctx, open.ID, user.ID, "rejoined the call")
 	}
-	limit := int(s.settings.Int(ctx, settings.CallsMaxParticipants))
+	limit, full := s.callLimit(ctx)
 	call, started, err := s.rooms.JoinCall(ctx, roomID, user.ID, request.Audio, request.Video, limit)
 	if err != nil {
-		return callError(err)
+		return joinError(err, full)
 	}
 	if started != nil {
 		s.publishEvent(ctx, *started)
 	}
+	call = s.forwardIfLarge(ctx, call)
 	// Answered here, so none of their other devices keeps ringing.
 	s.endRinging(ctx, user.ID, call.ID)
-	view := s.callViewOf(roomID, call.ID, call.StartedAt, call.Participants)
+	view := s.callViewOf(call.Call, call.Participants)
 	s.broadcastCallState(ctx, view)
 	return c.JSON(http.StatusOK, view)
 }
@@ -308,7 +313,15 @@ func (s *Server) announceCall(ctx context.Context, roomID uuid.UUID, call rooms.
 	if err != nil {
 		return callView{}, err
 	}
-	view := s.callViewOf(roomID, call.ID, call.StartedAt, participants)
+	// Read afresh too: a caller may know the call only by its identifier, and
+	// its mode may have changed since the caller read it.
+	if record, err := s.rooms.CallRecord(ctx, call.ID); err == nil {
+		call.Call = record
+	}
+	if call.RoomID == uuid.Nil {
+		call.RoomID = roomID
+	}
+	view := s.callViewOf(call.Call, participants)
 	s.broadcastCallState(ctx, view)
 	return view, nil
 }
@@ -331,6 +344,14 @@ func (s *Server) broadcastCallState(ctx context.Context, view callView) {
 	}
 	frame := realtime.Frame{Type: realtime.FrameCallState, RoomID: view.RoomID, Payload: payload}
 	roomID, _ := uuid.Parse(view.RoomID)
+	callID, _ := uuid.Parse(view.ID)
+	present := make([]uuid.UUID, 0, len(view.Participants))
+	for _, participant := range view.Participants {
+		if id, err := uuid.Parse(participant.UserID); err == nil {
+			present = append(present, id)
+		}
+	}
+	s.tellForwarding(ctx, dbgen.Call{ID: callID, Mode: view.Mode}, present)
 	s.hub.Publish(ctx, roomID, frame)
 	for _, participant := range view.Participants {
 		userID, err := uuid.Parse(participant.UserID)
@@ -354,21 +375,19 @@ func (s *Server) Signal(ctx context.Context, from, callID, to uuid.UUID, signal 
 	if from == to {
 		return errors.New("a participant cannot signal themselves")
 	}
+	// Addressed to nobody: to the forwarding unit, in a forwarded call.
+	if to == uuid.Nil {
+		return s.signalForwarding(ctx, from, callID, signal)
+	}
 	roomID, fromIn := s.rooms.CallRoomOf(ctx, callID, from)
 	toRoom, toIn := s.rooms.CallRoomOf(ctx, callID, to)
 	if !fromIn || !toIn || roomID != toRoom {
 		return rooms.ErrNoCall
 	}
 	for _, person := range []uuid.UUID{from, to} {
-		permissions, err := s.authz.PermissionsFor(ctx, person)
-		if err == nil && permissions.AllowsChannel(authz.PermCallJoin, roomID).Allowed {
-			continue
+		if !s.mayTakePart(ctx, person, roomID, callID) {
+			return errors.New("not allowed to take part in this call")
 		}
-		// A guest of this call takes part by the link that let them in.
-		if guest, err := s.identity.UserByID(ctx, person); err == nil && guest.GuestCall != nil && *guest.GuestCall == callID {
-			continue
-		}
-		return errors.New("not allowed to take part in this call")
 	}
 
 	payload, err := json.Marshal(map[string]any{
@@ -381,6 +400,17 @@ func (s *Server) Signal(ctx context.Context, from, callID, to uuid.UUID, signal 
 	here := s.hub.SendToUser(to, frame)
 	s.whisperElsewhere(ctx, to, frame, here)
 	return nil
+}
+
+// mayTakePart is whether somebody in a call is still allowed to be.
+func (s *Server) mayTakePart(ctx context.Context, person, roomID, callID uuid.UUID) bool {
+	permissions, err := s.authz.PermissionsFor(ctx, person)
+	if err == nil && permissions.AllowsChannel(authz.PermCallJoin, roomID).Allowed {
+		return true
+	}
+	// A guest of this call takes part by the link that let them in.
+	guest, err := s.identity.UserByID(ctx, person)
+	return err == nil && guest.GuestCall != nil && *guest.GuestCall == callID
 }
 
 type iceServer struct {
@@ -762,7 +792,7 @@ func (s *Server) handleCallByID(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(http.StatusOK, s.callViewOf(call.RoomID, call.ID, call.StartedAt, call.Participants))
+	return c.JSON(http.StatusOK, s.callViewOf(call.Call, call.Participants))
 }
 
 func (s *Server) handleJoinCallByID(c *echo.Context) error {
@@ -783,13 +813,14 @@ func (s *Server) handleJoinCallByID(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 	s.stopRecordingOf(ctx, call.ID, user.ID, "rejoined the call")
-	limit := int(s.settings.Int(ctx, settings.CallsMaxParticipants))
+	limit, full := s.callLimit(ctx)
 	joined, err := s.rooms.JoinInvited(ctx, call.ID, user.ID, request.Audio, request.Video, limit)
 	if err != nil {
-		return callError(err)
+		return joinError(err, full)
 	}
+	joined = s.forwardIfLarge(ctx, joined)
 	s.endRinging(ctx, user.ID, call.ID)
-	view := s.callViewOf(joined.RoomID, joined.ID, joined.StartedAt, joined.Participants)
+	view := s.callViewOf(joined.Call, joined.Participants)
 	s.broadcastCallState(ctx, view)
 	return c.JSON(http.StatusOK, view)
 }
@@ -995,7 +1026,11 @@ func (s *Server) dismissRemaining(ctx context.Context, roomID uuid.UUID, call ro
 	if s.hub == nil {
 		return
 	}
-	payload, err := json.Marshal(s.callViewOf(roomID, call.ID, call.StartedAt, nil))
+	if record, err := s.rooms.CallRecord(ctx, call.ID); err == nil {
+		call.Call = record
+	}
+	s.tellForwarding(ctx, call.Call, nil)
+	payload, err := json.Marshal(s.callViewOf(call.Call, nil))
 	if err != nil {
 		return
 	}

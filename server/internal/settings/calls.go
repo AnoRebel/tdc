@@ -30,11 +30,27 @@ const (
 	CallsTURNURLs Key = "calls.turn_urls"
 
 	/*
-		CallsMaxParticipants caps a call. Every participant sends to every
-		other, so past four or five a home connection runs out of upload
-		before the call runs out of interest.
+		CallsMeshLimit is how many people a call may hold while everybody sends
+		to everybody. Every participant sends to every other, so past four or
+		five a home connection runs out of upload before the call runs out of
+		interest. Past it, a call moves to the forwarding unit where that is on,
+		and is full where it is not.
+	*/
+	CallsMeshLimit Key = "calls.mesh_limit"
+
+	/*
+		CallsMaxParticipants caps a call however it is carried.
 	*/
 	CallsMaxParticipants Key = "calls.max_participants"
+
+	/*
+		CallsSFU turns on the forwarding unit built into the server: a call
+		past the mesh limit sends each person's media once, to the server,
+		which forwards it to everybody else. Off by default, because it costs
+		the server bandwidth and because media forwarded by the server is
+		decrypted inside it, which a mesh call's never is.
+	*/
+	CallsSFU Key = "calls.sfu"
 
 	/*
 		CallsGuests lets people without an account join a call through a link
@@ -76,10 +92,20 @@ func init() {
 			description: "Whether people holding call.record may record a call on their own device, everybody in it told first; the file is saved to the conversation as an attachment.",
 			validate:    boolean,
 		},
-		CallsMaxParticipants: {
+		CallsMeshLimit: {
 			fallback:    "4",
-			description: "The most people one call may have.",
+			description: "The most people a call holds while everybody sends to everybody; past it a call moves to the forwarding unit, or is full without one.",
 			validate:    atLeastOne,
+		},
+		CallsMaxParticipants: {
+			fallback:    "25",
+			description: "The most people one call may have, however it is carried.",
+			validate:    atLeastOne,
+		},
+		CallsSFU: {
+			fallback:    "false",
+			description: "Whether calls past the mesh limit move to the forwarding unit built into the server. Media it forwards is decrypted inside the server.",
+			validate:    boolean,
 		},
 	})
 }

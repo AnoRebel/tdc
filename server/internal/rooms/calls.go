@@ -209,6 +209,29 @@ func (s *Service) SetCallMedia(ctx context.Context, callID, userID uuid.UUID, au
 	return nil
 }
 
+/*
+ForwardCall moves a mesh call to the forwarding unit on a node, and says
+whether this moved it: a call is moved once, by whichever join takes it past
+the mesh limit first, and keeps its node until it ends.
+*/
+func (s *Service) ForwardCall(ctx context.Context, callID uuid.UUID, node string) (bool, error) {
+	moved, err := s.store.ForwardCall(ctx, dbgen.ForwardCallParams{ID: callID, ForwardingNode: &node})
+	if err != nil {
+		return false, fmt.Errorf("forward call: %w", err)
+	}
+	return moved == 1, nil
+}
+
+// ClaimForwarding takes over a forwarded call from a node that no longer
+// answers for it, and says whether this node now has it.
+func (s *Service) ClaimForwarding(ctx context.Context, callID uuid.UUID, previous, node string) (bool, error) {
+	claimed, err := s.store.ClaimForwarding(ctx, dbgen.ClaimForwardingParams{ID: callID, Node: &node, Previous: &previous})
+	if err != nil {
+		return false, fmt.Errorf("claim forwarding: %w", err)
+	}
+	return claimed == 1, nil
+}
+
 // CallRoomOf returns the room of an open call somebody is in now, and false if
 // they are not in it.
 func (s *Service) CallRoomOf(ctx context.Context, callID, userID uuid.UUID) (uuid.UUID, bool) {

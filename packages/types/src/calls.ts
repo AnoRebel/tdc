@@ -30,6 +30,11 @@ export interface Call {
   presenter?: string;
   /** Who is recording the call, if anybody, by user id. */
   recording?: string[];
+  /**
+   * How the call is carried: everybody sending to everybody, or through the
+   * server's forwarding unit, which a client then negotiates with instead.
+   */
+  mode?: "mesh" | "sfu";
 }
 
 /** The servers a client connects a call through. */
@@ -43,7 +48,14 @@ export interface IceConfiguration {
 export interface CallSignal {
   call: string;
   from: string;
-  signal: { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null };
+  signal: {
+    description?: RTCSessionDescriptionInit;
+    candidate?: RTCIceCandidateInit | null;
+    /** To the forwarding unit: which copy of each person's camera to send, by user id. */
+    layers?: Record<string, "q" | "h" | "f" | "off">;
+    /** To the forwarding unit: forget my last connection, a new one follows. */
+    reset?: boolean;
+  };
 }
 
 /** Somebody ringing you into a call. */

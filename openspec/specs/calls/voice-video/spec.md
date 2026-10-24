@@ -105,6 +105,31 @@ Where the configured limit exceeds what direct connections can sustain, a select
 - **WHEN** a call has few enough participants to be carried by direct connections
 - **THEN** it functions with no forwarding component deployed
 
+#### Scenario: A growing call moves to the forwarding unit
+
+- **WHEN** the forwarding unit is enabled and a join takes a call past the mesh limit
+- **THEN** the call is carried by the forwarding unit from then until it ends, every participant is told, and each sends their media once, to the server
+
+#### Scenario: Without the forwarding unit the mesh limit is the limit
+
+- **WHEN** the forwarding unit is not enabled and a call is at the mesh limit
+- **THEN** a further join is refused, saying that the server does not forward larger calls
+
+#### Scenario: Each receiver is sent what suits them
+
+- **WHEN** a participant in a forwarded call sends their camera in several qualities
+- **THEN** the forwarding unit sends each receiver one of them, chosen from how large that receiver shows the person and the bandwidth towards them
+
+#### Scenario: One node holds a forwarded call
+
+- **WHEN** a server runs on several nodes and a call is forwarded
+- **THEN** one node forwards it, participants connected to other nodes negotiate with it through the nodes' private channel and send media to it directly, and another node takes the call over if that node stops answering
+
+#### Scenario: What the forwarding unit can see is disclosed
+
+- **WHEN** an operator enables the forwarding unit
+- **THEN** the hosting guide states that forwarded media is decrypted inside the server process, which a mesh call's never is
+
 ### Requirement: Call controls
 
 Participants SHALL be able to mute and unmute audio, enable and disable video, and leave a call, with each participant's state visible to the others.

@@ -165,3 +165,15 @@ WHERE c.presenter IS NOT NULL AND c.ended_at IS NULL
 UPDATE call_participants
 SET hand_raised_at = CASE WHEN sqlc.arg(raised)::bool THEN COALESCE(hand_raised_at, NOW()) ELSE NULL END
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
+
+-- name: ForwardCall :execrows
+-- Moves a mesh call to the forwarding unit on one node. Once only: a call
+-- already forwarded keeps the node it has.
+UPDATE calls SET mode = 'sfu', forwarding_node = $2
+WHERE id = $1 AND ended_at IS NULL AND mode = 'mesh';
+
+-- name: ClaimForwarding :execrows
+-- Takes over a forwarded call's forwarding from a node that no longer answers
+-- for it, unless another node already has.
+UPDATE calls SET forwarding_node = sqlc.arg(node)
+WHERE id = $1 AND ended_at IS NULL AND mode = 'sfu' AND forwarding_node = sqlc.arg(previous);

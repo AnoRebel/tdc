@@ -256,13 +256,15 @@ type CalendarSubscription struct {
 }
 
 type Call struct {
-	ID           uuid.UUID
-	RoomID       uuid.UUID
-	StartedBy    *uuid.UUID
-	StartedAt    time.Time
-	EndedAt      *time.Time
-	StartedEvent *string
-	Presenter    *uuid.UUID
+	ID             uuid.UUID
+	RoomID         uuid.UUID
+	StartedBy      *uuid.UUID
+	StartedAt      time.Time
+	EndedAt        *time.Time
+	StartedEvent   *string
+	Presenter      *uuid.UUID
+	Mode           string
+	ForwardingNode *string
 }
 
 type CallInvite struct {

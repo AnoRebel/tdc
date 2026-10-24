@@ -13,7 +13,7 @@ import (
 )
 
 const callByID = `-- name: CallByID :one
-SELECT id, room_id, started_by, started_at, ended_at, started_event, presenter FROM calls WHERE id = $1
+SELECT id, room_id, started_by, started_at, ended_at, started_event, presenter, mode, forwarding_node FROM calls WHERE id = $1
 `
 
 func (q *Queries) CallByID(ctx context.Context, id uuid.UUID) (Call, error) {
@@ -27,6 +27,8 @@ func (q *Queries) CallByID(ctx context.Context, id uuid.UUID) (Call, error) {
 		&i.EndedAt,
 		&i.StartedEvent,
 		&i.Presenter,
+		&i.Mode,
+		&i.ForwardingNode,
 	)
 	return i, err
 }
@@ -181,6 +183,27 @@ func (q *Queries) CallRoomOfParticipant(ctx context.Context, arg CallRoomOfParti
 	return room_id, err
 }
 
+const claimForwarding = `-- name: ClaimForwarding :execrows
+UPDATE calls SET forwarding_node = $2
+WHERE id = $1 AND ended_at IS NULL AND mode = 'sfu' AND forwarding_node = $3
+`
+
+type ClaimForwardingParams struct {
+	ID       uuid.UUID
+	Node     *string
+	Previous *string
+}
+
+// Takes over a forwarded call's forwarding from a node that no longer answers
+// for it, unless another node already has.
+func (q *Queries) ClaimForwarding(ctx context.Context, arg ClaimForwardingParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimForwarding, arg.ID, arg.Node, arg.Previous)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const clearAbsentPresenters = `-- name: ClearAbsentPresenters :exec
 UPDATE calls c SET presenter = NULL
 WHERE c.presenter IS NOT NULL AND c.ended_at IS NULL
@@ -262,7 +285,7 @@ WHERE c.ended_at IS NULL
   AND c.started_at < NOW() - INTERVAL '1 minute'
   AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
                   WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
-RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter
+RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter, mode, forwarding_node
 `
 
 // Ends calls nobody has been in for a while: their last person left without
@@ -285,6 +308,8 @@ func (q *Queries) EndAbandonedCalls(ctx context.Context) ([]Call, error) {
 			&i.EndedAt,
 			&i.StartedEvent,
 			&i.Presenter,
+			&i.Mode,
+			&i.ForwardingNode,
 		); err != nil {
 			return nil, err
 		}
@@ -301,7 +326,7 @@ UPDATE calls c SET ended_at = NOW()
 WHERE c.id = $1 AND c.ended_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
                   WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
-RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter
+RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter, mode, forwarding_node
 `
 
 // Ends a call nobody who belongs here is in any more — guests of the call do
@@ -317,6 +342,8 @@ func (q *Queries) EndCallIfEmpty(ctx context.Context, id uuid.UUID) (Call, error
 		&i.EndedAt,
 		&i.StartedEvent,
 		&i.Presenter,
+		&i.Mode,
+		&i.ForwardingNode,
 	)
 	return i, err
 }
@@ -335,6 +362,26 @@ type EnterCallLobbyParams struct {
 func (q *Queries) EnterCallLobby(ctx context.Context, arg EnterCallLobbyParams) error {
 	_, err := q.db.Exec(ctx, enterCallLobby, arg.CallID, arg.UserID, arg.LinkID)
 	return err
+}
+
+const forwardCall = `-- name: ForwardCall :execrows
+UPDATE calls SET mode = 'sfu', forwarding_node = $2
+WHERE id = $1 AND ended_at IS NULL AND mode = 'mesh'
+`
+
+type ForwardCallParams struct {
+	ID             uuid.UUID
+	ForwardingNode *string
+}
+
+// Moves a mesh call to the forwarding unit on one node. Once only: a call
+// already forwarded keeps the node it has.
+func (q *Queries) ForwardCall(ctx context.Context, arg ForwardCallParams) (int64, error) {
+	result, err := q.db.Exec(ctx, forwardCall, arg.ID, arg.ForwardingNode)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const inviteToCall = `-- name: InviteToCall :exec
@@ -546,7 +593,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 }
 
 const openCallInRoom = `-- name: OpenCallInRoom :one
-SELECT id, room_id, started_by, started_at, ended_at, started_event, presenter FROM calls WHERE room_id = $1 AND ended_at IS NULL
+SELECT id, room_id, started_by, started_at, ended_at, started_event, presenter, mode, forwarding_node FROM calls WHERE room_id = $1 AND ended_at IS NULL
 `
 
 func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, error) {
@@ -560,6 +607,8 @@ func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, e
 		&i.EndedAt,
 		&i.StartedEvent,
 		&i.Presenter,
+		&i.Mode,
+		&i.ForwardingNode,
 	)
 	return i, err
 }
@@ -706,7 +755,7 @@ func (q *Queries) ShareAnOpenCall(ctx context.Context, arg ShareAnOpenCallParams
 const startCall = `-- name: StartCall :one
 INSERT INTO calls (id, room_id, started_by) VALUES ($1, $2, $3)
 ON CONFLICT (room_id) WHERE ended_at IS NULL DO NOTHING
-RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter
+RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter, mode, forwarding_node
 `
 
 type StartCallParams struct {
@@ -728,6 +777,8 @@ func (q *Queries) StartCall(ctx context.Context, arg StartCallParams) (Call, err
 		&i.EndedAt,
 		&i.StartedEvent,
 		&i.Presenter,
+		&i.Mode,
+		&i.ForwardingNode,
 	)
 	return i, err
 }

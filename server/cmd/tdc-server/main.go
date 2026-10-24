@@ -47,6 +47,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/search"
 	"github.com/AnoRebel/tdc/server/internal/secondfactor"
 	"github.com/AnoRebel/tdc/server/internal/settings"
+	"github.com/AnoRebel/tdc/server/internal/sfu"
 	"github.com/AnoRebel/tdc/server/internal/storage"
 	"github.com/AnoRebel/tdc/server/internal/translation"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
@@ -460,11 +461,15 @@ func run() (restartRequest, error) {
 		ServerDescription:      cfg.Server.Description,
 		CanonicalAddress:       cfg.Server.CanonicalAddress,
 		TURNSecret:             cfg.Calls.TURNSecret,
-		DefaultLanguage:        cfg.Server.DefaultLanguage,
-		AllowedOrigins:         cfg.Server.AllowedOrigins,
-		SecureCookies:          cfg.Server.SecureCookies,
-		SessionLifetime:        cfg.Server.SessionLifetime,
-		Keepalive:              cfg.Server.Keepalive,
+		Node:                   node,
+		Forwarding: sfu.Config{
+			UDPPorts: cfg.Calls.SFUUDPPorts, PublicIPs: cfg.Calls.SFUPublicIPs, Interfaces: cfg.Calls.SFUInterfaces,
+		},
+		DefaultLanguage: cfg.Server.DefaultLanguage,
+		AllowedOrigins:  cfg.Server.AllowedOrigins,
+		SecureCookies:   cfg.Server.SecureCookies,
+		SessionLifetime: cfg.Server.SessionLifetime,
+		Keepalive:       cfg.Server.Keepalive,
 	}, pool, services, log)
 
 	control := &controller{
