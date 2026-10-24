@@ -112,7 +112,8 @@ const statusLine = computed(() => {
   }
   // Said where the status is, so nobody forgets the server is answering for
   // them — the reason an automatic reply left on is noticed and turned off.
-  if (own.automaticReply) parts.push($ts("autoReply.on"));
+  // First, so a narrow sidebar cuts the status text rather than this.
+  if (own.automaticReply) parts.unshift($ts("autoReply.on"));
   return parts.join(" · ");
 });
 
