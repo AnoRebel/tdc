@@ -6,7 +6,7 @@ Defines how users are told about activity that concerns them — in-application,
 
 ### Requirement: Notification triggers
 
-The server SHALL generate notifications for direct messages, mentions of the user, replies in threads the user participates in or follows, and activity in conversations the user has chosen to be notified about.
+The server SHALL generate notifications for direct messages, mentions of the user, replies in threads the user participates in or follows, and activity in conversations the user has chosen to be notified about, and events: invitations, reminders before an event the user is going to, changes to its time or place, its cancellation, and a place freed from a waiting list.
 
 A user MUST NOT be notified of their own actions.
 
@@ -24,6 +24,11 @@ A user MUST NOT be notified of their own actions.
 
 - **WHEN** a reply is posted in a thread
 - **THEN** users participating in or following that thread are notified according to their preferences
+
+#### Scenario: Event reminder notifies
+
+- **WHEN** an event a user is going to is about to start
+- **THEN** the user is reminded according to their preferences, unless they have muted that event
 
 ### Requirement: Notification preferences
 

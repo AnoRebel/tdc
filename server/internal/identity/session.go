@@ -194,6 +194,10 @@ func (s *Service) lookupForAuthentication(ctx context.Context, identifier string
 	}
 }
 
+// IsSuspended reports whether an account is suspended now, for what answers
+// on somebody's behalf without a session of theirs — a calendar feed.
+func IsSuspended(user dbgen.User) bool { return isSuspended(user) }
+
 func isSuspended(user dbgen.User) bool {
 	if user.SuspendedAt == nil {
 		return false

@@ -283,8 +283,10 @@ func (q *Queries) ListAttachmentsForEvents(ctx context.Context, eventIds []strin
 
 const listOrphanedAttachments = `-- name: ListOrphanedAttachments :many
 SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source FROM attachments
-WHERE event_id IS NULL AND created_at < $1
-ORDER BY created_at
+WHERE attachments.event_id IS NULL AND attachments.created_at < $1
+  -- An event's cover is held by the event rather than by a message.
+  AND NOT EXISTS (SELECT 1 FROM calendar_events covers WHERE covers.cover_attachment_id = attachments.id)
+ORDER BY attachments.created_at
 LIMIT $2
 `
 

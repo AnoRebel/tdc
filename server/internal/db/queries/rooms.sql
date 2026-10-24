@@ -21,7 +21,7 @@ FROM rooms
 LEFT JOIN room_members ON room_members.room_id = rooms.id AND room_members.user_id = $1
 WHERE (room_members.user_id IS NOT NULL
    OR rooms.visibility = 'public')
-  AND rooms.kind NOT IN ('project', 'issue-discussion')
+  AND rooms.kind NOT IN ('project', 'issue-discussion', 'event')
 ORDER BY rooms.name;
 
 -- name: ListRoomsUserIsIn :many
@@ -30,7 +30,7 @@ FROM rooms
 JOIN room_members ON room_members.room_id = rooms.id
 WHERE room_members.user_id = $1
   -- Taking part in an issue's discussion is not joining a channel.
-  AND rooms.kind NOT IN ('project', 'issue-discussion')
+  AND rooms.kind NOT IN ('project', 'issue-discussion', 'event')
 ORDER BY rooms.name;
 
 -- name: RenameRoom :one
@@ -155,4 +155,4 @@ WHERE room_id = $1 AND user_id = $2;
 --
 -- Nor are a project's stream or an issue's discussion, which exist because
 -- somebody filed work rather than because anybody added a channel.
-SELECT count(*) FROM rooms WHERE kind NOT IN ('direct', 'project', 'issue-discussion');
+SELECT count(*) FROM rooms WHERE kind NOT IN ('direct', 'project', 'issue-discussion', 'event');

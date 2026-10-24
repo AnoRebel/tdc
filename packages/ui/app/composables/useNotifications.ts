@@ -94,6 +94,7 @@ export function describeNotification(
 ): string {
   const who = shortNameOf(notification.actor);
   const detail = notification.detail ?? "";
+  const eventName = () => detail || say("notification.reasons.anEvent");
 
   /*
    * A group is described by what it stands for rather than by its newest
@@ -137,6 +138,16 @@ export function describeNotification(
       return say("notification.reasons.assigned", { who, issue: detail }).trim();
     case "missed_call":
       return say("notification.reasons.missedCall", { who });
+    case "event_invite":
+      return say("notification.reasons.eventInvite", { who, event: eventName() });
+    case "event_reminder":
+      return say("notification.reasons.eventReminder", { event: eventName() });
+    case "event_changed":
+      return say("notification.reasons.eventChanged", { event: eventName() });
+    case "event_cancelled":
+      return say("notification.reasons.eventCancelled", { event: eventName() });
+    case "event_promoted":
+      return say("notification.reasons.eventPromoted", { event: eventName() });
     default:
       return say("notification.reasons.other", { who });
   }

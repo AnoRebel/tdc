@@ -45,7 +45,7 @@ func (q *Queries) ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error 
 }
 
 const countRooms = `-- name: CountRooms :one
-SELECT count(*) FROM rooms WHERE kind NOT IN ('direct', 'project', 'issue-discussion')
+SELECT count(*) FROM rooms WHERE kind NOT IN ('direct', 'project', 'issue-discussion', 'event')
 `
 
 // How many channels exist, for the operator's capacity limit.
@@ -383,7 +383,7 @@ FROM rooms
 LEFT JOIN room_members ON room_members.room_id = rooms.id AND room_members.user_id = $1
 WHERE (room_members.user_id IS NOT NULL
    OR rooms.visibility = 'public')
-  AND rooms.kind NOT IN ('project', 'issue-discussion')
+  AND rooms.kind NOT IN ('project', 'issue-discussion', 'event')
 ORDER BY rooms.name
 `
 
@@ -436,7 +436,7 @@ FROM rooms
 JOIN room_members ON room_members.room_id = rooms.id
 WHERE room_members.user_id = $1
   -- Taking part in an issue's discussion is not joining a channel.
-  AND rooms.kind NOT IN ('project', 'issue-discussion')
+  AND rooms.kind NOT IN ('project', 'issue-discussion', 'event')
 ORDER BY rooms.name
 `
 

@@ -107,6 +107,19 @@ in, the `permission` it needs if any, and `available` — whether you could ask
 for it now. The [event catalogue](#the-event-catalogue) below is the same list,
 with what each carries.
 
+**Events.** A channel's events each have a conversation of their own, and the
+four `event.*` types come from there: a subscription on the channel receives
+them with `room` naming the event's conversation and `event.content` carrying
+the event — its `event` id, `title`, `kind`, `startsAt`, `endsAt`, `timeZone`,
+`recurrence`, `location`, `visibility` and `channelId`, plus `changed` (the
+fields an update touched) or `reason` (a cancellation's). An answer's
+`event.rsvp` carries only the `event`, its `title` and the `status`, with the
+person who answered as `event.sender`. Events that are **invite-only** are never
+delivered to a channel's subscriptions, since a channel's reader may not be
+somebody the event was shown to; neither are events of the whole server, which
+belong to no channel. `event.rsvp` is sent only for people who let others see
+the events they go to.
+
 `GET /api/me/webhooks` lists yours, never with secrets. `DELETE
 /api/me/webhooks/{id}` removes one with its history. The interface for all of
 this is **Settings → Integrations** in the web client.
@@ -196,6 +209,10 @@ held server-wide.
 | `room.visibility_changed`   | C S   | It was made public or private                                                               | Reading the room                                   |
 | `call.started`              | C S   | A call began in the conversation                                                            | Reading the room                                   |
 | `call.ended`                | C S   | It ended; who was in it is not recorded                                                     | Reading the room                                   |
+| `event.created`             | C     | An event was scheduled in the channel                                                       | Reading the channel; never an invite-only event    |
+| `event.updated`             | C     | Its details changed; `changed` names the fields                                             | Reading the channel; never an invite-only event    |
+| `event.cancelled`           | C     | It was cancelled; `reason` says why, if given                                               | Reading the channel; never an invite-only event    |
+| `event.rsvp`                | C     | Somebody answered it, if they let others see what they go to                                | Reading the channel; never an invite-only event    |
 | `engagement.changed`        | C S   | A directory engagement moved on, in its own conversation                                    | Being in that conversation                         |
 | `project.created`           | S     | A project was started                                                                       | Seeing the project                                 |
 | `project.updated`           | P S   | Its name, description or visibility changed, each as `previous` and `new`                   | Seeing the project                                 |

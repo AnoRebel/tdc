@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -245,6 +246,10 @@ func (b *LiveBridge) notify(data []byte) {
 		b.announceRing(data)
 		return
 	}
+	if frame.Type == "event.reminder" {
+		b.announceReminder(data)
+		return
+	}
 
 	if frame.Type != "event" || frame.Payload.Type != "message.sent" {
 		return
@@ -319,4 +324,38 @@ func (b *LiveBridge) announceRing(data []byte) {
 		Server: server,
 		Room:   ring.RoomID,
 	})
+}
+
+/*
+announceReminder raises a banner for an event somebody is going to that is
+about to start. The server sends the frame only to people taking part who have
+not muted the event; pressing the banner opens the event's conversation, which
+the shared interface turns into the event's page.
+*/
+func (b *LiveBridge) announceReminder(data []byte) {
+	var reminder struct {
+		RoomID  string `json:"roomId"`
+		Payload struct {
+			Title   string `json:"title"`
+			Minutes int    `json:"minutes"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal(data, &reminder); err != nil || reminder.Payload.Title == "" {
+		return
+	}
+	body := "Starting soon"
+	switch minutes := reminder.Payload.Minutes; {
+	case minutes >= 1440:
+		body = "Starts tomorrow"
+	case minutes >= 60:
+		body = fmt.Sprintf("Starts in %d hours", minutes/60)
+	case minutes > 0:
+		body = fmt.Sprintf("Starts in %d minutes", minutes)
+	}
+
+	b.service.mu.RLock()
+	server := b.service.current
+	b.service.mu.RUnlock()
+
+	_ = b.notifier.Show(reminder.Payload.Title, body, Target{Server: server, Room: reminder.RoomID})
 }

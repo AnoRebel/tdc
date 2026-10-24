@@ -35,6 +35,14 @@ type Config struct {
 	// Describe says what a room belongs to. Nil treats every room as a
 	// channel.
 	Describe func(ctx context.Context, roomID uuid.UUID) Source
+	/*
+		OfferedIn says, for an event stored in a room nobody subscribes to, which
+		room's subscribers it is delivered to instead — an event's calendar
+		entries, to its channel's. False means its own room. Asked again before
+		sending, so an entry whose event has since stopped being offered anywhere
+		answers a room nobody can read, and is not sent. Nil is always false.
+	*/
+	OfferedIn func(ctx context.Context, event dbgen.Event) (uuid.UUID, bool)
 	// AllowPrivate is the operator's decision about private destinations.
 	AllowPrivate func(ctx context.Context) bool
 	// Send signs a delivery and sends it, within the operator's timeout.

@@ -52,6 +52,7 @@ const (
 	GroupMembers   = "members"
 	GroupChannels  = "channels"
 	GroupCalls     = "calls"
+	GroupEvents    = "events"
 	GroupDirectory = "directory"
 	GroupProjects  = "projects"
 	GroupIssues    = "issues"
@@ -79,6 +80,13 @@ const (
 var (
 	inRooms    = []string{ScopeChannel, ScopeServer}
 	inProjects = []string{ScopeProject, ScopeServer}
+	/*
+		inChannels are heard only by a channel's subscribers. An event's
+		entries are stored in its own conversation and offered to its
+		channel's subscriptions; a server-wide or invite-only event is offered
+		to none, so a server subscription is never the way to hear of one.
+	*/
+	inChannels = []string{ScopeChannel}
 	onServer   = []string{ScopeServer}
 )
 
@@ -110,6 +118,8 @@ var Catalogue = slices.Concat(
 		events.TypeRoomRenamed, events.TypeRoomArchived, events.TypeRoomRestored,
 		events.TypeRoomVisibilityChanged),
 	types(GroupCalls, inRooms, events.TypeCallStarted, events.TypeCallEnded),
+	types(GroupEvents, inChannels,
+		events.TypeEventCreated, events.TypeEventUpdated, events.TypeEventCancelled, events.TypeEventRSVP),
 	types(GroupDirectory, inRooms, "engagement.changed"),
 	types(GroupProjects, onServer, events.TypeProjectCreated),
 	types(GroupProjects, inProjects,

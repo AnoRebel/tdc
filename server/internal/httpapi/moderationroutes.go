@@ -414,6 +414,9 @@ type privacyRequest struct {
 	// writing. Turned off, the server records nothing when a client announces
 	// typing, so no client can show it.
 	SendsTypingIndication *bool `json:"sendsTypingIndication,omitempty"`
+	// ShowsEventAttendance is whether others may see which events this
+	// person is going to. Organisers see their own attendees regardless.
+	ShowsEventAttendance *bool `json:"showsEventAttendance,omitempty"`
 }
 
 // handleSetPrivacy records who may open a conversation with somebody, and what
@@ -493,6 +496,14 @@ func (s *Server) handleSetPrivacy(c *echo.Context) error {
 		}
 	}
 
+	if request.ShowsEventAttendance != nil {
+		if err := s.queries.SetShowsEventAttendance(ctx, dbgen.SetShowsEventAttendanceParams{
+			UserID: user.ID, ShowsEventAttendance: *request.ShowsEventAttendance,
+		}); err != nil {
+			return err
+		}
+	}
+
 	return c.NoContent(http.StatusNoContent)
 }
 
@@ -522,6 +533,11 @@ func (s *Server) handleGetPrivacy(c *echo.Context) error {
 	response.ShowsStatus = &disclosure.Status
 	response.ShowsLastSeen = &disclosure.LastSeen
 	response.SendsTypingIndication = &user.SendsTypingIndication
+	attendance, err := s.queries.ShowsEventAttendance(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	response.ShowsEventAttendance = &attendance
 
 	return c.JSON(http.StatusOK, response)
 }

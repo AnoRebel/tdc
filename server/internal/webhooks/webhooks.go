@@ -289,10 +289,22 @@ A subscription whose owner cannot read the room the event happened in is
 skipped here, and again at delivery, since access can be lost between the two.
 */
 func (s *Service) Enqueue(ctx context.Context, event dbgen.Event) {
-	source := s.describe(ctx, event.RoomID)
+	s.EnqueueFor(ctx, event.RoomID, event)
+}
+
+/*
+EnqueueFor offers an event stored in one room to the subscriptions of another.
+
+An event's conversation is a room of its own, but the people who would want to
+hear about it subscribed to the channel the event belongs to; the calendar
+entries of a channel's events are offered to that channel's subscriptions this
+way, with the owner's access to the channel checked as for every delivery.
+*/
+func (s *Service) EnqueueFor(ctx context.Context, roomID uuid.UUID, event dbgen.Event) {
+	source := s.describe(ctx, roomID)
 	kinds := append([]string{event.Type}, derived(event, source)...)
 
-	candidates, err := s.store.ListActiveWebhookSubscriptionsForRoom(ctx, &event.RoomID)
+	candidates, err := s.store.ListActiveWebhookSubscriptionsForRoom(ctx, &roomID)
 	if err != nil {
 		s.log.Error("cannot find webhooks for an event", "eventId", event.ID, "error", err)
 		return
@@ -331,7 +343,7 @@ func (s *Service) Enqueue(ctx context.Context, event dbgen.Event) {
 
 		allowed, asked := readers[subscription.OwnerID]
 		if !asked {
-			allowed = s.config.CanRead(ctx, event.RoomID, subscription.OwnerID)
+			allowed = s.config.CanRead(ctx, roomID, subscription.OwnerID)
 			readers[subscription.OwnerID] = allowed
 		}
 		if !allowed {
@@ -498,7 +510,13 @@ func (s *Service) entitled(ctx context.Context, subscription dbgen.WebhookSubscr
 		if err != nil {
 			return false
 		}
-		return s.config.CanRead(ctx, event.RoomID, subscription.OwnerID)
+		roomID := event.RoomID
+		if s.config.OfferedIn != nil {
+			if offered, ok := s.config.OfferedIn(ctx, event); ok {
+				roomID = offered
+			}
+		}
+		return s.config.CanRead(ctx, roomID, subscription.OwnerID)
 	}
 	definition, known := Lookup(claimed.Kind)
 	return known && definition.Permission != "" && s.holds(ctx, subscription.OwnerID, definition.Permission)

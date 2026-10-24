@@ -213,3 +213,19 @@ func TestAConferenceInvitationIsAnnounced(t *testing.T) {
 		t.Errorf("the conference invitation's banner reads %+v", spy.shown)
 	}
 }
+
+// A reminder of an event names it, says when, and leads to the event.
+func TestAnEventReminderIsAnnounced(t *testing.T) {
+	bridge, spy := bridgeWith(t, "me@example.test")
+	raw, _ := json.Marshal(map[string]any{
+		"type": "event.reminder", "roomId": "event-3",
+		"payload": map[string]any{"event": "event-3", "title": "Go meetup", "minutes": 15},
+	})
+	bridge.notify(raw)
+	if spy.count() != 1 {
+		t.Fatalf("a reminder raised %d banners, want 1", spy.count())
+	}
+	if shown := spy.shown[0]; shown.title != "Go meetup" || shown.body != "Starts in 15 minutes" || shown.target.Room != "event-3" {
+		t.Errorf("the reminder's banner reads %+v", shown)
+	}
+}

@@ -18,6 +18,8 @@ type Querier interface {
 	// Accepts a piece only in order, so two requests for one piece cannot both
 	// be counted and a gap cannot be skipped over.
 	AddBackupPiece(ctx context.Context, arg AddBackupPieceParams) (Backup, error)
+	AddCalendarEventPerson(ctx context.Context, arg AddCalendarEventPersonParams) error
+	AddCalendarSession(ctx context.Context, arg AddCalendarSessionParams) error
 	// Whoever creates a company is its first administrator, accepted from the
 	// start: they are consenting by creating it.
 	AddCompanyFounder(ctx context.Context, arg AddCompanyFounderParams) error
@@ -69,6 +71,12 @@ type Querier interface {
 	// a moderator extending a ban means the new terms, not an error.
 	BanFromChannel(ctx context.Context, arg BanFromChannelParams) error
 	BlockUser(ctx context.Context, arg BlockUserParams) error
+	// The entry an event began with, which notifications about the event as a
+	// whole point at.
+	CalendarAnchorEvent(ctx context.Context, roomID uuid.UUID) (string, error)
+	// The events somebody is in some way part of: hosting or speaking, having
+	// answered, or invited — themselves or through a channel they are in.
+	CalendarEventsInvolving(ctx context.Context, userID uuid.UUID) ([]CalendarEventsInvolvingRow, error)
 	CallByID(ctx context.Context, id uuid.UUID) (Call, error)
 	CallLinkByHash(ctx context.Context, tokenHash []byte) (CallLink, error)
 	CallLinkByID(ctx context.Context, id uuid.UUID) (CallLink, error)
@@ -76,6 +84,7 @@ type Querier interface {
 	CallLobby(ctx context.Context, callID uuid.UUID) ([]CallLobbyRow, error)
 	// The room of an open call somebody is in now; no row if they are not in it.
 	CallRoomOfParticipant(ctx context.Context, arg CallRoomOfParticipantParams) (uuid.UUID, error)
+	CancelCalendarEvent(ctx context.Context, arg CancelCalendarEventParams) (CalendarEvent, error)
 	// Everything still waiting for a subscription that has been turned off.
 	CancelPendingWebhookDeliveries(ctx context.Context, subscriptionID *uuid.UUID) (int64, error)
 	// Rewording or moving a message that has not gone, on the same terms as
@@ -88,6 +97,10 @@ type Querier interface {
 	// only when nothing was sent to them there within the quiet period, so two
 	// messages arriving together cannot both be answered.
 	ClaimAutomaticReply(ctx context.Context, arg ClaimAutomaticReplyParams) (time.Time, error)
+	ClaimCalendarReminder(ctx context.Context, arg ClaimCalendarReminderParams) (int64, error)
+	// One subscription whose turn has come, pushed into the future as it is
+	// claimed, so another node looking at the same moment finds nothing to do.
+	ClaimDueCalendarSubscription(ctx context.Context, holdSeconds int32) (CalendarSubscription, error)
 	ClaimDueNotificationDigests(ctx context.Context, limit int32) ([]NotificationDigest, error)
 	// What is ready to send, claimed by whoever asked.
 	//
@@ -108,6 +121,8 @@ type Querier interface {
 	// Clears presenters who are no longer in their call.
 	ClearAbsentPresenters(ctx context.Context) error
 	ClearApplicationChannels(ctx context.Context, applicationID uuid.UUID) error
+	ClearCalendarEventPeople(ctx context.Context, eventID uuid.UUID) error
+	ClearCalendarSessions(ctx context.Context, eventID uuid.UUID) error
 	// A success resets everything: consecutive failures are what matter, and a
 	// peer that answers has none.
 	ClearDeliveryFailures(ctx context.Context, arg ClearDeliveryFailuresParams) error
@@ -162,6 +177,9 @@ type Querier interface {
 	// Narrowed by the same filters as the cards, so a filtered board's counts are
 	// of what it shows.
 	CountBoardColumns(ctx context.Context, arg CountBoardColumnsParams) ([]CountBoardColumnsRow, error)
+	// Hosts and speakers do not take places.
+	CountCalendarGoing(ctx context.Context, eventID uuid.UUID) (int64, error)
+	CountCalendarRSVPs(ctx context.Context, eventID uuid.UUID) ([]CountCalendarRSVPsRow, error)
 	CountCompanyAdministrators(ctx context.Context, companyID uuid.UUID) (int64, error)
 	CountCredentialsForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	// How many issues each of a project's cycles holds, and how many are done.
@@ -223,6 +241,9 @@ type Querier interface {
 	CreateAutomaticReply(ctx context.Context, arg CreateAutomaticReplyParams) (AutomaticReply, error)
 	// Backups, restores, reloads and restarts: see 000429_operations.
 	CreateBackup(ctx context.Context, arg CreateBackupParams) (Backup, error)
+	CreateCalendarEvent(ctx context.Context, arg CreateCalendarEventParams) (CalendarEvent, error)
+	CreateCalendarInvite(ctx context.Context, arg CreateCalendarInviteParams) (CalendarInvite, error)
+	CreateCalendarSubscription(ctx context.Context, arg CreateCalendarSubscriptionParams) (CalendarSubscription, error)
 	CreateCallLink(ctx context.Context, arg CreateCallLinkParams) (CallLink, error)
 	CreateCompanyProfile(ctx context.Context, arg CreateCompanyProfileParams) (CompanyProfile, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
@@ -277,6 +298,11 @@ type Querier interface {
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
 	DeleteAutomaticReply(ctx context.Context, arg DeleteAutomaticReplyParams) (int64, error)
 	DeleteBackup(ctx context.Context, id uuid.UUID) error
+	// The room goes, and the event with it.
+	DeleteCalendarEvent(ctx context.Context, id uuid.UUID) error
+	DeleteCalendarFeed(ctx context.Context, userID uuid.UUID) (int64, error)
+	DeleteCalendarInvite(ctx context.Context, arg DeleteCalendarInviteParams) (int64, error)
+	DeleteCalendarSubscription(ctx context.Context, id uuid.UUID) (int64, error)
 	DeleteCompanyProfile(ctx context.Context, id uuid.UUID) error
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
 	DeleteCycle(ctx context.Context, id uuid.UUID) error
@@ -405,6 +431,7 @@ type Querier interface {
 	// Consumed when the second factor is accepted, so a ticket buys one session.
 	FinishPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
 	FinishWebhookAttempt(ctx context.Context, arg FinishWebhookAttemptParams) error
+	FirstWaitlisted(ctx context.Context, eventID uuid.UUID) (uuid.UUID, error)
 	// Following because of taking part, unless the person has already decided.
 	FollowThreadByTakingPart(ctx context.Context, arg FollowThreadByTakingPartParams) error
 	ForgetNodes(ctx context.Context, arg ForgetNodesParams) error
@@ -432,6 +459,12 @@ type Querier interface {
 	GetApplicationByAccount(ctx context.Context, accountID *uuid.UUID) (Application, error)
 	GetAttachment(ctx context.Context, id uuid.UUID) (Attachment, error)
 	GetBackup(ctx context.Context, id uuid.UUID) (Backup, error)
+	GetCalendarEvent(ctx context.Context, id uuid.UUID) (CalendarEvent, error)
+	GetCalendarEventByUID(ctx context.Context, arg GetCalendarEventByUIDParams) (CalendarEvent, error)
+	GetCalendarEventWithChannel(ctx context.Context, id uuid.UUID) (GetCalendarEventWithChannelRow, error)
+	GetCalendarFeed(ctx context.Context, userID uuid.UUID) (CalendarFeed, error)
+	GetCalendarRSVP(ctx context.Context, arg GetCalendarRSVPParams) (CalendarRsvp, error)
+	GetCalendarSubscription(ctx context.Context, id uuid.UUID) (CalendarSubscription, error)
 	GetCallPolicy(ctx context.Context, userID uuid.UUID) (GetCallPolicyRow, error)
 	// For the company's own administrators, whatever its visibility.
 	GetCompanyBySlug(ctx context.Context, slug string) (CompanyProfile, error)
@@ -574,6 +607,9 @@ type Querier interface {
 	// The expiry is evaluated here rather than by a sweep, so a temporary ban
 	// lifts at its moment rather than whenever a background job next runs.
 	IsBannedFromChannel(ctx context.Context, arg IsBannedFromChannelParams) (bool, error)
+	// Whether an attachment is some event's cover, which is what keeps it from
+	// being reclaimed and lets people who may see the event see it.
+	IsCalendarCover(ctx context.Context, coverAttachmentID *uuid.UUID) (uuid.UUID, error)
 	IsInvitedToCall(ctx context.Context, arg IsInvitedToCallParams) (bool, error)
 	// A restriction on this channel, or one on the whole server.
 	//
@@ -660,6 +696,26 @@ type Querier interface {
 	// description, a history or a comment count is what turns a page of cards into
 	// a page of issues.
 	ListBoardColumn(ctx context.Context, arg ListBoardColumnParams) ([]ListBoardColumnRow, error)
+	// Everybody who answered, with whether they let others see it. Withholding is
+	// the caller's to apply, by role.
+	ListCalendarAttendees(ctx context.Context, eventID uuid.UUID) ([]ListCalendarAttendeesRow, error)
+	ListCalendarEventPeople(ctx context.Context, eventID uuid.UUID) ([]ListCalendarEventPeopleRow, error)
+	ListCalendarEventsByIDs(ctx context.Context, ids []uuid.UUID) ([]ListCalendarEventsByIDsRow, error)
+	// Events that may have an occurrence starting soon: not cancelled, and either
+	// repeating or starting within the window.
+	ListCalendarEventsForReminders(ctx context.Context, until time.Time) ([]CalendarEvent, error)
+	// Every event of the given channels that has not long ended, for a feed.
+	ListCalendarEventsInChannels(ctx context.Context, arg ListCalendarEventsInChannelsParams) ([]ListCalendarEventsInChannelsRow, error)
+	// Candidates whose occurrences may fall in the range, with the channel each
+	// belongs to. Who may see each is decided by the caller, from the same facts
+	// every other route uses; this only narrows by time and place.
+	ListCalendarEventsInRange(ctx context.Context, arg ListCalendarEventsInRangeParams) ([]ListCalendarEventsInRangeRow, error)
+	ListCalendarInvites(ctx context.Context, eventID uuid.UUID) ([]ListCalendarInvitesRow, error)
+	// Who hears about an occurrence: people going or maybe going, and hosts and
+	// speakers.
+	ListCalendarRecipients(ctx context.Context, eventID uuid.UUID) ([]uuid.UUID, error)
+	ListCalendarSessions(ctx context.Context, eventID uuid.UUID) ([]CalendarSession, error)
+	ListCalendarSubscriptions(ctx context.Context) ([]CalendarSubscription, error)
 	ListCallParticipants(ctx context.Context, callID uuid.UUID) ([]ListCallParticipantsRow, error)
 	ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]ListChannelBansRow, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
@@ -719,6 +775,7 @@ type Querier interface {
 	ListMilestoneCycles(ctx context.Context, milestoneID uuid.UUID) ([]Cycle, error)
 	ListMilestonesForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListMilestonesForIssuesRow, error)
 	ListMilestonesOfProject(ctx context.Context, projectID uuid.UUID) ([]Milestone, error)
+	ListMyCalendarAnswers(ctx context.Context, userID uuid.UUID) ([]ListMyCalendarAnswersRow, error)
 	// Somebody's own associations, answered and unanswered.
 	ListMyCompanies(ctx context.Context, userID uuid.UUID) ([]ListMyCompaniesRow, error)
 	// Everything assigned to somebody, in every project they may still see.
@@ -785,6 +842,7 @@ type Querier interface {
 	ListProjectsForUser(ctx context.Context, userID uuid.UUID) ([]ListProjectsForUserRow, error)
 	ListProposalResponses(ctx context.Context, engagementID uuid.UUID) ([]ProposalResponse, error)
 	ListProposalVersions(ctx context.Context, engagementID uuid.UUID) ([]ProposalVersion, error)
+	ListPublicCalendarEvents(ctx context.Context, since time.Time) ([]ListPublicCalendarEventsRow, error)
 	ListPushSubscriptions(ctx context.Context, userID uuid.UUID) ([]PushSubscription, error)
 	// Every reaction on a set of messages, for drawing a timeline.
 	//
@@ -874,6 +932,7 @@ type Querier interface {
 	// The vocabulary for somebody choosing: every active skill matching what they
 	// typed, and their own proposals, which only they can attach.
 	ListSkills(ctx context.Context, arg ListSkillsParams) ([]Skill, error)
+	ListSubscriptionEventUIDs(ctx context.Context, subscriptionID *uuid.UUID) ([]ListSubscriptionEventUIDsRow, error)
 	ListThreadFollowers(ctx context.Context, rootEventID string) ([]uuid.UUID, error)
 	ListThreadReplies(ctx context.Context, threadRootID *string) ([]Event, error)
 	// How many replies each of a set of messages has, and when the latest arrived,
@@ -918,6 +977,9 @@ type Querier interface {
 	// A subscription's recent attempts, newest first, with what each was for.
 	ListWebhookHistory(ctx context.Context, arg ListWebhookHistoryParams) ([]ListWebhookHistoryRow, error)
 	ListWebhookSubscriptionsForOwner(ctx context.Context, ownerID uuid.UUID) ([]WebhookSubscription, error)
+	// Held for the length of an answer, so two people taking the last place
+	// serialise here and the second finds it gone.
+	LockCalendarEvent(ctx context.Context, id uuid.UUID) (CalendarEvent, error)
 	// Taken by whoever deals with a cycle's end, so two servers sharing a database
 	// cannot both do it. SKIP LOCKED: the other simply moves on.
 	LockCycle(ctx context.Context, id uuid.UUID) (Cycle, error)
@@ -1022,6 +1084,7 @@ type Querier interface {
 	RecordActionPress(ctx context.Context, arg RecordActionPressParams) (ActionPress, error)
 	RecordApplicationRateLimited(ctx context.Context, id uuid.UUID) error
 	RecordBackupManifest(ctx context.Context, arg RecordBackupManifestParams) error
+	RecordCalendarFetch(ctx context.Context, arg RecordCalendarFetchParams) error
 	// Counts a wrong passcode, starting a fresh window once the last has passed.
 	RecordCallLinkFailure(ctx context.Context, arg RecordCallLinkFailureParams) (int32, error)
 	RecordDeliveryFailure(ctx context.Context, arg RecordDeliveryFailureParams) (RoomPeer, error)
@@ -1101,8 +1164,10 @@ type Querier interface {
 	ResolveSkill(ctx context.Context, folded string) (Skill, error)
 	// Restarts of this host that a new process has not yet reported back from.
 	RestartsAwaitingReturn(ctx context.Context, host string) ([]Operation, error)
+	RestoreCalendarEvent(ctx context.Context, id uuid.UUID) (CalendarEvent, error)
 	RestoreRoom(ctx context.Context, id uuid.UUID) error
 	RestrictPosting(ctx context.Context, arg RestrictPostingParams) (PostingRestriction, error)
+	ResumeCalendarSubscription(ctx context.Context, id uuid.UUID) error
 	// An operator's decision to try an abandoned peer again.
 	ResumePeer(ctx context.Context, arg ResumePeerParams) error
 	// Scoped to the owner, so somebody cannot revoke a token by guessing an
@@ -1207,6 +1272,11 @@ type Querier interface {
 	// Scoped to the uploader and to attachments not yet sent: a caption is written
 	// while composing, and a message already sent is not edited this way.
 	SetAttachmentCaption(ctx context.Context, arg SetAttachmentCaptionParams) (int64, error)
+	SetCalendarEventCover(ctx context.Context, arg SetCalendarEventCoverParams) error
+	SetCalendarFeed(ctx context.Context, arg SetCalendarFeedParams) error
+	// The time answered changes only when the answer does, so changing nothing
+	// does not send somebody to the back of a waiting list.
+	SetCalendarRSVP(ctx context.Context, arg SetCalendarRSVPParams) error
 	// Raises a hand (keeping when it was first raised) or lowers it.
 	SetCallHand(ctx context.Context, arg SetCallHandParams) (int64, error)
 	SetCallMedia(ctx context.Context, arg SetCallMediaParams) (int64, error)
@@ -1266,6 +1336,7 @@ type Querier interface {
 	SetRoomNotificationPreference(ctx context.Context, arg SetRoomNotificationPreferenceParams) error
 	SetRoomVisibility(ctx context.Context, arg SetRoomVisibilityParams) (Room, error)
 	SetServerConfigValue(ctx context.Context, arg SetServerConfigValueParams) error
+	SetShowsEventAttendance(ctx context.Context, arg SetShowsEventAttendanceParams) error
 	SetStatus(ctx context.Context, arg SetStatusParams) (UserPresence, error)
 	SetTourProgress(ctx context.Context, arg SetTourProgressParams) error
 	SetTranslationConnection(ctx context.Context, arg SetTranslationConnectionParams) error
@@ -1280,6 +1351,7 @@ type Querier interface {
 	// conversation share a room by definition, which would make 'shared' mean
 	// 'anyone who has ever written to me'.
 	SharesAChannel(ctx context.Context, arg SharesAChannelParams) (bool, error)
+	ShowsEventAttendance(ctx context.Context, userID uuid.UUID) (bool, error)
 	// Whether somebody may put a skill on their own profile: any active skill,
 	// and their own proposals.
 	SkillAttachable(ctx context.Context, arg SkillAttachableParams) (bool, error)
@@ -1350,6 +1422,9 @@ type Querier interface {
 	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error
 	UnrelateIssues(ctx context.Context, arg UnrelateIssuesParams) (int64, error)
 	UpdateAutomaticReply(ctx context.Context, arg UpdateAutomaticReplyParams) (AutomaticReply, error)
+	// Every field an edit can change, and the sequence that tells a calendar
+	// application its copy is out of date.
+	UpdateCalendarEvent(ctx context.Context, arg UpdateCalendarEventParams) (CalendarEvent, error)
 	UpdateCompanyProfile(ctx context.Context, arg UpdateCompanyProfileParams) (CompanyProfile, error)
 	UpdateCycle(ctx context.Context, arg UpdateCycleParams) (Cycle, error)
 	UpdateIssueState(ctx context.Context, arg UpdateIssueStateParams) (IssueState, error)
@@ -1368,6 +1443,7 @@ type Querier interface {
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
+	UseCalendarFeed(ctx context.Context, tokenHash []byte) (uuid.UUID, error)
 	// Counts a use, refusing one past the limit in the same statement so two
 	// people arriving at once cannot both take the last.
 	UseCallLink(ctx context.Context, id uuid.UUID) (int64, error)
@@ -1388,6 +1464,7 @@ type Querier interface {
 	// A profile's skills as a viewer may see them: active ones only, and only
 	// when the viewer may see what the profile says.
 	ViewProfileSkills(ctx context.Context, arg ViewProfileSkillsParams) ([]ViewProfileSkillsRow, error)
+	WaitlistPosition(ctx context.Context, arg WaitlistPositionParams) (int64, error)
 	// Somebody taking part in an issue's discussion hears about everything said
 	// in it, as a tracker's participants expect — unless they have said
 	// otherwise: a setting of their own for this discussion is left alone, and so

@@ -1325,6 +1325,98 @@ Negotiation is sent on the same connection:
 checked on every frame: both people must be in that call now and allowed to
 take part, or it is dropped.
 
+## Events
+
+Where the server offers events (`capabilities` includes `events`), these routes
+schedule, read and answer them. Every instant is RFC 3339 in UTC; `timeZone` is
+the IANA zone the organiser meant, which is what a repeat is expanded in. An
+event somebody may not see is answered `404` exactly as one that does not
+exist.
+
+| Request                                                                       | What it does                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/events?from=&to=&channel=&limit=`                                   | The occurrences you can see over a range (default the next 90 days, at most 400, at most 500 entries), each with `occurrenceStartsAt`/`occurrenceEndsAt` and your `myAnswer`                    |
+| `POST /api/events`                                                            | Schedule one (needs `event.create`, in the channel when `channelId` is given). Answers the event as `GET` does                                                                                  |
+| `GET /api/events/:id`                                                         | The event with its `hosts`, `speakers`, `sessions`, `counts`, your answer and place on the waiting list, its `next` occurrence, and what you `may` do (`edit`, `delete`, `startCall`)           |
+| `PUT /api/events/:id`                                                         | Change it — its creator, a host, or `event.manage.any`. Send every field; `hosts`, `speakers` and `sessions` may be left out to keep them. It stays in its channel                              |
+| `POST /api/events/:id/cancel`                                                 | `{"reason": "…"}`. Kept, marked cancelled, and everybody going told                                                                                                                             |
+| `DELETE /api/events/:id`                                                      | Delete it and its conversation — its creator or `event.manage.any`                                                                                                                              |
+| `PUT /api/events/:id/cover`                                                   | `{"attachmentId": "…"}` — an image uploaded to the event's conversation (`POST /api/rooms/:id/attachments`, the event's id being its conversation's) — or `null` to clear it                    |
+| `PUT /api/events/:id/rsvp`                                                    | `{"status": "going" \| "maybe" \| "declined"}`. Answers the status recorded — `waitlisted`, with `position`, when it is full                                                                    |
+| `GET /api/events/:id/attendees`                                               | `attendees` you may be shown, and `unnamed` — counts, by answer, of people who keep their attendance to themselves. Organisers see everybody                                                    |
+| `GET`/`POST`/`DELETE /api/events/:id/invites[/:inviteId]`                     | Who was invited; invite `{"users": [ids], "channels": [ids]}`; withdraw one. For the event's organisers                                                                                         |
+| `GET /api/events/:id/ics`                                                     | The event as an iCalendar file                                                                                                                                                                  |
+| `POST /api/events/import/preview`, `POST /api/events/import`                  | `{"ics": "…"}` — what importing would do (`create`, `update` or `skip`, with `warnings`); then `{"ics", "uids", "channelId", "visibility", "kind"}` to import the chosen ones. Files up to 1 MB |
+| `GET`/`POST`/`DELETE /api/calendar/subscriptions[/:id]`, `POST …/:id/refresh` | Followed external calendars — `{"url", "label", "channelId", "visibility", "kind"}`; needs `event.calendars.manage`                                                                             |
+| `GET`/`POST`/`DELETE /api/me/calendar-feed`                                   | Your calendar address: whether you have one; make or replace it (the `path` with its secret is in that answer only); revoke it. Not available to API tokens                                     |
+| `GET /api/calendar/feeds/:secret/events.ics`                                  | A person's feed, authenticated by the secret in the address                                                                                                                                     |
+| `GET /api/calendar/public.ics`                                                | The server's public events, where the operator publishes them (`events.public_feed`)                                                                                                            |
+
+An event's body:
+
+```json
+{
+  "channelId": "5a1c…",
+  "kind": "meetup",
+  "title": "Dar es Salaam Go meetup",
+  "description": "Bring a **laptop**.",
+  "startsAt": "2026-11-05T15:00:00Z",
+  "endsAt": "2026-11-05T17:00:00Z",
+  "timeZone": "Africa/Dar_es_Salaam",
+  "allDay": false,
+  "recurrence": "FREQ=WEEKLY;COUNT=4",
+  "exceptions": ["2026-11-19T15:00:00Z"],
+  "location": "Kijitonyama, Dar es Salaam",
+  "online": true,
+  "onlineUrl": "",
+  "capacity": 20,
+  "visibility": "channel",
+  "hosts": ["<user id>"],
+  "speakers": [],
+  "sessions": [
+    {
+      "title": "Generics in practice",
+      "startsAt": "2026-11-05T15:15:00Z",
+      "endsAt": "2026-11-05T15:45:00Z",
+      "speakers": ["<user id>"],
+      "guestSpeakers": ""
+    }
+  ]
+}
+```
+
+- `kind` is `meetup`, `talk`, `workshop`, `office_hours` or `other`;
+  `visibility` is `public` (everybody on the server — only in a public channel or
+  none), `channel` (the channel's members) or `invite`.
+- `recurrence` is an RRULE body from a subset: `FREQ` of `DAILY`, `WEEKLY` or
+  `MONTHLY`, with `INTERVAL`, `COUNT` (at most 500) or `UNTIL`, `BYDAY` (with
+  an ordinal, like `2TU`, for monthly) and `BYMONTHDAY`. Anything else is
+  refused with `400`. `exceptions` are occurrence starts to skip.
+- An all-day event's start and end are stretched to midnights in its zone; the
+  end is the midnight after its last day, as iCalendar has it.
+
+**An event's conversation** is a room whose id is the event's. Its log holds
+`event.created`, `event.updated` (with `changed` naming the fields),
+`event.cancelled`, `event.rsvp` (only for people who show their attendance) and
+`event.reminder`. People going or maybe going, hosts and speakers are its
+members; nobody joins it any other way. For an event hosted online its call is
+`/api/rooms/:id/call` with the event's id, under every rule in [Calls](#calls) —
+except that only somebody running the event starts it.
+
+**On the live connection**, a reminder arrives as an `event.reminder` frame for
+each person reminded: `{"event", "title", "startsAt", "minutes", "online"}`.
+
+**Notifications** about events have the reasons `event_invite`,
+`event_reminder`, `event_changed`, `event_cancelled` and `event_promoted` (a
+place freed from the waiting list); `detail` carries the event's title, and the
+notification's room is the event's conversation.
+
+**The feeds** are iCalendar (RFC 5545): one event is written in UTC; a repeating
+one with `DTSTART;TZID=` in its own zone, its `RRULE` and `EXDATE`s, and a
+`VTIMEZONE` for that zone built from its current rules, so another calendar
+expands it to the same instants. Cancelled events carry `STATUS:CANCELLED` and a
+raised `SEQUENCE`, so a subscribed calendar updates rather than duplicates.
+
 ## Search
 
 Two endpoints, both taking the search text as `q`:

@@ -923,6 +923,68 @@ translations when a message is edited or removed.
 If translation is enabled with anything but on-device and your instance, say so
 in your [privacy policy](privacy-policy.md#what-leaves-this-server).
 
+### Events
+
+Events — meetups, talks, workshops, office hours — are **on by default**: they
+need nothing configured and nothing extra running. Turn them off while the
+server runs, and back on, without losing any:
+
+```sh
+curl -X PUT https://tdc.example/api/admin/features/events \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled": false}'
+```
+
+Off, the Events page and every events route, the calendar feeds included,
+answer that the server does not offer them.
+
+| Setting                               | Default   | What it does                                                                                                                                                                                                       |
+| ------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `events.reminder_minutes`             | `1440,15` | How long before each occurrence the people taking part are reminded, in minutes, comma-separated (at most five). Empty sends no reminders                                                                          |
+| `events.public_feed`                  | `false`   | Publishes the server's public events at `/api/calendar/public.ics`, to anybody, without signing in. "Public" means public to the people on this server; this is the separate decision to show them to the internet |
+| `events.subscription_refresh_minutes` | `60`      | How often a followed external calendar is fetched again; at least 15                                                                                                                                               |
+
+**Permissions.** `event.create` is granted to the `Member` role — on a new
+server as it is made, and on an existing one by the upgrade that brings events
+— so members schedule events as they make channels. Withdraw it to keep
+scheduling to some people, server-wide or in one channel. `event.manage.any`
+(changing, cancelling and deleting anybody's events, and seeing everybody
+going) and `event.calendars.manage` (following external calendars) are held by
+nobody until you give them; both can be granted server-wide or in one channel.
+Hosts who should be able to bring in guests without accounts through a call
+link need `call.link` as well.
+
+**What it stores.** Every event has a room behind it, of kind `event` — its own
+conversation, holding what happens to the event and its call. Like a project's
+rooms it appears in nobody's conversation list, cannot be joined except by
+answering the event, and does not count towards `limits.max_channels`.
+
+**Reminders** are sent by a pass every minute on every node; each reminder is
+claimed by inserting a row only one node can insert, so it goes out once
+however many nodes there are. A server that was down does not send reminders
+for occurrences that have started.
+
+**Calendar addresses.** A person's subscription address carries a secret,
+stored only as a hash; making a new one or revoking it is in the audit log as
+`calendar.feed.created` and `calendar.feed.revoked`. What a feed holds is decided
+for its owner at every fetch, and a suspended account's feed answers as if it
+did not exist.
+
+**Followed calendars make this server fetch addresses people give it.** The
+same guard as webhooks applies: the address is checked when the calendar is
+followed, and every connection — including after a redirect, at most three — is
+refused if it resolves to a private or reserved address, unless
+`integrations.allow_private_addresses` is on. A fetch is limited to 2 MB and 20
+seconds, sends `If-None-Match`/`If-Modified-Since` so an unchanged calendar
+costs little, ignores proxies from the environment, and is made by one node at
+a time. A calendar that fails ten times in a row is paused until somebody
+refreshes it by hand. Following and unfollowing are audited as
+`calendar.subscription.created` and `calendar.subscription.deleted`.
+
+Cancelling or deleting an event, and acting on somebody else's under
+`event.manage.any`, are audited as `event.cancelled`, `event.deleted` and
+`event.managed`.
+
 ### Calls
 
 Voice and video calls are **off by default**. Turn them on while the server
@@ -1190,24 +1252,26 @@ another machine.
 
 ### What a backup can hold
 
-| Part                                    | What is in it                                                                                                            | Brings with it               |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
-| Server settings and branding            | Runtime policy, feature switches, statuses, the legal documents, the server's signing key                                | —                            |
-| Accounts and roles                      | Accounts, password hashes and second factors, roles and grants, privacy settings, blocks                                 | —                            |
-| Channels and messages                   | Every room (or chosen channels) and everything in it: members, messages, reactions, pins, calls held, attachment records | Accounts                     |
-| Attached files                          | The bytes of those attachments and their previews                                                                        | Channels                     |
-| Projects and issues                     | Projects, issues, states, cycles, milestones, views                                                                      | Accounts, every channel      |
-| Directory                               | Profiles, companies, skills, enquiries, engagements and agreements                                                       | Accounts, channels, projects |
-| Integrations, webhooks and applications | Applications, tokens, incoming webhooks, subscriptions and their delivery history                                        | Accounts, every channel      |
-| Audit log                               | The whole log                                                                                                            | Accounts                     |
+| Part                                    | What is in it                                                                                                                                                         | Brings with it               |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Server settings and branding            | Runtime policy, feature switches, statuses, the legal documents, the server's signing key                                                                             | —                            |
+| Accounts and roles                      | Accounts, password hashes and second factors, roles and grants, privacy settings, automatic replies, calendar addresses, blocks                                       | —                            |
+| Channels and messages                   | Every room (or chosen channels) and everything in it: members, messages, reactions, pins, calls held, events and who is going, followed calendars, attachment records | Accounts                     |
+| Attached files                          | The bytes of those attachments and their previews                                                                                                                     | Channels                     |
+| Projects and issues                     | Projects, issues, states, cycles, milestones, views                                                                                                                   | Accounts, every channel      |
+| Directory                               | Profiles, companies, skills, enquiries, engagements and agreements                                                                                                    | Accounts, channels, projects |
+| Integrations, webhooks and applications | Applications, tokens, incoming webhooks, subscriptions and their delivery history                                                                                     | Accounts, every channel      |
+| Audit log                               | The whole log                                                                                                                                                         | Accounts                     |
 
 A part brings what it cannot be restored without: a message names its sender,
 so channels bring accounts. Choosing only some channels is allowed with parts
 that do not refer to every channel — not with projects, the directory or
 integrations. Every archive can therefore be restored into an empty server.
+Each event has a conversation of its own, so a backup of only some channels
+holds no events.
 
 What is never in a backup: sessions, sign-ins and recovery links in progress,
-presence and typing, and the record of backups and restarts themselves. Each
+presence and typing, who was sent an automatic reply today, and the record of backups and restarts themselves. Each
 either lapses within minutes or describes the running server rather than the
 community. After a restore everybody signs in again.
 

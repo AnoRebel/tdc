@@ -23,6 +23,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/backup"
 	"github.com/AnoRebel/tdc/server/internal/buildinfo"
 	"github.com/AnoRebel/tdc/server/internal/cache"
+	"github.com/AnoRebel/tdc/server/internal/calendar"
 	"github.com/AnoRebel/tdc/server/internal/config"
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -174,6 +175,10 @@ type Server struct {
 	// projects owns projects and issues. Built when its routes are mounted,
 	// from the pool and rooms service above; see projectroutes.go.
 	projects *projects.Service
+
+	// calendar keeps events. Built when its routes are mounted; see
+	// eventroutes.go.
+	calendar *calendar.Service
 
 	// shell is the built application's index.html, held in memory so social
 	// metadata can be inserted per request. Replaced by a reload.
@@ -473,6 +478,12 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// People whose connection went without saying goodbye leave their calls.
 	go s.sweepCallsPeriodically(ctx)
+
+	// Reminders of events people are going to. Every node runs a pass and
+	// claims what it sends.
+	go s.RunEventReminders(ctx)
+	// Calendars followed from elsewhere, fetched again as each comes due.
+	go s.RunCalendarSubscriptions(ctx)
 
 	// Summaries of missed activity, mailed to whoever chose one. Every node
 	// runs a pass for the same reason, and claims what it sends the same way.

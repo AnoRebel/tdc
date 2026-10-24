@@ -238,6 +238,19 @@ export function useLiveConnection(handlers: LiveHandlers) {
         break;
       }
 
+      case "event.reminder": {
+        /*
+         * Raised for the whole page rather than handed to one view: a
+         * reminder is about wherever somebody is, and the corner that shows it
+         * listens for this. Every open connection hears it, so the listener
+         * keeps one of each.
+         */
+        if (frame.payload && import.meta.client) {
+          window.dispatchEvent(new CustomEvent("tdc:event-reminder", { detail: frame.payload }));
+        }
+        break;
+      }
+
       case "ready":
       case "subscribed":
       case "pong":

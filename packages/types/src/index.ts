@@ -21,3 +21,4 @@ export * from "./directory";
 export * from "./projects";
 export * from "./calls";
 export * from "./translation";
+export * from "./events";

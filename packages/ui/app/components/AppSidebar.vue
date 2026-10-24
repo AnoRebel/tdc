@@ -241,6 +241,19 @@ function isCurrent(roomId: string): boolean {
           </li>
         </ul>
       </section>
+      <!-- Events: what is coming up, on servers that offer them. -->
+      <ul v-if="offers('events')" class="space-y-px">
+        <li>
+          <NuxtLink
+            :to="localeRoute({ name: 'events' })"
+            class="nav-item"
+            :data-active="route.path.startsWith('/events')"
+          >
+            <Icon name="lucide:calendar-days" class="size-3.5 shrink-0 opacity-60" />
+            <span class="truncate">{{ $t("events.title") }}</span>
+          </NuxtLink>
+        </li>
+      </ul>
       <!-- Projects: where work agreed in these conversations is tracked. -->
       <ul class="space-y-px">
         <li>

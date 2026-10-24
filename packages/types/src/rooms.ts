@@ -169,7 +169,9 @@ export type LiveFrameType =
   | "call.lobby"
   | "call.admitted"
   | "call.turned_away"
-  | "call.reaction";
+  | "call.reaction"
+  // An event somebody is going to is about to start.
+  | "event.reminder";
 
 /** One frame from the live connection. */
 export interface LiveFrame {
@@ -435,7 +437,13 @@ export type NotificationReason =
   // Somebody made you responsible for an issue; detail names it.
   | "assigned"
   // Somebody rang you into a call you did not answer.
-  | "missed_call";
+  | "missed_call"
+  // Events; detail carries the event's title.
+  | "event_invite"
+  | "event_reminder"
+  | "event_changed"
+  | "event_cancelled"
+  | "event_promoted";
 
 /** One thing somebody has been told about. */
 export interface Notification {
@@ -549,6 +557,11 @@ export interface DisclosureSettings {
   showsStatus: boolean;
   /** When they were last here — the most revealing of the three. */
   showsLastSeen: boolean;
+  /**
+   * Whether others may see which events they are going to. Organisers see
+   * their own attendees regardless.
+   */
+  showsEventAttendance: boolean;
 }
 
 /** Somebody's own privacy settings, as the settings screen reads them. */

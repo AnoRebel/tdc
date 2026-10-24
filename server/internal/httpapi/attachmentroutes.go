@@ -201,7 +201,7 @@ func (s *Server) handleDownloadAttachment(c *echo.Context) error {
 	// The room's permissions govern the file. Knowing an identifier is not
 	// authorisation, so this is checked on every request rather than trusted
 	// from whoever handed the link on.
-	if _, err := s.rooms.RequireMembership(ctx, attachment.RoomID, user.ID); err != nil {
+	if _, err := s.rooms.RequireMembership(ctx, attachment.RoomID, user.ID); err != nil && !s.coverVisible(c, attachment.ID) {
 		return roomError(err)
 	}
 
@@ -420,7 +420,7 @@ func (s *Server) handleAttachmentPreview(c *echo.Context) error {
 
 	// The same authorisation as the original: a preview is a smaller copy of
 	// the same private content.
-	if _, err := s.rooms.RequireMembership(ctx, attachment.RoomID, user.ID); err != nil {
+	if _, err := s.rooms.RequireMembership(ctx, attachment.RoomID, user.ID); err != nil && !s.coverVisible(c, attachment.ID) {
 		return roomError(err)
 	}
 

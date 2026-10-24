@@ -55,6 +55,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/calendar/subscriptions/:subscriptionId": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/calls/:callId": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -90,6 +95,16 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/events/:eventId": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"DELETE /api/events/:eventId/invites/:inviteId": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/invitations/:id": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -121,6 +136,11 @@ var routeBodies = map[string]routeBodySet{
 		},
 	},
 	"DELETE /api/me/blocks/:id": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"DELETE /api/me/calendar-feed": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
 		},
@@ -460,6 +480,21 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
+	"GET /api/calendar/feeds/:secret/events.ics": {
+		Raw: map[int]string{
+			200: "text/calendar; charset=utf-8",
+		},
+	},
+	"GET /api/calendar/public.ics": {
+		Raw: map[int]string{
+			200: "text/calendar; charset=utf-8",
+		},
+	},
+	"GET /api/calendar/subscriptions": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]subscriptionView]()},
+		},
+	},
 	"GET /api/call-links/:secret": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[callLinkTarget]()},
@@ -573,6 +608,32 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[[]skillView]()},
 		},
 	},
+	"GET /api/events": {
+		Query: []string{"channel", "from", "limit", "to"},
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]eventView]()},
+		},
+	},
+	"GET /api/events/:eventId": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[eventDetailView]()},
+		},
+	},
+	"GET /api/events/:eventId/attendees": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"GET /api/events/:eventId/ics": {
+		Raw: map[int]string{
+			200: "text/calendar; charset=utf-8",
+		},
+	},
+	"GET /api/events/:eventId/invites": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]inviteView]()},
+		},
+	},
 	"GET /api/federation/rooms": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
@@ -641,6 +702,11 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/me/blocks": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]blockedResponse]()},
+		},
+	},
+	"GET /api/me/calendar-feed": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[calendarFeedView]()},
 		},
 	},
 	"GET /api/me/email": {
@@ -1340,6 +1406,23 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"POST /api/calendar/subscriptions": {
+		Request: reflect.TypeFor[struct {
+			URL        string "json:\"url\""
+			Label      string "json:\"label\""
+			ChannelID  string "json:\"channelId\""
+			Visibility string "json:\"visibility\""
+			Kind       string "json:\"kind\""
+		}](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[subscriptionView]()},
+		},
+	},
+	"POST /api/calendar/subscriptions/:subscriptionId/refresh": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
 	"POST /api/call-links/:secret/guest": {
 		Request: reflect.TypeFor[guestRequest](),
 		Responses: []responseBody{
@@ -1484,6 +1567,41 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 201, Type: reflect.TypeFor[skillView]()},
 		},
 	},
+	"POST /api/events": {
+		Request: reflect.TypeFor[eventRequest](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[eventDetailView]()},
+		},
+	},
+	"POST /api/events/:eventId/cancel": {
+		Request: reflect.TypeFor[struct {
+			Reason string "json:\"reason\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[eventDetailView]()},
+		},
+	},
+	"POST /api/events/:eventId/invites": {
+		Request: reflect.TypeFor[struct {
+			Users    []string "json:\"users\""
+			Channels []string "json:\"channels\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/events/import": {
+		Request: reflect.TypeFor[importRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]int]()},
+		},
+	},
+	"POST /api/events/import/preview": {
+		Request: reflect.TypeFor[importRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
 	"POST /api/federation/ping": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
@@ -1573,6 +1691,11 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[blockRequest](),
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
+		},
+	},
+	"POST /api/me/calendar-feed": {
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[calendarFeedView]()},
 		},
 	},
 	"POST /api/me/email": {
@@ -1979,6 +2102,28 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[moderateProfileRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[ownProfileResponse]()},
+		},
+	},
+	"PUT /api/events/:eventId": {
+		Request: reflect.TypeFor[eventRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[eventDetailView]()},
+		},
+	},
+	"PUT /api/events/:eventId/cover": {
+		Request: reflect.TypeFor[struct {
+			AttachmentID *string "json:\"attachmentId\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[eventDetailView]()},
+		},
+	},
+	"PUT /api/events/:eventId/rsvp": {
+		Request: reflect.TypeFor[struct {
+			Status string "json:\"status\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[answerView]()},
 		},
 	},
 	"PUT /api/issues/:ref/assignees/:username": {

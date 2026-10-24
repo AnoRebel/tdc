@@ -122,6 +122,7 @@ var partTables = map[Part][]tableSpec{
 		{name: "user_privacy"},
 		{name: "translation_preferences"},
 		{name: "automatic_replies"},
+		{name: "calendar_feeds"},
 		{name: "username_history"},
 		{name: "user_blocks"},
 		{name: "oauth_authorizations"},
@@ -157,6 +158,14 @@ var partTables = map[Part][]tableSpec{
 		childOf("call_participants", "call_id", "calls"),
 		roomScoped("call_links"),
 		roomScoped("translation_room_rules"),
+		// An event is a room of its own, so only some channels carries none.
+		tableSpec{name: "calendar_subscriptions", roomColumn: "channel_id"},
+		tableSpec{name: "calendar_events", roomColumn: "id"},
+		childOf("calendar_event_people", "event_id", "calendar_events"),
+		childOf("calendar_sessions", "event_id", "calendar_events"),
+		childOf("calendar_rsvps", "event_id", "calendar_events"),
+		childOf("calendar_invites", "event_id", "calendar_events"),
+		childOf("calendar_reminders", "event_id", "calendar_events"),
 	},
 	PartProjects: {
 		{name: "projects"},

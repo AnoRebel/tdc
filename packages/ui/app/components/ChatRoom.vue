@@ -1655,6 +1655,12 @@ watch(roomId, load, { immediate: true });
 
       <CallBanner v-if="callable" :room-id="roomId" :call="roomCall" />
 
+      <!-- The channel's next event, where the server offers events. -->
+      <LazyEventsChannelStrip
+        v-if="serverOffers('events') && room?.kind === 'channel'"
+        :channel-id="roomId"
+      />
+
       <!-- What the channel has marked as important, collapsed to one line: a
            list of pinned messages above every conversation would push the
            conversation itself off the screen. -->

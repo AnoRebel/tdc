@@ -33,6 +33,7 @@ export function usePersonalModeration() {
     showsPresence: true,
     showsStatus: true,
     showsLastSeen: true,
+    showsEventAttendance: true,
   });
 
   async function refresh() {
@@ -49,6 +50,7 @@ export function usePersonalModeration() {
         showsPresence: privacy.showsPresence,
         showsStatus: privacy.showsStatus,
         showsLastSeen: privacy.showsLastSeen,
+        showsEventAttendance: privacy.showsEventAttendance ?? true,
       };
     } catch {
       // A settings page that cannot load is shown empty rather than as an

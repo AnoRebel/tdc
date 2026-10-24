@@ -66,6 +66,7 @@ func (s *Server) buildIntegrations() {
 			CanRead:      s.canRead,
 			Holds:        s.holdsForWebhooks,
 			Describe:     s.describeForWebhooks,
+			OfferedIn:    s.webhookRoomForEvent,
 			AllowPrivate: s.privateDeliveriesAllowed,
 			Send: func(ctx context.Context, endpoint, id, kind string, body, secret []byte) delivery.Outcome {
 				outcome, err := s.sendSigned(ctx, endpoint, id, kind, body, secret)
@@ -132,6 +133,9 @@ func (s *Server) queueWebhooks(ctx context.Context, event dbgen.Event) {
 	}
 	s.inBackground(ctx, "queue webhooks", func(ctx context.Context) {
 		service.Enqueue(ctx, event)
+		if channel, ok := s.webhookRoomForEvent(ctx, event); ok && channel != uuid.Nil {
+			service.EnqueueFor(ctx, channel, event)
+		}
 	})
 }
 

@@ -58,6 +58,20 @@ const (
 	ReasonPin Reason = "pin"
 	// ReasonMissedCall is a call somebody was rung into and did not answer.
 	ReasonMissedCall Reason = "missed_call"
+
+	// Events. The detail carries the event's title, so a notification
+	// still says what it was about after the event is gone.
+	//
+	// ReasonEventInvite is being invited to one.
+	ReasonEventInvite Reason = "event_invite"
+	// ReasonEventReminder is one you are going to starting soon.
+	ReasonEventReminder Reason = "event_reminder"
+	// ReasonEventChanged is its time or place changing.
+	ReasonEventChanged Reason = "event_changed"
+	// ReasonEventCancelled is it being called off.
+	ReasonEventCancelled Reason = "event_cancelled"
+	// ReasonEventPromoted is a place freeing up for somebody waiting.
+	ReasonEventPromoted Reason = "event_promoted"
 )
 
 // Preference is the setting that applies to one conversation.
