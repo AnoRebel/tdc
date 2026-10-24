@@ -219,6 +219,30 @@ A refused call MUST NOT tell the caller which setting refused it.
 - **WHEN** the server does not accept calls from connected servers
 - **THEN** no call from another server reaches anybody here, whatever their own setting
 
+### Requirement: Calls across servers
+
+Where both servers allow it, people SHALL be able to ring and call people on connected servers, and to hold calls in rooms shared between servers. A call MUST be held by one server — the caller's, or a shared room's home server — and the servers MUST exchange its ringing, membership and negotiation only as signed federated requests, each server authorising its own people and the person's own server applying its policy and their privacy.
+
+#### Scenario: A ring from a server that may not ring reaches nobody
+
+- **WHEN** a server rings somebody here and this server does not take calls from other servers, does not trust that server, or the person does not accept calls from other servers
+- **THEN** the person is not rung, and the ringing server is not told which refused
+
+#### Scenario: Only the call's home speaks for the call
+
+- **WHEN** a server other than the one holding a call sends somebody here anything about that call
+- **THEN** it is refused and nothing reaches the person
+
+#### Scenario: A shared room's call is held by its home
+
+- **WHEN** members of a room shared between servers call in it
+- **THEN** the room's home server holds the call, and members on other servers join it through their own servers
+
+#### Scenario: Each side's relay is its own
+
+- **WHEN** people on two servers are in one call
+- **THEN** each person's client is given relay credentials by its own server
+
 ### Requirement: Incoming calls do not take over the screen
 
 An incoming call SHALL be shown as a small window the person can move, which does not prevent them using the rest of the application, offering to answer by voice, answer with video, or decline. It MUST ring on each of the person's signed-in devices and stop on all of them when answered or declined on one.

@@ -24,7 +24,8 @@ UPDATE call_participants SET audio = $3, video = $4, held = $5
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, p.recording_since, u.username, u.display_name, (u.guest_call IS NOT NULL)::boolean AS guest
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, p.recording_since, u.username, u.display_name,
+       (u.guest_call IS NOT NULL AND u.remote_address IS NULL)::boolean AS guest, u.remote_address
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -41,7 +42,8 @@ WHERE p.call_id = $1 AND p.user_id = $2 AND p.left_at IS NULL AND c.ended_at IS 
 UPDATE calls c SET ended_at = NOW()
 WHERE c.id = $1 AND c.ended_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
-                  WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
+                  WHERE p.call_id = c.id AND p.left_at IS NULL
+                    AND (u.guest_call IS NULL OR u.remote_address IS NOT NULL))
 RETURNING *;
 
 -- name: LeaveEndedCall :exec
@@ -52,11 +54,15 @@ WHERE call_id = $1 AND left_at IS NULL;
 -- name: LeaveCallsOfDisconnected :many
 -- Takes out of their calls everybody with no live connection left, so a
 -- closed laptop or a lost network does not leave somebody "in" a call forever.
+-- Somebody from another server has no connection here: their server says they
+-- are still there instead, and a minute without hearing so takes them out.
 UPDATE call_participants p SET left_at = NOW()
-FROM calls c
-WHERE c.id = p.call_id AND c.ended_at IS NULL AND p.left_at IS NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM user_presence up WHERE up.user_id = p.user_id AND up.connections > 0)
+FROM calls c, users u
+WHERE c.id = p.call_id AND u.id = p.user_id AND c.ended_at IS NULL AND p.left_at IS NULL
+  AND CASE WHEN u.remote_address IS NULL
+           THEN NOT EXISTS (SELECT 1 FROM user_presence up WHERE up.user_id = p.user_id AND up.connections > 0)
+           ELSE p.remote_seen_at IS NULL OR p.remote_seen_at < NOW() - INTERVAL '1 minute'
+      END
 RETURNING p.call_id, p.user_id, c.room_id;
 
 -- name: SetCallStartedEvent :exec
@@ -136,7 +142,8 @@ UPDATE calls c SET ended_at = NOW()
 WHERE c.ended_at IS NULL
   AND c.started_at < NOW() - INTERVAL '1 minute'
   AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
-                  WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
+                  WHERE p.call_id = c.id AND p.left_at IS NULL
+                    AND (u.guest_call IS NULL OR u.remote_address IS NOT NULL))
 RETURNING *;
 
 -- name: TakeStage :execrows
@@ -177,3 +184,49 @@ WHERE id = $1 AND ended_at IS NULL AND mode = 'mesh';
 -- for it, unless another node already has.
 UPDATE calls SET forwarding_node = sqlc.arg(node)
 WHERE id = $1 AND ended_at IS NULL AND mode = 'sfu' AND forwarding_node = sqlc.arg(previous);
+
+-- name: TouchRemoteParticipant :execrows
+UPDATE call_participants SET remote_seen_at = NOW()
+WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
+
+-- name: UserByRemoteAddress :one
+SELECT * FROM users WHERE remote_address = $1;
+
+-- name: CreateRemoteShadow :one
+INSERT INTO users (id, username, username_folded, display_name, guest_call, remote_address, remote_server)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING *;
+
+-- name: UpdateRemoteShadow :exec
+UPDATE users SET display_name = $2, guest_call = $3, remote_server = $4
+WHERE id = $1 AND remote_address IS NOT NULL;
+
+-- name: InviteRemoteToCall :exec
+INSERT INTO call_remote_invites (call_id, address, invited_by) VALUES ($1, $2, $3)
+ON CONFLICT (call_id, address) DO NOTHING;
+
+-- name: IsRemoteInvitedToCall :one
+SELECT EXISTS (SELECT 1 FROM call_remote_invites WHERE call_id = $1 AND address = $2);
+
+-- name: RingRemoteCall :exec
+-- Somebody here rung into a call another server holds.
+INSERT INTO remote_calls (call_id, user_id, home, home_address, room_id)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (call_id, user_id) DO UPDATE
+SET home = EXCLUDED.home, home_address = EXCLUDED.home_address,
+    room_id = COALESCE(EXCLUDED.room_id, remote_calls.room_id), rung_at = NOW(), joined_at = NULL, left_at = NULL
+WHERE remote_calls.home = EXCLUDED.home;
+
+-- name: RemoteCallOf :one
+SELECT * FROM remote_calls WHERE call_id = $1 AND user_id = $2;
+
+-- name: JoinedRemoteCall :exec
+UPDATE remote_calls SET joined_at = NOW(), left_at = NULL WHERE call_id = $1 AND user_id = $2;
+
+-- name: LeftRemoteCall :exec
+UPDATE remote_calls SET left_at = NOW() WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
+
+-- name: PresentInRemoteCalls :many
+-- Everybody here in a call another server holds, for the sweep to vouch for or
+-- take out.
+SELECT * FROM remote_calls WHERE joined_at IS NOT NULL AND left_at IS NULL;

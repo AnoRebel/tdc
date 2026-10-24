@@ -27,6 +27,17 @@ The forwarding unit is Pion inside the server process: each participant has one 
 
 *Why built in rather than LiveKit or another service?* One binary is the deployment the rest of TDC assumes, and a community's calls are small. A separate SFU stays possible later behind the same signalling.
 
+### Calls across servers
+
+A call is held by one server — the caller's, or a shared room's home — which keeps `calls` and `call_participants` exactly as for its own people. Somebody from another server is a `users` row standing for them (`remote_address`, `remote_server`, `guest_call` so they stay out of every list of this server's people), **with the identifier their own server knows them by**, so their own client recognises itself in the call's state and perfect-negotiation politeness agrees on both sides; an identifier already somebody else's is refused. Their server is a go-between: `POST /api/federation/calls/{ring,join,view,media,leave,present,signal}` towards the home, `deliver` back, all RFC 9421-signed through the existing middleware, under `requireFederation`, `requireSignature` and `calls.federated` on both sides.
+
+- **Who authorises what.** The home: the call is open, the participant limit, invited (`call_remote_invites`, recorded when it rang them) or a member of the shared room. The person's server: `calls.federated` first, the federation trust lists, the person's "calls from other servers", and their own permission to call; a ring is answered 202 whether it rang or not.
+- **Only the home speaks for the call.** The person's server records the call's home in `remote_calls` when it rings them (or when they join a shared room's call) and accepts `deliver` only from that server, only for that call and person, and only call frame types.
+- **Order.** Signals from a person go to the home synchronously from their connection's read loop; frames to people elsewhere go through one queue per person, so an offer is never overtaken by its candidates.
+- **Liveness.** Nobody on the home holds their connection, so their server's sweep sends `present` every fifteen seconds (or `leave` once they have no connection) and the home's sweep takes out anybody from elsewhere not heard of for a minute.
+- **Events.** A call started or ended by somebody from elsewhere is recorded as the home server's own statement (`server@home`, naming them), never as from them.
+- **Not carried.** Hands, presenting and recording by people on the other server.
+
 ### ICE and the relay
 
 `GET /api/calls/ice` returns ICE servers for the person: STUN and TURN URLs from settings, and TURN credentials minted with coturn's REST shared-secret scheme (username = expiry:user, password = HMAC-SHA1(secret, username)), valid for the call's likely length. With no relay configured the list holds STUN only (or nothing, if none is set), and the client says when a call fails to connect that a relay would be needed. No public STUN server is configured by default: that would be a third party learning who calls; the operator chooses.

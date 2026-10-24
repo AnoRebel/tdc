@@ -61,7 +61,9 @@ var routeBodies = map[string]routeBodySet{
 		},
 	},
 	"DELETE /api/calls/:callId": {
+		Request: reflect.TypeFor[callMediaRequest](),
 		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
 			{Status: 204, Type: nil},
 		},
 	},
@@ -232,7 +234,9 @@ var routeBodies = map[string]routeBodySet{
 		},
 	},
 	"DELETE /api/rooms/:id/call": {
+		Request: reflect.TypeFor[callMediaRequest](),
 		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
 			{Status: 204, Type: nil},
 		},
 	},
@@ -511,8 +515,10 @@ var routeBodies = map[string]routeBodySet{
 		},
 	},
 	"GET /api/calls/:callId": {
+		Request: reflect.TypeFor[callMediaRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[callView]()},
+			{Status: 204, Type: nil},
 		},
 	},
 	"GET /api/calls/:callId/lobby": {
@@ -995,8 +1001,10 @@ var routeBodies = map[string]routeBodySet{
 		},
 	},
 	"GET /api/rooms/:id/call": {
+		Request: reflect.TypeFor[callMediaRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[callView]()},
+			{Status: 204, Type: nil},
 		},
 	},
 	"GET /api/rooms/:id/call/links": {
@@ -1148,6 +1156,7 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[callMediaRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[callView]()},
+			{Status: 204, Type: nil},
 		},
 	},
 	"PATCH /api/issues/:ref": {
@@ -1213,6 +1222,7 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[callMediaRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[callView]()},
+			{Status: 204, Type: nil},
 		},
 	},
 	"PATCH /api/rooms/:id/messages/:eventId": {
@@ -1469,6 +1479,7 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[callMediaRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[callView]()},
+			{Status: 204, Type: nil},
 		},
 	},
 	"POST /api/direct": {
@@ -1630,6 +1641,54 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[importRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/federation/calls/deliver": {
+		Request: reflect.TypeFor[federatedCallRequest](),
+		Responses: []responseBody{
+			{Status: 202, Type: nil},
+		},
+	},
+	"POST /api/federation/calls/join": {
+		Request: reflect.TypeFor[federatedCallRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
+		},
+	},
+	"POST /api/federation/calls/leave": {
+		Request: reflect.TypeFor[federatedCallRequest](),
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"POST /api/federation/calls/media": {
+		Request: reflect.TypeFor[federatedCallRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
+		},
+	},
+	"POST /api/federation/calls/present": {
+		Request: reflect.TypeFor[federatedCallRequest](),
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
+	"POST /api/federation/calls/ring": {
+		Request: reflect.TypeFor[federatedCallRequest](),
+		Responses: []responseBody{
+			{Status: 202, Type: nil},
+		},
+	},
+	"POST /api/federation/calls/signal": {
+		Request: reflect.TypeFor[federatedCallRequest](),
+		Responses: []responseBody{
+			{Status: 202, Type: nil},
+		},
+	},
+	"POST /api/federation/calls/view": {
+		Request: reflect.TypeFor[federatedCallRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[callView]()},
 		},
 	},
 	"POST /api/federation/ping": {
@@ -1904,6 +1963,7 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[callMediaRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[callView]()},
+			{Status: 204, Type: nil},
 		},
 	},
 	"POST /api/rooms/:id/call/decline": {

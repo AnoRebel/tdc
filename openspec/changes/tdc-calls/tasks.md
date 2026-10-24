@@ -37,10 +37,10 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 
 ## 4. Phase 4 — Calls across servers
 
-- [ ] 4.1 Server setting `calls.federated` (off by default): whether people on connected servers may ring and call people here; checked before the person's own setting, so an operator's no is final
-- [ ] 4.2 Federated call signalling: rings, call state and negotiation between servers as signed federated requests (the protocol's RFC 9421 signing), each server authorising its own people — the receiving server applies its policy and its person's privacy; each side gets relay credentials from its own server; verify a server not trusted, or with calls not federated, refuses and nothing reaches the person
-- [ ] 4.3 Calls in rooms shared with other servers, with the home server holding the call as it holds the room
-- [ ] 4.4 Protocol documentation for the call family; verify an independent implementation could ring and call a TDC user from the document
+- [x] 4.1 Server setting `calls.federated` (off by default): whether people on connected servers may ring and call people here; checked before the person's own setting, so an operator's no is final
+- [x] 4.2 Federated call signalling: rings, call state and negotiation between servers as signed federated requests (the protocol's RFC 9421 signing), each server authorising its own people — the receiving server applies its policy and its person's privacy; each side gets relay credentials from its own server; verify a server not trusted, or with calls not federated, refuses and nothing reaches the person
+- [x] 4.3 Calls in rooms shared with other servers, with the home server holding the call as it holds the room
+- [x] 4.4 Protocol documentation for the call family; verify an independent implementation could ring and call a TDC user from the document
 - [ ] **MILESTONE 4** — Demonstrate: a person on one server rings a person on another, who answers by video; with either server's federated calling off, or the person's setting refusing other servers, the ring never arrives. Tag `v1.52.0-dev`.
 
 ## 5. Phase 5 — Screens, presentations and recording

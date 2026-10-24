@@ -310,6 +310,14 @@ type CallParticipant struct {
 	Screen         bool
 	HandRaisedAt   *time.Time
 	RecordingSince *time.Time
+	RemoteSeenAt   *time.Time
+}
+
+type CallRemoteInvite struct {
+	CallID    uuid.UUID
+	Address   string
+	InvitedBy *uuid.UUID
+	InvitedAt time.Time
 }
 
 type ChannelBan struct {
@@ -965,6 +973,17 @@ type RecoveryToken struct {
 	UsedAt        *time.Time
 }
 
+type RemoteCall struct {
+	CallID      uuid.UUID
+	UserID      uuid.UUID
+	Home        string
+	HomeAddress string
+	RoomID      *uuid.UUID
+	RungAt      time.Time
+	JoinedAt    *time.Time
+	LeftAt      *time.Time
+}
+
 type RemoteMember struct {
 	RoomID     uuid.UUID
 	Address    string
@@ -1199,6 +1218,8 @@ type User struct {
 	WebauthnHandle        []byte
 	PendingEmail          *string
 	GuestCall             *uuid.UUID
+	RemoteAddress         *string
+	RemoteServer          *string
 }
 
 type UserBlock struct {

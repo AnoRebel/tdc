@@ -214,8 +214,7 @@ func (s *Server) sendFromForwarding(callID, to uuid.UUID, signal json.RawMessage
 		return
 	}
 	frame := realtime.Frame{Type: realtime.FrameCallSignal, Payload: payload}
-	here := s.hub.SendToUser(to, frame)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	s.whisperElsewhere(ctx, to, frame, here)
+	s.tellPerson(ctx, callID, to, frame)
 }

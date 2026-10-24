@@ -124,7 +124,7 @@ func (q *Queries) GetPasskeyByCredentialID(ctx context.Context, externalID *stri
 }
 
 const getUserByWebauthnHandle = `-- name: GetUserByWebauthnHandle :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call FROM users WHERE webauthn_handle = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server FROM users WHERE webauthn_handle = $1
 `
 
 func (q *Queries) GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []byte) (User, error) {
@@ -154,6 +154,8 @@ func (q *Queries) GetUserByWebauthnHandle(ctx context.Context, webauthnHandle []
 		&i.WebauthnHandle,
 		&i.PendingEmail,
 		&i.GuestCall,
+		&i.RemoteAddress,
+		&i.RemoteServer,
 	)
 	return i, err
 }

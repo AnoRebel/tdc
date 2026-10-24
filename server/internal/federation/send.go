@@ -161,6 +161,48 @@ func (s *Sender) DeliverEvents(ctx context.Context, peer, slug string, batch any
 }
 
 /*
+CallRefusedError is a peer's refusal of a call request: its status and the reason
+it gave, which for a full call is worth showing to the person.
+*/
+type CallRefusedError struct {
+	Status int
+	Reason string
+}
+
+func (r *CallRefusedError) Error() string { return r.Reason }
+
+/*
+Call sends one request of the call family (POST /api/federation/calls/{action})
+and decodes a successful answer into into, when it is not nil. A refusal is a
+*CallRefusedError carrying the peer's own words.
+*/
+func (s *Sender) Call(ctx context.Context, peer, action string, payload, into any) error {
+	response, err := s.Send(ctx, peer, "/api/federation/calls/"+action, payload)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode >= http.StatusMultipleChoices {
+		raw, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		var said struct {
+			Message string `json:"message"`
+		}
+		reason := strings.TrimSpace(string(raw))
+		if json.Unmarshal(raw, &said) == nil && said.Message != "" {
+			reason = said.Message
+		}
+		return &CallRefusedError{Status: response.StatusCode, Reason: reason}
+	}
+	if into == nil {
+		return nil
+	}
+	if err := json.NewDecoder(response.Body).Decode(into); err != nil {
+		return fmt.Errorf("peer %s gave an unreadable answer: %w", peer, err)
+	}
+	return nil
+}
+
+/*
 FetchEvents asks a peer for a room's events after a cursor.
 
 The pull half of catch-up. Push and pull ask the same underlying question —

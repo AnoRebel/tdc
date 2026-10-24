@@ -156,6 +156,12 @@ func (s *Server) callViewOf(call dbgen.Call, participants []dbgen.ListCallPartic
 		})
 	}
 	for index, p := range participants {
+		// Somebody from another server, shown by their own address.
+		if p.RemoteAddress != nil {
+			name, _, _ := strings.Cut(*p.RemoteAddress, "@")
+			view.Participants[index].Username = name
+			view.Participants[index].Address = *p.RemoteAddress
+		}
 		if p.HandRaisedAt != nil {
 			view.Participants[index].HandRaisedAt = p.HandRaisedAt.UTC().Format(time.RFC3339Nano)
 		}
@@ -183,6 +189,9 @@ func callError(err error) error {
 }
 
 func (s *Server) handleGetCall(c *echo.Context) error {
+	if room, elsewhere := s.hostedElsewhere(c); elsewhere {
+		return s.remoteRoomCall(c, room, "view")
+	}
 	user, _ := currentUser(c)
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -203,6 +212,9 @@ guard; on top of it, starting takes call.start and joining call.join, so an
 operator can allow one without the other, or messaging without either.
 */
 func (s *Server) handleJoinCall(c *echo.Context) error {
+	if room, elsewhere := s.hostedElsewhere(c); elsewhere {
+		return s.remoteRoomCall(c, room, "join")
+	}
 	ctx := c.Request().Context()
 	user, _ := currentUser(c)
 	roomID, err := uuid.Parse(c.Param("id"))
@@ -250,6 +262,9 @@ func (s *Server) handleJoinCall(c *echo.Context) error {
 }
 
 func (s *Server) handleCallMedia(c *echo.Context) error {
+	if room, elsewhere := s.hostedElsewhere(c); elsewhere {
+		return s.remoteRoomCall(c, room, "media")
+	}
 	ctx := c.Request().Context()
 	user, _ := currentUser(c)
 	roomID, err := uuid.Parse(c.Param("id"))
@@ -271,6 +286,9 @@ func (s *Server) handleCallMedia(c *echo.Context) error {
 }
 
 func (s *Server) handleLeaveCall(c *echo.Context) error {
+	if room, elsewhere := s.hostedElsewhere(c); elsewhere {
+		return s.remoteRoomCall(c, room, "leave")
+	}
 	// Leaving finishes even if the caller does not wait for the answer — a
 	// tab closed on the way out — so a call is not left open with nobody in it.
 	ctx := context.WithoutCancel(c.Request().Context())
@@ -358,8 +376,7 @@ func (s *Server) broadcastCallState(ctx context.Context, view callView) {
 		if err != nil {
 			continue
 		}
-		here := s.hub.SendToUser(userID, frame)
-		s.whisperElsewhere(ctx, userID, frame, here)
+		s.tellPerson(ctx, callID, userID, frame)
 	}
 }
 
@@ -374,6 +391,12 @@ once rather than when they next reconnect.
 func (s *Server) Signal(ctx context.Context, from, callID, to uuid.UUID, signal json.RawMessage) error {
 	if from == to {
 		return errors.New("a participant cannot signal themselves")
+	}
+	// A call another server holds: its home authorises and passes it on.
+	if _, in := s.rooms.CallRoomOf(ctx, callID, from); !in {
+		if rc, remote := s.remoteCallFor(ctx, callID, from); remote {
+			return s.signalRemote(ctx, from, rc, to, signal)
+		}
 	}
 	// Addressed to nobody: to the forwarding unit, in a forwarded call.
 	if to == uuid.Nil {
@@ -397,8 +420,7 @@ func (s *Server) Signal(ctx context.Context, from, callID, to uuid.UUID, signal 
 		return err
 	}
 	frame := realtime.Frame{Type: realtime.FrameCallSignal, RoomID: roomID.String(), Payload: payload}
-	here := s.hub.SendToUser(to, frame)
-	s.whisperElsewhere(ctx, to, frame, here)
+	s.tellPerson(ctx, callID, to, frame)
 	return nil
 }
 
@@ -471,6 +493,7 @@ func (s *Server) SweepCalls(ctx context.Context) {
 	if s.settings == nil || !s.settings.Enabled(ctx, settings.FeatureCalls) {
 		return
 	}
+	s.vouchForRemoteCallers(ctx)
 	changed, ended, err := s.rooms.SweepCalls(ctx)
 	if err != nil {
 		s.log.Warn("could not sweep calls", "error", err)
@@ -500,6 +523,9 @@ type ringRequest struct {
 	// Users to ring, by id. Empty rings everybody else in a direct
 	// conversation, and nobody in a channel.
 	Users []string `json:"users"`
+	// Addresses rings people on other servers, by address (name@server),
+	// where calls cross servers here.
+	Addresses []string `json:"addresses"`
 }
 
 type ringFrame struct {
@@ -605,7 +631,12 @@ func (s *Server) handleRing(c *echo.Context) error {
 		s.missedIfUnanswered(target, caller, call)
 		s.pushRing(target, identity.NameOf(caller.Username, caller.DisplayName), room, call.ID)
 	}
-	return c.JSON(http.StatusOK, map[string]any{"rung": rung, "notRung": len(targets) - len(rung)})
+	for _, address := range request.Addresses {
+		if s.ringRemote(ctx, caller, call, strings.TrimSpace(address)) {
+			rung = append(rung, address)
+		}
+	}
+	return c.JSON(http.StatusOK, map[string]any{"rung": rung, "notRung": len(targets) + len(request.Addresses) - len(rung)})
 }
 
 /*
@@ -672,8 +703,7 @@ func (s *Server) endRinging(ctx context.Context, userID, callID uuid.UUID) {
 	}
 	payload, _ := json.Marshal(map[string]string{"call": callID.String()})
 	frame := realtime.Frame{Type: realtime.FrameCallRingEnded, Payload: payload}
-	here := s.hub.SendToUser(userID, frame)
-	s.whisperElsewhere(ctx, userID, frame, here)
+	s.tellPerson(ctx, callID, userID, frame)
 }
 
 // handleDeclineRing stops somebody's devices ringing and tells the call.
@@ -708,8 +738,7 @@ func (s *Server) handleDeclineRing(c *echo.Context) error {
 	})
 	frame := realtime.Frame{Type: realtime.FrameCallDeclined, RoomID: roomID.String(), Payload: payload}
 	for _, participant := range call.Participants {
-		here := s.hub.SendToUser(participant.UserID, frame)
-		s.whisperElsewhere(ctx, participant.UserID, frame, here)
+		s.tellPerson(ctx, call.ID, participant.UserID, frame)
 	}
 	return c.NoContent(http.StatusNoContent)
 }
@@ -788,6 +817,9 @@ func (s *Server) callByID(c *echo.Context) (rooms.Call, error) {
 }
 
 func (s *Server) handleCallByID(c *echo.Context) error {
+	if remote, err := s.remoteByID(c, "view"); remote {
+		return err
+	}
 	call, err := s.callByID(c)
 	if err != nil {
 		return err
@@ -796,6 +828,9 @@ func (s *Server) handleCallByID(c *echo.Context) error {
 }
 
 func (s *Server) handleJoinCallByID(c *echo.Context) error {
+	if remote, err := s.remoteByID(c, "join"); remote {
+		return err
+	}
 	ctx := c.Request().Context()
 	user, _ := currentUser(c)
 	call, err := s.callByID(c)
@@ -826,6 +861,9 @@ func (s *Server) handleJoinCallByID(c *echo.Context) error {
 }
 
 func (s *Server) handleCallMediaByID(c *echo.Context) error {
+	if remote, err := s.remoteByID(c, "media"); remote {
+		return err
+	}
 	user, _ := currentUser(c)
 	call, err := s.callByID(c)
 	if err != nil {
@@ -842,6 +880,9 @@ func (s *Server) handleCallMediaByID(c *echo.Context) error {
 }
 
 func (s *Server) handleLeaveCallByID(c *echo.Context) error {
+	if remote, err := s.remoteByID(c, "leave"); remote {
+		return err
+	}
 	ctx := context.WithoutCancel(c.Request().Context())
 	user, _ := currentUser(c)
 	call, err := s.callByID(c)
@@ -1010,8 +1051,7 @@ func (s *Server) handleCallReaction(c *echo.Context) error {
 	frame := realtime.Frame{Type: realtime.FrameCallReaction, Payload: payload}
 	if s.hub != nil {
 		for _, participant := range call.Participants {
-			here := s.hub.SendToUser(participant.UserID, frame)
-			s.whisperElsewhere(ctx, participant.UserID, frame, here)
+			s.tellPerson(ctx, call.ID, participant.UserID, frame)
 		}
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -1036,7 +1076,6 @@ func (s *Server) dismissRemaining(ctx context.Context, roomID uuid.UUID, call ro
 	}
 	frame := realtime.Frame{Type: realtime.FrameCallState, RoomID: roomID.String(), Payload: payload}
 	for _, participant := range call.Participants {
-		here := s.hub.SendToUser(participant.UserID, frame)
-		s.whisperElsewhere(ctx, participant.UserID, frame, here)
+		s.tellPerson(ctx, call.ID, participant.UserID, frame)
 	}
 }

@@ -164,8 +164,11 @@ type Server struct {
 	// which binds nothing until a call is forwarded here.
 	node       string
 	forwarding *sfu.Unit
-	realtime   *realtime.Server
-	config     Config
+	// remoteQueues holds, per person from another server in a call here, the
+	// frames waiting to be passed to their server, in order.
+	remoteQueues sync.Map
+	realtime     *realtime.Server
+	config       Config
 
 	/*
 		What federation needs to hold between requests.

@@ -53,6 +53,13 @@ const (
 	CallsSFU Key = "calls.sfu"
 
 	/*
+		CallsFederated is whether people on connected servers may ring and call
+		people here, and people here them. Off by default, and checked before
+		anybody's own setting, so an operator's no is final.
+	*/
+	CallsFederated Key = "calls.federated"
+
+	/*
 		CallsGuests lets people without an account join a call through a link
 		made to allow them. Off by default: a guest is somebody the server
 		knows nothing about, and an operator should choose to admit them.
@@ -101,6 +108,11 @@ func init() {
 			fallback:    "25",
 			description: "The most people one call may have, however it is carried.",
 			validate:    atLeastOne,
+		},
+		CallsFederated: {
+			fallback:    "false",
+			description: "Whether people on connected servers may ring and call people here, and people here them. Needs federation on.",
+			validate:    boolean,
 		},
 		CallsSFU: {
 			fallback:    "false",

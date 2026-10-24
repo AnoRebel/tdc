@@ -100,6 +100,35 @@ func (s *Service) JoinCall(
 	if err != nil {
 		return Call{}, nil, err
 	}
+	return s.joinOrStart(ctx, room, userID, "", audio, video, maxParticipants)
+}
+
+/*
+JoinCallRemote puts somebody from another server, a member of a room shared
+with theirs, in the room's call, starting one if none is open. A call they
+start is recorded as this server's statement naming them, since no event here
+may claim to be from somebody this server does not host.
+*/
+func (s *Service) JoinCallRemote(
+	ctx context.Context,
+	room dbgen.Room,
+	userID uuid.UUID,
+	address string,
+	audio, video bool,
+	maxParticipants int,
+) (Call, *dbgen.Event, error) {
+	return s.joinOrStart(ctx, room, userID, address, audio, video, maxParticipants)
+}
+
+func (s *Service) joinOrStart(
+	ctx context.Context,
+	room dbgen.Room,
+	userID uuid.UUID,
+	remoteAddress string,
+	audio, video bool,
+	maxParticipants int,
+) (Call, *dbgen.Event, error) {
+	roomID := room.ID
 	if err := s.callable(room); err != nil {
 		return Call{}, nil, err
 	}
@@ -127,8 +156,14 @@ func (s *Service) JoinCall(
 
 	var startedEvent *dbgen.Event
 	if started {
-		content, _ := json.Marshal(map[string]string{"call": current.ID.String()})
-		event, err := s.appendBy(ctx, room, userID, events.TypeCallStarted, content)
+		var event dbgen.Event
+		if remoteAddress == "" {
+			content, _ := json.Marshal(map[string]string{"call": current.ID.String()})
+			event, err = s.appendBy(ctx, room, userID, events.TypeCallStarted, content)
+		} else {
+			content, _ := json.Marshal(map[string]string{"call": current.ID.String(), "member": remoteAddress})
+			event, err = s.appendFrom(ctx, room, s.serverAddress(), events.TypeCallStarted, content)
+		}
 		if err != nil {
 			return Call{}, nil, err
 		}
@@ -187,6 +222,15 @@ func (s *Service) noteCallEnded(ctx context.Context, ended dbgen.Call, actorID u
 	content, _ := json.Marshal(map[string]any{
 		"call": ended.ID.String(), "seconds": int64(duration.Seconds()),
 	})
+	// Somebody from another server leaving last is not somebody this server
+	// may attribute an event to; the end is this server's to state.
+	if actor, err := s.store.GetUserByID(ctx, actorID); err == nil && actor.RemoteAddress != nil {
+		event, err := s.appendFrom(ctx, room, s.serverAddress(), events.TypeCallEnded, content)
+		if err != nil {
+			return nil, err
+		}
+		return &event, nil
+	}
 	event, err := s.appendBy(ctx, room, actorID, events.TypeCallEnded, content)
 	if err != nil {
 		return nil, err

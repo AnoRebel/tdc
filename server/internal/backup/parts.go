@@ -240,7 +240,10 @@ var excluded = map[string]string{
 		"and lapse within a day; whoever was sending one sends it again",
 	"direct_transfers": "offers to send a file straight between two devices, which lapse in minutes " +
 		"and whose files never touched this server",
-	"call_lobby": "who is waiting to be let into a call in progress",
+	"call_lobby":          "who is waiting to be let into a call in progress",
+	"call_remote_invites": "people on other servers rung into a call in progress here",
+	"remote_calls": "calls on other servers that people here are rung into or in, " +
+		"which those servers hold and end",
 	"automatic_reply_log": "who was answered automatically today, which keeps a reply to one a day " +
 		"and lapses in a day",
 	"storage_deletions":    "objects waiting to be deleted from storage, which the next sweep removes",

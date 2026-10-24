@@ -8,7 +8,7 @@ Federation is optional. A server with it switched off is a complete TDC server;
 nothing on this page is needed to run one.
 
 > **Status.** This document covers discovery, identity, request signing, room
-> replication, and remote membership and posting. Cross-server browsing and
+> replication, remote membership and posting, files, and calls. Cross-server browsing and
 > moderation are still being built. Version `tdc/1` is not frozen until they
 > land.
 
@@ -477,6 +477,153 @@ back on the next attempt.
 A success resets the count. Consecutive failures are what matter; a peer that
 fails once an hour is not one that has been down for an hour.
 
+## Calls
+
+A call between people on different servers is **held by one server**, its
+_home_: the server of whoever rang, or, for a call in a room shared between
+servers, the room's home server. The home server keeps the list of who is in
+the call and relays negotiation, exactly as it does for its own people. Every
+other server is a go-between for its own people: it authorises them, carries
+their negotiation to the home server, and passes back what the home server
+sends them. Media never travels through this protocol — WebRTC carries it,
+between the people (a mesh) or to the home server's forwarding unit — and
+each person's client gets its relay credentials from **its own** server.
+
+Both servers must have calls enabled and `calls.federated` set to `true`. A
+server with it off refuses every request below with `404`, and sends none.
+
+All requests are `POST`, signed as above, with JSON bodies. In every request
+that names a `member`, **the member must be on the server that signed it** —
+a server acts for its own people and nobody else's — and a request naming
+somebody else is refused with `403`.
+
+### People
+
+A person is named by their address, `name@their-server`, and also carries
+`id`, the UUID their own server knows them by. The home server shows them in
+the call by that same `id`, so that the person's own client, which knows itself
+by it, recognises itself in the call's state. A home server refuses an `id`
+that is already somebody else's — one of its own people, or another server's.
+
+### Ringing somebody on another server
+
+```
+POST /api/federation/calls/ring
+{
+  "call": "4b1c…",                       // the call, as the home server names it
+  "roomId": "9e0a…",                     // the call's room on the home server
+  "to": "baraka@b.example",
+  "from": { "address": "amina@a.example", "displayName": "Amina" }
+}
+```
+
+Sent by the home server to the server of the person rung. That server decides,
+by its own policy and the person's own settings, whether to ring them: whether
+it takes calls from other servers at all (`calls.federated`), and whether the
+person accepts calls from people on other servers. It answers **`202` whether
+it rang or not**, so the caller learns nothing of either setting. Ringing is
+limited at the home server as it is for local rings.
+
+A server that rings its person records that this call, at this home server,
+may now reach them. Only that home server, and only about that call, may
+deliver to them afterwards.
+
+### Joining, and what follows
+
+```
+POST /api/federation/calls/join
+{ "call": "4b1c…", "member": "baraka@b.example", "id": "77d2…",
+  "displayName": "Baraka", "audio": true, "video": false }
+
+POST /api/federation/calls/join
+{ "room": "general", "member": "baraka@b.example", "id": "77d2…", ... }
+```
+
+Sent by the person's server to the home server. The first form joins a call the
+person was rung into; the second joins, or starts, the call in a shared room
+(`room` is the room's slug on its home server), which the person must be a
+member of. The home server applies its own rules — the call is open, the
+participant limit, the room's — and answers `200` with the call's state:
+
+```json
+{
+  "id": "4b1c…",
+  "roomId": "9e0a…",
+  "startedAt": "2026-10-24T09:00:00Z",
+  "mode": "mesh",
+  "presenter": "",
+  "participants": [
+    {
+      "userId": "77d2…",
+      "username": "baraka",
+      "displayName": "Baraka",
+      "address": "baraka@b.example",
+      "audio": true,
+      "video": false,
+      "held": false,
+      "screen": false,
+      "joinedAt": "…"
+    }
+  ]
+}
+```
+
+or `409` with the reason (the call is full, and why), or `404` (no such call,
+or not one this person may join — the two are not told apart).
+
+```
+POST /api/federation/calls/view    { "room": "general", "member": "…" }        → 200 state, or 404
+POST /api/federation/calls/media   { "call": "…", "member": "…", "audio": true, "video": true, "held": false } → 200 state
+POST /api/federation/calls/leave   { "call": "…", "member": "…" }              → 204
+POST /api/federation/calls/present { "call": "…", "member": "…" }              → 204
+POST /api/federation/calls/signal  { "call": "…", "member": "…", "to": "…", "signal": { … } } → 202
+```
+
+- **`view`** reads the call in progress in a shared room, so a member can see
+  there is one before joining.
+- **`media`** says what the person is sending, as the web client's own `PATCH`
+  does.
+- **`present`** is sent every fifteen seconds while the person is connected to
+  their own server. A home server takes out of its calls anybody from another
+  server not heard of for a minute, which is how a server that went away stops
+  holding a place in a call.
+- **`signal`** carries one piece of WebRTC negotiation — `{"description": …}`
+  or `{"candidate": …}` — to one participant, named by `to` (their `userId` in
+  the call's state), or to the forwarding unit, named by the zero UUID
+  `00000000-0000-0000-0000-000000000000` when the call's `mode` is `sfu`.
+  Signals must be sent in order; a server sends one person's signals one at a
+  time.
+
+### What the home server sends back
+
+```
+POST /api/federation/calls/deliver
+{ "call": "4b1c…", "to": "baraka@b.example",
+  "type": "call.signal", "payload": { … } }
+```
+
+Sent by the home server to the person's server for anything the call sends
+them. `type` is one of:
+
+| Type              | Payload                                                                                      |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| `call.state`      | the call's state, as above; a state not listing the person means they are out                |
+| `call.signal`     | `{ "call", "from", "signal" }`: negotiation from `from` (the zero UUID: the forwarding unit) |
+| `call.ring_ended` | `{ "call" }`: stop ringing                                                                   |
+| `call.declined`   | `{ "call", "userId", "displayName", "message" }`                                             |
+| `call.reaction`   | `{ "call", "from", "kind", … }`                                                              |
+
+The person's server accepts a delivery only from the server it recorded as
+that call's home for that person, only while they were rung or are in it, and
+only of these types; anything else is `404`. It answers `202` and passes the
+payload to the person's devices unchanged, except that for a call in a shared
+room it may rename `roomId` to its own copy of the room.
+
+### What is not carried
+
+Raising hands, presenting and recording are not yet carried between servers:
+a person on another server sees them in the call's state but cannot do them.
+
 ## Whether a server will deal with you at all
 
 Before a signature is examined, the receiving server decides whether it deals
@@ -572,6 +719,7 @@ peer is named by the operator. Permitting the second does not permit the first.
 | ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `federation.enabled`                 | `false` | Whether this server federates at all. Off means the discovery document still answers, saying so; every other federated route refuses. |
 | `federation.allow_private_addresses` | `false` | Whether peers on private network addresses may be reached.                                                                            |
+| `calls.federated`                    | `false` | Whether calls cross servers here: people on connected servers ringing and calling people here, and people here them. Needs calls on.  |
 
 Federation is off until an operator turns it on. A server joins a network
 because somebody chose that, never because it was the default.

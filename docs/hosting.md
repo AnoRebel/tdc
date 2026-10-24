@@ -1242,7 +1242,8 @@ WebRTC itself (DTLS-SRTP) — they never pass through the TDC server. So calling
 costs the server almost nothing: a few small messages per person joining, and a
 sweep every fifteen seconds that takes people whose connection dropped out of
 their calls. Nothing a call carries is stored, and the server has no way to
-record one.
+record one. The one exception is a call through the **forwarding unit**, if you
+turn it on (below): its media passes through the server, decrypted while it does.
 
 **What it costs the people in it.** Every participant sends their own stream to
 every other participant (a _mesh_), so upload grows with the size of the call:
@@ -1490,7 +1491,49 @@ camera sent to each person — so a 10-person call holds about 25 MB and a
 size — one upload instead of one per person — but receiving 24 cameras is still
 24 videos to decode; phones in a call of 25 do better with cameras off.
 
-**Not yet:** calls in conversations shared with other servers.
+#### Calls across servers
+
+With federation on, people can ring and call people on connected servers, and
+hold calls in rooms shared with them. Off by default; both servers must turn it
+on, and either saying no is final:
+
+```sh
+curl -X PUT https://tdc.example/api/admin/settings/calls.federated \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value": "true"}'
+```
+
+**Who holds the call.** One server: the server of whoever rang, or, for a room
+shared between servers, the room's home server — as it holds the room. It
+keeps the list of who is in the call. The other servers carry their own
+people's part of it — ringing, joining, negotiation — as signed requests
+(the federation protocol's own signing), and pass back what the call sends
+them. The protocol is in [the federation protocol](federation-protocol.md#calls).
+
+**Each server decides for its own people.** A ring from another server reaches
+somebody here only if this server takes calls from other servers
+(`calls.federated`), trusts that server (the federation allow and block
+lists), and the person accepts calls from people on other servers — their own
+setting, which they can change. The caller is never told which of these said
+no. The home server applies its own rules — the call is open, the participant
+limit, the room's membership — and the person's own server checks their
+permission to call.
+
+**Media and relays.** Media still goes directly between the people, or to the
+home server's forwarding unit if the call is forwarded; nothing of it passes
+through the federation requests. **Each person's client gets relay credentials
+from its own server**, so for a call between your members and another
+server's, you need your relay and they need theirs — and if the call is
+forwarded, the home server's forwarding port must be reachable from the
+other server's members as from your own.
+
+**What it costs the server.** A few small signed requests per person joining,
+a handful per connection negotiated, and one every fifteen seconds per person
+in a call elsewhere, saying they are still there. A server that stops saying so
+has its people taken out of the call within a minute.
+
+**Not carried between servers yet:** raising hands, presenting, reactions and
+recording by people on the other server (they see them, but cannot do them).
 
 #### What an event costs
 

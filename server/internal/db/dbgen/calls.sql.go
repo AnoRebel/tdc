@@ -279,12 +279,70 @@ func (q *Queries) CreateCallLink(ctx context.Context, arg CreateCallLinkParams) 
 	return i, err
 }
 
+const createRemoteShadow = `-- name: CreateRemoteShadow :one
+INSERT INTO users (id, username, username_folded, display_name, guest_call, remote_address, remote_server)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server
+`
+
+type CreateRemoteShadowParams struct {
+	ID             uuid.UUID
+	Username       string
+	UsernameFolded string
+	DisplayName    string
+	GuestCall      *uuid.UUID
+	RemoteAddress  *string
+	RemoteServer   *string
+}
+
+func (q *Queries) CreateRemoteShadow(ctx context.Context, arg CreateRemoteShadowParams) (User, error) {
+	row := q.db.QueryRow(ctx, createRemoteShadow,
+		arg.ID,
+		arg.Username,
+		arg.UsernameFolded,
+		arg.DisplayName,
+		arg.GuestCall,
+		arg.RemoteAddress,
+		arg.RemoteServer,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.UsernameFolded,
+		&i.DisplayName,
+		&i.Email,
+		&i.EmailFolded,
+		&i.EmailVerified,
+		&i.SuspendedAt,
+		&i.SuspendedUntil,
+		&i.SuspendedBy,
+		&i.SuspensionNote,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SendsTypingIndication,
+		&i.LinkPreviewsEnabled,
+		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
+		&i.TourProgress,
+		&i.WebauthnHandle,
+		&i.PendingEmail,
+		&i.GuestCall,
+		&i.RemoteAddress,
+		&i.RemoteServer,
+	)
+	return i, err
+}
+
 const endAbandonedCalls = `-- name: EndAbandonedCalls :many
 UPDATE calls c SET ended_at = NOW()
 WHERE c.ended_at IS NULL
   AND c.started_at < NOW() - INTERVAL '1 minute'
   AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
-                  WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
+                  WHERE p.call_id = c.id AND p.left_at IS NULL
+                    AND (u.guest_call IS NULL OR u.remote_address IS NOT NULL))
 RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter, mode, forwarding_node
 `
 
@@ -325,7 +383,8 @@ const endCallIfEmpty = `-- name: EndCallIfEmpty :one
 UPDATE calls c SET ended_at = NOW()
 WHERE c.id = $1 AND c.ended_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM call_participants p JOIN users u ON u.id = p.user_id
-                  WHERE p.call_id = c.id AND p.left_at IS NULL AND u.guest_call IS NULL)
+                  WHERE p.call_id = c.id AND p.left_at IS NULL
+                    AND (u.guest_call IS NULL OR u.remote_address IS NOT NULL))
 RETURNING id, room_id, started_by, started_at, ended_at, started_event, presenter, mode, forwarding_node
 `
 
@@ -384,6 +443,22 @@ func (q *Queries) ForwardCall(ctx context.Context, arg ForwardCallParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const inviteRemoteToCall = `-- name: InviteRemoteToCall :exec
+INSERT INTO call_remote_invites (call_id, address, invited_by) VALUES ($1, $2, $3)
+ON CONFLICT (call_id, address) DO NOTHING
+`
+
+type InviteRemoteToCallParams struct {
+	CallID    uuid.UUID
+	Address   string
+	InvitedBy *uuid.UUID
+}
+
+func (q *Queries) InviteRemoteToCall(ctx context.Context, arg InviteRemoteToCallParams) error {
+	_, err := q.db.Exec(ctx, inviteRemoteToCall, arg.CallID, arg.Address, arg.InvitedBy)
+	return err
+}
+
 const inviteToCall = `-- name: InviteToCall :exec
 INSERT INTO call_invites (call_id, user_id, invited_by) VALUES ($1, $2, $3)
 ON CONFLICT (call_id, user_id) DO NOTHING
@@ -416,6 +491,22 @@ func (q *Queries) IsInvitedToCall(ctx context.Context, arg IsInvitedToCallParams
 	return exists, err
 }
 
+const isRemoteInvitedToCall = `-- name: IsRemoteInvitedToCall :one
+SELECT EXISTS (SELECT 1 FROM call_remote_invites WHERE call_id = $1 AND address = $2)
+`
+
+type IsRemoteInvitedToCallParams struct {
+	CallID  uuid.UUID
+	Address string
+}
+
+func (q *Queries) IsRemoteInvitedToCall(ctx context.Context, arg IsRemoteInvitedToCallParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isRemoteInvitedToCall, arg.CallID, arg.Address)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const joinCall = `-- name: JoinCall :exec
 INSERT INTO call_participants (call_id, user_id, audio, video)
 VALUES ($1, $2, $3, $4)
@@ -438,6 +529,20 @@ func (q *Queries) JoinCall(ctx context.Context, arg JoinCallParams) error {
 		arg.Audio,
 		arg.Video,
 	)
+	return err
+}
+
+const joinedRemoteCall = `-- name: JoinedRemoteCall :exec
+UPDATE remote_calls SET joined_at = NOW(), left_at = NULL WHERE call_id = $1 AND user_id = $2
+`
+
+type JoinedRemoteCallParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) JoinedRemoteCall(ctx context.Context, arg JoinedRemoteCallParams) error {
+	_, err := q.db.Exec(ctx, joinedRemoteCall, arg.CallID, arg.UserID)
 	return err
 }
 
@@ -477,10 +582,12 @@ func (q *Queries) LeaveCallLobby(ctx context.Context, arg LeaveCallLobbyParams) 
 
 const leaveCallsOfDisconnected = `-- name: LeaveCallsOfDisconnected :many
 UPDATE call_participants p SET left_at = NOW()
-FROM calls c
-WHERE c.id = p.call_id AND c.ended_at IS NULL AND p.left_at IS NULL
-  AND NOT EXISTS (
-      SELECT 1 FROM user_presence up WHERE up.user_id = p.user_id AND up.connections > 0)
+FROM calls c, users u
+WHERE c.id = p.call_id AND u.id = p.user_id AND c.ended_at IS NULL AND p.left_at IS NULL
+  AND CASE WHEN u.remote_address IS NULL
+           THEN NOT EXISTS (SELECT 1 FROM user_presence up WHERE up.user_id = p.user_id AND up.connections > 0)
+           ELSE p.remote_seen_at IS NULL OR p.remote_seen_at < NOW() - INTERVAL '1 minute'
+      END
 RETURNING p.call_id, p.user_id, c.room_id
 `
 
@@ -492,6 +599,8 @@ type LeaveCallsOfDisconnectedRow struct {
 
 // Takes out of their calls everybody with no live connection left, so a
 // closed laptop or a lost network does not leave somebody "in" a call forever.
+// Somebody from another server has no connection here: their server says they
+// are still there instead, and a minute without hearing so takes them out.
 func (q *Queries) LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfDisconnectedRow, error) {
 	rows, err := q.db.Query(ctx, leaveCallsOfDisconnected)
 	if err != nil {
@@ -538,8 +647,23 @@ func (q *Queries) LeaveStage(ctx context.Context, arg LeaveStageParams) error {
 	return err
 }
 
+const leftRemoteCall = `-- name: LeftRemoteCall :exec
+UPDATE remote_calls SET left_at = NOW() WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
+`
+
+type LeftRemoteCallParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) LeftRemoteCall(ctx context.Context, arg LeftRemoteCallParams) error {
+	_, err := q.db.Exec(ctx, leftRemoteCall, arg.CallID, arg.UserID)
+	return err
+}
+
 const listCallParticipants = `-- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, p.recording_since, u.username, u.display_name, (u.guest_call IS NOT NULL)::boolean AS guest
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, p.recording_since, u.username, u.display_name,
+       (u.guest_call IS NOT NULL AND u.remote_address IS NULL)::boolean AS guest, u.remote_address
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -558,6 +682,7 @@ type ListCallParticipantsRow struct {
 	Username       string
 	DisplayName    string
 	Guest          bool
+	RemoteAddress  *string
 }
 
 func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([]ListCallParticipantsRow, error) {
@@ -581,6 +706,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 			&i.Username,
 			&i.DisplayName,
 			&i.Guest,
+			&i.RemoteAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -613,6 +739,41 @@ func (q *Queries) OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, e
 	return i, err
 }
 
+const presentInRemoteCalls = `-- name: PresentInRemoteCalls :many
+SELECT call_id, user_id, home, home_address, room_id, rung_at, joined_at, left_at FROM remote_calls WHERE joined_at IS NOT NULL AND left_at IS NULL
+`
+
+// Everybody here in a call another server holds, for the sweep to vouch for or
+// take out.
+func (q *Queries) PresentInRemoteCalls(ctx context.Context) ([]RemoteCall, error) {
+	rows, err := q.db.Query(ctx, presentInRemoteCalls)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RemoteCall{}
+	for rows.Next() {
+		var i RemoteCall
+		if err := rows.Scan(
+			&i.CallID,
+			&i.UserID,
+			&i.Home,
+			&i.HomeAddress,
+			&i.RoomID,
+			&i.RungAt,
+			&i.JoinedAt,
+			&i.LeftAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const recordCallLinkFailure = `-- name: RecordCallLinkFailure :one
 UPDATE call_links SET
     passcode_failures = CASE WHEN passcode_failures_from < NOW() - make_interval(secs => $2::float8)
@@ -636,6 +797,31 @@ func (q *Queries) RecordCallLinkFailure(ctx context.Context, arg RecordCallLinkF
 	return passcode_failures, err
 }
 
+const remoteCallOf = `-- name: RemoteCallOf :one
+SELECT call_id, user_id, home, home_address, room_id, rung_at, joined_at, left_at FROM remote_calls WHERE call_id = $1 AND user_id = $2
+`
+
+type RemoteCallOfParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) RemoteCallOf(ctx context.Context, arg RemoteCallOfParams) (RemoteCall, error) {
+	row := q.db.QueryRow(ctx, remoteCallOf, arg.CallID, arg.UserID)
+	var i RemoteCall
+	err := row.Scan(
+		&i.CallID,
+		&i.UserID,
+		&i.Home,
+		&i.HomeAddress,
+		&i.RoomID,
+		&i.RungAt,
+		&i.JoinedAt,
+		&i.LeftAt,
+	)
+	return i, err
+}
+
 const revokeCallLink = `-- name: RevokeCallLink :execrows
 UPDATE call_links SET revoked_at = NOW() WHERE id = $1 AND room_id = $2 AND revoked_at IS NULL
 `
@@ -651,6 +837,35 @@ func (q *Queries) RevokeCallLink(ctx context.Context, arg RevokeCallLinkParams) 
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const ringRemoteCall = `-- name: RingRemoteCall :exec
+INSERT INTO remote_calls (call_id, user_id, home, home_address, room_id)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (call_id, user_id) DO UPDATE
+SET home = EXCLUDED.home, home_address = EXCLUDED.home_address,
+    room_id = COALESCE(EXCLUDED.room_id, remote_calls.room_id), rung_at = NOW(), joined_at = NULL, left_at = NULL
+WHERE remote_calls.home = EXCLUDED.home
+`
+
+type RingRemoteCallParams struct {
+	CallID      uuid.UUID
+	UserID      uuid.UUID
+	Home        string
+	HomeAddress string
+	RoomID      *uuid.UUID
+}
+
+// Somebody here rung into a call another server holds.
+func (q *Queries) RingRemoteCall(ctx context.Context, arg RingRemoteCallParams) error {
+	_, err := q.db.Exec(ctx, ringRemoteCall,
+		arg.CallID,
+		arg.UserID,
+		arg.Home,
+		arg.HomeAddress,
+		arg.RoomID,
+	)
+	return err
 }
 
 const setCallHand = `-- name: SetCallHand :execrows
@@ -801,6 +1016,46 @@ func (q *Queries) TakeStage(ctx context.Context, arg TakeStageParams) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const touchRemoteParticipant = `-- name: TouchRemoteParticipant :execrows
+UPDATE call_participants SET remote_seen_at = NOW()
+WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL
+`
+
+type TouchRemoteParticipantParams struct {
+	CallID uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) TouchRemoteParticipant(ctx context.Context, arg TouchRemoteParticipantParams) (int64, error) {
+	result, err := q.db.Exec(ctx, touchRemoteParticipant, arg.CallID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateRemoteShadow = `-- name: UpdateRemoteShadow :exec
+UPDATE users SET display_name = $2, guest_call = $3, remote_server = $4
+WHERE id = $1 AND remote_address IS NOT NULL
+`
+
+type UpdateRemoteShadowParams struct {
+	ID           uuid.UUID
+	DisplayName  string
+	GuestCall    *uuid.UUID
+	RemoteServer *string
+}
+
+func (q *Queries) UpdateRemoteShadow(ctx context.Context, arg UpdateRemoteShadowParams) error {
+	_, err := q.db.Exec(ctx, updateRemoteShadow,
+		arg.ID,
+		arg.DisplayName,
+		arg.GuestCall,
+		arg.RemoteServer,
+	)
+	return err
+}
+
 const useCallLink = `-- name: UseCallLink :execrows
 UPDATE call_links SET uses = uses + 1
 WHERE id = $1 AND revoked_at IS NULL
@@ -816,4 +1071,41 @@ func (q *Queries) UseCallLink(ctx context.Context, id uuid.UUID) (int64, error) 
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const userByRemoteAddress = `-- name: UserByRemoteAddress :one
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server FROM users WHERE remote_address = $1
+`
+
+func (q *Queries) UserByRemoteAddress(ctx context.Context, remoteAddress *string) (User, error) {
+	row := q.db.QueryRow(ctx, userByRemoteAddress, remoteAddress)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.UsernameFolded,
+		&i.DisplayName,
+		&i.Email,
+		&i.EmailFolded,
+		&i.EmailVerified,
+		&i.SuspendedAt,
+		&i.SuspendedUntil,
+		&i.SuspendedBy,
+		&i.SuspensionNote,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SendsTypingIndication,
+		&i.LinkPreviewsEnabled,
+		&i.HidePushContent,
+		&i.AppearancePalette,
+		&i.AppearanceMode,
+		&i.AppearanceAccent,
+		&i.TourProgress,
+		&i.WebauthnHandle,
+		&i.PendingEmail,
+		&i.GuestCall,
+		&i.RemoteAddress,
+		&i.RemoteServer,
+	)
+	return i, err
 }

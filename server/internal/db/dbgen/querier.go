@@ -305,6 +305,7 @@ type Querier interface {
 	// message carries. The bytes are not here yet; fetched_at stays empty until
 	// somebody opens it and they are copied.
 	CreateRemoteAttachment(ctx context.Context, arg CreateRemoteAttachmentParams) (Attachment, error)
+	CreateRemoteShadow(ctx context.Context, arg CreateRemoteShadowParams) (User, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
@@ -630,6 +631,7 @@ type Querier interface {
 	// Asks somebody to be listed. Does nothing if they already are, or were
 	// already asked: inviting twice is not a second question.
 	InviteCompanyMember(ctx context.Context, arg InviteCompanyMemberParams) (int64, error)
+	InviteRemoteToCall(ctx context.Context, arg InviteRemoteToCallParams) error
 	InviteToCall(ctx context.Context, arg InviteToCallParams) error
 	// Asked before joining and before posting.
 	//
@@ -645,9 +647,11 @@ type Querier interface {
 	// Both are checked in one query: asking twice would mean two round trips on
 	// the path every message takes.
 	IsPostingRestricted(ctx context.Context, arg IsPostingRestrictedParams) (bool, error)
+	IsRemoteInvitedToCall(ctx context.Context, arg IsRemoteInvitedToCallParams) (bool, error)
 	IsRemoteMember(ctx context.Context, arg IsRemoteMemberParams) (bool, error)
 	IsRoomMember(ctx context.Context, arg IsRoomMemberParams) (bool, error)
 	JoinCall(ctx context.Context, arg JoinCallParams) error
+	JoinedRemoteCall(ctx context.Context, arg JoinedRemoteCallParams) error
 	KnownPeers(ctx context.Context) ([]KnownPeersRow, error)
 	LabelIssue(ctx context.Context, arg LabelIssueParams) (int64, error)
 	// When this account last changed its username, if it ever has.
@@ -662,11 +666,14 @@ type Querier interface {
 	LeaveCallLobby(ctx context.Context, arg LeaveCallLobbyParams) (uuid.UUID, error)
 	// Takes out of their calls everybody with no live connection left, so a
 	// closed laptop or a lost network does not leave somebody "in" a call forever.
+	// Somebody from another server has no connection here: their server says they
+	// are still there instead, and a minute without hearing so takes them out.
 	LeaveCallsOfDisconnected(ctx context.Context) ([]LeaveCallsOfDisconnectedRow, error)
 	// Takes whoever is left — guests — out of a call that has ended.
 	LeaveEndedCall(ctx context.Context, callID uuid.UUID) error
 	// Clears the presenter, if it is this person.
 	LeaveStage(ctx context.Context, arg LeaveStageParams) error
+	LeftRemoteCall(ctx context.Context, arg LeftRemoteCallParams) error
 	LiftChannelBan(ctx context.Context, arg LiftChannelBanParams) (int64, error)
 	// Within the scope the request names — one channel, or the whole server when
 	// the room is null — so lifting by identifier cannot reach a restriction made
@@ -1102,6 +1109,9 @@ type Querier interface {
 	PostponeNotificationDigest(ctx context.Context, arg PostponeNotificationDigestParams) error
 	// Held back by a rate limit: not an attempt, so the count is given back.
 	PostponeWebhookDelivery(ctx context.Context, arg PostponeWebhookDeliveryParams) error
+	// Everybody here in a call another server holds, for the sweep to vouch for or
+	// take out.
+	PresentInRemoteCalls(ctx context.Context) ([]RemoteCall, error)
 	// Removes subscriptions that have failed repeatedly without the service ever
 	// saying they are gone.
 	//
@@ -1166,6 +1176,7 @@ type Querier interface {
 	// mid-attempt. Put back rather than lost; the receiver may see one twice,
 	// which the delivery identifier lets it notice.
 	ReleaseStaleWebhookDeliveries(ctx context.Context, claimedAt *time.Time) (int64, error)
+	RemoteCallOf(ctx context.Context, arg RemoteCallOfParams) (RemoteCall, error)
 	RemoteMember(ctx context.Context, arg RemoteMemberParams) (RemoteMember, error)
 	RemoteMembers(ctx context.Context, roomID uuid.UUID) ([]RemoteMember, error)
 	RemoveApplication(ctx context.Context, arg RemoveApplicationParams) (Application, error)
@@ -1231,6 +1242,8 @@ type Querier interface {
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
 	RevokeVerification(ctx context.Context, arg RevokeVerificationParams) (int64, error)
+	// Somebody here rung into a call another server holds.
+	RingRemoteCall(ctx context.Context, arg RingRemoteCallParams) error
 	// The file a sent message in a room carries, by its digest: what a peer asks
 	// for. A copy held here is preferred over a description of one not yet copied.
 	RoomFileByKey(ctx context.Context, arg RoomFileByKeyParams) (Attachment, error)
@@ -1456,6 +1469,7 @@ type Querier interface {
 	TouchCredential(ctx context.Context, arg TouchCredentialParams) error
 	TouchNode(ctx context.Context, arg TouchNodeParams) error
 	TouchPresence(ctx context.Context, userID uuid.UUID) error
+	TouchRemoteParticipant(ctx context.Context, arg TouchRemoteParticipantParams) (int64, error)
 	TouchSession(ctx context.Context, id uuid.UUID) error
 	// Moves an issue between states, only if it is still in the state the mover
 	// saw. Two people moving the same card at once both reach this statement; the
@@ -1499,6 +1513,7 @@ type Querier interface {
 	UpdateProjectLabel(ctx context.Context, arg UpdateProjectLabelParams) (ProjectLabel, error)
 	UpdateProjectPriority(ctx context.Context, arg UpdateProjectPriorityParams) (ProjectPriority, error)
 	UpdateProjectView(ctx context.Context, arg UpdateProjectViewParams) (ProjectView, error)
+	UpdateRemoteShadow(ctx context.Context, arg UpdateRemoteShadowParams) error
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
@@ -1506,6 +1521,7 @@ type Querier interface {
 	// Counts a use, refusing one past the limit in the same statement so two
 	// people arriving at once cannot both take the last.
 	UseCallLink(ctx context.Context, id uuid.UUID) (int64, error)
+	UserByRemoteAddress(ctx context.Context, remoteAddress *string) (User, error)
 	// Whether somebody else gave this name up recently enough that it is still
 	// theirs to come back to.
 	UsernameHeldByOther(ctx context.Context, arg UsernameHeldByOtherParams) (bool, error)
