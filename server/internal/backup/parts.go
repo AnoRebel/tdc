@@ -121,6 +121,7 @@ var partTables = map[Part][]tableSpec{
 		{name: "user_roles"},
 		{name: "user_privacy"},
 		{name: "translation_preferences"},
+		{name: "automatic_replies"},
 		{name: "username_history"},
 		{name: "user_blocks"},
 		{name: "oauth_authorizations"},
@@ -216,17 +217,19 @@ transient ones — a session for an account the restore replaced must not
 survive it — and never touches the operational ones.
 */
 var excluded = map[string]string{
-	"sessions":             "signed-in sessions; everybody signs in again after a restore",
-	"webauthn_ceremonies":  "passkey ceremonies in progress, which expire in minutes",
-	"pending_sign_ins":     "sign-ins waiting for a second factor, which expire in minutes",
-	"recovery_tokens":      "recovery links, which expire and must not outlive a restore",
-	"email_confirmations":  "confirmation links, which expire",
-	"oauth_outcomes":       "sign-ins through a provider in progress",
-	"typing_indicators":    "who is typing, which lapses in seconds",
-	"user_presence":        "who is online, which lapses in seconds",
-	"event_idempotency":    "retry keys for messages being sent, which lapse",
-	"call_invites":         "who was let into a call in progress",
-	"call_lobby":           "who is waiting to be let into a call in progress",
+	"sessions":            "signed-in sessions; everybody signs in again after a restore",
+	"webauthn_ceremonies": "passkey ceremonies in progress, which expire in minutes",
+	"pending_sign_ins":    "sign-ins waiting for a second factor, which expire in minutes",
+	"recovery_tokens":     "recovery links, which expire and must not outlive a restore",
+	"email_confirmations": "confirmation links, which expire",
+	"oauth_outcomes":      "sign-ins through a provider in progress",
+	"typing_indicators":   "who is typing, which lapses in seconds",
+	"user_presence":       "who is online, which lapses in seconds",
+	"event_idempotency":   "retry keys for messages being sent, which lapse",
+	"call_invites":        "who was let into a call in progress",
+	"call_lobby":          "who is waiting to be let into a call in progress",
+	"automatic_reply_log": "who was answered automatically today, which keeps a reply to one a day " +
+		"and lapses in a day",
 	"message_translations": "translations already made, which are made again when asked for",
 	"translation_connections": "keys for outside translation services, sealed with this server's own " +
 		"key; carrying them to another server is not this archive's to do, so people connect again",

@@ -489,6 +489,11 @@ func (s *Server) routes() {
 	me.GET("/unread", s.handleUnreadCounts)
 	me.GET("/status", s.handleGetStatus)
 	me.PUT("/status", s.handleSetStatus)
+	// What the server says on somebody's behalf while they are away.
+	me.GET("/automatic-replies", s.handleListAutomaticReplies)
+	me.POST("/automatic-replies", s.handleCreateAutomaticReply)
+	me.PUT("/automatic-replies/:id", s.handleUpdateAutomaticReply)
+	me.DELETE("/automatic-replies/:id", s.handleDeleteAutomaticReply)
 	s.echo.GET("/api/statuses", s.handleListStatuses, requireAuthentication)
 
 	// The live connection. Authenticated like any other route; a connection is

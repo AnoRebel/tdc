@@ -115,6 +115,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[issueResponse]()},
 		},
 	},
+	"DELETE /api/me/automatic-replies/:id": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/me/blocks/:id": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -626,6 +631,11 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/me": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[userResponse]()},
+		},
+	},
+	"GET /api/me/automatic-replies": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]automaticReplyResponse]()},
 		},
 	},
 	"GET /api/me/blocks": {
@@ -1553,6 +1563,12 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 409, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
+	"POST /api/me/automatic-replies": {
+		Request: reflect.TypeFor[automaticReplyRequest](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[automaticReplyResponse]()},
+		},
+	},
 	"POST /api/me/blocks": {
 		Request: reflect.TypeFor[blockRequest](),
 		Responses: []responseBody{
@@ -1997,6 +2013,12 @@ var routeBodies = map[string]routeBodySet{
 		}](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[issueResponse]()},
+		},
+	},
+	"PUT /api/me/automatic-replies/:id": {
+		Request: reflect.TypeFor[automaticReplyRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[automaticReplyResponse]()},
 		},
 	},
 	"PUT /api/me/display-name": {

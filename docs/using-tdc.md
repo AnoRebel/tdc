@@ -603,6 +603,57 @@ everything. Choosing any other status makes you visible again. It also holds
 notifications, as Busy does — hiding that you are here does not mean you want
 to be interrupted.
 
+### Automatic replies
+
+While you are away, the server can answer for you: somebody who writes to you
+directly, or names you with `@` in a channel, is told what you would have told
+them — "away until Monday, ask Amina meanwhile".
+
+The quickest way is from the status dialog. Choose a status other than
+Available and tick **Turn on my automatic reply**, with the words to send. That
+reply is tied to the status: it answers while you hold it and stops when you
+change back or the status clears itself. The foot of the sidebar says
+**Automatic reply on**, with a small speech-bubble mark, for as long as one is
+answering.
+
+Settings → **Automatic replies** is where they are made in full. Each one has:
+
+- **What it says.** Up to 500 characters, formatted as a message is. You can
+  give mentions in channels different words from direct messages.
+- **When it answers.** While your status is one or more of those you pick, or
+  whatever your status is if you pick none; and from a time, until a time, both,
+  or neither. The times are read in the time zone you choose, which starts as
+  your device's — 09:00 in Dar es Salaam means 09:00 there wherever the server
+  is. Leaving the end empty means until you change it.
+- **What it answers.** Direct messages, group conversations, mentions in
+  channels — any of them.
+- **A preview** of the reply exactly as the person receiving it will see it.
+
+You can keep several, and switch each on and off without losing it. Where more
+than one applies, the one made first answers.
+
+**What people see.** The reply is posted as you, with **Automatic reply** beside
+your name, so nobody takes it for you typing. A direct message is answered in
+the conversation. A mention is answered in the thread of the message that named
+you — the person who named you is told, and the channel itself is left alone.
+
+**When it stays quiet.** An automatic reply that fires at everything is worse
+than none, so:
+
+- Each person hears it once per conversation per day, however many times they
+  write.
+- It answers people, never bots, webhooks or another automatic reply, and never
+  you yourself.
+- Nobody you have blocked, or who has blocked you, is answered; nor is anybody
+  your privacy settings would not let start a conversation with you.
+- A reply tied to a status stays silent while you **appear offline**, since that
+  status is hidden from everybody then. A reply tied to Appear offline itself,
+  or to no status, still answers — it says only what you wrote, and nothing
+  about it depends on whether you are connected.
+- At most twenty conversations an hour are answered for any one person.
+- Only conversations on this server: somebody in a channel another server holds
+  is not answered.
+
 ### What a member list says about you
 
 A channel's members can see who else is in it. Your **name and address are

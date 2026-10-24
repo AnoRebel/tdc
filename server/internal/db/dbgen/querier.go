@@ -84,6 +84,10 @@ type Querier interface {
 	ChangeScheduledMessage(ctx context.Context, arg ChangeScheduledMessageParams) (ScheduledMessage, error)
 	// Somebody deciding for themselves, which participation never overrides.
 	ChooseThreadFollowing(ctx context.Context, arg ChooseThreadFollowingParams) error
+	// Claims the right to answer one sender in one conversation. Returns a row
+	// only when nothing was sent to them there within the quiet period, so two
+	// messages arriving together cannot both be answered.
+	ClaimAutomaticReply(ctx context.Context, arg ClaimAutomaticReplyParams) (time.Time, error)
 	ClaimDueNotificationDigests(ctx context.Context, limit int32) ([]NotificationDigest, error)
 	// What is ready to send, claimed by whoever asked.
 	//
@@ -151,6 +155,7 @@ type Querier interface {
 	// "entries older than a year were removed" is not an account of anything, and
 	// afterwards there is nothing left to count.
 	CountAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (CountAuditEntriesBeforeRow, error)
+	CountAutomaticReplies(ctx context.Context, userID uuid.UUID) (int64, error)
 	// How many issues each state holds, so a column can say how many it has
 	// without sending them.
 	//
@@ -176,6 +181,9 @@ type Querier interface {
 	// when asked, from the issues' own states, never kept as a number of its own.
 	CountProjectProgress(ctx context.Context, projectID uuid.UUID) (CountProjectProgressRow, error)
 	CountReactionsForEvent(ctx context.Context, eventID string) (int64, error)
+	// How many conversations somebody's automatic reply has answered lately, for
+	// the hourly ceiling.
+	CountRecentAutomaticReplies(ctx context.Context, arg CountRecentAutomaticRepliesParams) (int64, error)
 	// How many reports somebody has filed recently, so a person cannot bury the
 	// queue under hundreds of them.
 	CountRecentReportsBy(ctx context.Context, arg CountRecentReportsByParams) (int64, error)
@@ -212,6 +220,7 @@ type Querier interface {
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
 	CreateApplicationToken(ctx context.Context, arg CreateApplicationTokenParams) (CreateApplicationTokenRow, error)
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) (Attachment, error)
+	CreateAutomaticReply(ctx context.Context, arg CreateAutomaticReplyParams) (AutomaticReply, error)
 	// Backups, restores, reloads and restarts: see 000429_operations.
 	CreateBackup(ctx context.Context, arg CreateBackupParams) (Backup, error)
 	CreateCallLink(ctx context.Context, arg CreateCallLinkParams) (CallLink, error)
@@ -266,6 +275,7 @@ type Querier interface {
 	CreateWebhookSubscription(ctx context.Context, arg CreateWebhookSubscriptionParams) (WebhookSubscription, error)
 	DeleteAttachment(ctx context.Context, id uuid.UUID) error
 	DeleteAuditEntriesBefore(ctx context.Context, occurredAt time.Time) (int64, error)
+	DeleteAutomaticReply(ctx context.Context, arg DeleteAutomaticReplyParams) (int64, error)
 	DeleteBackup(ctx context.Context, id uuid.UUID) error
 	DeleteCompanyProfile(ctx context.Context, id uuid.UUID) error
 	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) error
@@ -634,6 +644,7 @@ type Querier interface {
 	// Filters are optional: a NULL argument matches everything, so one query
 	// serves the whole administrative view rather than one per filter combination.
 	ListAuditEntries(ctx context.Context, arg ListAuditEntriesParams) ([]AuditEntry, error)
+	ListAutomaticReplies(ctx context.Context, userID uuid.UUID) ([]AutomaticReply, error)
 	ListBackups(ctx context.Context) ([]Backup, error)
 	// Who somebody has blocked, which only they can see.
 	ListBlocked(ctx context.Context, blockerID uuid.UUID) ([]ListBlockedRow, error)
@@ -1043,6 +1054,8 @@ type Querier interface {
 	// Naming the conflict: the same relationship twice is nothing new, but a
 	// second parent is a different constraint and must be refused, not swallowed.
 	RelateIssues(ctx context.Context, arg RelateIssuesParams) (int64, error)
+	// Gives back a claim whose reply could not be posted.
+	ReleaseAutomaticReply(ctx context.Context, arg ReleaseAutomaticReplyParams) error
 	// Deliveries a worker claimed and never finished, because the process ended
 	// mid-attempt. Put back rather than lost; the receiver may see one twice,
 	// which the delivery identifier lets it notice.
@@ -1336,6 +1349,7 @@ type Querier interface {
 	UnpinMessage(ctx context.Context, arg UnpinMessageParams) error
 	UnpinRoom(ctx context.Context, arg UnpinRoomParams) error
 	UnrelateIssues(ctx context.Context, arg UnrelateIssuesParams) (int64, error)
+	UpdateAutomaticReply(ctx context.Context, arg UpdateAutomaticReplyParams) (AutomaticReply, error)
 	UpdateCompanyProfile(ctx context.Context, arg UpdateCompanyProfileParams) (CompanyProfile, error)
 	UpdateCycle(ctx context.Context, arg UpdateCycleParams) (Cycle, error)
 	UpdateIssueState(ctx context.Context, arg UpdateIssueStateParams) (IssueState, error)

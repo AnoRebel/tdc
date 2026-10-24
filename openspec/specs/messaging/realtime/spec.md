@@ -138,6 +138,51 @@ A status MAY carry an expiry after which it reverts automatically.
 - **WHEN** a user sets a status in either client
 - **THEN** they may choose when it clears — after a fixed time, at the end of the day or week, at a chosen time, or never — and are shown how long it has left
 
+### Requirement: Automatic replies
+
+Users SHALL be able to keep automatic replies that the server posts on their behalf while they are away, in answer to a direct message or to being mentioned in a channel. Each reply MUST carry its text (at most 500 characters), and MAY be tied to one or more statuses, to a window of time with either end open, or to both; a reply tied to nothing applies until it is turned off. The server MUST mark every automatic reply in the message's own content as automatic, so that no client, export or delivery presents it as the person typing.
+
+The server MUST NOT post an automatic reply to a message from a program, a webhook, another automatic reply, or the person themselves; MUST answer a given sender at most once per conversation per day; MUST NOT answer somebody either party has blocked or whom the person's direct-message setting would not admit; and MUST NOT post a reply tied to a status while the person appears offline.
+
+#### Scenario: A direct message is answered once
+
+- **WHEN** somebody sends a direct message to a person whose automatic reply applies
+- **THEN** the server posts the reply in that conversation as the person, marked as automatic
+- **AND** a further message from the same sender in that conversation within a day is not answered again
+
+#### Scenario: A mention is answered in its thread
+
+- **WHEN** somebody mentions a person whose automatic reply applies in a channel they share
+- **THEN** the reply is posted in the thread of the mentioning message, using the mention text if one was given
+- **AND** nothing is posted in the channel itself
+
+#### Scenario: Outside its window or status
+
+- **WHEN** a reply's window has not begun or has ended, or the person does not hold any of the statuses it is tied to
+- **THEN** no reply is posted
+
+#### Scenario: Programs and automatic replies are never answered
+
+- **WHEN** a bot, a webhook, or another person's automatic reply addresses a person whose automatic reply applies
+- **THEN** no reply is posted
+
+#### Scenario: Appearing offline is not contradicted
+
+- **WHEN** a person appears offline and holds a status that one of their replies is tied to
+- **THEN** that reply is not posted, since the status is withheld from everybody
+- **AND** a reply tied to appearing offline, or to no status, still answers, and nothing about any reply depends on whether the person is connected
+
+#### Scenario: Blocks and contact settings are honoured
+
+- **WHEN** the sender has blocked the person, the person has blocked the sender, or the person's direct-message setting would not admit the sender
+- **THEN** no reply is posted, and the silence is indistinguishable from the person not having one
+
+#### Scenario: Set from the status dialog
+
+- **WHEN** a person chooses a status other than available in either client
+- **THEN** they may turn on an automatic reply tied to that status, with its text, which stops answering when the status changes back or clears
+- **AND** while any reply applies, the client says so where the person's status is shown
+
 ### Requirement: Typing indication
 
 The server SHALL support indicating that a user is composing a message in a conversation. Indicators MUST expire automatically if not refreshed, and MUST be suppressible by the user.

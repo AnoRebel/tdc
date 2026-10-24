@@ -48,7 +48,13 @@ function shortName(address: string): string {
         class="rounded border border-border px-1 text-[0.625rem] font-medium tracking-wide text-muted-foreground uppercase"
         data-sender-kind
       >
-        {{ viaOf(run)!.kind === "bot" ? $t("integrations.bot") : $t("integrations.webhook") }}
+        {{
+          viaOf(run)!.kind === "automatic"
+            ? $t("autoReply.badge")
+            : viaOf(run)!.kind === "bot"
+              ? $t("integrations.bot")
+              : $t("integrations.webhook")
+        }}
       </span>
       <time class="text-[0.6875rem] text-muted-foreground" :datetime="run.at">
         {{ atTime(run.at) }}

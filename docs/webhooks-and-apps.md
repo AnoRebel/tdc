@@ -719,6 +719,14 @@ its name with a **Bot** mark beside it, in words, so nobody reads a program's
 message as a person's; a person's message can neither claim the mark nor shed
 it.
 
+**Automatic replies reach a bot like any message, and never answer one.** When
+somebody is away and has an automatic reply on, the server posts it as them
+with `"via": {"kind": "automatic", …}` in its content, so an outgoing webhook
+subscribed to `message.sent` receives it with that mark — a bot should read it
+as nobody speaking, and not reply. A bot that writes to somebody directly or
+names them in a channel is never answered by their automatic reply: nothing
+carrying a `via` is.
+
 ![A channel holding a message from Build server marked Webhook, and one from Deploy bot marked Bot that asks whether to deploy, with Deploy, Not yet and See the changes buttons](images/using-tdc/program-messages.webp)
 
 **It is moderated as anybody is.** Its account is an ordinary account —

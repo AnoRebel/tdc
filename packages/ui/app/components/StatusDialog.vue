@@ -8,6 +8,9 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Select } from "#layers/ui/app/components/ui/select";
+import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
+import { Textarea } from "#layers/ui/app/components/ui/textarea";
+import { automaticReplyLimit } from "#layers/ui/app/composables/useAutomaticReplies";
 import { atTime, onDayAtTime } from "#layers/ui/app/lib/dates";
 import { presenceDotClass } from "#layers/ui/app/lib/presencedot";
 import { appearOfflineKey } from "#layers/ui/app/composables/useOwnStatus";
@@ -31,6 +34,7 @@ const open = defineModel<boolean>({ default: false });
 
 const { $t, $ts } = useI18n();
 const status = useOwnStatus();
+const automatic = useAutomaticReplies();
 const { say } = useNotice();
 const error = ref<string | null>(null);
 
@@ -51,7 +55,23 @@ const schema = computed(() =>
       text: v.pipe(v.string(), v.maxLength(100, $ts("status.noteTooLong"))),
       clearAfter: v.picklist([...expiryChoices, "custom"] as Choice[]),
       at: v.nullable(v.date()),
+      autoReply: v.boolean(),
+      autoReplyText: v.string(),
     }),
+    v.forward(
+      v.check(
+        (value) => !value.autoReply || value.autoReplyText.trim().length > 0,
+        $ts("autoReply.required"),
+      ),
+      ["autoReplyText"],
+    ),
+    v.forward(
+      v.check(
+        (value) => value.autoReplyText.trim().length <= automaticReplyLimit,
+        $ts("autoReply.tooLong", { limit: automaticReplyLimit }),
+      ),
+      ["autoReplyText"],
+    ),
     v.forward(
       v.check(
         (value) => value.clearAfter !== "custom" || (!!value.at && !!secondsUntilMoment(value.at)),
@@ -68,6 +88,8 @@ const form = useForm({
     text: "",
     clearAfter: "never" as Choice,
     at: null as Date | null,
+    autoReply: false,
+    autoReplyText: "",
   },
   validators: { onSubmit: schema.value },
   async onSubmit({ value }) {
@@ -80,6 +102,7 @@ const form = useForm({
         : secondsUntil(value.clearAfter as ExpiryChoice);
     try {
       await status.set({ status: value.status, text: value.text.trim(), expiresInSeconds });
+      await keepAutomaticReply(value.status, value.autoReply, value.autoReplyText.trim());
       open.value = false;
       say($ts("status.saved"));
     } catch (cause) {
@@ -103,10 +126,51 @@ watch(
       text: own.statusText,
       clearAfter: own.expiresAt ? "custom" : "never",
       at: own.expiresAt ? new Date(own.expiresAt) : null,
+      autoReply: false,
+      autoReplyText: "",
     });
+    automatic
+      .load()
+      .then(() => automaticFor(own.status))
+      .catch(() => {
+        // Without the list the box starts unticked, and saving with it ticked
+        // still makes one.
+      });
   },
   { immediate: true },
 );
+
+/*
+ * The automatic reply that goes with a status: tied to that status alone, so
+ * it stops when the status changes back or clears itself, with nothing else to
+ * remember to turn off. Anything more particular is made in settings.
+ */
+function automaticFor(key: string) {
+  const reply = automatic.forStatus(key);
+  form.setFieldValue("autoReply", Boolean(reply?.enabled));
+  form.setFieldValue("autoReplyText", reply?.message ?? "");
+}
+
+async function keepAutomaticReply(key: string, on: boolean, message: string) {
+  if (key === "available") return;
+  const existing = automatic.forStatus(key);
+  if (existing) {
+    if (existing.enabled === on && (!on || existing.message === message)) return;
+    const { id, active: _active, updatedAt: _updatedAt, ...input } = existing;
+    await automatic.update(id, { ...input, enabled: on, message: on ? message : existing.message });
+  } else if (on) {
+    await automatic.create({
+      enabled: true,
+      message,
+      mentionMessage: "",
+      statuses: [key],
+      timeZone: deviceTimeZone(),
+      replyToDirect: true,
+      replyToGroups: false,
+      replyToMentions: true,
+    });
+  }
+}
 
 async function clearStatus() {
   error.value = null;
@@ -190,7 +254,10 @@ const earliest = computed(() => new Date(Date.now() + 60_000));
                           class="sr-only"
                           :value="option.key"
                           :checked="field.state.value === option.key"
-                          @change="field.handleChange(option.key)"
+                          @change="
+                            field.handleChange(option.key);
+                            automaticFor(option.key);
+                          "
                         />
                         <span
                           class="size-2.5 shrink-0 rounded-full"
@@ -306,6 +373,65 @@ const earliest = computed(() => new Date(Date.now() + 60_000));
                   </form.Field>
                 </template>
               </form.Field>
+
+              <!-- Offered for any status but the default: what the server should
+                   say for you while you hold this one. -->
+              <form.Subscribe>
+                <template #default="{ values }">
+                  <div
+                    v-if="values.status !== 'available'"
+                    class="space-y-2"
+                    data-status-auto-reply
+                  >
+                    <form.Field name="autoReply">
+                      <template #default="{ field }">
+                        <label class="flex cursor-pointer items-start gap-2">
+                          <Checkbox
+                            class="mt-0.5"
+                            :model-value="field.state.value"
+                            @update:model-value="field.handleChange($event)"
+                          />
+                          <span class="min-w-0">
+                            <span class="block text-sm font-medium">
+                              {{ $t("autoReply.fromStatus") }}
+                            </span>
+                            <span class="block text-xs text-muted-foreground">
+                              {{ $t("autoReply.fromStatusHint") }}
+                            </span>
+                          </span>
+                        </label>
+                      </template>
+                    </form.Field>
+                    <form.Field v-if="values.autoReply" name="autoReplyText">
+                      <template #default="{ field }">
+                        <Field
+                          :label="$ts('autoReply.message')"
+                          :error="
+                            field.state.meta.errors[0]
+                              ? String(
+                                  (field.state.meta.errors[0] as { message?: string }).message ??
+                                    field.state.meta.errors[0],
+                                )
+                              : undefined
+                          "
+                        >
+                          <template #default="{ id, invalid, describedBy }">
+                            <Textarea
+                              :id="id"
+                              rows="2"
+                              :model-value="field.state.value"
+                              :placeholder="$ts('autoReply.messagePlaceholder')"
+                              :invalid="invalid"
+                              :described-by="describedBy"
+                              @update:model-value="field.handleChange($event)"
+                            />
+                          </template>
+                        </Field>
+                      </template>
+                    </form.Field>
+                  </div>
+                </template>
+              </form.Subscribe>
 
               <p v-if="error" role="alert" class="text-xs text-destructive">{{ error }}</p>
             </div>

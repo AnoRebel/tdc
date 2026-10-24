@@ -87,6 +87,11 @@ export interface MessageRun {
   items: ShownMessage[];
 }
 
+/** What kind of program, if any, a message came from. */
+function viaKind(message: ShownMessage): string | undefined {
+  return (message.content as { via?: { kind?: string } } | undefined)?.via?.kind;
+}
+
 /** How far apart two messages from one person can be and still read as one turn. */
 const RUN_GAP = 5 * 60 * 1000;
 
@@ -109,7 +114,10 @@ export function groupMessages(
       new Date(message.sentAt).getTime() - new Date(previous.items.at(-1)!.sentAt).getTime() <
         RUN_GAP;
 
-    if (previous && previous.sender === message.sender && soonAfter) {
+    // An automatic reply is its own turn even beside the person's own
+    // messages, so its mark is never read as covering what they typed.
+    const sameKind = previous && viaKind(previous.items.at(-1)!) === viaKind(message);
+    if (previous && previous.sender === message.sender && soonAfter && sameKind) {
       previous.items.push(message);
       continue;
     }

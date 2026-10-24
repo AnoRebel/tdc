@@ -51,8 +51,13 @@ export const renderableControlKinds: ReadonlySet<string | undefined> = new Set([
  * server, in the message's own content; absent on everybody's messages.
  */
 export interface MessageVia {
-  kind: "webhook" | "bot";
-  /** The webhook or application. */
+  /**
+   * "automatic" is an automatic reply: sent as the person, by the server, on
+   * their behalf while they are away. The id is theirs and the name is their
+   * display name.
+   */
+  kind: "webhook" | "bot" | "automatic";
+  /** The webhook or application, or the person for an automatic reply. */
   id: string;
   /** What to show in place of a person's name. */
   name: string;

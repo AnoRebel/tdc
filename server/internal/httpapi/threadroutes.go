@@ -394,6 +394,8 @@ type ownStatusResponse struct {
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 	// Invisible is whether this person appears offline while connected.
 	Invisible bool `json:"invisible"`
+	// AutomaticReply is whether one of their automatic replies answers now.
+	AutomaticReply bool `json:"automaticReply"`
 }
 
 // handleGetStatus returns the signed-in person's own status.
@@ -413,6 +415,8 @@ func (s *Server) respondWithOwnStatus(c *echo.Context, userID uuid.UUID) error {
 		StatusText: own.StatusText,
 		ExpiresAt:  own.ExpiresAt,
 		Invisible:  own.Invisible,
+		AutomaticReply: s.automaticReplyActive(c.Request().Context(), userID,
+			ownStatusForRules{status: own.Status, invisible: own.Invisible}),
 	})
 }
 

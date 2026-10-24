@@ -1,4 +1,4 @@
-import { tz } from "@date-fns/tz";
+import { TZDate, tz } from "@date-fns/tz";
 import {
   addDays,
   format,
@@ -145,4 +145,25 @@ export function whenBriefly(value: string | number | Date, timeZone?: string): s
  */
 export function daysFromNow(days: number): string {
   return addDays(new Date(), days).toISOString();
+}
+
+/**
+ * The instant a wall-clock time names in a zone, as RFC 3339 — "2026-11-03T09:00"
+ * in Dar es Salaam is 06:00 UTC, whatever zone this machine runs in.
+ *
+ * For a datetime-local field, whose value has no zone of its own: the zone is
+ * the one the person chose, not the process's. Undefined for an empty or
+ * unreadable value.
+ */
+export function wallClockIn(value: string, timeZone: string): string | undefined {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  if (!parts) return undefined;
+  const [, year, month, day, hour, minute] = parts.map(Number) as number[];
+  const at = new TZDate(year!, month! - 1, day!, hour!, minute!, timeZone);
+  return Number.isNaN(at.getTime()) ? undefined : new Date(at.getTime()).toISOString();
+}
+
+/** An instant as a datetime-local field's value, in a zone: wallClockIn backwards. */
+export function wallClockOf(value: string, timeZone: string): string {
+  return format(new TZDate(instant(value).getTime(), timeZone), "yyyy-MM-dd'T'HH:mm");
 }
