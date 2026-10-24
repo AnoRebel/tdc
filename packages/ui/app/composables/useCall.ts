@@ -891,14 +891,20 @@ export const useCall = createGlobalState(() => {
 
   /**
    * Rings people into the call shown: the given people, or everybody else in
-   * a direct conversation. Who could not be rung is not said, by design.
+   * a direct conversation, and people on other servers by address. Who could
+   * not be rung is not said, by design; what comes back is who was, or null
+   * where the ring was refused outright.
    */
-  async function ring(users: string[] = []) {
-    if (!joined.value || !roomId.value) return;
+  async function ring(users: string[] = [], addresses: string[] = []) {
+    if (!joined.value || !roomId.value) return null;
     try {
-      await api.post(`/api/rooms/${roomId.value}/call/ring`, { users });
+      return await api.post<{ rung: string[] }>(`/api/rooms/${roomId.value}/call/ring`, {
+        users,
+        addresses,
+      });
     } catch {
       // Ringing is a courtesy; the call goes on without it.
+      return null;
     }
   }
 

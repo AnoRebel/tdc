@@ -841,6 +841,11 @@ func (s *Server) capabilities(ctx context.Context) []string {
 		if settings.Feature(feature) == settings.FeatureCalls && s.settings.Get(ctx, settings.CallsRecording) == "true" {
 			capabilities = append(capabilities, "calls.recording")
 		}
+		// Ringing people on other servers, offered only where the call family
+		// would accept it: calls, federation and the operator's yes together.
+		if settings.Feature(feature) == settings.FeatureCalls && s.callsFederated(ctx) {
+			capabilities = append(capabilities, "calls.federated")
+		}
 	}
 
 	return capabilities

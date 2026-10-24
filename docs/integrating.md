@@ -1395,7 +1395,8 @@ whose receivers genuinely live beside the server turns on
 Where the operator has switched calls on (`capabilities` includes `calls`), any
 channel or direct conversation can hold one voice or video call. Media goes
 directly between the participants over WebRTC; the server records who is in
-the call and relays their negotiation, and never carries the media itself.
+the call and relays their negotiation. It carries the media only for a call
+past the mesh limit, where the operator has turned on the forwarding unit.
 
 | Request                                                                                         | What it does                                                                                                                                                                                                                                             |
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1404,7 +1405,7 @@ the call and relays their negotiation, and never carries the media itself.
 | `POST /api/rooms/:id/call`                                                                      | Join it, starting one if there is none — `{"audio": true, "video": false}`                                                                                                                                                                               |
 | `PATCH /api/rooms/:id/call`                                                                     | Say what you are sending, and whether you are holding the call — `{"audio", "video", "held"}`                                                                                                                                                            |
 | `DELETE /api/rooms/:id/call`                                                                    | Leave                                                                                                                                                                                                                                                    |
-| `POST /api/rooms/:id/call/ring`                                                                 | Ring people into it — `{"users": [ids]}`; empty rings everybody else in a direct conversation                                                                                                                                                            |
+| `POST /api/rooms/:id/call/ring`                                                                 | Ring people into it — `{"users": [ids], "addresses": ["name@server"]}`; empty rings everybody else in a direct conversation. Addresses on other servers need `calls.federated` in `capabilities`                                                         |
 | `POST /api/rooms/:id/call/decline`                                                              | Decline a ring, optionally with `{"message": "…"}` for the caller                                                                                                                                                                                        |
 | `PUT`/`DELETE /api/rooms/:id/call/hand`, `DELETE …/hand/:userId`                                | Raise or lower your hand (`handRaisedAt` on the participant, oldest first); lowering somebody else's needs to be the presenter or hold `moderation.restrict`                                                                                             |
 | `POST /api/rooms/:id/call/reactions`                                                            | `{"kind": "clap"}` — one of `clap`, `laugh`, `heart`, `thumbs_up`, `surprise`, `celebrate` — passed to the call's participants as `call.reaction` and kept nowhere; 20 per person every 10 seconds                                                       |
@@ -1420,7 +1421,9 @@ the call and relays their negotiation, and never carries the media itself.
 
 Starting needs `call.start` and joining `call.join`. Ringing answers who was
 rung and only a count of who was not: whether somebody accepts calls from you is
-theirs, and the reason is never disclosed. Rings are limited per caller.
+theirs, and the reason is never disclosed. An address on another server is
+"rung" once the ring is on its way; their server answers the same whether it
+rang them or not. Rings are limited per caller.
 
 **On the live connection**, a call sends these frames:
 

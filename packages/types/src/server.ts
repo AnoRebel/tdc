@@ -153,6 +153,9 @@ export type Capability =
   // Recording a call on the recorder's device, where calls are on and the
   // operator allows it.
   | "calls.recording"
+  // Ringing people on other servers into a call, where calls, federation
+  // and the operator's calls.federated are all on.
+  | "calls.federated"
   | "webhooks"
   | "applications"
   | "interactive-messages"

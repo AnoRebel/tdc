@@ -429,3 +429,24 @@ func TestACallInASharedRoomIsHeldByItsHome(t *testing.T) {
 		t.Error("a call started from another server is not in the room's history")
 	}
 }
+
+/*
+Ringing somebody on another server is advertised exactly while the call family
+would accept it, so the interface never offers an address field that always
+fails: calls, federation and calls.federated together.
+*/
+func TestFederatedCallingIsAdvertisedOnlyWhileItWorks(t *testing.T) {
+	handler, founder := federatedCalls(t, newCallPeer(t, "home-key"))
+	if !slices.Contains(advertised(t, handler), "calls.federated") {
+		t.Fatal("federated calling on, but not advertised")
+	}
+	setSetting(t, handler, founder, "calls.federated", "false")
+	if slices.Contains(advertised(t, handler), "calls.federated") {
+		t.Error("advertised with calls.federated off")
+	}
+	setSetting(t, handler, founder, "calls.federated", "true")
+	setFeature(t, handler, founder, "calls", false)
+	if slices.Contains(advertised(t, handler), "calls.federated") {
+		t.Error("advertised with calls off")
+	}
+}
