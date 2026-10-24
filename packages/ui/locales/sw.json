@@ -2015,7 +2015,8 @@
       "navigation": "Kuzunguka",
       "conversation": "Ndani ya mazungumzo",
       "projects": "Ndani ya mradi",
-      "formatting": "Ndani ya kisanduku cha ujumbe"
+      "formatting": "Ndani ya kisanduku cha ujumbe",
+      "call": "Kwenye simu"
     },
     "shortcuts": {
       "search": "Tafuta jumbe, chaneli na watu",
@@ -2047,7 +2048,12 @@
       "formatStrikethrough": "Mstari katikati",
       "formatCode": "Msimbo ndani ya mstari",
       "formatCodeBlock": "Kizuizi cha msimbo",
-      "newLineInMessage": "Mstari mpya badala ya kutuma (Enter peke yake huongeza mstari ndani ya kizuizi cha msimbo kilicho wazi)"
+      "newLineInMessage": "Mstari mpya badala ya kutuma (Enter peke yake huongeza mstari ndani ya kizuizi cha msimbo kilicho wazi)",
+      "callMicrophone": "Zima au washa maikrofoni yako",
+      "callCamera": "Washa au zima kamera yako",
+      "callHand": "Inua au shusha mkono wako",
+      "callShare": "Wasilisha skrini yako, au acha kuwasilisha",
+      "callExpand": "Panua dirisha la simu, au lirudishe dogo"
     },
     "formatting": {
       "title": "Mpangilio wa maandishi",
@@ -2288,6 +2294,30 @@
         "accessibility": "{name} hajairuhusu TDC kudhibiti Mac yake. Anaweza kuiruhusu katika Mipangilio ya Mfumo, Faragha na Usalama, Ufikivu.",
         "platform": "Kompyuta ya {name} haiwezi kudhibitiwa kwa mbali."
       }
+    },
+    "line": {
+      "started": "{name} ameanzisha simu",
+      "ended": "Simu iliisha baada ya {duration}",
+      "recordingStarted": "{name} ameanza kurekodi simu",
+      "recordingStopped": "{name} ameacha kurekodi, baada ya {duration}",
+      "underMinute": "chini ya dakika moja",
+      "minutes": "dakika {minutes}",
+      "hours": "saa {hours} dakika {minutes}"
+    },
+    "quality": {
+      "1": "Muunganisho wako ni wa polepole, kwa hiyo video yako inatumwa kwa ubora wa chini.",
+      "2": "Muunganisho wako ni wa polepole sana, kwa hiyo video yako na skrini unayoshiriki zinatumwa kwa ubora wa chini.",
+      "3": "Muunganisho wako ni wa polepole mno kwa kamera yako, kwa hiyo video yako imesimamishwa. Sauti yako na skrini unayoshiriki vinaendelea.",
+      "4": "Muunganisho wako unashikilia kwa shida, kwa hiyo sauti yako inatumwa kwa ubora wa chini ili simu iendelee.",
+      "recovered": "Muunganisho wako umerudi, na unachotuma kimerudi kawaida."
+    },
+    "unsupported": {
+      "title": "Kwa nini huwezi kupiga simu kutoka hapa",
+      "insecure": "Simu zinahitaji muunganisho salama (https), na ukurasa huu hauko kwenye muunganisho huo.",
+      "no-webrtc": "Huwezi kupiga simu kutoka kivinjari hiki: hakina WebRTC. Chrome, Edge, Firefox na Safari za sasa zote zinayo.",
+      "no-webrtc-desktop": "Huwezi kupiga simu kutoka dirisha hili: WebKitGTK inayoliendesha ilijengwa bila WebRTC. Sakinisha WebKitGTK ya usambazaji wako yenye WebRTC, au tumia TDC kwenye kivinjari.",
+      "no-media": "Huwezi kupiga simu kutoka hapa: kivinjari hiki hakiwezi kufikia maikrofoni.",
+      "gstreamer-webrtc": "Bado huwezi kupiga simu kutoka kompyuta hii: programu-jalizi za WebRTC za GStreamer hazijasakinishwa. Sakinisha gst-plugins-bad na libnice (gstreamer1.0-plugins-bad na gstreamer1.0-nice kwenye Debian na Ubuntu, gstreamer1-plugins-bad-free na libnice-gstreamer1 kwenye Fedora)."
     }
   },
   "names": {

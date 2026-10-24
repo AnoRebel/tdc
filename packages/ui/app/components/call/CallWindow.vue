@@ -108,6 +108,22 @@ const {
   style: floatingStyle,
   corner: floatingCorner,
 } = useMovable(floating, grip, "call", "right-4 bottom-4");
+
+// The call's keys, which do nothing unless there is a call to act on.
+const inLiveCall = () => inCall.value && !c.onHold.value;
+useShortcutAction("callMicrophone", () => (inLiveCall() ? void c.toggleMicrophone() : false));
+useShortcutAction("callCamera", () => (inLiveCall() ? void c.toggleCamera() : false));
+useShortcutAction("callHand", () => (inLiveCall() ? void c.setHand(!c.handUp.value) : false));
+useShortcutAction("callShare", () => {
+  if (!inLiveCall() || !c.canShareScreen.value) return false;
+  if (c.screen.value) void c.stopSharing();
+  else if (!c.call.value?.presenter) void c.shareScreen();
+  else return false;
+});
+useShortcutAction("callExpand", () => {
+  if (!inCall.value) return false;
+  c.view.value = c.view.value === "expanded" ? "docked" : "expanded";
+});
 </script>
 
 <template>

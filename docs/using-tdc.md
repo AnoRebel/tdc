@@ -1320,6 +1320,27 @@ before you join where your device says the connection is metered. A call has a
 limit on how many people it can hold, set by your server — four, unless your
 operator chose otherwise — and the next person is told the call is full.
 
+**On a poor connection** a call steps down rather than dropping. When your
+connection cannot carry what you send, your video goes to a lower quality,
+then lower still (with any screen you share sent at fewer frames a second),
+then your camera pauses while your sound and shared screen go on, and only
+after that is your sound sent at lower quality — the call itself is never ended
+for it. Each step is said in the call window ("Your connection is slow, so your
+video is sent at lower quality", and so on), and once the connection has stayed
+good for about ten seconds things come back a step at a time, which is said too.
+
+**A call's start and end** are lines in the conversation, between the messages
+around them: who started it, and how long it lasted. A recording's start and
+end are lines too, naming who recorded.
+
+**From the keyboard**, while you are in a call and not typing: `Shift M` mutes
+and unmutes, `Shift V` turns the camera on and off, `Shift H` raises or lowers
+your hand, `Shift S` presents your screen or stops, and `Shift F` makes the call
+window large or small again. They are listed under `?` with the rest. With
+reduced motion (in **Settings → Appearance**, or your system's own setting),
+the call's moving parts — reactions, the ringing pulse, the recording mark —
+keep still.
+
 Some networks — offices, mobile carriers, some home routers — stop two people
 reaching each other directly. Your server's operator can run a relay so those
 calls still connect; without one, a call between two such people fails, and
@@ -1591,6 +1612,11 @@ Press `?` for the full list, grouped by where each shortcut works.
 | `Ctrl B`, `Ctrl I`, `Ctrl E`   | Bold, italic, inline code, in the message box       |
 | `Ctrl Shift X`, `Ctrl Shift C` | Strikethrough, code block, in the message box       |
 | `Shift Enter`                  | New line instead of sending                         |
+| `Shift M`                      | Mute or unmute, in a call                           |
+| `Shift V`                      | Camera on or off, in a call                         |
+| `Shift H`                      | Raise or lower your hand, in a call                 |
+| `Shift S`                      | Present your screen, or stop, in a call             |
+| `Shift F`                      | Make the call window large, or small again          |
 
 On a board, every card has a move handle. Focus it and press `Enter` or `Space`
 to pick the card up, `←` and `→` to choose a column, and `Enter` to put it down
@@ -1742,6 +1768,19 @@ not run. Moving between them means downloading the other one yourself, which you
 would only need to do after upgrading the operating system.
 
 macOS and Windows have one build each; there is nothing to choose.
+
+**Calls on Linux** go through GStreamer, which WebKitGTK uses for sound and
+video: its WebRTC plugin (in `gst-plugins-bad`) and libnice's plugin must be
+installed. The `.deb`, `.rpm` and Arch packages bring them in themselves. With
+another kind of download, or where they are missing, the conversation header
+shows a crossed-out phone instead of the call buttons, and pressing it says
+what to install — `gstreamer1.0-plugins-bad` and `gstreamer1.0-nice` on Debian
+and Ubuntu, `gstreamer1-plugins-bad-free` and `libnice-gstreamer1` on Fedora,
+`gst-plugins-bad` and `libnice` on Arch. A WebKitGTK built without WebRTC at all
+is said the same way; the desktop application switches WebRTC on in the
+WebKitGTK it is given, reloading its page once at start to do it. On macOS the
+first call asks for the camera and microphone in the system's own dialog; on
+Windows, calls need nothing extra.
 
 ## Asking before it is too late
 

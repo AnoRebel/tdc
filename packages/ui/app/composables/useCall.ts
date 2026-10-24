@@ -1,3 +1,5 @@
+import type { CallUnsupported } from "#layers/ui/app/composables/useCallSupport";
+import { callSupportKey } from "#layers/ui/app/composables/useCallSupport";
 import type {
   Call,
   CallDeclined,
@@ -12,6 +14,13 @@ import type {
 import { isApiError } from "@tdc/types";
 import { createGlobalState } from "@vueuse/core";
 
+import {
+  encodingFor,
+  initialQuality,
+  stepQuality,
+  type QualityLevel,
+  type QualityState,
+} from "#layers/ui/app/lib/callQuality";
 import { nameOf } from "#layers/ui/app/lib/names";
 
 /**
@@ -197,13 +206,31 @@ export const useCall = createGlobalState(() => {
     return Boolean(connection?.saveData || connection?.type === "cellular");
   });
 
+  /*
+   * Why this device cannot take part, when it cannot: what the page can see
+   * — no secure context, no WebRTC, no way to the microphone — and what only
+   * the application around it knows, such as the desktop's missing GStreamer
+   * plugins on Linux. Said to the person rather than hidden, so a call button
+   * that is not there has a reason.
+   */
+  const platformMissing = ref("");
+  const checkPlatform = inject(callSupportKey, null);
+  if (checkPlatform && !import.meta.server) {
+    void checkPlatform()
+      .then((missing) => (platformMissing.value = missing))
+      .catch(() => {});
+  }
+  const unsupported = computed<CallUnsupported | null>(() => {
+    if (import.meta.server) return null;
+    if (typeof RTCPeerConnection === "undefined")
+      return checkPlatform ? "no-webrtc-desktop" : "no-webrtc";
+    if (!navigator.mediaDevices?.getUserMedia)
+      return window.isSecureContext ? "no-media" : "insecure";
+    if (platformMissing.value === "gstreamer-webrtc") return "gstreamer-webrtc";
+    return null;
+  });
   /** Whether this device can take part at all. */
-  const supported = computed(
-    () =>
-      !import.meta.server &&
-      typeof RTCPeerConnection !== "undefined" &&
-      Boolean(navigator.mediaDevices?.getUserMedia),
-  );
+  const supported = computed(() => !import.meta.server && unsupported.value === null);
 
   function track(kind: "audio" | "video"): MediaStreamTrack | null {
     return local.value?.getTracks().find((each) => each.kind === kind) ?? null;
@@ -343,6 +370,8 @@ export const useCall = createGlobalState(() => {
   /** What a slot should be sending in a conversation's call now. */
   function wanted(room: string, slot: number): MediaStreamTrack | null {
     if (!live(room)) return null;
+    // Too little bandwidth for the camera: sound and any shared screen go on.
+    if (slot === 1 && quality.value.level >= 3) return null;
     return (
       [track("audio"), track("video"), screenTrack("video"), screenTrack("audio")][slot] ?? null
     );
@@ -353,6 +382,87 @@ export const useCall = createGlobalState(() => {
     for (const [slot, sender] of peer.senders.entries()) {
       const next = wanted(room, slot);
       if (sender.track !== next) await sender.replaceTrack(next);
+    }
+    if (quality.value.level > 0) await tunePeer(peer);
+  }
+
+  /*
+   * Stepping down on a poor connection. Every two seconds the call being
+   * talked in is asked how much its connections can send; video gives way
+   * first, then the camera, and only then the sound, and each comes back once
+   * the connection has stayed comfortable (see lib/callQuality). What changed
+   * is said in the call window.
+   */
+  const quality = ref<QualityState>(initialQuality);
+  /** The last step taken, for the call window to say; `recovered` when back to full. */
+  const qualityNotice = ref<QualityLevel | "recovered" | null>(null);
+  let sampling: ReturnType<typeof setInterval> | null = null;
+
+  function watchQuality() {
+    if (sampling || import.meta.server) return;
+    sampling = setInterval(() => void sampleQuality(), 2000);
+  }
+
+  async function sampleQuality() {
+    const room = roomId.value;
+    if (!Object.keys(calls.value).length) {
+      if (sampling) clearInterval(sampling);
+      sampling = null;
+      quality.value = initialQuality;
+      qualityNotice.value = null;
+      return;
+    }
+    const connections = [...(peers.get(room ?? "")?.values() ?? [])];
+    if (!room || !live(room) || !connections.length) return;
+    let kbps: number | null = null;
+    let limited = false;
+    for (const { connection } of connections) {
+      const reports = await connection.getStats().catch(() => null);
+      reports?.forEach((report) => {
+        if (
+          report.type === "candidate-pair" &&
+          report.nominated &&
+          typeof report.availableOutgoingBitrate === "number"
+        ) {
+          kbps = Math.min(kbps ?? Infinity, report.availableOutgoingBitrate / 1000);
+        }
+        if (
+          report.type === "outbound-rtp" &&
+          report.kind === "video" &&
+          report.qualityLimitationReason === "bandwidth"
+        ) {
+          limited = true;
+        }
+      });
+    }
+    const before = quality.value.level;
+    quality.value = stepQuality(quality.value, { kbps, limited });
+    if (quality.value.level === before) return;
+    qualityNotice.value = quality.value.level === 0 ? "recovered" : quality.value.level;
+    if (quality.value.level === 0) {
+      setTimeout(() => {
+        if (qualityNotice.value === "recovered") qualityNotice.value = null;
+      }, 6000);
+    }
+    await sync(room);
+    for (const peer of connections) await tunePeer(peer);
+  }
+
+  /** Sets what each of a connection's senders may use, for the current step. */
+  async function tunePeer(peer: Peer) {
+    if (!peer.senders) return;
+    const slots = ["audio", "camera", "screen"] as const;
+    for (const [index, slot] of slots.entries()) {
+      const sender = peer.senders[index];
+      if (!sender?.track) continue;
+      const parameters = sender.getParameters();
+      const encoding = parameters.encodings?.[0];
+      if (!encoding) continue;
+      for (const [key, value] of Object.entries(encodingFor(quality.value.level, slot))) {
+        if (value === undefined) delete (encoding as Record<string, unknown>)[key];
+        else (encoding as Record<string, unknown>)[key] = value;
+      }
+      await sender.setParameters(parameters).catch(() => {});
     }
   }
 
@@ -548,6 +658,7 @@ export const useCall = createGlobalState(() => {
       incoming.value = incoming.value.filter((ring) => ring.roomId !== room);
       if (withVideo && !camera.value) await toggleCamera();
       if (options.ring) await ring();
+      watchQuality();
     } catch (cause) {
       if (!Object.keys(calls.value).length) stopLocal();
       early = [];
@@ -981,11 +1092,14 @@ export const useCall = createGlobalState(() => {
     remote,
     metered,
     supported,
+    unsupported,
     isIn,
     recordingNotice,
     answerRecording,
     onControl,
     sendControl,
+    quality,
+    qualityNotice,
     reactions,
     reactionCounts,
     onReaction,

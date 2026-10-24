@@ -1,7 +1,13 @@
 import type { Message } from "@tdc/types";
 import { describe, expect, it } from "vitest";
 
-import { completeMention, foldMessages, groupMessages, mentionAt } from "./timeline";
+import {
+  completeMention,
+  foldMessages,
+  groupMessages,
+  groupWithLines,
+  mentionAt,
+} from "./timeline";
 
 let sequence = 0;
 function event(type: string, content: Message["content"], extra: Partial<Message> = {}): Message {
@@ -102,5 +108,23 @@ describe("noticing a mention being typed", () => {
       text: "@juma ",
       caret: 6,
     });
+  });
+});
+
+describe("lines between messages", () => {
+  it("puts a call's start and end where they happened, breaking the run around them", () => {
+    const events = [
+      event("message.sent", { body: "shall we talk?" }, { id: "m1" }),
+      event("call.started", { call: "c" } as unknown as Message["content"], { id: "s" }),
+      event("message.sent", { body: "back" }, { id: "m2" }),
+      event("call.ended", { call: "c", seconds: 90 } as unknown as Message["content"], { id: "e" }),
+    ];
+    const entries = groupWithLines(foldMessages(events), events, () => false);
+    expect(entries.map((entry) => ("line" in entry ? entry.line.id : entry.items[0]!.id))).toEqual([
+      "m1",
+      "s",
+      "m2",
+      "e",
+    ]);
   });
 });

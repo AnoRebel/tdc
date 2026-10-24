@@ -98,12 +98,8 @@ const percent = computed(() =>
 <style scoped>
 @reference "#layers/ui/app/assets/css/main.css";
 
+/* Pulses, unless motion is reduced or off: motion.css stills it then. */
 .recording-dot {
-  @apply size-2 shrink-0 rounded-full bg-destructive;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .recording-dot {
-    @apply animate-pulse;
-  }
+  @apply size-2 shrink-0 animate-pulse rounded-full bg-destructive;
 }
 </style>

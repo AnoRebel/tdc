@@ -28,10 +28,17 @@ contents:
   - src: "./build/linux/tdc.desktop"
     dst: "/usr/share/applications/net.anorebel.tdc.desktop"
 
-# Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+)
+# Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+),
+# with the GStreamer plugins WebKitGTK places calls with: webrtcbin (in the
+# "bad" set), libnice's ICE agent, and the codecs and capture in "good" and
+# "base". Without them the application runs and says why it cannot call.
 depends:
   - libgtk-4-1
   - libwebkitgtk-6.0-4
+  - gstreamer1.0-plugins-base
+  - gstreamer1.0-plugins-good
+  - gstreamer1.0-plugins-bad
+  - gstreamer1.0-nice
 
 # Distribution-specific overrides for different package formats
 overrides:
@@ -40,12 +47,20 @@ overrides:
     depends:
       - gtk4
       - webkitgtk6.0
+      - gstreamer1-plugins-base
+      - gstreamer1-plugins-good
+      - gstreamer1-plugins-bad-free
+      - libnice-gstreamer1
 
   # Arch Linux packages
   archlinux:
     depends:
       - gtk4
       - webkitgtk-6.0
+      - gst-plugins-base
+      - gst-plugins-good
+      - gst-plugins-bad
+      - libnice
 
 # Refresh the desktop, MIME and icon databases after install, and the icon
 # cache again after removal so it stops naming files that are gone.

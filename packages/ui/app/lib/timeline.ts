@@ -137,6 +137,49 @@ export function groupMessages(
   return runs;
 }
 
+/**
+ * The events a conversation shows as a line of their own between messages: a
+ * call starting and ending, and a recording of it starting and stopping.
+ */
+const LINE_TYPES = new Set([
+  "call.started",
+  "call.ended",
+  "call.recording_started",
+  "call.recording_stopped",
+]);
+
+/** One of those lines, in its place in the conversation. */
+export interface TimelineLine {
+  line: Message;
+  at: string;
+}
+
+/**
+ * Messages in runs, with the call lines between them where they happened: a
+ * line breaks a run, so a turn on either side of a call reads as two.
+ */
+export function groupWithLines(
+  messages: ShownMessage[],
+  events: Message[],
+  isMine: (sender: string) => boolean,
+): (MessageRun | TimelineLine)[] {
+  const lines = events
+    .filter((event) => LINE_TYPES.has(event.type) && !event.threadRoot)
+    .sort((a, b) => a.sequence - b.sequence);
+  const entries: (MessageRun | TimelineLine)[] = [];
+  let from = 0;
+  for (const line of lines) {
+    const before: ShownMessage[] = [];
+    while (from < messages.length && messages[from]!.sequence < line.sequence) {
+      before.push(messages[from]!);
+      from += 1;
+    }
+    entries.push(...groupMessages(before, isMine), { line, at: line.sentAt });
+  }
+  entries.push(...groupMessages(messages.slice(from), isMine));
+  return entries;
+}
+
 /** The name being typed after an @, and where the @ is. */
 export interface MentionQuery {
   /** What follows the @ so far, possibly empty. */

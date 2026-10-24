@@ -24,6 +24,22 @@ const picking = ref(false);
 const linking = ref(false);
 const { can } = useAuth();
 const guest = computed(() => Boolean(c.roomId.value && c.guestOf.value.includes(c.roomId.value)));
+// What the call last gave up, or got back, on a poor connection.
+const qualityText = computed(() => {
+  switch (c.qualityNotice.value) {
+    case 1:
+      return $ts("calls.quality.1");
+    case 2:
+      return $ts("calls.quality.2");
+    case 3:
+      return $ts("calls.quality.3");
+    case 4:
+      return $ts("calls.quality.4");
+    case "recovered":
+      return $ts("calls.quality.recovered");
+  }
+  return "";
+});
 </script>
 
 <template>
@@ -43,6 +59,16 @@ const guest = computed(() => Boolean(c.roomId.value && c.guestOf.value.includes(
     role="status"
   >
     {{ $t("calls.youAreHolding") }}
+  </p>
+  <p
+    v-if="c.qualityNotice.value !== null"
+    class="rounded-md px-2 py-1 text-center text-xs"
+    :class="
+      c.qualityNotice.value === 'recovered' ? 'text-muted-foreground' : 'bg-warning/10 text-warning'
+    "
+    role="status"
+  >
+    {{ qualityText }}
   </p>
   <CallRingPicker v-if="picking" />
   <CallLinks v-if="linking" />

@@ -34,6 +34,7 @@ export const SHORTCUT_GROUPS = [
   "conversation",
   "formatting",
   "projects",
+  "call",
 ] as const;
 export type ShortcutGroup = (typeof SHORTCUT_GROUPS)[number];
 
@@ -219,6 +220,17 @@ export const SHORTCUTS: ShortcutDefinition[] = [
   },
 
   { id: "newIssue", group: "projects", bindings: [{ chord: { key: "n" } }] },
+
+  /*
+   * In a call, with Shift so none of them is a conversation's own single key,
+   * and outside text fields like every other letter: a capital typed into a
+   * message must not mute anybody.
+   */
+  { id: "callMicrophone", group: "call", bindings: [{ chord: { key: "m", shift: true } }] },
+  { id: "callCamera", group: "call", bindings: [{ chord: { key: "v", shift: true } }] },
+  { id: "callHand", group: "call", bindings: [{ chord: { key: "h", shift: true } }] },
+  { id: "callShare", group: "call", bindings: [{ chord: { key: "s", shift: true } }] },
+  { id: "callExpand", group: "call", bindings: [{ chord: { key: "f", shift: true } }] },
   {
     id: "pickUpCard",
     group: "projects",

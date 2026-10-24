@@ -58,7 +58,7 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { atTime, onDay } from "#layers/ui/app/lib/dates";
 import { isTyping } from "#layers/ui/app/lib/shortcuts";
 import { plainText } from "#layers/ui/app/lib/formatting";
-import { foldMessages, groupMessages } from "#layers/ui/app/lib/timeline";
+import { foldMessages, groupWithLines } from "#layers/ui/app/lib/timeline";
 import { isOwnAddress, nameAt, nameOf } from "#layers/ui/app/lib/names";
 import IssueFromMessage from "#layers/ui/app/components/projects/IssueFromMessage.vue";
 import TranslationRoomToggle from "#layers/ui/app/components/translation/TranslationRoomToggle.vue";
@@ -624,9 +624,12 @@ const typingLabel = computed(() => {
 /** What the channel shows: its messages with their edits and deletions folded in. */
 const visible = computed(() => foldMessages(messages.value));
 
-/** Runs of messages from one sender, so a run reads as one turn. */
+/**
+ * Runs of messages from one sender, so a run reads as one turn, with a call's
+ * start and end, and its recording, as lines between them.
+ */
 const grouped = computed(() =>
-  groupMessages(visible.value, (sender) => isOwnAddress(user.value, sender)),
+  groupWithLines(visible.value, messages.value, (sender) => isOwnAddress(user.value, sender)),
 );
 
 /** Date headings between groups, so a long history stays navigable. */
@@ -1628,6 +1631,10 @@ watch(roomId, load, { immediate: true });
             <Video class="size-3.5" />
           </Button>
 
+          <LazyCallUnavailable
+            v-if="serverOffers('calls') && room && !room.homeServer && !calling.supported.value"
+          />
+
           <TranslationRoomToggle :room-id="roomId" />
 
           <ChannelSettings :room="room" :events="messages" @changed="room = $event" />
@@ -1813,7 +1820,8 @@ watch(roomId, load, { immediate: true });
             <!-- A dated rule, so scrolling back through history stays
                  oriented. -->
             <Separator v-if="dayBreakBefore(index)" :label="dayBreakBefore(index)!" />
-            <TimelineGroup :run="group" :reactions="reactions" />
+            <TimelineCallLine v-if="'line' in group" :line="group.line" />
+            <TimelineGroup v-else :run="group" :reactions="reactions" />
           </template>
 
           <!-- Messages written while the server could not be reached.

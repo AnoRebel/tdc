@@ -361,6 +361,10 @@ func main() {
 
 	// Remote control of a screen shared in a call; see remotecontrol.go.
 	app.RegisterService(application.NewService(remoteControlFor(app)))
+	// Calls: switched on in a web view that has them off, and what is missing
+	// where they still cannot work.
+	shell.EnableCalls(window.(*application.WebviewWindow))
+	app.RegisterService(application.NewService(shell.NewCallSupport()))
 
 	/*
 		The live connection, bridged from Go.

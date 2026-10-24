@@ -137,6 +137,16 @@ Users MUST be warned before a call is started on a connection the client identif
 - **WHEN** a participant's available bandwidth falls
 - **THEN** their media quality is reduced, and video is dropped before audio, rather than the call ending
 
+#### Scenario: The client says what it changed
+
+- **WHEN** a client lowers what it sends because of its connection, or restores it
+- **THEN** it tells the person what it changed
+
+#### Scenario: A device that cannot call says why
+
+- **WHEN** the server offers calls and a client cannot place them — no WebRTC, no microphone access, or, in the desktop application, missing platform components
+- **THEN** the client says why instead of offering a call that would fail
+
 #### Scenario: Metered connection is flagged
 
 - **WHEN** a user starts or joins a call on a connection reported as metered

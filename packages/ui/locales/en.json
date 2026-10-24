@@ -2015,7 +2015,8 @@
       "navigation": "Getting around",
       "conversation": "In a conversation",
       "projects": "In a project",
-      "formatting": "In the message box"
+      "formatting": "In the message box",
+      "call": "In a call"
     },
     "shortcuts": {
       "search": "Search messages, channels and people",
@@ -2047,7 +2048,12 @@
       "formatStrikethrough": "Strikethrough",
       "formatCode": "Inline code",
       "formatCodeBlock": "Code block",
-      "newLineInMessage": "New line instead of sending (Enter alone adds one inside an open code block)"
+      "newLineInMessage": "New line instead of sending (Enter alone adds one inside an open code block)",
+      "callMicrophone": "Mute or unmute your microphone",
+      "callCamera": "Turn your camera on or off",
+      "callHand": "Raise or lower your hand",
+      "callShare": "Present your screen, or stop presenting",
+      "callExpand": "Make the call window large, or small again"
     },
     "formatting": {
       "title": "Formatting",
@@ -2288,6 +2294,30 @@
         "accessibility": "{name} has not allowed TDC to control their Mac. They can allow it in System Settings, Privacy & Security, Accessibility.",
         "platform": "{name}'s computer cannot be controlled remotely."
       }
+    },
+    "line": {
+      "started": "{name} started a call",
+      "ended": "The call ended after {duration}",
+      "recordingStarted": "{name} started recording the call",
+      "recordingStopped": "{name} stopped recording, after {duration}",
+      "underMinute": "less than a minute",
+      "minutes": "{minutes} min",
+      "hours": "{hours} h {minutes} min"
+    },
+    "quality": {
+      "1": "Your connection is slow, so your video is sent at lower quality.",
+      "2": "Your connection is very slow, so your video and any shared screen are sent at low quality.",
+      "3": "Your connection is too slow for your camera, so your video is paused. Your sound and any shared screen go on.",
+      "4": "Your connection is barely holding, so your sound is sent at lower quality to keep the call going.",
+      "recovered": "Your connection has recovered, and what you send is back to normal."
+    },
+    "unsupported": {
+      "title": "Why you cannot call from here",
+      "insecure": "Calls need a secure connection (https), and this page is not on one.",
+      "no-webrtc": "You cannot call from this browser: it has no WebRTC. Current Chrome, Edge, Firefox and Safari all have it.",
+      "no-webrtc-desktop": "You cannot call from this window: the WebKitGTK it runs on was built without WebRTC. Install your distribution's WebKitGTK with WebRTC, or use TDC in a browser.",
+      "no-media": "You cannot call from here: this browser cannot reach a microphone.",
+      "gstreamer-webrtc": "You cannot call from this computer yet: GStreamer's WebRTC plugins are not installed. Install gst-plugins-bad and libnice (gstreamer1.0-plugins-bad and gstreamer1.0-nice on Debian and Ubuntu, gstreamer1-plugins-bad-free and libnice-gstreamer1 on Fedora)."
     }
   },
   "names": {

@@ -1310,7 +1310,9 @@ It also answers STUN, so `calls.stun_urls` can be `stun:tdc.example:3478`.
 **Clients.** Current Chrome, Edge, Firefox and Safari all place calls, on
 desktops and phones. The desktop application uses its platform's web view:
 Windows and macOS support calls; on Linux they depend on WebKitGTK being built
-with WebRTC and GStreamer's WebRTC plugins being installed. Picture-in-picture
+with WebRTC and GStreamer's WebRTC plugins being installed — which the Linux
+packages depend on, and which the application names when they are missing,
+rather than offering calls that cannot connect. Picture-in-picture
 of the whole call needs a Chromium-based browser; others put the main video
 there instead.
 
