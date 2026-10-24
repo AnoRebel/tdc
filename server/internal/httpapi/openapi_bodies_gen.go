@@ -741,6 +741,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[[]myIssue]()},
 		},
 	},
+	"GET /api/me/location": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[locationView]()},
+		},
+	},
 	"GET /api/me/notifications": {
 		Query: []string{"grouped", "limit"},
 		Responses: []responseBody{
@@ -1794,6 +1799,12 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 202, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
+	"POST /api/me/location/detect": {
+		Request: reflect.TypeFor[detectLocationRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[locationView]()},
+		},
+	},
 	"POST /api/me/notifications/:id/read": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -2278,6 +2289,12 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[displayNameRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[userResponse]()},
+		},
+	},
+	"PUT /api/me/location": {
+		Request: reflect.TypeFor[setLocationRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[locationView]()},
 		},
 	},
 	"PUT /api/me/pins/:id": {

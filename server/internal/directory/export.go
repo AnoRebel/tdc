@@ -40,7 +40,6 @@ descriptions of the same thing.
 type ProfileDocument struct {
 	Headline          string              `json:"headline"`
 	Bio               string              `json:"bio"`
-	Location          string              `json:"location"`
 	Experience        string              `json:"experience"`
 	ContactEmail      string              `json:"contactEmail"`
 	ContactPhone      string              `json:"contactPhone"`
@@ -93,7 +92,7 @@ type ExportCompany struct {
 // Input turns a document into what Save takes.
 func (d ProfileDocument) Input() ProfileInput {
 	input := ProfileInput{
-		Headline: d.Headline, Bio: d.Bio, Location: d.Location, Experience: d.Experience,
+		Headline: d.Headline, Bio: d.Bio, Experience: d.Experience,
 		ContactEmail: d.ContactEmail, ContactPhone: d.ContactPhone, ContactURL: d.ContactURL,
 		Visibility: d.Visibility, DetailsVisibility: d.DetailsVisibility,
 		ContactVisibility: d.ContactVisibility,
@@ -114,7 +113,7 @@ func (d ProfileDocument) Input() ProfileInput {
 // Document turns somebody's own profile into the shape it is saved in.
 func (p Profile) Document() ProfileDocument {
 	document := ProfileDocument{
-		Headline: p.Headline, Bio: p.Bio, Location: p.Location, Experience: p.Experience,
+		Headline: p.Headline, Bio: p.Bio, Experience: p.Experience,
 		ContactEmail: p.ContactEmail, ContactPhone: p.ContactPhone, ContactURL: p.ContactURL,
 		Visibility: p.Visibility, DetailsVisibility: p.DetailsVisibility,
 		ContactVisibility: p.ContactVisibility,

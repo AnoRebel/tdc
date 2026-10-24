@@ -770,6 +770,10 @@ type memberResponse struct {
 	StatusText *string    `json:"statusText,omitempty"`
 	LastSeenAt *time.Time `json:"lastSeenAt,omitempty"`
 
+	// Location is absent when there is none or this caller may not see it,
+	// which person_location() has already decided.
+	Location string `json:"location,omitempty"`
+
 	/*
 		Withheld names the details this person does not disclose, and is sent
 		only to a moderator who is being shown them anyway.
@@ -801,7 +805,7 @@ func (s *Server) handleRoomMembers(c *echo.Context) error {
 	*/
 	asModerator := c.QueryParam("moderating") == "true" && s.mayModerate(ctx, user)
 
-	members, err := s.rooms.MembersWithDisclosure(ctx, roomID, user.ID, asModerator)
+	members, err := s.rooms.MembersWithDisclosure(ctx, roomID, user.ID, asModerator, int16(viewerRankOf(user)))
 	if err != nil {
 		return roomError(err)
 	}
@@ -815,6 +819,7 @@ func (s *Server) handleRoomMembers(c *echo.Context) error {
 			DisplayName: member.DisplayName,
 			Address:     member.Username + "@" + s.serverName(),
 			JoinedAt:    member.JoinedAt,
+			Location:    member.Location,
 		}
 
 		// Each detail is attached only when it is not withheld. The query has

@@ -304,7 +304,7 @@ func (s *Server) handleRoomPresence(c *echo.Context) error {
 		moderation context: this is what a conversation polls, not a report
 		being reviewed.
 	*/
-	disclosure, err := s.rooms.MembersWithDisclosure(ctx, roomID, user.ID, false)
+	disclosure, err := s.rooms.MembersWithDisclosure(ctx, roomID, user.ID, false, int16(viewerRankOf(user)))
 	if err != nil {
 		return roomError(err)
 	}

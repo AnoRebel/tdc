@@ -406,7 +406,6 @@ type DirectoryProfile struct {
 	UserID                uuid.UUID
 	Headline              string
 	Bio                   string
-	Location              string
 	Experience            string
 	ContactEmail          string
 	ContactPhone          string
@@ -1226,6 +1225,16 @@ type UserBlock struct {
 	BlockerID uuid.UUID
 	BlockedID uuid.UUID
 	CreatedAt time.Time
+}
+
+type UserLocation struct {
+	UserID       uuid.UUID
+	Place        string
+	Mode         string
+	DetectedAt   *time.Time
+	Visibility   string
+	LocationRank *int16
+	UpdatedAt    time.Time
 }
 
 type UserPresence struct {

@@ -11,3 +11,9 @@ Note on other Tanzania Developers Community repositories: several of them are
 licensed under the GNU General Public License. Code may not be copied from
 those repositories into this one without relicensing by its copyright holder.
 See CONTRIBUTING.md.
+
+This product includes place names and positions from GeoNames
+(https://www.geonames.org), licensed under the Creative Commons Attribution
+4.0 License (https://creativecommons.org/licenses/by/4.0/). The data is the
+"cities15000" and "countryInfo" exports, reduced to each town's name, country
+and position, in server/internal/places/places.tsv.gz.

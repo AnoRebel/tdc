@@ -388,6 +388,13 @@ func (s *Server) routes() {
 	me.GET("/privacy", s.handleGetPrivacy)
 	me.PUT("/privacy", s.handleSetPrivacy)
 
+	// Where this person is, and who may see it. Detecting takes a position
+	// and keeps only the town it is nearest, matched here rather than by
+	// anybody else.
+	me.GET("/location", s.handleGetLocation)
+	me.PUT("/location", s.handleSetLocation)
+	me.POST("/location/detect", s.handleDetectLocation)
+
 	s.echo.GET("/api/me/pins", s.handleListPinnedRooms, requireAuthentication)
 	s.echo.PUT("/api/me/pins/:id", s.handlePinRoom, requireAuthentication)
 	s.echo.DELETE("/api/me/pins/:id", s.handleUnpinRoom, requireAuthentication)

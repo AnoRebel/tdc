@@ -338,7 +338,7 @@ func TestSearchRespectsVisibility(t *testing.T) {
 	common := func(visibility, details string) map[string]any {
 		return map[string]any{
 			"visibility": visibility, "detailsVisibility": details,
-			"location": "Arusha", "headline": "Flutter developer",
+			"headline":   "Flutter developer",
 			"skills":     []map[string]any{{"name": "Flutter"}},
 			"openToWork": true, "availableUntil": inDays(20),
 		}
@@ -347,6 +347,11 @@ func TestSearchRespectsVisibility(t *testing.T) {
 	saveProfile(t, handler, members, common("members", "members"))
 	saveProfile(t, handler, hidden, common("hidden", "hidden"))
 	saveProfile(t, handler, secretive, common("members", "hidden"))
+	// The account's location, as public as it can be: what limits it here is
+	// the profile showing it.
+	for _, token := range []string{public, members, hidden, secretive} {
+		setLocation(t, handler, token, "Arusha", "public")
+	}
 
 	all, body := searchDirectory(t, handler, client, url.Values{})
 	if has(all, "hidden") {
@@ -565,8 +570,10 @@ func TestSearchByCompanyAndLocation(t *testing.T) {
 	amina := registerAndSignIn(t, handler, "amina")
 	client := registerAndSignIn(t, handler, "client")
 
-	saveProfile(t, handler, juma, map[string]any{"location": "Mwanza"})
-	saveProfile(t, handler, amina, map[string]any{"location": "Dodoma"})
+	saveProfile(t, handler, juma, map[string]any{})
+	saveProfile(t, handler, amina, map[string]any{})
+	setLocation(t, handler, juma, "Mwanza", "members")
+	setLocation(t, handler, amina, "Dodoma", "members")
 	call(t, handler, http.MethodPost, "/api/directory/companies", map[string]any{"slug": "ziwa", "name": "Ziwa Tech"}, juma)
 
 	if names, _ := searchDirectory(t, handler, client, url.Values{"location": {"mwanza"}}); !reflect.DeepEqual(names, []string{"juma"}) {

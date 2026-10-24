@@ -120,6 +120,7 @@ var partTables = map[Part][]tableSpec{
 		{name: "role_permissions"},
 		{name: "user_roles"},
 		{name: "user_privacy"},
+		{name: "user_locations"},
 		{name: "translation_preferences"},
 		{name: "automatic_replies"},
 		{name: "calendar_feeds"},

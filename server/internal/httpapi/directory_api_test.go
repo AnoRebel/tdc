@@ -255,10 +255,12 @@ func TestAHiddenSectionIsAbsent(t *testing.T) {
 		"detailsVisibility": "hidden",
 		"contactVisibility": "members",
 		"bio":               "private bio",
-		"location":          "Arusha",
 		"contactEmail":      "juma@example.com",
 		"portfolio":         []map[string]any{{"title": "Site", "url": "https://example.com"}},
 	})
+	// Public on the account, and still withheld here: the profile's hidden
+	// details are its ceiling.
+	setLocation(t, handler, juma, "Arusha", "public")
 
 	// A company juma agreed to be listed by, which is part of what the
 	// profile says and so part of what hiding the details hides.
@@ -500,7 +502,7 @@ func TestAnExportedProfileRoundTrips(t *testing.T) {
 	juma := registerAndSignIn(t, handler, "juma")
 
 	saveProfile(t, handler, juma, map[string]any{
-		"headline": "Backend developer", "bio": "Go and Postgres", "location": "Dar es Salaam",
+		"headline": "Backend developer", "bio": "Go and Postgres",
 		"experience": "Eight years", "contactEmail": "juma@example.com",
 		"visibility": "public", "detailsVisibility": "members", "contactVisibility": "hidden",
 		"portfolio": []map[string]any{{"title": "Site", "url": "https://example.com", "description": "Mine"}},
@@ -525,7 +527,7 @@ func TestAnExportedProfileRoundTrips(t *testing.T) {
 	// a field would round-trip perfectly, having lost it both times.
 	exported := first["profile"].(map[string]any)
 	for field, want := range map[string]any{
-		"headline": "Backend developer", "bio": "Go and Postgres", "location": "Dar es Salaam",
+		"headline": "Backend developer", "bio": "Go and Postgres",
 		"experience": "Eight years", "contactEmail": "juma@example.com", "visibility": "public",
 	} {
 		if exported[field] != want {

@@ -66,7 +66,7 @@ func TestTheDefaultIsToDisclose(t *testing.T) {
 		t.Fatalf("Join: %v", err)
 	}
 
-	members, err := service.MembersWithDisclosure(ctx, room.ID, owner.ID, false)
+	members, err := service.MembersWithDisclosure(ctx, room.ID, owner.ID, false, 1)
 	if err != nil {
 		t.Fatalf("MembersWithDisclosure: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestAWithheldDetailIsNotReturned(t *testing.T) {
 	}
 	withhold(t, queries, guest.ID, false, false, false)
 
-	members, err := service.MembersWithDisclosure(ctx, room.ID, owner.ID, false)
+	members, err := service.MembersWithDisclosure(ctx, room.ID, owner.ID, false, 1)
 	if err != nil {
 		t.Fatalf("MembersWithDisclosure: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestDetailsAreWithheldIndividually(t *testing.T) {
 	// Shown as online, but not when they were last here.
 	withhold(t, queries, guest.ID, true, true, false)
 
-	members, err := service.MembersWithDisclosure(ctx, room.ID, owner.ID, false)
+	members, err := service.MembersWithDisclosure(ctx, room.ID, owner.ID, false, 1)
 	if err != nil {
 		t.Fatalf("MembersWithDisclosure: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestAModeratorSeesWithheldDetails(t *testing.T) {
 	}
 	withhold(t, queries, guest.ID, false, false, false)
 
-	members, err := service.MembersWithDisclosure(ctx, room.ID, owner.ID, true)
+	members, err := service.MembersWithDisclosure(ctx, room.ID, owner.ID, true, 1)
 	if err != nil {
 		t.Fatalf("MembersWithDisclosure: %v", err)
 	}

@@ -37,7 +37,7 @@ SELECT
     u.display_name,
     (p.details_rank <= $1::smallint)::boolean AS details_shown,
     (CASE WHEN p.details_rank <= $1::smallint THEN p.headline ELSE '' END)::text AS headline,
-    (CASE WHEN p.details_rank <= $1::smallint THEN p.location ELSE '' END)::text AS location,
+    person_location(p.user_id, $1::smallint, p.details_rank)::text AS location,
     COALESCE(p.details_rank <= $1::smallint
              AND p.open_to_work AND p.availability_expires_at > NOW(), FALSE)::boolean AS available,
     (CASE WHEN p.details_rank <= $1::smallint
@@ -75,7 +75,7 @@ WHERE p.profile_rank <= $1::smallint
       )
   AND (
         $5::text = ''
-        OR (p.details_rank <= $1::smallint AND p.location ILIKE '%' || $5::text || '%')
+        OR person_location(p.user_id, $1::smallint, p.details_rank) ILIKE '%' || $5::text || '%'
       )
   AND (
         $6::text = ''

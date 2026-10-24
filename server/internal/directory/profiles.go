@@ -38,8 +38,10 @@ phone over metered data, which is where a developer answering a client is most
 likely to be reading it.
 */
 const (
-	maxHeadline     = 120
-	maxBio          = 2000
+	maxHeadline = 120
+	maxBio      = 2000
+	// maxLocation is the account location's limit too, enforced there; a
+	// moderator replacing it through a profile is held to the same.
 	maxLocation     = 80
 	maxExperience   = 500
 	maxContactField = 200
@@ -60,10 +62,12 @@ const (
 )
 
 // ProfileInput is everything a person may say in their own profile.
+//
+// No location: that belongs to the account, set in its own settings, and a
+// profile shows it rather than holding a second copy.
 type ProfileInput struct {
 	Headline   string
 	Bio        string
-	Location   string
 	Experience string
 
 	ContactEmail string
@@ -197,7 +201,6 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, input ProfileInput
 		UserID:                userID,
 		Headline:              input.Headline,
 		Bio:                   input.Bio,
-		Location:              input.Location,
 		Experience:            input.Experience,
 		ContactEmail:          input.ContactEmail,
 		ContactPhone:          input.ContactPhone,
@@ -478,12 +481,15 @@ func (s *Service) Moderate(ctx context.Context, userID uuid.UUID, change Moderat
 		return invalid("visibility", `must be "public", "members" or "hidden"`)
 	}
 	input := ProfileInput{
-		Headline: change.Headline, Bio: change.Bio,
-		Location: change.Location, Experience: change.Experience,
+		Headline: change.Headline, Bio: change.Bio, Experience: change.Experience,
 		Visibility: change.Visibility, DetailsVisibility: Members, ContactVisibility: Hidden,
 	}
 	if err := normalise(&input); err != nil {
 		return err
+	}
+	place := strings.TrimSpace(change.Location)
+	if utf8.RuneCountInString(place) > maxLocation {
+		return invalid("location", fmt.Sprintf("at most %d characters", maxLocation))
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -497,11 +503,17 @@ func (s *Service) Moderate(ctx context.Context, userID uuid.UUID, change Moderat
 		UserID:     userID,
 		Headline:   input.Headline,
 		Bio:        input.Bio,
-		Location:   input.Location,
 		Experience: input.Experience,
 		Visibility: string(input.Visibility),
 	}); err != nil {
 		return fmt.Errorf("moderate a profile: %w", err)
+	}
+	// The location the profile shows is the account's, so replacing what the
+	// profile says replaces that too.
+	if err := queries.ModerateLocation(ctx, dbgen.ModerateLocationParams{
+		UserID: userID, Place: place,
+	}); err != nil {
+		return fmt.Errorf("moderate a location: %w", err)
 	}
 	if change.RemovePortfolio {
 		if err := queries.DeletePortfolioItemsExcept(ctx, dbgen.DeletePortfolioItemsExceptParams{
@@ -558,7 +570,6 @@ that forgets the field publishes nothing.
 func normalise(input *ProfileInput) error {
 	input.Headline = strings.TrimSpace(input.Headline)
 	input.Bio = strings.TrimSpace(input.Bio)
-	input.Location = strings.TrimSpace(input.Location)
 	input.Experience = strings.TrimSpace(input.Experience)
 	input.ContactEmail = strings.TrimSpace(input.ContactEmail)
 	input.ContactPhone = strings.TrimSpace(input.ContactPhone)
@@ -589,7 +600,6 @@ func normalise(input *ProfileInput) error {
 	}{
 		{"headline", input.Headline, maxHeadline},
 		{"bio", input.Bio, maxBio},
-		{"location", input.Location, maxLocation},
 		{"experience", input.Experience, maxExperience},
 		{"contactEmail", input.ContactEmail, maxContactField},
 		{"contactPhone", input.ContactPhone, maxContactField},

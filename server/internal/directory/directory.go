@@ -8,6 +8,10 @@ built as a separate layer rather than a loosening of the first: its own tables,
 its own queries, its own visibility settings, and nothing that reads or writes
 user_privacy, user_presence or the member-list search.
 
+The one thing a profile shows that it does not own is where somebody is: that
+is the account's, read through person_location() with the profile's details
+rank as its ceiling, so a profile can narrow who sees it but never widen it.
+
 An account with no profile is a complete account. Creating one is the decision
 to be found, and every section of it is disclosed only as its owner chose.
 */

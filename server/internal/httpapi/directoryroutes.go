@@ -164,7 +164,7 @@ is as undiscoverable as the server itself.
 */
 func (api *directoryAPI) viewerRank(c *echo.Context) (directory.Rank, uuid.UUID, bool) {
 	if user, ok := currentUser(c); ok {
-		return directory.Member, user.ID, true
+		return viewerRankOf(user), user.ID, true
 	}
 	if api.visibility(c.Request().Context()) != VisibilityPublic {
 		return directory.Anonymous, uuid.Nil, false
@@ -345,7 +345,10 @@ type ownProfileResponse struct {
 	DisplayName string                    `json:"displayName"`
 	Address     string                    `json:"address"`
 	Profile     directory.ProfileDocument `json:"profile"`
-	Companies   []companyRefView          `json:"companies"`
+	// Location is the account's, which the profile shows but does not hold:
+	// read here, changed in the account's own settings.
+	Location  string           `json:"location,omitempty"`
+	Companies []companyRefView `json:"companies"`
 	// Verifications are the owner's own, with what each moderator checked.
 	Verifications []ownVerificationView `json:"verifications"`
 	CreatedAt     string                `json:"createdAt"`
@@ -365,6 +368,7 @@ func (api *directoryAPI) ownResponse(profile directory.Profile, verifications ma
 		DisplayName:   profile.DisplayName,
 		Address:       api.rooms.UserAddress(profile.Username),
 		Profile:       profile.Document(),
+		Location:      profile.Location,
 		Companies:     []companyRefView{},
 		Verifications: []ownVerificationView{},
 		CreatedAt:     profile.CreatedAt.UTC().Format(time.RFC3339),

@@ -11,7 +11,9 @@ discipline the member-list disclosure established, applied to strangers.
 -- name: GetOwnDirectoryProfile :one
 -- The owner's own profile, all of it. Only ever called with the signed-in
 -- person's own identifier.
-SELECT p.*, u.username, u.display_name
+SELECT p.*, u.username, u.display_name,
+    -- The account's location, as its owner sees it.
+    person_location(p.user_id, 2::smallint, 0::smallint)::text AS location
 FROM directory_profiles p
 JOIN users u ON u.id = p.user_id
 WHERE p.user_id = $1;
@@ -21,12 +23,12 @@ WHERE p.user_id = $1;
 -- person saving twice from two tabs cannot end up with two profiles or with
 -- one half-written.
 INSERT INTO directory_profiles (
-    user_id, headline, bio, location, experience,
+    user_id, headline, bio, experience,
     contact_email, contact_phone, contact_url,
     visibility, details_visibility, contact_visibility,
     open_to_work, availability_note, availability_expires_at, accepts_enquiries
 ) VALUES (
-    @user_id, @headline, @bio, @location, @experience,
+    @user_id, @headline, @bio, @experience,
     @contact_email, @contact_phone, @contact_url,
     @visibility, @details_visibility, @contact_visibility,
     @open_to_work, @availability_note, sqlc.narg('availability_expires_at'),
@@ -39,7 +41,6 @@ ON CONFLICT (user_id) DO UPDATE SET
     availability_expires_at = EXCLUDED.availability_expires_at,
     headline = EXCLUDED.headline,
     bio = EXCLUDED.bio,
-    location = EXCLUDED.location,
     experience = EXCLUDED.experience,
     contact_email = EXCLUDED.contact_email,
     contact_phone = EXCLUDED.contact_phone,
@@ -81,7 +82,8 @@ SELECT
     (p.contact_rank <= @viewer_rank::smallint)::boolean AS contact_shown,
     (CASE WHEN p.details_rank <= @viewer_rank::smallint THEN p.headline ELSE '' END)::text AS headline,
     (CASE WHEN p.details_rank <= @viewer_rank::smallint THEN p.bio ELSE '' END)::text AS bio,
-    (CASE WHEN p.details_rank <= @viewer_rank::smallint THEN p.location ELSE '' END)::text AS location,
+    -- The account's location, never more visible than these details.
+    person_location(u.id, @viewer_rank::smallint, p.details_rank)::text AS location,
     (CASE WHEN p.details_rank <= @viewer_rank::smallint THEN p.experience ELSE '' END)::text AS experience,
     (CASE WHEN p.contact_rank <= @viewer_rank::smallint THEN p.contact_email ELSE '' END)::text AS contact_email,
     (CASE WHEN p.contact_rank <= @viewer_rank::smallint THEN p.contact_phone ELSE '' END)::text AS contact_phone,
@@ -157,7 +159,6 @@ WHERE user_id = @user_id AND NOT (id = ANY(@keep::uuid[]));
 UPDATE directory_profiles
 SET headline = @headline,
     bio = @bio,
-    location = @location,
     experience = @experience,
     visibility = @visibility,
     updated_at = NOW()

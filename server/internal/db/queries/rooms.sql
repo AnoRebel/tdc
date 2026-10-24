@@ -126,7 +126,11 @@ SELECT
     -- recording. Never sent to an ordinary caller.
     (NOT COALESCE(user_privacy.shows_presence, TRUE))::boolean  AS withholds_presence,
     (NOT COALESCE(user_privacy.shows_status, TRUE))::boolean    AS withholds_status,
-    (NOT COALESCE(user_privacy.shows_last_seen, TRUE))::boolean AS withholds_last_seen
+    (NOT COALESCE(user_privacy.shows_last_seen, TRUE))::boolean AS withholds_last_seen,
+    -- Where they are, as far as this viewer may know: the one rule every
+    -- query returning a person uses. Not lifted for a moderator; a location
+    -- is not something a report about a conversation turns on.
+    person_location(users.id, sqlc.arg(viewer_rank)::smallint, 0::smallint)::text AS location
 FROM room_members
 JOIN users ON users.id = room_members.user_id
 -- Left, because presence is created on first connection: somebody who has

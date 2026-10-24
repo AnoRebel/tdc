@@ -548,6 +548,7 @@ type Querier interface {
 	// The owner's own profile, all of it. Only ever called with the signed-in
 	// person's own identifier.
 	GetOwnDirectoryProfile(ctx context.Context, userID uuid.UUID) (GetOwnDirectoryProfileRow, error)
+	GetOwnLocation(ctx context.Context, userID uuid.UUID) (GetOwnLocationRow, error)
 	GetPasskeyByCredentialID(ctx context.Context, externalID *string) (Credential, error)
 	GetPasswordCredential(ctx context.Context, userID uuid.UUID) (Credential, error)
 	// Read without consuming: a wrong code must leave the ticket usable, or one
@@ -1068,6 +1069,9 @@ type Querier interface {
 	// visibility can be lowered in the same change, so abusive content can be
 	// taken out of the directory while it is dealt with.
 	ModerateDirectoryProfile(ctx context.Context, arg ModerateDirectoryProfileParams) error
+	// A moderator replacing what somebody's location says, from the directory's
+	// moderation screen. Made manual, so a detection does not quietly undo it.
+	ModerateLocation(ctx context.Context, arg ModerateLocationParams) error
 	// Moves an offer from one state to another, only if it is still in one of the
 	// states it may move from and has not lapsed — so two people acting at once
 	// cannot both win, and an offer nobody answered cannot be accepted late.
@@ -1379,6 +1383,9 @@ type Querier interface {
 	SetMessageLifetime(ctx context.Context, arg SetMessageLifetimeParams) (MessageLifetime, error)
 	SetMilestoneDue(ctx context.Context, arg SetMilestoneDueParams) error
 	SetNotificationDigest(ctx context.Context, arg SetNotificationDigestParams) (NotificationDigest, error)
+	// The whole setting at once. detected_at is kept unless a detection is being
+	// recorded, so switching to manual does not forget when the place was found.
+	SetOwnLocation(ctx context.Context, arg SetOwnLocationParams) (SetOwnLocationRow, error)
 	// Recording an address somebody has asked to prove, which does not touch the
 	// one they already have.
 	SetPendingEmail(ctx context.Context, arg SetPendingEmailParams) error

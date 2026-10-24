@@ -295,7 +295,11 @@ SELECT
     -- recording. Never sent to an ordinary caller.
     (NOT COALESCE(user_privacy.shows_presence, TRUE))::boolean  AS withholds_presence,
     (NOT COALESCE(user_privacy.shows_status, TRUE))::boolean    AS withholds_status,
-    (NOT COALESCE(user_privacy.shows_last_seen, TRUE))::boolean AS withholds_last_seen
+    (NOT COALESCE(user_privacy.shows_last_seen, TRUE))::boolean AS withholds_last_seen,
+    -- Where they are, as far as this viewer may know: the one rule every
+    -- query returning a person uses. Not lifted for a moderator; a location
+    -- is not something a report about a conversation turns on.
+    person_location(users.id, $3::smallint, 0::smallint)::text AS location
 FROM room_members
 JOIN users ON users.id = room_members.user_id
 LEFT JOIN user_presence ON user_presence.user_id = users.id
@@ -307,6 +311,7 @@ ORDER BY users.username
 type ListRoomMembersWithDisclosureParams struct {
 	RoomID      uuid.UUID
 	AsModerator bool
+	ViewerRank  int16
 }
 
 type ListRoomMembersWithDisclosureRow struct {
@@ -321,6 +326,7 @@ type ListRoomMembersWithDisclosureRow struct {
 	WithholdsPresence bool
 	WithholdsStatus   bool
 	WithholdsLastSeen bool
+	Location          string
 }
 
 // Who is in a channel, with the details each person allows to be disclosed.
@@ -346,7 +352,7 @@ type ListRoomMembersWithDisclosureRow struct {
 // never connected has no row, and an inner join would drop them from the
 // member list entirely. The same is true of user_privacy.
 func (q *Queries) ListRoomMembersWithDisclosure(ctx context.Context, arg ListRoomMembersWithDisclosureParams) ([]ListRoomMembersWithDisclosureRow, error) {
-	rows, err := q.db.Query(ctx, listRoomMembersWithDisclosure, arg.RoomID, arg.AsModerator)
+	rows, err := q.db.Query(ctx, listRoomMembersWithDisclosure, arg.RoomID, arg.AsModerator, arg.ViewerRank)
 	if err != nil {
 		return nil, err
 	}
@@ -366,6 +372,7 @@ func (q *Queries) ListRoomMembersWithDisclosure(ctx context.Context, arg ListRoo
 			&i.WithholdsPresence,
 			&i.WithholdsStatus,
 			&i.WithholdsLastSeen,
+			&i.Location,
 		); err != nil {
 			return nil, err
 		}

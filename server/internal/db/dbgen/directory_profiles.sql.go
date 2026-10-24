@@ -73,7 +73,9 @@ mistake in a handler cannot leak what the query did not return. This is the
 discipline the member-list disclosure established, applied to strangers.
 */
 
-SELECT p.user_id, p.headline, p.bio, p.location, p.experience, p.contact_email, p.contact_phone, p.contact_url, p.visibility, p.details_visibility, p.contact_visibility, p.profile_rank, p.details_rank, p.contact_rank, p.created_at, p.updated_at, p.open_to_work, p.availability_note, p.availability_expires_at, p.accepts_enquiries, u.username, u.display_name
+SELECT p.user_id, p.headline, p.bio, p.experience, p.contact_email, p.contact_phone, p.contact_url, p.visibility, p.details_visibility, p.contact_visibility, p.profile_rank, p.details_rank, p.contact_rank, p.created_at, p.updated_at, p.open_to_work, p.availability_note, p.availability_expires_at, p.accepts_enquiries, u.username, u.display_name,
+    -- The account's location, as its owner sees it.
+    person_location(p.user_id, 2::smallint, 0::smallint)::text AS location
 FROM directory_profiles p
 JOIN users u ON u.id = p.user_id
 WHERE p.user_id = $1
@@ -83,7 +85,6 @@ type GetOwnDirectoryProfileRow struct {
 	UserID                uuid.UUID
 	Headline              string
 	Bio                   string
-	Location              string
 	Experience            string
 	ContactEmail          string
 	ContactPhone          string
@@ -102,6 +103,7 @@ type GetOwnDirectoryProfileRow struct {
 	AcceptsEnquiries      *bool
 	Username              string
 	DisplayName           string
+	Location              string
 }
 
 // The owner's own profile, all of it. Only ever called with the signed-in
@@ -113,7 +115,6 @@ func (q *Queries) GetOwnDirectoryProfile(ctx context.Context, userID uuid.UUID) 
 		&i.UserID,
 		&i.Headline,
 		&i.Bio,
-		&i.Location,
 		&i.Experience,
 		&i.ContactEmail,
 		&i.ContactPhone,
@@ -132,6 +133,7 @@ func (q *Queries) GetOwnDirectoryProfile(ctx context.Context, userID uuid.UUID) 
 		&i.AcceptsEnquiries,
 		&i.Username,
 		&i.DisplayName,
+		&i.Location,
 	)
 	return i, err
 }
@@ -200,17 +202,15 @@ const moderateDirectoryProfile = `-- name: ModerateDirectoryProfile :exec
 UPDATE directory_profiles
 SET headline = $1,
     bio = $2,
-    location = $3,
-    experience = $4,
-    visibility = $5,
+    experience = $3,
+    visibility = $4,
     updated_at = NOW()
-WHERE user_id = $6
+WHERE user_id = $5
 `
 
 type ModerateDirectoryProfileParams struct {
 	Headline   string
 	Bio        string
-	Location   string
 	Experience string
 	Visibility string
 	UserID     uuid.UUID
@@ -223,7 +223,6 @@ func (q *Queries) ModerateDirectoryProfile(ctx context.Context, arg ModerateDire
 	_, err := q.db.Exec(ctx, moderateDirectoryProfile,
 		arg.Headline,
 		arg.Bio,
-		arg.Location,
 		arg.Experience,
 		arg.Visibility,
 		arg.UserID,
@@ -233,16 +232,16 @@ func (q *Queries) ModerateDirectoryProfile(ctx context.Context, arg ModerateDire
 
 const saveDirectoryProfile = `-- name: SaveDirectoryProfile :one
 INSERT INTO directory_profiles (
-    user_id, headline, bio, location, experience,
+    user_id, headline, bio, experience,
     contact_email, contact_phone, contact_url,
     visibility, details_visibility, contact_visibility,
     open_to_work, availability_note, availability_expires_at, accepts_enquiries
 ) VALUES (
-    $1, $2, $3, $4, $5,
-    $6, $7, $8,
-    $9, $10, $11,
-    $12, $13, $14,
-    $15
+    $1, $2, $3, $4,
+    $5, $6, $7,
+    $8, $9, $10,
+    $11, $12, $13,
+    $14
 )
 ON CONFLICT (user_id) DO UPDATE SET
     accepts_enquiries = EXCLUDED.accepts_enquiries,
@@ -251,7 +250,6 @@ ON CONFLICT (user_id) DO UPDATE SET
     availability_expires_at = EXCLUDED.availability_expires_at,
     headline = EXCLUDED.headline,
     bio = EXCLUDED.bio,
-    location = EXCLUDED.location,
     experience = EXCLUDED.experience,
     contact_email = EXCLUDED.contact_email,
     contact_phone = EXCLUDED.contact_phone,
@@ -267,7 +265,6 @@ type SaveDirectoryProfileParams struct {
 	UserID                uuid.UUID
 	Headline              string
 	Bio                   string
-	Location              string
 	Experience            string
 	ContactEmail          string
 	ContactPhone          string
@@ -289,7 +286,6 @@ func (q *Queries) SaveDirectoryProfile(ctx context.Context, arg SaveDirectoryPro
 		arg.UserID,
 		arg.Headline,
 		arg.Bio,
-		arg.Location,
 		arg.Experience,
 		arg.ContactEmail,
 		arg.ContactPhone,
@@ -373,7 +369,8 @@ SELECT
     (p.contact_rank <= $1::smallint)::boolean AS contact_shown,
     (CASE WHEN p.details_rank <= $1::smallint THEN p.headline ELSE '' END)::text AS headline,
     (CASE WHEN p.details_rank <= $1::smallint THEN p.bio ELSE '' END)::text AS bio,
-    (CASE WHEN p.details_rank <= $1::smallint THEN p.location ELSE '' END)::text AS location,
+    -- The account's location, never more visible than these details.
+    person_location(u.id, $1::smallint, p.details_rank)::text AS location,
     (CASE WHEN p.details_rank <= $1::smallint THEN p.experience ELSE '' END)::text AS experience,
     (CASE WHEN p.contact_rank <= $1::smallint THEN p.contact_email ELSE '' END)::text AS contact_email,
     (CASE WHEN p.contact_rank <= $1::smallint THEN p.contact_phone ELSE '' END)::text AS contact_phone,

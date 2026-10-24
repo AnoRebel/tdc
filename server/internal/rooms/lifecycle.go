@@ -215,6 +215,9 @@ func (s *Service) MembersWithDisclosure(
 	ctx context.Context,
 	roomID, userID uuid.UUID,
 	asModerator bool,
+	// viewerRank is 0 for somebody who sees only what is public, 1 for a
+	// member of this server: what person_location() is asked with.
+	viewerRank int16,
 ) ([]dbgen.ListRoomMembersWithDisclosureRow, error) {
 	if _, err := s.Visible(ctx, roomID, userID); err != nil {
 		return nil, err
@@ -224,6 +227,7 @@ func (s *Service) MembersWithDisclosure(
 		dbgen.ListRoomMembersWithDisclosureParams{
 			RoomID:      roomID,
 			AsModerator: asModerator,
+			ViewerRank:  viewerRank,
 		})
 	if err != nil {
 		return nil, fmt.Errorf("list members: %w", err)
