@@ -55,11 +55,11 @@ dev_mode:
       - "*.ts" # The frontend directory will be excluded entirely by the setting above.
     git_ignore: true
   executes:
-    - cmd: wails3 build DEV=true
+    - cmd: go run github.com/wailsapp/wails/v3/cmd/wails3 build DEV=true
       type: blocking
-    - cmd: wails3 task common:dev:frontend
+    - cmd: go run github.com/wailsapp/wails/v3/cmd/wails3 task common:dev:frontend
       type: background
-    - cmd: wails3 task run
+    - cmd: go run github.com/wailsapp/wails/v3/cmd/wails3 task run
       type: primary
 
 # File Associations

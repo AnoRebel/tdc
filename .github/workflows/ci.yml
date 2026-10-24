@@ -323,18 +323,18 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - name: The generated bindings are current
-        # They are committed so a checkout builds without the CLI, which means
-        # they can also be committed stale. Regenerating and finding a diff is
-        # the only way to notice.
+      - name: Generate the bindings, and check the menu events are current
+        # The bindings are not committed (they are generated, like this, before
+        # every typecheck and build), so there is nothing to compare them with.
+        # The menu events file is committed, so it can go stale; regenerating it
+        # and finding a diff is the only way to notice.
         run: |
           go run github.com/wailsapp/wails/v3/cmd/wails3 generate bindings -ts -i
           go generate ./internal/shell
-          if ! git diff --quiet -- frontend/bindings frontend/app/lib/menu-events.ts; then
-            echo "The generated bindings are out of date. Regenerate and commit:"
-            echo "  wails3 generate bindings -ts -i"
+          if ! git diff --quiet -- frontend/app/lib/menu-events.ts; then
+            echo "The menu events are out of date. Regenerate and commit:"
             echo "  go generate ./internal/shell"
-            git diff --stat -- frontend/bindings frontend/app/lib/menu-events.ts
+            git diff --stat -- frontend/app/lib/menu-events.ts
             exit 1
           fi
         working-directory: apps/desktop

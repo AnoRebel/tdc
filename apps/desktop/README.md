@@ -49,8 +49,13 @@ rather than anything about the frontend.
 ## Developing
 
 ```sh
-wails3 dev
+go run github.com/wailsapp/wails/v3/cmd/wails3 dev
 ```
+
+The CLI is always run this way, here and in every Taskfile command, so it is
+exactly the version `go.mod` names: an installed `wails3` drifts from the Go
+library and the runtime package, and the three must match. Its build is
+cached, so it costs a moment only the first time.
 
 Which runs the Go application and the Nuxt dev server together, and reloads
 the window when either changes. The frontend serves on the port in
@@ -472,7 +477,8 @@ like, which is the same failure with an extra step.
 
 `wails3 generate bindings -ts -i` writes TypeScript mirroring the Go services
 into `frontend/bindings`, which the frontend reaches through the `#bindings`
-alias. They are not committed. `wails3 task build` and `wails3 dev` regenerate
+alias. They are not committed. `wails3 task build` and `wails3 dev` (each run
+through `go run` as above) regenerate
 them; anything else that compiles the frontend — `bun run typecheck` at the
 root, `bun run --cwd frontend build` — needs them generated first, with the CLI
 at the version in `go.mod`:
