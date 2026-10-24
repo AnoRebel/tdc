@@ -71,8 +71,8 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 
 ## 8. Phase 8 — Ready to run
 
-- [ ] 8.1 Hosting guide: enabling calls, the relay (ports, secret), the forwarding unit (ports, what it can see), limits, federated calling, and recording (what it is and is not)
-- [ ] 8.2 User guide: starting, joining, ringing, who may call you, links, controls, what others can see
+- [x] 8.1 Hosting guide: enabling calls, the relay (ports, secret), the forwarding unit (ports, what it can see), limits, federated calling, and recording (what it is and is not)
+- [x] 8.2 User guide: starting, joining, ringing, who may call you, links, controls, what others can see
 - [x] 8.4 What hosting costs: a worked guide to the resources and money an event takes — voice only and with video, for audiences of 10, 50, 200 and 1,000, on one server and spread over several connected servers — with bandwidth, CPU and memory per person through the relay and the forwarding unit, and example prices from common hosts
 - [ ] 8.3 Browser checks for two-person calls (fake media devices) in Chromium and Firefox, WebKit in CI
 - [ ] **MILESTONE 8** — A stranger following the hosting guide enables calling with a relay and holds a call. Tag `v1.56.0-dev`.

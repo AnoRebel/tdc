@@ -1226,8 +1226,9 @@ Cancelling or deleting an event, and acting on somebody else's under
 
 ### Calls
 
-Voice and video calls are **off by default**. Turn them on while the server
-runs:
+Voice and video calls are **off by default**, and nothing about them is shown
+to anybody while they are. Turn them on under **Administration → What this
+server offers**, or while the server runs:
 
 ```sh
 curl -X PUT https://tdc.example/api/admin/features/calls \
@@ -1235,18 +1236,60 @@ curl -X PUT https://tdc.example/api/admin/features/calls \
   -d '{"enabled": true}'
 ```
 
-**What the server does, and does not.** It tells the people in a call about each
-other and passes on the few kilobytes each pair needs to find a way to connect.
-The audio and video go **directly between the people in the call**, encrypted by
-WebRTC itself (DTLS-SRTP) — they never pass through the TDC server. So calling
-costs the server almost nothing: a few small messages per person joining, and a
-sweep every fifteen seconds that takes people whose connection dropped out of
-their calls. Nothing a call carries is stored, and the server has no way to
-record one. The one exception is a call through the **forwarding unit**, if you
-turn it on (below): its media passes through the server, decrypted while it does.
+That is enough for two people on ordinary connections to call each other. The
+rest of this section is what to add, and why: a **relay** so calls connect from
+offices and phones, the **forwarding unit** for calls of more than four,
+**calls across servers**, and the permissions that decide who may ring, link,
+admit guests and record. Each is off until you turn it on.
 
-**What it costs the people in it.** Every participant sends their own stream to
-every other participant (a _mesh_), so upload grows with the size of the call:
+#### What passes through your server, and what you can see
+
+A call is carried one of three ways, and they differ in what you, the
+operator, can see. Say this to your members; the user guide tells them the
+same.
+
+| How the call is carried                               | Where the audio and video go                                    | Encrypted between                      | What you can see                                                                                                                       |
+| ----------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Mesh** (the default, up to `calls.mesh_limit`)      | Directly between the people in the call                         | Each pair of devices (DTLS-SRTP)       | Who called whom, when, for how long; the network addresses their devices offered each other. Not the media                             |
+| **Through the relay** (for people who cannot connect) | Through coturn, still end to end                                | Each pair of devices — coturn forwards | As for a mesh, plus how much each relayed person sent. coturn cannot read what it forwards                                             |
+| **Through the forwarding unit** (past the mesh limit) | Each person to the TDC server, and the server to everybody else | Each device and the server             | **The media itself.** Encryption ends at the server: audio and video are in the clear in the TDC process's memory as they pass through |
+
+Three things hold whichever way a call goes. The server **stores nothing a call
+carries** and has no way to record one; recording, where you allow it, happens
+on a participant's device (below). The server **passes on each pair's
+negotiation**, including the keys' fingerprints that DTLS checks, so a mesh
+call's encryption protects against the network between people, not against a
+server whose operator changes its code to put itself in the middle — that is
+the trust any server-run calling asks for. And a call's start and end, and any
+recording's, are **lines in the conversation** and entries in the audit log.
+
+What the server itself does for a mesh call costs almost nothing: a few small
+messages per person joining, and a sweep every fifteen seconds that takes people
+whose connection dropped out of their calls.
+
+#### Settings
+
+| Setting                  | Default | What it does                                                                                     |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------ |
+| `calls.mesh_limit`       | `4`     | The most people a call holds while everybody sends to everybody                                  |
+| `calls.max_participants` | `25`    | The most people one call may hold, however it is carried; the next is told the call is full      |
+| `calls.sfu`              | `false` | Whether calls past the mesh limit move to the forwarding unit                                    |
+| `calls.stun_urls`        | —       | STUN servers, comma-separated (`stun:host:3478`), for finding a direct path                      |
+| `calls.turn_urls`        | —       | TURN relays, comma-separated (`turn:host:3478?transport=udp`, `turns:host:5349`)                 |
+| `calls.federated`        | `false` | Whether people on connected servers may ring and call people here, and people here them          |
+| `calls.guests`           | `false` | Whether people without an account may join a call through a link that allows guests              |
+| `calls.recording`        | `false` | Whether people holding `call.record` may record a call on their own device, everybody told first |
+
+Settings change while the server runs, from **Administration** or
+`PUT /api/admin/settings/<name>`. And one piece of configuration, a secret
+rather than a setting, which a reload picks up without a restart:
+
+| Configuration       | Environment             | What it does                                                    |
+| ------------------- | ----------------------- | --------------------------------------------------------------- |
+| `calls.turn_secret` | `TDC_CALLS_TURN_SECRET` | Shared with the relay; without it no relay is offered to anyone |
+
+**Why four.** In a mesh every participant sends their own stream to every
+other, so upload grows with the size of the call:
 
 | People in the call | Each person sends (voice) | Each person sends (video, ~720p) | Each person receives |
 | ------------------ | ------------------------- | -------------------------------- | -------------------- |
@@ -1257,37 +1300,23 @@ every other participant (a _mesh_), so upload grows with the size of the call:
 
 Browsers lower video quality by themselves when a connection cannot keep up,
 and encoding one stream per other person also costs CPU — comfortable for four
-people on a laptop, hard work for a phone with video past three. That is why
-`calls.mesh_limit` defaults to **4**. Past it, a call either moves to the
-server's **forwarding unit** (below), if you have turned it on, or is full: the
-next person is told the call is full because this server does not forward
-larger calls. `calls.max_participants` caps every call however it is carried.
+people on a laptop, hard work for a phone with video past three. Past
+`calls.mesh_limit`, a call moves to the forwarding unit if you have turned it
+on, or is full: the next person is told the call is full because this server
+does not forward larger calls. Without the forwarding unit a call holds at most
+the smaller of the two limits. A server upgraded from before the mesh limit
+existed keeps whatever it had set `calls.max_participants` to as its mesh
+limit, so nothing it allowed is refused afterwards.
 
-| Setting                  | Default | What it does                                                                                |
-| ------------------------ | ------- | ------------------------------------------------------------------------------------------- |
-| `calls.mesh_limit`       | `4`     | The most people a call holds while everybody sends to everybody                             |
-| `calls.max_participants` | `25`    | The most people one call may hold, however it is carried; the next is told the call is full |
-| `calls.sfu`              | `false` | Whether calls past the mesh limit move to the forwarding unit                               |
-| `calls.stun_urls`        | —       | STUN servers, comma-separated (`stun:host:3478`), for finding a direct path                 |
-| `calls.turn_urls`        | —       | TURN relays, comma-separated (`turn:host:3478?transport=udp`, `turns:host:5349`)            |
-
-Without the forwarding unit a call holds at most the smaller of the two limits.
-A server upgraded from before the mesh limit existed keeps whatever it had set
-`calls.max_participants` to as its mesh limit, so nothing it allowed is refused
-afterwards.
-
-And one piece of configuration, a secret rather than a setting:
-
-| Configuration       | Environment             | What it does                                                    |
-| ------------------- | ----------------------- | --------------------------------------------------------------- |
-| `calls.turn_secret` | `TDC_CALLS_TURN_SECRET` | Shared with the relay; without it no relay is offered to anyone |
+#### The relay, and constrained networks
 
 **Nothing is configured to a third party by default.** No public STUN server is
 set, because one learns who is calling whom. With nothing set, calls connect
 between people who can reach each other directly — on one network, or on
 ordinary home connections — and fail between people behind stricter networks
-(offices, mobile carriers, some routers). For a community whose members call
-from phones and offices, run the relay.
+(offices, mobile carriers, some routers), with the call window saying the
+connection could not be made. For a community whose members call from phones
+and offices, run the relay.
 
 **The relay** is [coturn](https://github.com/coturn/coturn) (BSD licence),
 included in the compose file behind the `calls` profile:
@@ -1303,83 +1332,45 @@ curl -X PUT https://tdc.example/api/admin/settings/calls.turn_urls \
 It also answers STUN, so `calls.stun_urls` can be `stun:tdc.example:3478`.
 
 - **Ports to open:** `3478` UDP and TCP, and `49160–49200` UDP for relayed media.
-  Each relayed participant in a call holds a port from that range, so the range
-  is how many relayed participants you can carry at once; widen `--min-port` /
+  The container uses the host's network, so these are the host's ports. Each
+  relayed participant in a call holds a port from that range, so the range is
+  how many relayed participants you can carry at once; widen `--min-port` /
   `--max-port` together with the firewall for more.
+- **The secret** is the same `TDC_CALLS_TURN_SECRET` for TDC and coturn. The
+  relay refuses to start without one, because an empty secret is a key anybody
+  can compute. `TDC_CALLS_TURN_REALM` (default `tdc`) names the relay's realm.
+- **Credentials** are minted by the TDC server per person and expire after four
+  hours, so the relay is not an open proxy, and it never relays into private
+  networks — so a node it must reach, such as the forwarding unit, needs a
+  public address.
 - **Bandwidth:** the relay carries a relayed participant's streams both ways,
   so plan for the table above, per relayed person, on the relay's host — a
   four-person video call with everybody relayed is roughly 12–18 Mbit/s each way.
   In practice most people connect directly and only a few calls are relayed.
 - **CPU and memory:** small — it forwards encrypted packets it cannot read.
   Half a CPU core and 256 MB carry dozens of relayed participants.
-- **Credentials** are minted by the TDC server per person and expire after four
-  hours, so the relay is not an open proxy; it refuses to start without a
-  secret, and never relays into private networks.
+
+**Networks that allow only web traffic.** Some offices and hotels let nothing
+out but TCP to port 443. The compose file's relay listens on 3478 without TLS,
+which those networks block. To reach them, give coturn a certificate and a
+`turns:` listener on 443 (`--tls-listening-port=443 --cert --pkey`, on an
+address nothing else uses for 443), and add `turns:tdc.example:443?transport=tcp`
+to `calls.turn_urls`. TDC needs nothing more.
+
+**What clients do on a poor connection.** A call steps down rather than
+dropping — video to lower quality, then the camera paused, then sound at lower
+quality — saying each step to the person, and steps back up once the
+connection has been good for about ten seconds. A device that reports its
+connection as metered or cellular is warned before it joins. None of this needs
+configuring.
 
 **Clients.** Current Chrome, Edge, Firefox and Safari all place calls, on
 desktops and phones. The desktop application uses its platform's web view:
 Windows and macOS support calls; on Linux they depend on WebKitGTK being built
 with WebRTC and GStreamer's WebRTC plugins being installed — which the Linux
 packages depend on, and which the application names when they are missing,
-rather than offering calls that cannot connect. Picture-in-picture
-of the whole call needs a Chromium-based browser; others put the main video
-there instead.
-
-**Links to calls.** `call.link` lets somebody make links that admit people
-from elsewhere on the server to a conversation's call without joining the
-conversation. Nobody holds it until you grant it, to a role or in one channel.
-Links are stored hashed; a protected link's passcode is stored as a password
-is, and guessing is limited per address and per link and recorded in the audit
-log.
-
-**Guests in calls.** `calls.guests` (off by default) lets people without an
-account join a call through a link made to allow them. A guest gets an account
-row for that one call — no password, unable to sign in, absent from people
-search, the list of people and every account count — and a session that reaches
-that call's routes and the live connection and nothing else, ending with the
-call. Guests are limited to five per address every ten minutes, each one
-admitted is in the audit log as `call.guest.admitted` against the link, and a
-second-factor requirement does not apply to them.
-
-**Ringing.** People can ring each other into calls; a ring reaches every
-device of the person rung, by the live connection, and by web push where the
-server has push configured, so a browser in the background still rings.
-Ringing is limited to ten rings per person every five minutes. Each person
-decides who may ring them; whether people on connected servers may ring anybody
-here is the server's decision first.
-
-**Recording.** `calls.recording` (off by default) lets people holding
-`call.record` — which nobody holds until you grant it, to a role or in one
-channel — record a call. Both are needed; either missing refuses, saying which.
-What recording is: the recorder's own browser or desktop application composes
-the stage and everybody's sound into one file (WebM, or MP4 where that is all
-the platform records) and, when they stop, uploads it into the conversation
-through the ordinary attachment path, so the attachment size limit, the
-person's quota, scanning and retention all apply to it; a file the server
-refuses is offered to the recorder to save on their own device instead. What
-recording is not: the server records nothing. No call media passes through it
-for a recording and none is kept by it, beyond the attachment the recorder
-uploads. Before the recorder's client begins, the server marks them as
-recording in the call's state, sends that to everybody in the call, and writes
-`call.recording_started` in the conversation's log and `call.recording.started`
-in the audit log; if the audit log cannot take the entry, the recording is
-refused. Stopping — by the recorder, by their leaving or holding the call, or
-by their connection dropping, which the call sweep notices within about fifteen
-seconds — writes `call.recording_stopped` and `call.recording.stopped` the same
-way. Somebody joining a recorded call is told before their media is sent. A
-participant can always record their screen with other software; the feature is
-about recording openly, with notice and a record.
-
-**Remote control** of a shared screen happens entirely between two people's
-clients: the request, the grant and the pointer and keyboard input travel on
-the call's own peer-to-peer data channel, and the server neither sees nor
-relays them. Only the desktop application can be controlled, because only it
-can put input into the operating system: through X11's XTEST on Linux (not
-under Wayland, which does not allow it), `SendInput` on Windows, and Quartz
-events on macOS once the person has allowed TDC under Accessibility. Nothing
-needs installing or configuring on the server for it. Because it needs that direct
-channel, remote control is not available in a call carried by the forwarding
-unit; asking for it there says so.
+rather than offering calls that cannot connect. Picture-in-picture of the whole
+call needs a Chromium-based browser; others put the main video there instead.
 
 #### The forwarding unit
 
@@ -1392,6 +1383,16 @@ curl -X PUT https://tdc.example/api/admin/settings/calls.sfu \
   -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
   -d '{"value": "true"}'
 ```
+
+**What it can see — decide this first.** As the table above says, a forwarded
+call is not encrypted end to end. The unit decrypts each packet to choose and
+forward it and encrypts it again for each receiver, so the audio and video of a
+forwarded call are in the clear in the TDC process's memory while they pass
+through. Nothing is written to disk or kept, and nothing in TDC records it — but
+whoever controls the server could. End-to-end encryption through the unit
+(insertable streams) is not available in every web view TDC runs in, so it is
+not offered. Remote control of a shared screen, which needs the direct channel
+between two people, is refused in a forwarded call and says why.
 
 **What changes.** A call starts as a mesh. When a join takes it past
 `calls.mesh_limit`, it moves to the unit — then, while it is in progress, since
@@ -1408,20 +1409,10 @@ three copies at once — a quarter, a half and full size (_simulcast_, capped at
 about 150 kbit/s, 500 kbit/s and 1.5 Mbit/s). The unit sends each receiver one
 copy per person: the size that suits how many people their screen shows (full
 for one or two others or for whoever is presenting, half for three or four, a
-quarter in a larger grid), stepped down when the server's estimate of the bandwidth towards that
-receiver says it will not fit — the largest picture gives way first. Voice is
-never stepped down. Nothing is decoded or re-encoded: the unit copies packets.
-
-**What it can see.** Be clear about this before turning it on, and say it to
-your members. In a mesh, media is encrypted from one person's browser to
-another's (DTLS-SRTP) and the server never has it. **Through the forwarding
-unit, encryption ends at the server**: the unit decrypts each packet to choose
-and forward it and encrypts it again for each receiver, so the audio and video
-of a forwarded call are in the clear in the TDC process's memory while they
-pass through. Nothing is written to disk or kept, and nothing in TDC records
-it — but whoever controls the server could. End-to-end encryption through the
-unit (insertable streams) is not available in every webview TDC runs in, so it
-is not offered. The relay is different: coturn forwards packets it cannot read.
+quarter in a larger grid), stepped down when the server's estimate of the
+bandwidth towards that receiver says it will not fit — the largest picture
+gives way first. Voice is never stepped down. Nothing is decoded or re-encoded:
+the unit copies packets.
 
 **Ports.** The unit listens on one UDP port, **7882** by default, which every
 forwarded participant shares — open it in the firewall and publish it from the
@@ -1505,6 +1496,11 @@ curl -X PUT https://tdc.example/api/admin/settings/calls.federated \
   -d '{"value": "true"}'
 ```
 
+Once it is on (and calls and federation are), the server advertises
+`calls.federated`, and the call window's **Ring people** gains a field for
+ringing somebody by address (`name@server`). Shared rooms need nothing more:
+their calls simply include the people from the other server.
+
 **Who holds the call.** One server: the server of whoever rang, or, for a room
 shared between servers, the room's home server — as it holds the room. It
 keeps the list of who is in the call. The other servers carry their own
@@ -1516,18 +1512,22 @@ them. The protocol is in [the federation protocol](federation-protocol.md#calls)
 somebody here only if this server takes calls from other servers
 (`calls.federated`), trusts that server (the federation allow and block
 lists), and the person accepts calls from people on other servers — their own
-setting, which they can change. The caller is never told which of these said
-no. The home server applies its own rules — the call is open, the participant
-limit, the room's membership — and the person's own server checks their
-permission to call.
+setting, which they can change. **The caller is never told which of these said
+no**, nor whether the ring reached anybody: the other server answers every ring
+the same way. So the interface says "rung, if they accept calls from other
+servers", and says plainly only what this server itself refused — an address
+on a server it does not federate with, or one of its own. The home server
+applies its own rules — the call is open, the participant limit, the room's
+membership — and the person's own server checks their permission to call.
 
 **Media and relays.** Media still goes directly between the people, or to the
-home server's forwarding unit if the call is forwarded; nothing of it passes
-through the federation requests. **Each person's client gets relay credentials
-from its own server**, so for a call between your members and another
-server's, you need your relay and they need theirs — and if the call is
-forwarded, the home server's forwarding port must be reachable from the
-other server's members as from your own.
+home server's forwarding unit if the call is forwarded — so a forwarded call
+with people from your server is visible to the _home_ server's operator, as
+above. Nothing of the media passes through the federation requests. **Each
+person's client gets relay credentials from its own server**, so for a call
+between your members and another server's, you need your relay and they need
+theirs — and if the call is forwarded, the home server's forwarding port must be
+reachable from the other server's members as from your own.
 
 **What it costs the server.** A few small signed requests per person joining,
 a handful per connection negotiated, and one every fifteen seconds per person
@@ -1536,6 +1536,70 @@ has its people taken out of the call within a minute.
 
 **Not carried between servers yet:** raising hands, presenting, reactions and
 recording by people on the other server (they see them, but cannot do them).
+
+#### Who may do what in a call
+
+Starting a call needs `call.start` and joining `call.join`, which members hold.
+The rest is granted, to a role or in one channel, and nobody holds it until you
+do — see [Roles](#roles).
+
+**Ringing.** A ring reaches every device of the person rung, by the live
+connection, and by web push where the server has push configured, so a browser
+in the background still rings. Unanswered after 45 seconds, it becomes a missed
+call. Ringing is limited to ten rings per person every five minutes. Each
+person decides who may ring them — anybody here, people they share a
+conversation with, or nobody — and whether people on connected servers may;
+whether anybody on another server may ring anybody here is the server's
+decision first.
+
+**Links to calls.** `call.link` lets somebody make links that admit people
+from elsewhere on the server to a conversation's call without joining the
+conversation. Links are stored hashed; a protected link's passcode is stored as
+a password is, and guessing is limited per address and per link and recorded in
+the audit log.
+
+**Guests in calls.** `calls.guests` (off by default) lets people without an
+account join a call through a link made to allow them. A guest gets an account
+row for that one call — no password, unable to sign in, absent from people
+search, the list of people and every account count — and a session that reaches
+that call's routes and the live connection and nothing else, ending with the
+call. Guests are limited to five per address every ten minutes, each one
+admitted is in the audit log as `call.guest.admitted` against the link, and a
+second-factor requirement does not apply to them.
+
+**Recording.** `calls.recording` (off by default) lets people holding
+`call.record` record a call; both are needed, and either missing refuses,
+saying which. The server advertises `calls.recording` while it is on.
+
+- **What it is:** the recorder's own browser or desktop application composes the
+  stage and everybody's sound into one file (WebM, or MP4 where that is all the
+  platform records) and, when they stop, uploads it into the conversation
+  through the ordinary attachment path, so the attachment size limit, the
+  person's quota, scanning and retention all apply to it. A file the server
+  refuses is offered to the recorder to save on their own device instead.
+- **What it is not:** the server records nothing. No call media passes through
+  it for a recording and none is kept by it, beyond the attachment the recorder
+  uploads. Nor can it stop somebody recording their screen with other
+  software; the feature is about recording openly, with notice and a record.
+- **Notice and record:** before the recorder's client begins, the server marks
+  them as recording in the call's state, sends that to everybody in the call,
+  and writes `call.recording_started` in the conversation and
+  `call.recording.started` in the audit log; if the audit log cannot take the
+  entry, the recording is refused. Stopping — by the recorder, by their leaving
+  or holding the call, or by their connection dropping, which the call sweep
+  notices within about fifteen seconds — writes `call.recording_stopped` and
+  `call.recording.stopped` the same way. Somebody joining a recorded call is
+  told before their media is sent.
+
+**Remote control** of a shared screen happens entirely between two people's
+clients: the request, the grant and the pointer and keyboard input travel on
+the call's own peer-to-peer data channel, and the server neither sees nor
+relays them. Only the desktop application can be controlled, because only it
+can put input into the operating system: through X11's XTEST on Linux (not
+under Wayland, which does not allow it), `SendInput` on Windows, and Quartz
+events on macOS once the person has allowed TDC under Accessibility. Nothing
+needs installing or configuring on the server for it, and it is unavailable in
+a forwarded call, which has no direct channel.
 
 #### What an event costs
 

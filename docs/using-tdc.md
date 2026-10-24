@@ -1130,39 +1130,58 @@ Where your server offers them, any channel or direct conversation can hold a
 voice or video call. Calls are off unless the server's operator turns them on,
 so if you see no phone button in a conversation's header, that is why.
 
-**Starting one.** The phone button in the header starts a call by voice; you
-can turn your camera on once you are in. Everybody in the conversation sees a
-bar saying a call is going on and who is in it, with **Join** and **Join with
-video**. Your browser asks for your microphone (and camera) the first time;
-nothing is sent until you allow it, and nobody is told you have joined until
-then either.
+### Starting and joining
+
+The phone button in a conversation's header starts a call by voice; you can
+turn your camera on once you are in. In a direct conversation that rings the
+other person, and **Start a video call** does the same with your camera on.
+Everybody in the conversation sees a bar saying a call is going on and who is
+in it, with **Join** and **Join with video**. Your browser asks for your
+microphone (and camera) the first time; nothing is sent until you allow it, and
+nobody is told you have joined until then either. Where your device says the
+connection is metered, TDC warns you before you join.
 
 ![A voice call in the General channel: a bar across the top says you are in the call with neema and juma, and a small call window in the corner shows both people with mute, camera, ring, hold and Leave](images/using-tdc/call.webp)
 
-**Ringing people.** Starting a call in a direct conversation rings the other
-person; **Start a video call** does the same with your camera on. In a channel,
-the bell in the call window (**Ring people**) lets you ring particular members
-into it. A ring reaches every device the person is signed in on, and stops on
-all of them when they answer on one. If they decline, you see that for a
-moment; if nobody answers within 45 seconds, they get a missed-call
-notification. Somebody whose settings do not let you ring them is simply not
+You can switch between voice and video at any time: answer or join by voice or
+with video, and turn your camera on or off during the call. Closing the tab or
+reloading the page ends your part in the call; moving between pages inside TDC
+does not.
+
+### Ringing people, and being rung
+
+**Ringing.** In a call, the bell in the call window (**Ring people**) lists the
+conversation's members who are not in the call, each with **Ring**. A ring
+reaches every device the person is signed in on, and stops on all of them when
+they answer on one. If they decline, you see that for a moment; if nobody
+answers within 45 seconds, they get a missed-call notification. Somebody whose
+settings do not let you ring them is listed like anybody else and simply not
 rung — you are not told why.
+
+**Somebody on another server.** Where your server calls connected servers,
+**Ring people** also has a field for an address — `name@server`. Type it and
+press **Ring**. Their server decides for them, and answers every ring the same
+way whether it rang them or not, so TDC tells you only that they were rung _if
+they accept calls from other servers_. If they join, they appear in the call
+like anybody else. If your own server cannot ring that address — it is not
+connected to theirs, or the address is one of this server's own, whom you ring
+from the list — the field says so.
+
+**From a profile.** The phone and camera buttons on somebody's directory
+profile, and beside people in a channel's member list, open your direct
+conversation with them — or the one you already have — and ring them.
 
 **Being rung.** An incoming call appears as a small window at the edge of the
 screen, never over what you are doing; drag it anywhere, or move it from the
 keyboard by its grip. It stays while you move between pages, and offers
 **Answer**, **Video** (answer with your camera on) and **Decline**. Several
 calls at once are listed together, newest first, each with its own buttons.
-If you are already in a call, the
-window says so and offers **Hold & answer** — the current call waits while you
-take the new one — or **End & answer**, with a choice of a few words for the
-people you are leaving. **Silence** stops the sound
-without declining. When the browser is in the background or closed, a ring
-arrives as a notification, where you have allowed notifications; the desktop
-application shows a banner, even when closed to the tray.
-
-You can switch between voice and video at any time: answer by voice or with
-video, and turn your camera on or off during the call.
+**Silence** stops the sound without declining. If you are already in a call,
+the window says so and offers **Hold & answer** — the current call waits while
+you take the new one — or **End & answer**, with a choice of a few words for
+the people you are leaving. When the browser is in the background or closed, a
+ring arrives as a notification, where you have allowed notifications; the
+desktop application shows a banner, even when closed to the tray.
 
 **Declining with a message.** The speech-bubble button beside **Decline**
 offers quick replies — "Can't talk right now", "I'll call you back soon" and
@@ -1170,20 +1189,48 @@ others — or a box for your own words. The caller sees them at once in their
 call window, and they are posted in your conversation with them, where they
 stay.
 
-**Several calls at once.** You can be in more than one call, talking in one
-and holding the others, as on a phone. Your microphone and camera go only to
-the call you are talking in; nothing reaches a held call, and its people see
-that you are holding. Held calls are listed in the call window with
-**Switch**, which holds the current call and takes you back to that one, and a
-button to leave them. **Hold** in the call controls holds the call you are in,
-and **Resume** brings it back. Joining another conversation's call while in one
-holds the first rather than ending it.
+**Who may call you** is in **Settings → Privacy**: anybody on this server,
+only people you share a conversation with, or nobody — you can still join calls
+yourself. A separate switch decides whether people on connected servers may
+ring you, where your server allows that at all. Whoever is refused is not told
+why.
 
-**Merging calls into a conference.** With one call held and another going,
-**Merge** on the held call invites its people into the call you are in. Each of
-them is asked first, and joins only by accepting; once they have, the held call
-ends. People merged in take part in the call and nothing else: they cannot open
-its conversation, read its messages or see who else is in it beyond the call.
+**How it sounds** is in **Settings → Ringing**, kept on each device and, in
+the desktop application, for each server separately: turn the ringer off,
+choose a tone, add your own (an audio file under 400 KB), give particular
+people their own tone by address (`name@server`), and, on phones whose browser
+supports it, vibrate for incoming calls. The incoming window has a ringer
+switch too.
+
+### In a call
+
+The call sits in a small window in the corner, so you can carry on reading,
+writing, opening projects — anywhere in the application — without leaving it.
+From that window you can:
+
+- **mute** and unmute, and turn your **camera** on and off;
+- **expand** it to fill the screen, and make it small again;
+- **minimize** it to a bar with just your microphone and **Leave**;
+- **move** it: drag it by its grip (the dotted handle) anywhere on the screen,
+  or focus the grip and use the arrow keys (Shift moves it further). It stays
+  where you put it, on this device;
+- **picture in picture**: take the call out of the page into a small window
+  that stays above your other windows, so you can work in another app. Where
+  your browser can only put a single video there, it is the first person's;
+- **hold** it, **ring** people into it, **present**, **raise your hand or
+  react**, and — where you may — **record** it or make a **link** to it, each
+  described below;
+- **Leave**.
+
+**From the keyboard**, while you are in a call and not typing: `Shift M` mutes
+and unmutes, `Shift V` turns the camera on and off, `Shift H` raises or lowers
+your hand, `Shift S` presents your screen or stops, and `Shift F` makes the call
+window large or small again. They are listed under `?` with the rest. With
+reduced motion (in **Settings → Appearance**, or your system's own setting),
+the call's moving parts — reactions, the ringing pulse, the recording mark —
+keep still.
+
+### Presenting, hands and reactions
 
 **Presenting your screen.** The screen button in the call controls shares a
 screen, a window or a browser tab — with its sound, where your browser offers
@@ -1222,44 +1269,52 @@ controlling** gives control back.
 Somebody asking is told plainly when control cannot be given, and why: you are
 presenting from a browser (which cannot move a pointer, so remote control needs
 the desktop application), you are sharing a window or a tab rather than a whole
-screen, or your computer cannot be driven. On Linux that last one means a
-Wayland desktop — Wayland does not let one program move the pointer or type into
-others, so remote control works only in an X11 session; under Windows, programs
-running as administrator cannot be controlled from a program that is not; and a
-Mac needs TDC allowed under **System Settings → Privacy & Security →
-Accessibility** first.
+screen, the call is a large one carried through the server (which has no direct
+channel between you), or your computer cannot be driven. On Linux that last one
+means a Wayland desktop — Wayland does not let one program move the pointer or
+type into others, so remote control works only in an X11 session; under
+Windows, programs running as administrator cannot be controlled from a program
+that is not; and a Mac needs TDC allowed under **System Settings → Privacy &
+Security → Accessibility** first.
 
-**Recording a call.** Where the server's operator allows recording, somebody
-holding the `call.record` permission (which nobody has until an administrator
-grants it) sees a red record button in the call controls. Pressing it tells
-everybody first: before your device records anything, the server writes in the
+### Recording a call
+
+Where the server's operator allows recording, somebody holding the
+`call.record` permission (which nobody has until an administrator grants it)
+sees a red record button in the call controls. Pressing it tells everybody
+first: before your device records anything, the server writes in the
 conversation and the audit log that you started recording, and everybody in the
 call gets a red **Recording** bar naming you, which stays up for as long as the
 recording lasts — in every size of the call window, and as a red mark on the
 minimized bar. Somebody joining a call that is being recorded is told who is
 recording before any of their sound or picture is sent, and can choose **Don't
-join** instead. The recording is made on your own device — the stage (the
-screen being presented, or everybody's tiles with their names) and everybody's
-sound mixed together — so it holds what your device received: if your
-connection dropped somebody for a while, they are missing from it. Press the
-button again to stop. Leaving the call, holding it, switching to another call,
-or losing your connection stops it too, and that is noted in the conversation
-and the audit log the same way. When it stops, the file is uploaded into the
-conversation as an ordinary attachment, under the server's usual file limits;
-if the server will not take it — it is larger than the server accepts, say —
-the call window says why and offers **Save it on this device** instead. The
-feature is about recording openly: it cannot stop anybody recording their own
-screen with other software.
+join** instead.
 
-**Links to a call.** Somebody allowed to (the `call.link` permission, which
-an administrator grants) can make a link to a conversation's call from the
-link button in the call window: with a label, a lobby where people wait until
-somebody in the call lets them in, a passcode, an expiry and a limit on how
-many people it lets in. The link is shown once — copy it then. Whoever opens it
-sees the conversation's name and who is in the call, signs in if they have not,
-and joins the call — only the call: the conversation, its messages and members
-stay closed to them. Links already made are listed below the form, with a
-button to withdraw each. A link to a call that has not started waits for it.
+The recording is made on your own device — the stage (the screen being
+presented, or everybody's tiles with their names) and everybody's sound mixed
+together — so it holds what your device received: if your connection dropped
+somebody for a while, they are missing from it. The server records nothing
+itself. Press the button again to stop. Leaving the call, holding it, switching
+to another call, or losing your connection stops it too, and that is noted in
+the conversation and the audit log the same way. When it stops, the file is
+uploaded into the conversation as an ordinary attachment, under the server's
+usual file limits; if the server will not take it — it is larger than the
+server accepts, say — the call window says why and offers **Save it on this
+device** instead. The feature is about recording openly: it cannot stop anybody
+recording their own screen with other software.
+
+### Links to a call, and guests
+
+Somebody allowed to (the `call.link` permission, which an administrator grants)
+can make a link to a conversation's call from the link button in the call
+window: with a label, a lobby where people wait until somebody in the call lets
+them in, a passcode, an expiry and a limit on how many people it lets in. The
+link is shown once — copy it then. Whoever opens it sees the conversation's
+name and who is in the call, signs in if they have not, and joins the call —
+only the call: the conversation, its messages and members stay closed to them.
+Links already made are listed below the form, with a button to withdraw each. A
+link to a call that has not started waits for it. People waiting in a lobby are
+listed in the call window, with **Let in** and a button to turn each away.
 
 **Guests.** Where the server's operator allows it, a link can also let in
 people with no account here — a speaker from elsewhere, a client. Switch on
@@ -1270,55 +1325,58 @@ conversation or anything else on the server, everybody in the call sees them
 marked _Guest_, and when the last person who belongs to the conversation
 leaves, the call ends for the guests too. Guests join from a web browser.
 
-**Calling from a profile.** The phone and camera buttons on somebody's
-directory profile, and beside people in a channel's member list, open your
-direct conversation with them — or the one you already have — and ring them.
+### Several calls at once
 
-**Who may call you** is in **Settings → Privacy**: anybody on this server,
-only people you share a conversation with, or nobody — you can still join calls
-yourself. A separate switch decides whether people on connected servers may
-ring you, where your server allows that at all.
+You can be in more than one call, talking in one and holding the others, as on
+a phone. Your microphone and camera go only to the call you are talking in;
+nothing reaches a held call, and its people see that you are holding. Held
+calls are listed in the call window with **Switch**, which holds the current
+call and takes you back to that one, and a button to leave them. **Hold** in the
+call controls holds the call you are in, and **Resume** brings it back. Joining
+another conversation's call while in one holds the first rather than ending it.
 
-**How it sounds** is in **Settings → Ringing**, kept on each device and, in
-the desktop application, for each server separately: turn the ringer off,
-choose a tone, add your own (an audio file under 400 KB), give particular
-people their own tone by address (`name@server`), and, on phones whose browser
-supports it, vibrate for incoming calls. The incoming window has a ringer
-switch too.
+**Merging calls into a conference.** With one call held and another going,
+**Merge** on the held call invites its people into the call you are in. Each of
+them is asked first, and joins only by accepting; once they have, the held call
+ends. People merged in take part in the call and nothing else: they cannot open
+its conversation, read its messages or see who else is in it beyond the call.
 
-**While you are in it.** The call sits in a small window in the corner, so you
-can carry on reading, writing, opening projects — anywhere in the application —
-without leaving it. From that window you can:
+### What others can see
 
-- **mute** and unmute, and turn your **camera** on and off — everybody sees
-  which, on your tile;
-- **expand** it to fill the screen, and make it small again;
-- **minimize** it to a bar with just your microphone and **Leave**;
-- **move** it: drag it by its grip (the dotted handle) anywhere on the screen,
-  or focus the grip and use the arrow keys (Shift moves it further). It stays
-  where you put it, on this device;
-- **picture in picture**: take the call out of the page into a small window
-  that stays above your other windows, so you can work in another app. Where
-  your browser can only put a single video there, it is the first person's.
+- **In the conversation:** that a call is going on and who is in it; then lines
+  between the messages for its start (who started it) and its end (how long it
+  lasted), and for any recording's start and end, naming who recorded.
+- **In the call:** your tile, with your name and whether your microphone and
+  camera are on; that you are holding the call; your raised hand, in its place
+  in the queue; your reactions, with your name, for a few seconds; whatever you
+  present; a red **Recording** bar naming whoever records; and _Guest_ beside
+  anybody without an account.
+- **Your server's operator:** who called whom, when and for how long. In a
+  call of up to four people (or your server's mesh limit), sound and picture go
+  directly between you, encrypted between each pair of devices, and do not pass
+  through the server. In a larger call carried by the server's forwarding unit,
+  they pass through the server and are decrypted there on the way — nothing is
+  kept, but the server handles them. Your operator's hosting guide says which
+  your server does.
 
-Closing the tab or reloading the page ends your part in the call; moving
-between pages inside TDC does not. Joining another call holds this one; see
-**Several calls at once** above.
+### Your connection
 
-**What a call uses.** Calls go directly between the people in them, not
-through the server, so what matters is your own connection:
+**What a call uses.** In a small call, everybody sends their own sound and
+picture to everybody else, so what matters is your own connection:
 
 | In a call with   | Voice only (send / receive) | With video (send / receive)  |
 | ---------------- | --------------------------- | ---------------------------- |
 | one other person | about 0.4 MB a minute each  | about 5–10 MB a minute each  |
 | three others     | about 1.2 MB a minute each  | about 15–30 MB a minute each |
 
-Every person in a call sends their own audio and video to every other person,
-so each extra person adds to what _you_ send, not only to what you receive. On
-a phone, or on a connection that charges for data, prefer voice; TDC warns you
-before you join where your device says the connection is metered. A call has a
-limit on how many people it can hold, set by your server — four, unless your
-operator chose otherwise — and the next person is told the call is full.
+Each extra person adds to what _you_ send, not only to what you receive. On a
+phone, or on a connection that charges for data, prefer voice. Past four
+people (or your server's mesh limit), a call either moves to the server's
+forwarding unit — everybody then sends once, to the server, and the picture
+freezes for a second while the call moves — or, where the server does not
+forward calls, is full, and the next person is told so. However it is carried,
+a call holds at most the server's limit, 25 unless your operator chose
+otherwise.
 
 **On a poor connection** a call steps down rather than dropping. When your
 connection cannot carry what you send, your video goes to a lower quality,
@@ -1329,22 +1387,10 @@ for it. Each step is said in the call window ("Your connection is slow, so your
 video is sent at lower quality", and so on), and once the connection has stayed
 good for about ten seconds things come back a step at a time, which is said too.
 
-**A call's start and end** are lines in the conversation, between the messages
-around them: who started it, and how long it lasted. A recording's start and
-end are lines too, naming who recorded.
-
-**From the keyboard**, while you are in a call and not typing: `Shift M` mutes
-and unmutes, `Shift V` turns the camera on and off, `Shift H` raises or lowers
-your hand, `Shift S` presents your screen or stops, and `Shift F` makes the call
-window large or small again. They are listed under `?` with the rest. With
-reduced motion (in **Settings → Appearance**, or your system's own setting),
-the call's moving parts — reactions, the ringing pulse, the recording mark —
-keep still.
-
-Some networks — offices, mobile carriers, some home routers — stop two people
-reaching each other directly. Your server's operator can run a relay so those
-calls still connect; without one, a call between two such people fails, and
-TDC says so.
+**Networks that block calls.** Some networks — offices, mobile carriers, some
+home routers — stop two people reaching each other directly. Your server's
+operator can run a relay so those calls still connect; without one, a call
+between two such people fails, and TDC says so.
 
 ## Events
 
@@ -1802,4 +1848,6 @@ So that nothing above is read as implying more than it says:
   conference, links, guests, presenting a screen, raised hands and reactions.
   Larger calls go through the server's forwarding unit where the server has
   it on, and calls reach people on connected servers where both servers allow
-  it. Recording is still to come.
+  it, recording on your own device where the server allows it, and remote
+  control from the desktop application. Not yet: raising a hand, presenting,
+  reacting or recording for people who joined from another server.
