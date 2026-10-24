@@ -352,7 +352,7 @@ function line(item: Item): string {
 <template>
   <section
     v-if="items.length"
-    class="fixed right-4 bottom-4 z-50 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
+    class="fixed top-14 right-4 z-50 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
     :aria-label="$ts('transfer.region')"
   >
     <article
