@@ -354,6 +354,10 @@ function deviceName(userAgent: string): string {
            and the username that is half of the address above. -->
       <AccountNames />
 
+      <!-- Where you are, and who may see it. Loaded on its own: the form and
+           detection are needed only by somebody who opens this. -->
+      <LazyLocationSetting />
+
       <section>
         <h2 class="text-sm font-semibold">{{ $t("settings.status") }}</h2>
         <p class="mt-0.5 text-xs text-muted-foreground">

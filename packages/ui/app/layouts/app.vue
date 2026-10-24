@@ -162,6 +162,11 @@ function refreshPersonal() {
   void notificationPreferences.refresh();
   void ownStatus.refresh();
   void scheduledMessages.refresh();
+  // A detected location, kept current at most every few hours and never by
+  // asking: loaded separately, so it costs the first page nothing.
+  void import("#layers/ui/app/lib/locationrefresh")
+    .then(({ refreshLocation }) => refreshLocation(api))
+    .catch(() => {});
 }
 refreshPersonal();
 const focused = useWindowFocus();

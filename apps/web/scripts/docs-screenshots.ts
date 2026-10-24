@@ -24,6 +24,7 @@
  *                    seeding again — for working on one screenshot
  *
  * TDC_DOCS_POSTGRES names the Postgres server (the compose file's by default),
+ * TDC_DOCS_DATABASE the scratch database it creates and drops,
  * TDC_DOCS_PORT the port the server listens on (8131); the port after it takes
  * the seeded outgoing webhook's deliveries.
  */
@@ -41,7 +42,7 @@ import { shots, type Shot } from "./docs-shots";
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const IMAGES = join(ROOT, "docs", "images");
 const POSTGRES = process.env.TDC_DOCS_POSTGRES ?? "postgres://tdc:tdc@127.0.0.1:55433";
-const DATABASE = "tdc_docs_screenshots";
+const DATABASE = process.env.TDC_DOCS_DATABASE ?? "tdc_docs_screenshots";
 const PORT = Number(process.env.TDC_DOCS_PORT ?? 8131);
 const BASE = `http://127.0.0.1:${PORT}`;
 const BINARY = join(tmpdir(), "tdc-docs-screenshots-server");

@@ -62,6 +62,8 @@ export interface RoomMember {
   status?: string;
   statusText?: string;
   lastSeenAt?: string;
+  /** Where they are, when they have said and this viewer may know. */
+  location?: string;
 
   /**
    * Which details this person withholds, sent only to a moderator who asked to

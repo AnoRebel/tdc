@@ -245,6 +245,14 @@ export const shots: Shot[] = [
   },
   {
     guide: "using-tdc",
+    name: "location",
+    async take(studio) {
+      const page = await open(studio, "neema", "/settings");
+      return region(page, section(page, "Location"));
+    },
+  },
+  {
+    guide: "using-tdc",
     name: "notifications",
     async take(studio) {
       const page = await open(studio, "neema", room(studio, "announcements"));

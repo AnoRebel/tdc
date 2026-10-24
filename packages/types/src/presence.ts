@@ -117,3 +117,20 @@ export interface Thread {
   /** Whether the reader hears about new replies here. */
   following: boolean;
 }
+
+/** How somebody's location is kept: typed by them, or detected by their device. */
+export type LocationMode = "manual" | "automatic";
+
+/**
+ * Somebody's own location setting.
+ *
+ * Only a place name is ever stored. Detection sends a position to this server,
+ * which names the nearest town from a list it carries and keeps the town.
+ */
+export interface OwnLocation {
+  place: string;
+  mode: LocationMode;
+  visibility: "public" | "members" | "hidden";
+  /** When the place was last detected, if it ever was. */
+  detectedAt?: string;
+}

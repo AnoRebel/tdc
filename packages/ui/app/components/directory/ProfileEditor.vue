@@ -2,9 +2,9 @@
 import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
-import { Plus, Trash2 } from "lucide-vue-next";
+import { MapPin, Plus, Trash2 } from "lucide-vue-next";
 
-import type { ProfileDocument } from "@tdc/types";
+import type { OwnLocation, ProfileDocument } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Field } from "#layers/ui/app/components/ui/field";
@@ -17,7 +17,7 @@ import { Select } from "#layers/ui/app/components/ui/select";
 import { Switch } from "#layers/ui/app/components/ui/switch";
 import { daysFromNow, onDate } from "#layers/ui/app/lib/dates";
 
-const { $t, $ts } = useI18n();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 
 /**
  * Somebody writing their own profile.
@@ -41,7 +41,22 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [ProfileDocument] }>();
 
 const directory = useDirectory();
+const api = useApi();
 const error = ref<string | null>(null);
+
+/*
+ * The account's location, shown here and changed in settings: it belongs to
+ * the account, so a profile carries no copy of its own to drift from it. Read
+ * rather than passed in, so a profile being created shows it too.
+ */
+const location = ref("");
+onMounted(async () => {
+  try {
+    location.value = (await api.get<OwnLocation>("/api/me/location")).place;
+  } catch {
+    // Shown as not set; the settings link is still there.
+  }
+});
 
 const webLink = (message: string) =>
   v.pipe(
@@ -54,7 +69,6 @@ const schema = computed(() =>
   v.object({
     headline: v.pipe(v.string(), v.maxLength(120, $ts("directory.form.tooLong", { count: 120 }))),
     bio: v.pipe(v.string(), v.maxLength(2000, $ts("directory.form.tooLong", { count: 2000 }))),
-    location: v.pipe(v.string(), v.maxLength(80, $ts("directory.form.tooLong", { count: 80 }))),
     experience: v.pipe(v.string(), v.maxLength(500, $ts("directory.form.tooLong", { count: 500 }))),
     contactEmail: v.union([
       v.literal(""),
@@ -218,23 +232,23 @@ const form = useForm({
       </form.Field>
 
       <div class="grid gap-4 sm:grid-cols-2">
-        <form.Field name="location">
-          <template #default="{ field }">
-            <Field :label="$ts('directory.profile.location')" :error="firstError(field)">
-              <template #default="{ id, invalid, describedBy }">
-                <Input
-                  :id="id"
-                  :model-value="field.state.value"
-                  autocomplete="address-level2"
-                  :invalid="invalid"
-                  :described-by="describedBy"
-                  @update:model-value="field.handleChange($event)"
-                  @blur="field.handleBlur"
-                />
-              </template>
-            </Field>
-          </template>
-        </form.Field>
+        <div class="space-y-1.5" data-profile-location>
+          <p class="text-sm font-medium">{{ $t("directory.profile.location") }}</p>
+          <p class="flex min-h-9 items-center gap-1.5 text-sm">
+            <MapPin class="size-3.5 shrink-0 text-muted-foreground" />
+            <span v-if="location" class="truncate">{{ location }}</span>
+            <span v-else class="text-muted-foreground">{{ $t("location.notSet") }}</span>
+          </p>
+          <p class="text-xs text-muted-foreground">
+            {{ $t("location.fromSettings") }}
+            <NuxtLink
+              :to="localeRoute({ name: 'settings', hash: '#location' })"
+              class="underline underline-offset-2 hover:text-foreground"
+            >
+              {{ $t("location.changeInSettings") }}
+            </NuxtLink>
+          </p>
+        </div>
 
         <form.Field name="experience">
           <template #default="{ field }">

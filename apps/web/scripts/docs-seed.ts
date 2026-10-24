@@ -541,6 +541,11 @@ export async function seed(base: string, receiver: string): Promise<Seeded> {
   await api("daudi", "PUT", "/api/me/status", { status: "busy", text: "Deploying until 15:00" });
   await api("zawadi", "PUT", "/api/me/status", { status: "away", text: "Travelling to Dar" });
   await api("neema", "PUT", "/api/me/status", { status: "available", text: "" });
+  await api("neema", "PUT", "/api/me/location", {
+    mode: "manual",
+    place: "Dar es Salaam, Tanzania",
+    visibility: "members",
+  });
 
   /* ------------------------------------------------------- incoming webhook */
 
@@ -1134,7 +1139,17 @@ async function seedDirectory(api: Api): Promise<string> {
     },
   };
   for (const [username, profile] of Object.entries(profiles)) {
-    const { skills, ...rest } = profile as { skills: string[]; openToWork: boolean };
+    const { skills, location, ...rest } = profile as {
+      skills: string[];
+      location: string;
+      openToWork: boolean;
+    };
+    // A location is the account's, which the profile shows.
+    await api(username, "PUT", "/api/me/location", {
+      mode: "manual",
+      place: location,
+      visibility: "members",
+    });
     await api(username, "PUT", "/api/directory/me", {
       ...rest,
       visibility: "public",

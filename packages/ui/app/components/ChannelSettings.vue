@@ -452,7 +452,8 @@ const others = computed(() => members.value.filter((member) => member.id !== use
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm">{{ nameOf(member) }}</span>
                 <span class="block truncate text-[0.6875rem] text-muted-foreground">
-                  {{ member.address }}
+                  {{ member.address
+                  }}<template v-if="member.location"> · {{ member.location }}</template>
                 </span>
               </span>
               <CallPerson :user-id="member.id" :name="nameOf(member)" />

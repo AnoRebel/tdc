@@ -27,7 +27,6 @@ export interface PortfolioLink {
 export interface ProfileDocument {
   headline: string;
   bio: string;
-  location: string;
   experience: string;
   contactEmail: string;
   contactPhone: string;
@@ -244,6 +243,11 @@ export interface OwnProfile {
   displayName: string;
   address: string;
   profile: ProfileDocument;
+  /**
+   * The account's location, which the profile shows but does not hold: it is
+   * changed in the account's settings. Absent when there is none.
+   */
+  location?: string;
   companies: CompanyReference[];
   verifications: OwnVerification[];
   createdAt: string;

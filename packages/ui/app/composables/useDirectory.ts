@@ -32,7 +32,6 @@ export function emptyProfile(): ProfileDocument {
   return {
     headline: "",
     bio: "",
-    location: "",
     experience: "",
     contactEmail: "",
     contactPhone: "",
