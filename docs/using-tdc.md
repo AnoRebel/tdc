@@ -1800,5 +1800,6 @@ So that nothing above is read as implying more than it says:
 - **More of calls.** Calls between a few people work, on servers that switch
   them on (see [Calls](#calls)), with ringing, holding, merging into a
   conference, links, guests, presenting a screen, raised hands and reactions.
-  Recording, calls with people on other servers and calls of more than a
-  handful of people are still to come.
+  Larger calls go through the server's forwarding unit where the server has
+  it on, and calls reach people on connected servers where both servers allow
+  it. Recording is still to come.

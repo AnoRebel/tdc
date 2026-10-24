@@ -1548,10 +1548,12 @@ everybody — suits four to six people and puts the cost on their own
 connections, not the server's (see the table above). An event of fifty or a
 thousand needs the **forwarding unit** (above): each speaker sends once to the
 server, and the server sends a copy to each listener. Then the
-server's outbound bandwidth is the cost, and it grows with the audience. Spread
-over **several connected servers** (also planned), each server forwards to its
-own members and receives one copy from the server hosting the event, so the
-audience's bandwidth is shared between the servers whose members are watching.
+server's outbound bandwidth is the cost, and it grows with the audience. Today
+people on connected servers join the hosting server's forwarding unit directly,
+so the host pays for every listener wherever they are. Spread over **several
+connected servers** (planned, not built), each server would forward to its own
+members and receive one copy from the server hosting the event, sharing the
+audience's bandwidth between the servers whose members are watching.
 
 **What one listener costs the server**, per hour, through a forwarding unit:
 
@@ -1604,11 +1606,11 @@ noise. With example prices (check your own host — these change):
   times the bill. For events, the host's traffic price matters more than
   anything else on this page.
 
-**Over several servers** the arithmetic is the same, divided by where the
-audience is: a thousand watching, six hundred on the host's server and four
-hundred on a connected one, means the host sends six hundred copies plus one to
-the other server, and the other server sends four hundred. Each pays for its own
-members.
+**Over several servers**, once servers forward to each other, the arithmetic
+will be the same, divided by where the audience is: a thousand watching, six
+hundred on the host's server and four hundred on a connected one, would mean
+the host sends six hundred copies plus one to the other server, and the other
+server sends four hundred. Until then the host sends all thousand.
 
 **Ways to make an event cheaper:** ask listeners to join muted with cameras
 off; share slides rather than a
