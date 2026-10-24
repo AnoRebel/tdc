@@ -122,6 +122,50 @@ export default defineConfig({
         /milestone-8\.spec\.ts|milestone-10a\.spec\.ts|accessibility\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
     },
     /*
+     * A two-person call, in each engine, with fake camera and microphone.
+     *
+     * Their own projects because the fakes are launch options: Chromium's
+     * flags and Firefox's preferences answer every permission prompt, which
+     * no other check should have done for it. WebKit has no such switch and
+     * takes granted permissions on the context instead (the spec does that).
+     * The spec builds its own channel and second person, so it signs the
+     * founder in once over the API, beside the stored session.
+     */
+    {
+      name: "calls-chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+        },
+      },
+      dependencies: ["setup"],
+      testMatch: /calls\.spec\.ts/,
+    },
+    {
+      name: "calls-firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        launchOptions: {
+          firefoxUserPrefs: {
+            "media.navigator.streams.fake": true,
+            "media.navigator.permission.disabled": true,
+            // Played without a gesture of its own: the remote video is what
+            // carries the other person's sound.
+            "media.autoplay.default": 0,
+          },
+        },
+      },
+      dependencies: ["setup"],
+      testMatch: /calls\.spec\.ts/,
+    },
+    {
+      name: "calls-webkit",
+      use: { ...devices["Desktop Safari"] },
+      dependencies: ["setup"],
+      testMatch: /calls\.spec\.ts/,
+    },
+    /*
      * The milestone demonstration, run on its own.
      *
      * A fresh profile each time: it shows what somebody meets on a first

@@ -187,7 +187,9 @@ jobs:
       # on their own fresh account. WebKit is what every iPhone runs whatever
       # browser is installed, and Firefox implements the specification rather
       # than Chromium's reading of it — this matrix has already caught a
-      # difference between them.
+      # difference between them. The calls-* projects hold a two-person call in
+      # each engine with fake camera and microphone; WebKit takes them as
+      # granted permissions, and skips saying so where its build has no WebRTC.
       - name: Check
         run: bun run test:e2e
         working-directory: apps/web
