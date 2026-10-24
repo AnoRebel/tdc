@@ -1,11 +1,9 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"strings"
 )
@@ -81,67 +79,4 @@ func (s *Service) FetchMedia(ctx context.Context, path string) (MediaResponse, e
 		Status:      incoming.StatusCode,
 		OK:          incoming.StatusCode >= 200 && incoming.StatusCode < 300,
 	}, nil
-}
-
-/*
-Upload sends one file to a room and returns what the server made of it.
-
-The bytes arrive from the webview as a []byte — the file the person picked, read
-there and handed over whole. Progress is not reported: the runtime call is one
-round trip, and the honest thing on the desktop is to show that a send is in
-progress rather than invent a fraction. The webview's uploader treats this as a
-transfer with no progress events, which its progress bar already tolerates.
-
-The reply is the attachment as JSON, in the same Response shape Send returns, so
-the transport above reads it the same way.
-*/
-func (s *Service) Upload(ctx context.Context, roomID, filename string, file []byte) (Response, error) {
-	s.mu.RLock()
-	base, client := s.current, s.clients[s.current]
-	s.mu.RUnlock()
-
-	if base == "" || client == nil {
-		return Response{}, ErrNoServer
-	}
-
-	var body bytes.Buffer
-	form := multipart.NewWriter(&body)
-	part, err := form.CreateFormFile("file", filename)
-	if err != nil {
-		return Response{}, fmt.Errorf("building the upload: %w", err)
-	}
-	if _, err := part.Write(file); err != nil {
-		return Response{}, fmt.Errorf("building the upload: %w", err)
-	}
-	if err := form.Close(); err != nil {
-		return Response{}, fmt.Errorf("building the upload: %w", err)
-	}
-
-	url := base + "/api/rooms/" + roomID + "/attachments"
-	outgoing, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &body)
-	if err != nil {
-		return Response{}, fmt.Errorf("building the request: %w", err)
-	}
-	outgoing.Header.Set("Content-Type", form.FormDataContentType())
-	outgoing.Header.Set("Accept", "application/json")
-
-	incoming, err := client.Do(outgoing)
-	if err != nil {
-		return Response{}, fmt.Errorf("reaching %s: %w", base, err)
-	}
-	defer incoming.Body.Close()
-
-	raw, err := io.ReadAll(io.LimitReader(incoming.Body, 10<<20))
-	if err != nil {
-		return Response{}, fmt.Errorf("reading the response: %w", err)
-	}
-
-	response := Response{
-		Status: incoming.StatusCode,
-		OK:     incoming.StatusCode >= 200 && incoming.StatusCode < 300,
-	}
-	if len(raw) > 0 {
-		response.Body = raw
-	}
-	return response, nil
 }

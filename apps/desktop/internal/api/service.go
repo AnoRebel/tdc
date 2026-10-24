@@ -95,6 +95,9 @@ type Service struct {
 	*/
 	opener Opener
 
+	// chooser asks where to save a file, and is nil until main wires one.
+	chooser SaveChooser
+
 	// Which server requests currently go to. Empty until somebody has chosen
 	// one; a request before then is refused rather than sent somewhere
 	// arbitrary.

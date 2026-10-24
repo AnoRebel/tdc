@@ -380,6 +380,10 @@ func main() {
 		site, and in a webview neither is true.
 	*/
 	api.UseOpener(apiService, app.Browser)
+	// Where a file is saved, asked of the operating system's own dialog.
+	api.UseSaveChooser(apiService, func(suggested string) (string, error) {
+		return app.Dialog.SaveFile().SetFilename(suggested).PromptForSingleSelection()
+	})
 
 	/*
 		What the close button does, which is a question rather than an answer.

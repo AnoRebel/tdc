@@ -363,6 +363,12 @@ export interface AttachmentLimits {
   /** Empty means every type not explicitly blocked is permitted. */
   allowedTypes: string[];
   blockedTypes: string[];
+  /** What the caller's files may occupy, or 0 for no quota. */
+  quota: number;
+  /** What the caller's files occupy now, uploads in progress included. */
+  used: number;
+  /** The size of the pieces a file is uploaded in. */
+  pieceBytes: number;
 }
 
 /**

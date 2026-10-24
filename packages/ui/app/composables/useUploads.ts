@@ -1,22 +1,60 @@
 import type { Attachment, UploadProgress } from "@tdc/types";
+import type { PieceUploadHandlers } from "#layers/ui/app/lib/pieceUpload";
 
-import type { Transfer } from "#layers/ui/app/composables/useUploadTransfer";
+/** A running upload, which can be stopped. Safe to stop more than once. */
+interface Transfer {
+  abort(): void;
+}
 
 /**
- * Uploads with real progress and cancellation.
+ * Uploads with real progress, cancellation, and resumption.
  *
- * The list, the retries, and what counts as finished are the same everywhere
- * and live here. The transfer itself — the one operation that reports how much
- * of a file has gone out, and carries whatever authorises it — is injected,
- * because the two clients do it differently: the web over XMLHttpRequest with a
- * cookie, the desktop through Go. Progress matters enough to be worth the seam:
- * on a phone sending a photograph over mobile data, "sixty per cent of four
- * megabytes" is the difference between waiting and giving up, and a plain fetch
- * cannot report it.
+ * Every file is sent in pieces (see lib/pieceUpload), so a dropped connection
+ * costs one piece rather than the file and a proxy with a small body limit is
+ * no obstacle. How one piece travels is injected, because the two clients do
+ * it differently: the web over XMLHttpRequest with a cookie, the desktop
+ * through Go. Progress matters enough to be worth the seam: on a phone sending
+ * a photograph over mobile data, "sixty per cent of four megabytes" is the
+ * difference between waiting and giving up.
  */
 export function useUploads() {
-  // How the bytes actually travel, from whichever application is running.
-  const transfer = useUploadTransfer();
+  // How one piece's bytes travel, from whichever application is running.
+  const sendPiece = useUploadTransfer();
+  const api = useApi();
+  const { $ts } = useNuxtApp();
+
+  /*
+   * Starts sending a file. The piece loop is loaded the first time somebody
+   * sends something, rather than with every page; the handle is returned at
+   * once, so a cancellation before it has loaded still cancels.
+   */
+  function transfer(roomId: string, file: File, handlers: PieceUploadHandlers): Transfer {
+    let inner: Transfer | null = null;
+    let stopped = false;
+    void import("#layers/ui/app/lib/pieceUpload")
+      .then(({ sendInPieces }) => {
+        if (stopped) return;
+        inner = sendInPieces(
+          api,
+          sendPiece,
+          roomId,
+          file,
+          handlers,
+          $ts("attachment.uploadUnreachable"),
+        );
+      })
+      .catch(() => {
+        if (!stopped) handlers.onError($ts("attachment.uploadUnreachable"));
+      });
+    return {
+      abort() {
+        if (stopped) return;
+        stopped = true;
+        if (inner) inner.abort();
+        else handlers.onCancel();
+      },
+    };
+  }
 
   /** Uploads currently in flight or recently finished, oldest first. */
   const uploads = ref<UploadProgress[]>([]);

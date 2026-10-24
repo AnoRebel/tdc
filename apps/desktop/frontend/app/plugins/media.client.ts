@@ -1,10 +1,12 @@
-import type { Attachment } from "@tdc/types";
+import { createApiClient } from "@tdc/types";
 
 import { downloadKey } from "#layers/ui/app/composables/useDownload";
 import { mediaBaseKey } from "#layers/ui/app/composables/useMediaBase";
 import { mediaFetchKey } from "#layers/ui/app/composables/useMediaFetch";
 import { uploadTransferKey } from "#layers/ui/app/composables/useUploadTransfer";
 import * as Api from "#bindings/api";
+
+import { createWailsTransport } from "~/lib/transport";
 
 /**
  * Installs the desktop client's media base, byte fetcher, upload transfer, and
@@ -62,75 +64,33 @@ export default defineNuxtPlugin({
       return bytesFromBase64(result.data ?? "");
     });
 
-    nuxtApp.vueApp.provide(uploadTransferKey, (roomId, file, handlers) => {
-      let cancelled = false;
-
-      // One round trip through Go, with no progress events — the honest thing
-      // on the desktop rather than a fraction invented from nothing. The tray's
-      // progress bar already tolerates a transfer that only reports its end.
-      void (async () => {
-        try {
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          const response = await Api.Service.Upload(roomId, file.name, base64FromBytes(bytes));
-          if (cancelled) return;
-
-          if (response.ok && response.body) {
-            handlers.onDone(response.body as unknown as Attachment);
-          } else {
-            handlers.onError(messageFrom(response.status ?? 0, nuxtApp.$ts));
-          }
-        } catch {
-          if (!cancelled) handlers.onError(nuxtApp.$ts("attachment.uploadUnreachable"));
-        }
-      })();
-
-      return {
-        abort() {
-          // The request to Go cannot be recalled once sent, so cancelling only
-          // stops this client from acting on the reply — the server may still
-          // have stored the file. Marked cancelled so the tray shows that
-          // rather than a phantom success.
-          cancelled = true;
-          handlers.onCancel();
-        },
-      };
+    /*
+     * One piece through Go, as base64 in JSON — the ordinary request path,
+     * which carries the session. Only one piece is ever in memory, so a file
+     * of any size can be sent, and progress moves a piece at a time where it
+     * used to show nothing until the whole file had gone. A piece already
+     * handed to Go cannot be recalled; stopping takes effect at the next one.
+     */
+    const pieces = createApiClient(createWailsTransport(Api.Service));
+    nuxtApp.vueApp.provide(uploadTransferKey, async (uploadId, piece, data, onProgress, signal) => {
+      if (signal.aborted) throw new Error("stopped");
+      const bytes = new Uint8Array(await data.arrayBuffer());
+      await pieces.put(`/api/uploads/${uploadId}/pieces/${piece}`, {
+        data: base64FromBytes(bytes),
+      });
+      onProgress(data.size);
     });
 
     /*
      * A server file, saved. A link would leave the webview without the
-     * session, so Go fetches the bytes and they are handed over as a file from
-     * here — held in memory on the way, which the size limit on FetchMedia
-     * keeps bounded.
+     * session, so Go asks where to put it with the system's own dialog and
+     * streams it there — never through memory, so a file of any size saves.
      */
     nuxtApp.vueApp.provide(downloadKey, async (path, filename) => {
-      const result = await Api.Service.FetchMedia(path);
-      if (!result.ok) {
-        throw new Error(nuxtApp.$ts("attachment.fileUnreadable", { status: result.status }));
-      }
-
-      const blob = new Blob([bytesFromBase64(result.data ?? "")], {
-        type: result.contentType || "application/octet-stream",
-      });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = filename;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      await Api.Service.SaveMedia(path, filename);
     });
   },
 });
-
-/** The same explanations the web client gives, keyed on status alone. */
-function messageFrom(
-  status: number,
-  say: (key: string, params?: Record<string, number>) => string,
-): string {
-  if (status === 413) return say("attachment.tooLarge");
-  if (status === 415) return say("attachment.notAccepted");
-  if (status === 401) return say("attachment.sessionExpired");
-  if (status === 403) return say("attachment.noUploadPermission");
-  return say("attachment.uploadFailed", { status });
-}
 
 /** base64 to bytes, without a Buffer this webview does not have. */
 function bytesFromBase64(value: string): ArrayBuffer {

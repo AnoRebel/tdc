@@ -1,54 +1,35 @@
-import type { Attachment } from "@tdc/types";
-
 /**
- * Sending one file's bytes to the server, with progress, as the two clients do
- * it differently.
+ * Sending one piece of a file to the server, with progress, as the two clients
+ * do it differently.
  *
- * The bookkeeping around an upload — the list, the retries, what counts as
- * finished — is the same everywhere and lives in useUploads. What differs is
- * the transfer itself: the web client sends over XMLHttpRequest, which is the
- * one API that reports how much of a request body has gone out, with the
- * session cookie the browser carries. The desktop client has no cookie in its
- * webview and sends through Go instead. So only the transfer is injected, and
- * the composable above it is shared whole.
+ * Everything else about an upload — declaring it, resuming it from what the
+ * server holds, retrying a piece, finishing it — is the same everywhere and
+ * goes through the ordinary API client, which both clients already provide.
+ * What differs is how the bytes of one piece travel: the web client sends them
+ * raw over XMLHttpRequest, the one API that reports how much of a request body
+ * has gone out; the desktop client has no session in its webview and sends
+ * them through Go, as base64 in JSON. So only that is injected.
  */
 
-/** What a transfer reports back as it runs and when it ends. */
-export interface TransferHandlers {
-  /** Called as bytes leave, with how many have. */
-  onProgress(transferred: number): void;
-  /** The attachment the server created, on success. */
-  onDone(attachment: Attachment): void;
-  /** A message fit to show, on any failure that is not a cancellation. */
-  onError(message: string): void;
-  /** The person, or the page going away, stopped it. */
-  onCancel(): void;
-}
-
 /**
- * A running transfer, which can be stopped.
+ * Sends one piece of an upload and resolves once the server has it.
  *
- * Abort is idempotent and safe after the transfer has already ended: useUploads
- * calls it on cleanup without tracking whether each one is still in flight.
+ * Rejects with an ApiError for a refusal (so a 409 can be told from a 400) and
+ * with anything else for a server that could not be reached. The signal stops
+ * it; a stopped piece rejects and is not reported as a failure by the caller.
  */
-export interface Transfer {
-  abort(): void;
-}
-
-/**
- * Starts sending one file and returns a handle to stop it.
- *
- * roomId and file are what to send; the handlers are how the shared composable
- * hears about it. Deliberately not a Promise: an upload reports progress over
- * time, and a Promise has only one result — the handlers carry the running
- * commentary a progress bar is drawn from.
- */
-export type UploadTransfer = (roomId: string, file: File, handlers: TransferHandlers) => Transfer;
+export type UploadTransfer = (
+  uploadId: string,
+  piece: number,
+  data: Blob,
+  onProgress: (sent: number) => void,
+  signal: AbortSignal,
+) => Promise<void>;
 
 export const uploadTransferKey = Symbol("tdc.uploadTransfer") as InjectionKey<UploadTransfer>;
 
 /**
- * How to transfer an upload, from whichever application is running.
+ * How to send a piece, from whichever application is running.
  *
  * Required rather than defaulted, like the request transport: the layer does
  * not open an XMLHttpRequest of its own, so no file here assumes the web
