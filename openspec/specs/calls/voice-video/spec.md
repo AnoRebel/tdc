@@ -223,6 +223,27 @@ Participants SHALL be able to share a screen, window or browser tab in a call, a
 - **WHEN** a client's platform cannot capture a screen
 - **THEN** the client does not offer sharing rather than offering it and failing
 
+### Requirement: Remote control of a shared screen
+
+A participant sharing their whole screen from the desktop application SHALL be able to hand control of their pointer and keyboard to one other participant at a time, who asks for it; control MUST be granted explicitly by the sharer, shown on the sharer's screen above every other window while it lasts, and revocable at once, including by a key on the sharer's keyboard that the controller cannot send. Control MUST end when the share ends or either person leaves.
+
+Where the sharer is in a browser, is sharing less than a whole screen, or is on a platform where input cannot be injected, a request for control MUST be refused, telling the person asking which of these it is. No input may be applied to the sharer's computer unless a grant to its sender is in force.
+
+#### Scenario: Control is asked for and granted
+
+- **WHEN** a participant asks to control a whole screen shared from the desktop application
+- **THEN** the sharer is asked, and only on their allowing it does the participant's input reach the sharer's computer
+
+#### Scenario: Taking control back
+
+- **WHEN** the sharer takes control back, presses the reserved key, stops sharing, or either leaves the call
+- **THEN** control ends at once, and input sent after it is not applied
+
+#### Scenario: Refused where it cannot be given
+
+- **WHEN** the sharer is in a browser, shares a window or a tab, or is on a platform that cannot inject input (such as a Wayland session)
+- **THEN** the request is refused, saying which
+
 ### Requirement: Privacy and recording
 
 The server SHALL NOT record calls unless recording is explicitly enabled by the operator, and where enabled, every participant MUST be informed before recording begins.

@@ -8,6 +8,8 @@
  */
 
 const c = useCall();
+// Listening for asks to control a shared screen, wherever somebody is.
+useRemoteControl();
 
 const live = useLiveConnection({
   onEvent: () => {},

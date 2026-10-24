@@ -31,8 +31,11 @@ const stream = computed(() =>
       : null,
 );
 
+const video = shallowRef<HTMLVideoElement | null>(null);
 function attach(element: unknown, media: MediaStream | null) {
-  if (element instanceof HTMLVideoElement && element.srcObject !== media) element.srcObject = media;
+  if (!(element instanceof HTMLVideoElement)) return;
+  video.value = element;
+  if (element.srcObject !== media) element.srcObject = media;
 }
 </script>
 
@@ -56,6 +59,7 @@ function attach(element: unknown, media: MediaStream | null) {
     >
       {{ mine ? $t("calls.stage.youPresent") : $t("calls.stage.presenting", { name: who }) }}
     </figcaption>
+    <CallControlView v-if="!mine && presenter" :video="video" :presenter="presenter" />
     <p
       v-if="mine && Object.keys(c.reactionCounts.value).length"
       class="absolute bottom-1.5 left-1.5 flex gap-2 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white"

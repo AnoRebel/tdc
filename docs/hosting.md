@@ -1359,6 +1359,15 @@ way. Somebody joining a recorded call is told before their media is sent. A
 participant can always record their screen with other software; the feature is
 about recording openly, with notice and a record.
 
+**Remote control** of a shared screen happens entirely between two people's
+clients: the request, the grant and the pointer and keyboard input travel on
+the call's own peer-to-peer data channel, and the server neither sees nor
+relays them. Only the desktop application can be controlled, because only it
+can put input into the operating system: through X11's XTEST on Linux (not
+under Wayland, which does not allow it), `SendInput` on Windows, and Quartz
+events on macOS once the person has allowed TDC under Accessibility. Nothing
+needs installing or configuring on the server for it.
+
 **Not yet:** calls in conversations shared with other servers; and calls of
 more than a few people through a forwarding unit.
 

@@ -359,6 +359,9 @@ func main() {
 	*/
 	app.RegisterService(application.NewService(shell.NewStartupService(app, startupSettings)))
 
+	// Remote control of a screen shared in a call; see remotecontrol.go.
+	app.RegisterService(application.NewService(remoteControlFor(app)))
+
 	/*
 		The live connection, bridged from Go.
 

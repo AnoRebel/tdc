@@ -117,6 +117,7 @@ const {
       <div class="flex h-screen flex-col gap-2 p-2">
         <div class="min-h-0 flex-1 overflow-y-auto"><CallTiles compact /></div>
         <CallRecordingBar />
+        <CallControlShare />
         <CallLobbyList />
         <CallHands />
         <CallHeld />
@@ -254,6 +255,7 @@ const {
         <CallTiles />
       </div>
       <CallRecordingBar />
+      <CallControlShare />
       <CallLobbyList />
       <CallHands />
       <CallHeld />
@@ -327,6 +329,7 @@ const {
         <CallTiles compact />
       </div>
       <CallRecordingBar />
+      <CallControlShare />
       <CallLobbyList />
       <CallHands />
       <CallHeld />

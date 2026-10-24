@@ -62,7 +62,13 @@ interface Peer {
   polite: boolean;
   makingOffer: boolean;
   ignoreOffer: boolean;
+  /** A data channel between the two, for remote control of a shared screen. */
+  control: RTCDataChannel | null;
 }
+
+/** A message on a peer's control channel; `gone` is said here when the peer goes. */
+export type ControlMessage = { t: string } & Record<string, unknown>;
+type ControlListener = (room: string, from: string, message: ControlMessage) => void;
 
 export const useCall = createGlobalState(() => {
   const api = useApi();
@@ -78,6 +84,18 @@ export const useCall = createGlobalState(() => {
   const roomId = useState<string | null>("call.room", () => null);
   const view = ref<CallView>("docked");
   let sendSignal: SignalSender = () => {};
+  let controlListener: ControlListener = () => {};
+  /** Set by remote control, which is the only thing that talks on the channel. */
+  function onControl(listener: ControlListener) {
+    controlListener = listener;
+  }
+  /** Sends a message to one person in a call on its control channel. */
+  function sendControl(room: string, to: string, message: ControlMessage): boolean {
+    const channel = peers.get(room)?.get(to)?.control;
+    if (channel?.readyState !== "open") return false;
+    channel.send(JSON.stringify(message));
+    return true;
+  }
   /** Set by the call host, whose connection carries the negotiation. */
   function setSignaller(sender: SignalSender) {
     sendSignal = sender;
@@ -227,7 +245,30 @@ export const useCall = createGlobalState(() => {
     const senders = polite
       ? null
       : SLOTS.map((kind) => connection.addTransceiver(kind, { direction: "sendrecv" }).sender);
-    const peer: Peer = { connection, senders, polite, makingOffer: false, ignoreOffer: false };
+    const peer: Peer = {
+      connection,
+      senders,
+      polite,
+      makingOffer: false,
+      ignoreOffer: false,
+      control: null,
+    };
+    // The side that makes the slots makes the channel too, in the same offer.
+    const attach = (channel: RTCDataChannel) => {
+      peer.control = channel;
+      channel.onmessage = ({ data }) => {
+        try {
+          const message = JSON.parse(String(data)) as ControlMessage;
+          if (typeof message?.t === "string") controlListener(room, other, message);
+        } catch {
+          // Not something either side sends: ignored.
+        }
+      };
+    };
+    if (!polite) attach(connection.createDataChannel("control"));
+    connection.ondatachannel = ({ channel }) => {
+      if (channel.label === "control") attach(channel);
+    };
     if (senders) void syncPeer(room, peer);
 
     const arriving = new MediaStream();
@@ -271,6 +312,7 @@ export const useCall = createGlobalState(() => {
   }
 
   function closePeer(room: string, other: string) {
+    if (peers.get(room)?.has(other)) controlListener(room, other, { t: "gone" });
     peers.get(room)?.get(other)?.connection.close();
     peers.get(room)?.delete(other);
     for (const store of [remotes, remoteScreens]) {
@@ -942,6 +984,8 @@ export const useCall = createGlobalState(() => {
     isIn,
     recordingNotice,
     answerRecording,
+    onControl,
+    sendControl,
     reactions,
     reactionCounts,
     onReaction,

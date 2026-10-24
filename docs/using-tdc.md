@@ -1202,6 +1202,33 @@ your name and is gone after a few seconds; nothing is kept. Whoever presents
 sees a running count of the reactions their presentation has drawn. With
 reduced motion, reactions fade in place instead of floating.
 
+**Letting somebody control your screen.** When you present your whole screen
+from the TDC desktop application, the others in the call see **Ask to control**
+on your screen. If somebody asks, the call window shows their name with
+**Allow** and **Decline**; nothing happens until you choose. Once you allow it,
+their pointer movements, clicks, scrolling and typing reach your computer — any
+program on the screen you share, not only TDC — and a red strip stays at the top
+left of your screen, above every other window, saying who is in control. One
+person controls at a time: allowing somebody else takes it from the first. You
+take control back at once with **Take back control** in the call window, or by
+pressing **Pause** on your keyboard (on a Mac, which has no Pause key,
+**Control-Option-Command-Escape**) wherever you are; that key is kept for you,
+so the person controlling cannot press it or block it. Control also ends when
+you stop sharing, or when either of you leaves the call. The person controlling
+clicks on your screen in the call window to start, and the keyboard goes to you
+only while your screen has focus there; **Tab** moves them off it, and **Stop
+controlling** gives control back.
+
+Somebody asking is told plainly when control cannot be given, and why: you are
+presenting from a browser (which cannot move a pointer, so remote control needs
+the desktop application), you are sharing a window or a tab rather than a whole
+screen, or your computer cannot be driven. On Linux that last one means a
+Wayland desktop — Wayland does not let one program move the pointer or type into
+others, so remote control works only in an X11 session; under Windows, programs
+running as administrator cannot be controlled from a program that is not; and a
+Mac needs TDC allowed under **System Settings → Privacy & Security →
+Accessibility** first.
+
 **Recording a call.** Where the server's operator allows recording, somebody
 holding the `call.record` permission (which nobody has until an administrator
 grants it) sees a red record button in the call controls. Pressing it tells
@@ -1665,6 +1692,9 @@ What the desktop client adds:
   restored — adjusted if the display it was on has gone.
 - **Updates that verify what they downloaded** and discard anything that fails
   the check rather than installing it.
+- **Letting somebody in a call control your screen**, when you present your
+  whole screen from here; a browser cannot move the pointer, so it cannot offer
+  this. See **Letting somebody control your screen** under Calls.
 
 What works differently, because the window is not a browser:
 
@@ -1676,6 +1706,8 @@ What works differently, because the window is not a browser:
   attachments, an event's `.ics` file, backup archives and exports. A file you
   attach is sent the same way, so the tray shows it when it is done rather than
   a progress bar.
+- **A recording too large for the server** is saved through the system's own
+  save dialog rather than as a browser download.
 - **Notifications come from the operating system, not from push.** The web
   client's **Push notifications** setting is not here; calls ringing and event
   reminders raise a system notification as well as appearing in the window,

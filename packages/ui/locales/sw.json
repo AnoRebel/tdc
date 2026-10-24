@@ -2260,6 +2260,34 @@
       "notSent": "Rekodi haikutumwa.",
       "couldNotSave": "Imeshindwa kuhifadhi rekodi.",
       "fileName": "Rekodi ya simu {when}"
+    },
+    "control": {
+      "ask": "Omba kudhibiti",
+      "askHint": "Mwombe {name} akuruhusu kutumia kipanya na kibodi yake",
+      "asking": "Umemwomba {name} udhibiti…",
+      "controlling": "Unadhibiti skrini ya {name}",
+      "surface": "Skrini ya {name}. Kiashiria na vitufe vyako vinaenda huko unapoidhibiti.",
+      "stop": "Acha kudhibiti",
+      "declined": "{name} amekataa.",
+      "revoked": "{name} amechukua udhibiti tena.",
+      "dismiss": "Funga",
+      "requestTitle": "{name} anaomba kudhibiti skrini yako",
+      "requestBody": "Ataweza kusogeza kiashiria chako, kubofya na kuandika popote kwenye skrini unayoshiriki, hadi utakapochukua udhibiti tena.",
+      "allow": "Ruhusu",
+      "decline": "Kataa",
+      "controlledBy": "{name} anadhibiti skrini yako",
+      "revokeHint": "Bonyeza {key} kwenye kibodi yako kuchukua udhibiti tena, popote ulipo.",
+      "takeBack": "Chukua udhibiti tena",
+      "noticeOnScreen": "{name} anadhibiti skrini yako. Bonyeza {key} kuchukua udhibiti tena.",
+      "refused": {
+        "browser": "{name} anawasilisha kutoka kivinjari, ambacho hakiwezi kumruhusu mtu mwingine kusogeza kiashiria. Udhibiti wa mbali unahitaji programu ya TDC ya kompyuta.",
+        "not-screen": "{name} anashiriki dirisha au kichupo. Udhibiti wa mbali unahitaji skrini nzima ikishirikiwa kutoka programu ya kompyuta.",
+        "wayland": "Kompyuta ya {name} inatumia eneo-kazi la Wayland, ambalo halimruhusu programu moja kusogeza kiashiria au kuandika kwenye nyingine. Udhibiti wa mbali hufanya kazi huko kwenye kipindi cha X11 tu.",
+        "no-display": "Kompyuta ya {name} haina skrini ambayo TDC inaweza kuifikia.",
+        "no-xtest": "Seva ya X ya {name} haitoi XTEST, ambayo udhibiti wa mbali unahitaji.",
+        "accessibility": "{name} hajairuhusu TDC kudhibiti Mac yake. Anaweza kuiruhusu katika Mipangilio ya Mfumo, Faragha na Usalama, Ufikivu.",
+        "platform": "Kompyuta ya {name} haiwezi kudhibitiwa kwa mbali."
+      }
     }
   },
   "names": {

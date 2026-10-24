@@ -2260,6 +2260,34 @@
       "notSent": "The recording was not sent.",
       "couldNotSave": "Could not save the recording.",
       "fileName": "Call recording {when}"
+    },
+    "control": {
+      "ask": "Ask to control",
+      "askHint": "Ask {name} to let you use their mouse and keyboard",
+      "asking": "Asked {name} for control…",
+      "controlling": "You are controlling {name}'s screen",
+      "surface": "{name}'s screen. Your pointer and keys go to it while you control it.",
+      "stop": "Stop controlling",
+      "declined": "{name} declined.",
+      "revoked": "{name} took control back.",
+      "dismiss": "Dismiss",
+      "requestTitle": "{name} asks to control your screen",
+      "requestBody": "They will be able to move your pointer, click and type anywhere on the screen you share, until you take it back.",
+      "allow": "Allow",
+      "decline": "Decline",
+      "controlledBy": "{name} is controlling your screen",
+      "revokeHint": "Press {key} on your keyboard to take it back, wherever you are.",
+      "takeBack": "Take back control",
+      "noticeOnScreen": "{name} is controlling your screen. Press {key} to take it back.",
+      "refused": {
+        "browser": "{name} is presenting from a browser, which cannot let anybody else move the pointer. Remote control needs the TDC desktop application.",
+        "not-screen": "{name} is sharing a window or a tab. Remote control needs a whole screen shared from the desktop application.",
+        "wayland": "{name}'s computer runs a Wayland desktop, which does not let one program move the pointer or type into others. Remote control works there only in an X11 session.",
+        "no-display": "{name}'s computer has no display TDC can reach.",
+        "no-xtest": "{name}'s X server does not offer XTEST, which remote control needs.",
+        "accessibility": "{name} has not allowed TDC to control their Mac. They can allow it in System Settings, Privacy & Security, Accessibility.",
+        "platform": "{name}'s computer cannot be controlled remotely."
+      }
     }
   },
   "names": {
