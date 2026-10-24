@@ -104,6 +104,7 @@ async function startServer(): Promise<ChildProcess> {
       // So people read as neema@community.example rather than neema@localhost.
       TDC_SERVER_CANONICAL_ADDRESS: "https://community.example",
       TDC_LOG_LEVEL: "error",
+      TDC_TRANSLATION_LIBRETRANSLATE_URL: `http://127.0.0.1:${PORT + 1}`,
     },
   });
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -116,6 +117,27 @@ async function startServer(): Promise<ChildProcess> {
   }
   server.kill();
   throw new Error("the server did not start; is Postgres running?");
+}
+
+/*
+ * LibreTranslate, as far as a screenshot needs it: the seeded Swahili
+ * greeting comes back in English, and anything else as it was, said to be
+ * English already.
+ */
+const TRANSLATIONS: Record<string, string> = {
+  "Karibu sana Amani! Tutaonana kwenye meetup — nitaleta chai ya tangawizi kwa wote.":
+    "Welcome, Amani! See you at the meetup — I'll bring ginger tea for everyone.",
+};
+async function translate(request: Request) {
+  const { q } = (await request.json()) as { q: string[] };
+  const translatedText = q.map((text) =>
+    Object.entries(TRANSLATIONS).reduce((done, [from, to]) => done.replace(from, to), text),
+  );
+  const detectedLanguage = q.map((text) => ({
+    language: Object.keys(TRANSLATIONS).some((from) => text.includes(from)) ? "sw" : "en",
+    confidence: 90,
+  }));
+  return Response.json({ translatedText, detectedLanguage });
 }
 
 /** A PNG, as WebP, encoded by the page given; with its size. */
@@ -247,11 +269,15 @@ async function main() {
   if (!flags.has("--skip-build")) build();
   await freshDatabase();
   let server: ChildProcess | undefined;
-  // Where the seeded outgoing webhook delivers: it only has to say yes.
+  // Where the seeded outgoing webhook delivers, which only has to say yes;
+  // and a stand-in LibreTranslate for the translation screenshots.
   const receiver = Bun.serve({
     hostname: "127.0.0.1",
     port: PORT + 1,
-    fetch: () => new Response(null, { status: 204 }),
+    fetch: (request) =>
+      new URL(request.url).pathname === "/translate"
+        ? translate(request)
+        : new Response(null, { status: 204 }),
   });
   try {
     server = await startServer();

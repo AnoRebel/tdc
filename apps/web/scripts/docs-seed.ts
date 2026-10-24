@@ -30,6 +30,8 @@ export interface Seeded {
   engagement: string;
   webhook: { id: string; url: string };
   application: string;
+  /** The monthly meetup, as an event with a page of its own. */
+  event: string;
 }
 
 /*
@@ -50,6 +52,9 @@ const PEOPLE: [string, string][] = [
   ["wanjiru", "Wanjiru Kamau"],
   ["tumaini", "Tumaini Massawe"],
 ];
+
+// What the community's moderators may do, for the roles screenshot.
+const MODERATING = ["message.delete.any", "moderation.restrict", "moderation.review"];
 
 /*
  * Registration is limited to five an hour from one address, and sign-in to
@@ -166,7 +171,7 @@ export async function seed(base: string, receiver: string): Promise<Seeded> {
 
   /* ---------------------------------------------------------------- server */
 
-  for (const feature of ["directory", "calls"]) {
+  for (const feature of ["directory", "calls", "events", "translation", "scheduled-messages"]) {
     await api("neema", "PUT", `/api/admin/features/${feature}`, { enabled: true });
   }
   const settings: Record<string, string> = {
@@ -176,6 +181,9 @@ export async function seed(base: string, receiver: string): Promise<Seeded> {
     "directory.enquiries_per_hour": "50",
     "registration.policy": "invitation",
     "integrations.allow_private_addresses": "true",
+    // For the calls' recording, link and guest screenshots.
+    "calls.recording": "true",
+    "calls.guests": "true",
   };
   for (const [key, value] of Object.entries(settings)) {
     await api("neema", "PUT", `/api/admin/settings/${key}`, { value });
@@ -360,6 +368,11 @@ export async function seed(base: string, receiver: string): Promise<Seeded> {
     "amani",
     general,
     "Habari zenu! Amani from Arusha. Go and Flutter, mostly mobile money integrations. Happy to help anyone stuck on payment callbacks.",
+  );
+  messages.swahili = await say(
+    "halima",
+    general,
+    "Karibu sana Amani! Tutaonana kwenye meetup — nitaleta chai ya tangawizi kwa wote.",
   );
   messages.poster = await sendFile(
     "rehema",
@@ -617,6 +630,86 @@ export async function seed(base: string, receiver: string): Promise<Seeded> {
     expiresInHours: 72,
   });
 
+  /* ---------------------------------------------------------------- events */
+
+  const event = await seedEvents(api, rooms, (name) => people[name]!.id);
+
+  /* ---------------------------------------------------- automatic replies */
+
+  // Rehema is at a conference: whoever writes is told who to ask instead.
+  await api("rehema", "POST", "/api/me/automatic-replies", {
+    enabled: true,
+    message:
+      "I'm at DevFest Arusha until Monday with patchy signal. For anything about the venue, ask @daudi.",
+    mentionMessage: "Away until Monday — @daudi has the venue details.",
+    statuses: [],
+    timeZone: "Africa/Dar_es_Salaam",
+    replyToDirect: true,
+    replyToGroups: true,
+    replyToMentions: true,
+  });
+
+  // Juma reads Swahili through the server's LibreTranslate, which the
+  // screenshots stand in for: a browser's own translation is not in a
+  // headless one.
+  await api("juma", "PUT", "/api/me/translation/preferences", {
+    provider: "libretranslate",
+    targetLanguage: "",
+    autoTranslate: false,
+  });
+
+  /* ----------------------------------------------------- scheduled messages */
+
+  const later = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
+  await api("neema", "POST", `/api/rooms/${rooms.announcements}/scheduled`, {
+    body: "Doors open at 17:30 on meetup day — bring your ID for the building's front desk.",
+    sendAt: later(20),
+  });
+  await api("neema", "POST", `/api/rooms/${rooms.general}/scheduled`, {
+    body: "Slides from the talks are in #announcements. Asante sana kwa kuja!",
+    sendAt: later(30),
+  });
+
+  /* ------------------------------------------------------------------ roles */
+
+  const moderators = await api<{ id: string }>("neema", "POST", "/api/admin/roles", {
+    name: "Moderators",
+    description: "Keep the channels friendly: remove messages, restrict people, review reports.",
+  });
+  for (const permission of MODERATING) {
+    await api("neema", "PUT", `/api/admin/roles/${moderators.id}/permissions`, {
+      permission,
+      granted: true,
+    });
+  }
+  const hosts = await api<{ id: string }>("neema", "POST", "/api/admin/roles", {
+    name: "Event hosts",
+    description: "Run the meetups: make call links and record the talks.",
+  });
+  for (const permission of ["call.link", "call.record"]) {
+    await api("neema", "PUT", `/api/admin/roles/${hosts.id}/permissions`, {
+      permission,
+      granted: true,
+    });
+  }
+  for (const [role, member] of [
+    [moderators.id, "daudi"],
+    [moderators.id, "rehema"],
+    [hosts.id, "rehema"],
+    [hosts.id, "zawadi"],
+  ] as const) {
+    await api("neema", "POST", `/api/admin/roles/${role}/members`, {
+      user: people[member]!.id,
+    });
+  }
+
+  /* --------------------------------------------------------------- backups */
+
+  await api("neema", "POST", "/api/admin/backups", {
+    parts: ["settings", "accounts", "channels", "projects"],
+    passphrase: "pole-pole-ndio-mwendo",
+  });
+
   /* -------------------------------------------------------------- projects */
 
   await seedProjects(api, rooms, messages);
@@ -633,7 +726,103 @@ export async function seed(base: string, receiver: string): Promise<Seeded> {
     engagement,
     webhook: { id: outgoing.id, url: hookUrl },
     application: application.id,
+    event,
   };
+}
+
+/*
+ * The group's coming events, dated from today so the screenshots always show
+ * them ahead: the monthly meetup with its talks, a Go night, a workshop and
+ * office hours.
+ */
+async function seedEvents(api: Api, rooms: Record<string, string>, id: (name: string) => string) {
+  // A time in Dar es Salaam (UTC+3), some days from now.
+  const at = (days: number, hour: number, minute = 0) => {
+    const day = new Date(Date.now() + days * 86_400_000);
+    return new Date(
+      Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate(), hour - 3, minute),
+    ).toISOString();
+  };
+  const plain = {
+    timeZone: "Africa/Dar_es_Salaam",
+    allDay: false,
+    recurrence: "",
+    exceptions: [],
+    online: false,
+    onlineUrl: "",
+    location: "",
+    capacity: null,
+    visibility: "public",
+  };
+  const meetup = await api<{ id: string }>("neema", "POST", "/api/events", {
+    ...plain,
+    channelId: rooms.general,
+    kind: "meetup",
+    title: "Dar Devs monthly meetup",
+    description:
+      "Two talks, then food and talk. **Venue:** Buni Hub, COSTECH, Kijitonyama. The room takes sixty.",
+    startsAt: at(4, 17, 30),
+    endsAt: at(4, 20, 30),
+    location: "Buni Hub, COSTECH, Kijitonyama",
+    capacity: 60,
+    hosts: [id("rehema")],
+    sessions: [
+      {
+        title: "Range-over-func iterators in a payments service",
+        startsAt: at(4, 18),
+        endsAt: at(4, 18, 40),
+        speakers: [id("juma")],
+      },
+      {
+        title: "SSR on a 1 GB server: what we learned",
+        startsAt: at(4, 18, 50),
+        endsAt: at(4, 19, 30),
+        speakers: [id("zawadi")],
+      },
+    ],
+  });
+  for (const [who, status] of [
+    ["juma", "going"],
+    ["zawadi", "going"],
+    ["halima", "going"],
+    ["faraji", "maybe"],
+    ["amani", "going"],
+    ["tumaini", "going"],
+  ] as const) {
+    await api(who, "PUT", `/api/events/${meetup.id}/rsvp`, { status });
+  }
+  await api("daudi", "POST", "/api/events", {
+    ...plain,
+    channelId: rooms.golang,
+    kind: "meetup",
+    title: "Go night: profiling with pprof",
+    description: "Bring a laptop and a slow endpoint.",
+    startsAt: at(9, 18),
+    endsAt: at(9, 20),
+    location: "Kilele Labs, Masaki",
+  });
+  await api("zawadi", "POST", "/api/events", {
+    ...plain,
+    channelId: rooms.nuxt,
+    kind: "workshop",
+    title: "Workshop: i18n for the community website",
+    description: "Hands-on: Swahili routes and hreflang. Laptops with Node 22.",
+    startsAt: at(12, 10),
+    endsAt: at(12, 13),
+    online: true,
+    capacity: 20,
+  });
+  await api("neema", "POST", "/api/events", {
+    ...plain,
+    kind: "office_hours",
+    title: "Organisers' office hours",
+    description: "Ask us anything about speaking, sponsoring or the code of conduct.",
+    startsAt: at(2, 12),
+    endsAt: at(2, 13),
+    online: true,
+    recurrence: "FREQ=WEEKLY;COUNT=6",
+  });
+  return meetup.id;
 }
 
 async function seedProjects(

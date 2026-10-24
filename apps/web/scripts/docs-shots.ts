@@ -86,6 +86,61 @@ async function region(page: Page, target: Locator, margin = 16): Promise<Buffer>
 /** The whole window. */
 const window = (page: Page) => page.screenshot();
 
+/** An API request as one of the seeded people, for what a shot sets up off screen. */
+async function as(studio: Studio, who: string, method: string, path: string, body?: unknown) {
+  const response = await fetch(new URL(path, studio.base), {
+    method,
+    headers: {
+      Authorization: `Bearer ${studio.seeded.people[who]!.token}`,
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`${who}: ${method} ${path} → ${response.status} ${text}`);
+  return (text ? JSON.parse(text) : {}) as Record<string, unknown>;
+}
+
+const media = { permissions: ["microphone", "camera"] };
+
+/*
+ * A call in #general: Neema starts it, Juma and Zawadi join by voice, and the
+ * three are connected by the time this returns.
+ */
+async function callInGeneral(studio: Studio) {
+  // An earlier shot's call ends once the server notices its people gone,
+  // within about fifteen seconds; each shot starts its own.
+  for (let tries = 0; tries < 60; tries++) {
+    const now = await fetch(
+      new URL(`/api/rooms/${studio.seeded.rooms.general}/call`, studio.base),
+      {
+        headers: { Authorization: `Bearer ${studio.seeded.people.neema!.token}` },
+      },
+    );
+    const call = now.ok ? ((await now.json()) as { participants?: unknown[] } | null) : null;
+    if (!call?.participants?.length) break;
+    await Bun.sleep(1000);
+  }
+  const host = await open(studio, "neema", room(studio, "general"), media);
+  await host.getByRole("button", { name: "Start a call" }).click();
+  for (const who of ["juma", "zawadi"]) {
+    const guest = await open(studio, who, room(studio, "general"), media);
+    await guest
+      .locator("[data-call-banner]")
+      .getByRole("button", { name: "Join", exact: true })
+      .click();
+  }
+  await host.locator("[data-call-window] li").nth(2).waitFor();
+  await host.waitForTimeout(2500);
+  return host;
+}
+
+/** The call window, large. */
+async function expanded(page: Page) {
+  await page.keyboard.press("Shift+F");
+  await settle(page);
+}
+
 export const shots: Shot[] = [
   /* ----------------------------------------------------------- using-tdc */
   {
@@ -225,6 +280,215 @@ export const shots: Shot[] = [
       await host.waitForTimeout(4000);
       await settle(host);
       return window(host);
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "call-presenting",
+    async take(studio) {
+      const host = await callInGeneral(studio);
+      await expanded(host);
+      // The fake capture device's test pattern stands in for a screen.
+      await host.getByRole("button", { name: "Share your screen" }).click();
+      await host.getByText("You are presenting").first().waitFor();
+      await as(studio, "juma", "PUT", `/api/rooms/${studio.seeded.rooms.general}/call/hand`);
+      await as(studio, "zawadi", "PUT", `/api/rooms/${studio.seeded.rooms.general}/call/hand`);
+      await host.getByText("Hands up: 2").first().waitFor();
+      await as(studio, "juma", "POST", `/api/rooms/${studio.seeded.rooms.general}/call/reactions`, {
+        kind: "clap",
+      });
+      await host.waitForTimeout(600);
+      return window(host);
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "call-recording",
+    async take(studio) {
+      const host = await callInGeneral(studio);
+      await host.getByRole("button", { name: "Record the call" }).click();
+      await host.getByText("You are recording this call").first().waitFor();
+      await settle(host);
+      return region(host, host.locator("[data-call-window] [role=region]").first());
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "call-links",
+    async take(studio) {
+      const host = await callInGeneral(studio);
+      await as(studio, "neema", "POST", `/api/rooms/${studio.seeded.rooms.general}/call/links`, {
+        label: "Speakers' green room",
+        lobby: true,
+        passcode: "",
+        expiresInHours: 24,
+        maxUses: 10,
+      });
+      await expanded(host);
+      await host.getByRole("button", { name: "Links to this call" }).click();
+      await host.getByLabel("Label (optional)").fill("Guests from DevFest Arusha");
+      await host.getByText("Let people without an account join").click();
+      await settle(host);
+      return window(host);
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "call-guest",
+    async take(studio) {
+      await callInGeneral(studio);
+      const link = await as(
+        studio,
+        "neema",
+        "POST",
+        `/api/rooms/${studio.seeded.rooms.general}/call/links`,
+        { label: "Guest speaker", lobby: true, guests: true, passcode: "", expiresInHours: 24 },
+      );
+      const url = String(link.url ?? `/call/${String(link.secret)}`);
+      const page = await open(studio, null, new URL(url, studio.base).pathname, media);
+      return window(page);
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "events",
+    async take(studio) {
+      return window(await open(studio, "juma", "/events"));
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "events-month",
+    async take(studio) {
+      return window(await open(studio, "juma", "/events?view=month"));
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "events-week",
+    async take(studio) {
+      const page = await open(studio, "juma", "/events?view=week");
+      // On to the week the meetup is in, which may be the next.
+      for (let step = 0; step < 2; step++) {
+        if (await page.getByText("Dar Devs monthly meetup").count()) break;
+        await page.getByRole("button", { name: "Next" }).click();
+        await settle(page);
+      }
+      return window(page);
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "event",
+    async take(studio) {
+      return window(await open(studio, "juma", `/events/${studio.seeded.event}`));
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "automatic-replies",
+    async take(studio) {
+      const page = await open(studio, "rehema", "/settings");
+      return region(page, page.locator("[data-automatic-replies]"));
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "automatic-reply-mark",
+    async take(studio) {
+      const page = await open(studio, "rehema", room(studio, "general"));
+      const mark = page.getByText("Automatic reply on").first();
+      await mark.waitFor();
+      const box = (await mark.boundingBox())!;
+      return page.screenshot({ clip: { x: 0, y: box.y - 72, width: 240, height: 120 } });
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "translation-settings",
+    async take(studio) {
+      const page = await open(studio, "juma", "/settings");
+      return region(page, page.locator("#translation"));
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "translation",
+    async take(studio) {
+      const page = await open(studio, "juma", room(studio, "general"));
+      const message = page.locator(`[data-message-id="${studio.seeded.messages.swahili}"]`).first();
+      await message.scrollIntoViewIfNeeded();
+      await message.hover();
+      await message.getByRole("button", { name: "Translate", exact: true }).click();
+      await page.getByText("Welcome, Amani!").first().waitFor();
+      await message.hover();
+      await settle(page);
+      return window(page);
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "api-tokens",
+    async take(studio) {
+      const page = await open(studio, "neema", "/settings");
+      return region(page, page.locator("[data-api-tokens]"));
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "scheduled",
+    async take(studio) {
+      const page = await open(studio, "neema", room(studio, "general"));
+      await page
+        .getByRole("button", { name: /Scheduled messages/ })
+        .first()
+        .click();
+      await settle(page);
+      return window(page);
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "upload",
+    async take(studio) {
+      const page = await open(studio, "zawadi", room(studio, "nuxt"));
+      // A slow connection, so the picture catches the upload part way.
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Network.emulateNetworkConditions", {
+        offline: false,
+        latency: 40,
+        downloadThroughput: 4_000_000,
+        uploadThroughput: 300_000,
+      });
+      await page.getByLabel("Choose files to attach").setInputFiles({
+        name: "meetup-recording-raw.mp4",
+        mimeType: "video/mp4",
+        buffer: Buffer.alloc(24 * 1024 * 1024, 7),
+      });
+      await page.waitForTimeout(5000);
+      return window(page);
+    },
+  },
+  {
+    guide: "using-tdc",
+    name: "transfer-offer",
+    async take(studio) {
+      const direct = `/rooms/${studio.seeded.direct}`;
+      const receiver = await open(studio, "amani", direct);
+      const sender = await open(studio, "neema", direct);
+      await sender.getByRole("button", { name: "Attach", exact: true }).first().click();
+      const chooser = sender.waitForEvent("filechooser");
+      await sender.getByText("Send directly…").click();
+      await (
+        await chooser
+      ).setFiles({
+        name: "venue-walkthrough.mov",
+        mimeType: "video/quicktime",
+        buffer: Buffer.alloc(3 * 1024 * 1024, 1),
+      });
+      await receiver.getByRole("button", { name: "Accept" }).waitFor();
+      await settle(receiver);
+      return window(receiver);
     },
   },
   {
@@ -478,6 +742,21 @@ export const shots: Shot[] = [
     async take(studio) {
       const page = await open(studio, "neema", "/admin");
       return region(page, section(page, "Other servers"));
+    },
+  },
+  {
+    guide: "hosting",
+    name: "backups",
+    async take(studio) {
+      const page = await open(studio, "neema", "/backups");
+      return window(page);
+    },
+  },
+  {
+    guide: "hosting",
+    name: "roles",
+    async take(studio) {
+      return window(await open(studio, "neema", "/roles"));
     },
   },
   {

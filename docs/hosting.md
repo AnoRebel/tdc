@@ -281,6 +281,8 @@ finds them by name. Their descriptions and permissions are yours to change.
 Roles beyond them are yours to make, from the screen or under
 `/api/admin/roles`.
 
+![Roles and permissions: Administrator and Member, built in, and two made here, Event hosts and Moderators, each with how many permissions it allows and how many people hold it, and a search for what one person may do](images/hosting/roles.webp)
+
 #### Setting up a moderator from the screen
 
 **Settings → Administration → Roles and permissions** is where this is done.
@@ -1747,6 +1749,8 @@ server's storage, where it can be downloaded. It is the one to use for
 "keep a copy of this channel", "everything except the files", a backup before a
 risky change, and restoring parts of a server. It needs the `server.backup`
 permission, which administrators hold and nobody else does unless granted it.
+
+![The Backups page: what to keep, with parts another part needs ticked and greyed, a passphrase twice, Start the backup, and one archive made by hand with download, Restore and delete](images/hosting/backups.webp)
 
 **`pg_dump`** is the whole database exactly as Postgres holds it, restorable by
 Postgres's own tools whatever happens to TDC. It is the one to use for disaster

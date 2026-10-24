@@ -148,6 +148,8 @@ starts with nothing ticked, and the form counts what the token will be denied
 as you choose. It can never do more than your account, and when your account
 loses a permission, its tokens lose it in the same moment.
 
+![Settings, API tokens: Backup script, which may only read channels, and Meetup calendar sync, which may read and post, each with when it was made and a Revoke button, and Create token below](images/using-tdc/api-tokens.webp)
+
 **The token is shown once**, when it is made, with a button to copy it. It is
 stored only in a form nobody can turn back into the token, so a lost one is
 revoked and replaced rather than recovered. The list shows each token's name,
@@ -318,6 +320,8 @@ time, **sent now**, or **cancelled** — cancelling asks first, since the words 
 with it. Sending now goes through the same checks it would have met later: if
 you may no longer post there, you are told at once rather than finding out
 tomorrow.
+
+![Scheduled messages: two messages waiting, one for Announcements in 20 hours and one for General tomorrow, each with Send now, Change time, Edit and Cancel message](images/using-tdc/scheduled.webp)
 
 A message the server has begun sending can no longer be changed or cancelled;
 for the moment it takes, it is already on its way.
@@ -501,6 +505,8 @@ replaced by the translation, marked "Translated from Swahili · Show original",
 and **Show original** puts the words back as written. Threads work the same
 way.
 
+![A message from Halima in the General channel shown in English, marked Translated from Swahili with Show original beside it](images/using-tdc/translation.webp)
+
 You can also have translation happen without asking:
 
 - **Everything on this server** — in **Settings → Translation**.
@@ -515,6 +521,8 @@ which occasionally costs a little fluency around inline code.
 
 **Which language.** The one you read the interface in, unless you choose another
 in **Settings → Translation**.
+
+![Settings, Translation: the language to translate into, the provider, the switch for translating everything automatically, and the providers with which are available and connected](images/using-tdc/translation-settings.webp)
 
 **Where it happens, and who sees your messages.** You choose the provider. By
 default it is the first of these that works for you:
@@ -555,6 +563,8 @@ to send does not lose the file.
 While a file is uploading you see real progress — the actual transfer, not an
 animation — and you can cancel it, or retry without choosing the file again. The
 conversation stays usable throughout.
+
+![A 24 MB video uploading above the composer in the nuxt channel: its name, 1.4 MB of 24 MB sent, a progress bar and a button to cancel](images/using-tdc/upload.webp)
 
 **A message can be just its files.** Pick a photo and press send without
 writing anything; it goes as a message on its own, in a channel, a thread, a
@@ -625,6 +635,8 @@ one. The name and size are what your device says; nothing has been checked by
 the server, because the server never sees the file. Nothing is sent until they
 accept.
 
+![A card in the corner of the screen: Neema Mushi wants to send venue-walkthrough.mov, 3.0 MB, directly, with the note about network addresses, Accept and Decline](images/using-tdc/transfer-offer.webp)
+
 **While it goes,** both of you see progress and speed, and either of you can
 stop it. On a browser that can (Chrome, Edge and other Chromium browsers),
 accepting asks where to save the file and writes it to disk as it arrives, so
@@ -693,6 +705,8 @@ change back or the status clears itself. The foot of the sidebar says
 **Automatic reply on**, with a small speech-bubble mark, for as long as one is
 answering.
 
+![The foot of the sidebar for Rehema, with the speech-bubble mark under her name that says an automatic reply is on](images/using-tdc/automatic-reply-mark.webp)
+
 Settings → **Automatic replies** is where they are made in full. Each one has:
 
 - **What it says.** Up to 500 characters, formatted as a message is. You can
@@ -705,6 +719,8 @@ Settings → **Automatic replies** is where they are made in full. Each one has:
 - **What it answers.** Direct messages, group conversations, mentions in
   channels — any of them.
 - **A preview** of the reply exactly as the person receiving it will see it.
+
+![Settings, Automatic replies: one reply, on now for any status, saying Rehema is at DevFest Arusha until Monday and to ask Daudi, with a switch, edit and delete](images/using-tdc/automatic-replies.webp)
 
 You can keep several, and switch each on and off without losing it. Where more
 than one applies, the one made first answers.
@@ -1249,6 +1265,8 @@ your name and is gone after a few seconds; nothing is kept. Whoever presents
 sees a running count of the reactions their presentation has drawn. With
 reduced motion, reactions fade in place instead of floating.
 
+![The call window made large: Neema presenting a shared screen (here a test pattern), two hands up in order, Juma and then Zawadi, and a clap from Juma rising over the call](images/using-tdc/call-presenting.webp)
+
 **Letting somebody control your screen.** When you present your whole screen
 from the TDC desktop application, the others in the call see **Ask to control**
 on your screen. If somebody asks, the call window shows their name with
@@ -1290,6 +1308,8 @@ minimized bar. Somebody joining a call that is being recorded is told who is
 recording before any of their sound or picture is sent, and can choose **Don't
 join** instead.
 
+![The call window with a red bar saying Recording, You are recording this call, above the controls, and the record button showing as stop](images/using-tdc/call-recording.webp)
+
 The recording is made on your own device — the stage (the screen being
 presented, or everybody's tiles with their names) and everybody's sound mixed
 together — so it holds what your device received: if your connection dropped
@@ -1316,6 +1336,8 @@ Links already made are listed below the form, with a button to withdraw each. A
 link to a call that has not started waits for it. People waiting in a lobby are
 listed in the call window, with **Let in** and a button to turn each away.
 
+![Making a link to a call in the call window: a label, switches for a lobby, for guests and for a passcode, an expiry and a limit on uses, Make link, and a link already made, Speakers' green room, below](images/using-tdc/call-links.webp)
+
 **Guests.** Where the server's operator allows it, a link can also let in
 people with no account here — a speaker from elsewhere, a client. Switch on
 _Let people without an account join_ when making the link. Whoever opens it is
@@ -1324,6 +1346,8 @@ shown by. A guest is in the call and nowhere else: they cannot open its
 conversation or anything else on the server, everybody in the call sees them
 marked _Guest_, and when the last person who belongs to the conversation
 leaves, the call ends for the guests too. Guests join from a web browser.
+
+![The page a call link opens, signed out: a call in General with three people in it, Sign in to join, and below it a name to be shown by and Join as a guest](images/using-tdc/call-guest.webp)
 
 ### Several calls at once
 
@@ -1400,6 +1424,12 @@ under **Past**, what has been), as a **month**, or as a **week**, and can be
 narrowed to one channel. A channel also shows its next event in a line under
 its header. Each occurrence of a repeating event is its own entry.
 
+![Events as an agenda: office hours each Monday, the monthly meetup marked Going, a Go night and a workshop, each with its time, channel and place](images/using-tdc/events.webp)
+
+![The same events as a month, each a line on its day](images/using-tdc/events-month.webp)
+
+![The week the meetup falls in, each event under its day with its time](images/using-tdc/events-week.webp)
+
 The Events page is there only where your operator offers events, which a new
 server does.
 
@@ -1449,6 +1479,8 @@ what they do is in the audit log.
 On an event's page, answer **Going**, **Maybe** or **Not going**, and change
 your answer whenever you like until it is over. An answer to a repeating event
 covers every occurrence.
+
+![An event's page: the Dar Devs monthly meetup with its date, place and description, an agenda of two talks with their speakers, who is coming, and on the right Going, Maybe and Not going, the places left, a reminder switch, the hosts and ways to add it to a calendar](images/using-tdc/event.webp)
 
 If an event has a number of places and they are taken, **Going** puts you on the
 **waiting list**, and the page says your place in it. When somebody going
