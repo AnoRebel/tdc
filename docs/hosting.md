@@ -554,7 +554,7 @@ The settings that have no section of their own below:
 | `registration.domains`                            | —         | Email domains that may register under `domain`, comma-separated, like `example.com` |
 | `limits.max_users`                                | `0`       | Most accounts; `0` is no limit                                                      |
 | `limits.max_channels`                             | `0`       | Most channels; `0` is no limit                                                      |
-| `limits.max_storage_bytes`                        | `0`       | Most attachment storage, in bytes; `0` is no limit                                  |
+| `limits.max_storage_bytes`                        | `0`       | Most file storage in bytes, uploads in progress too; `0` is no limit                |
 | `filter.words`                                    | —         | Words to act on, comma-separated. Empty is no filtering                             |
 | `filter.action`                                   | `flag`    | What happens to a matching message: `flag`, `mask` or `block`                       |
 | `moderation.obscure_sensitive_media`              | `true`    | Hide media marked sensitive until a viewer chooses to see it                        |
@@ -585,6 +585,7 @@ in **What this server offers** on the server settings page:
 | Feature                | Default | What it is                                                             |
 | ---------------------- | ------- | ---------------------------------------------------------------------- |
 | `attachments`          | on      | Uploading files and images                                             |
+| `direct-transfers`     | on      | Sending a file straight to another device; see [Files](#files)         |
 | `invitations`          | on      | Issuing invitation links and codes                                     |
 | `public-directory`     | on      | Listing public channels to people who have not joined them             |
 | `scheduled-messages`   | on      | Sending a message at a chosen time                                     |
@@ -639,6 +640,151 @@ under `legal` so a client can show them before anybody has signed in.
 Each must be an `http` or `https` link. Leave one empty and the clients show
 nothing for it — never the templates, because a template is not a promise you
 have made.
+
+### Files
+
+Every file a member sends is uploaded to this server, in pieces, and kept in
+the configured storage (`storage.backend`: a directory by default, or an S3
+bucket) under its SHA-256, so the same file sent twice occupies one place. A
+file can also go straight between two members' devices without being stored
+here at all. These are the settings, all of which change without a restart:
+
+| Setting                           | Default | What it does                                                                                                  |
+| --------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `files.max_file_bytes`            | 100 MiB | The largest single file                                                                                       |
+| `files.max_message_bytes`         | 250 MiB | The largest total one message may carry (and at most ten files)                                               |
+| `files.quota_per_person_bytes`    | `0`     | What one person's files may occupy, counted once per distinct file, uploads in progress included; `0` is none |
+| `limits.max_storage_bytes`        | `0`     | What all files together may occupy, uploads in progress and copies of other servers' files included           |
+| `files.upload_piece_bytes`        | 4 MiB   | The size of the pieces clients upload in, from 256 KiB to 8 MiB. Keep it under your proxy's body limit        |
+| `files.abandoned_after_hours`     | `24`    | When an unfinished upload, or a file uploaded and never sent, is removed                                      |
+| `files.federation_copy_max_bytes` | 100 MiB | The largest file this server copies from another when a member opens it; `0` is no limit                      |
+| `files.direct_transfer_relay`     | `true`  | Whether direct transfers may use your TURN relay                                                              |
+
+Malware scanning (`attachments.scanner_address`, off unless set) applies to
+every file however it arrives — uploaded in one request, in pieces, or copied
+from another server. Whatever a file calls itself, its type is decided from its
+bytes, executables are refused, and everything is served so that nothing a
+member sent can run in the application.
+
+#### How uploads work, and what your proxy must allow
+
+Both clients send every file in pieces: they declare it (every limit is checked
+then, against the declared size, before a byte is sent), send pieces of
+`files.upload_piece_bytes` in order, and finish it, at which point the file is
+joined, typed, scanned and stored exactly as a file sent in one request is. Each
+piece is stored as its own object, so pieces may land on different nodes, and a
+dropped connection costs one piece rather than the file. Only the uploader can
+see or add to an upload. Integrations may still upload in one request
+(`POST /api/rooms/:id/attachments`).
+
+So your reverse proxy needs to accept a body **a little larger than one piece**
+— not as large as the largest file. The desktop client sends a piece as base64
+in JSON, a third larger than the piece:
+
+| Proxy   | Default body limit | What to set for the default 4 MiB pieces                                                         |
+| ------- | ------------------ | ------------------------------------------------------------------------------------------------ |
+| nginx   | 1 MiB              | `client_max_body_size 8m;` — or `files.upload_piece_bytes = 524288` and leave nginx alone        |
+| Caddy   | none               | nothing                                                                                          |
+| Traefik | none               | nothing (a `buffering` middleware's `maxRequestBodyBytes` must be at least 8 MiB if you use one) |
+
+If integrations upload large files in one request, the proxy must allow
+`files.max_file_bytes` for that route as well. A piece takes a few seconds even
+on a slow link, so the ordinary read timeout is enough; there is no long
+request to keep alive.
+
+**What an upload costs the server while it runs.** Memory stays small: a raw
+piece streams to disk, and a base64 one is decoded in memory, about 15 MB at
+most per piece arriving at that moment. Disk is the cost: while a file is being
+finished, its pieces, the joined copy in the system's temporary directory and
+the stored file exist together, so for a moment it occupies about three times
+its size (with S3 the pieces and the stored file are in the bucket and only the
+joined copy is local). Give the temporary directory room for a few of your
+largest files at once.
+
+**Quotas.** A file being uploaded reserves its declared size against the
+person's quota and the server's limit from the moment it begins, so twenty
+people starting large uploads at once cannot together pass a limit each would
+pass alone. Nobody may have more than 20 uploads in progress. A member sees
+their own use against their quota where they attach files; you see the
+server's on the settings page.
+
+**Cleanup.** Every ten minutes each node removes uploads nobody has added to for
+`files.abandoned_after_hours`, with their pieces, and files that were uploaded
+but never sent in a message for as long. Deleting a message deletes its files;
+a stored file is removed once no message refers to it. Nothing needs running by
+hand.
+
+#### What files cost: a guide with numbers
+
+Disk grows with what people send and is the cost that never goes away by
+itself; bandwidth grows with how many people open each file. Images are reduced
+before sending unless somebody chooses the original, so a typical photograph is
+a few hundred kilobytes, and previews are tens of kilobytes. Take, as a
+starting guess, an average of 1 MB a file, and a tenth of members each sending
+three files on a given day, plus a few large files (recordings, archives) a
+week:
+
+|                                                     | 500 members                        | 5,000 members                     |
+| --------------------------------------------------- | ---------------------------------- | --------------------------------- |
+| Files a day                                         | ~150, ~150 MB                      | ~1,500, ~1.5 GB                   |
+| Large files a week (100 MB each)                    | 5, ~0.5 GB                         | 50, ~5 GB                         |
+| **Disk a month**                                    | **~6.5 GB**                        | **~65 GB**                        |
+| **Disk a year**                                     | **~80 GB**                         | **~800 GB**                       |
+| Uploads in (a month)                                | ~6.5 GB                            | ~65 GB                            |
+| Downloads out, if each file is opened by ten people | ~65 GB/month (~0.2 Mbit/s average) | ~650 GB/month (~2 Mbit/s average) |
+
+Busy hours carry several times the average. Previews make browsing a
+conversation cheap; it is opening originals that costs bandwidth. With S3 and a
+store that serves presigned links, downloads go from the bucket rather than
+through this server, which moves the outbound cost to the bucket.
+
+Ways to keep the numbers down: lower `files.max_file_bytes` (most of the disk
+is in the few largest files), set `files.quota_per_person_bytes` (5 GB a person
+caps 500 members at 2.5 TB in the worst case), set message retention
+(`moderation.retention_seconds`, whose expiry takes the files too), and point
+people at direct transfers for the very large ones.
+
+#### Files across servers
+
+In a room shared with another server, a message describes its files — name,
+type, size and SHA-256 — in what its author's server signs, and every server
+records them. The bytes are copied the first time one of that server's members
+opens a file: a server holding a copy of somebody else's room asks the room's
+home server, and the home server asks the server whose member sent it. Each copy
+is checked against the signed digest, typed again, held to this server's own
+limits and scanner, and made **once per server** however many members open it.
+See [the protocol](federation-protocol.md#files).
+
+**Who pays.** The sender's server stores the original. Your server stores a copy
+of each file from elsewhere that one of your members opened, and when you host
+a room, a copy of every file a member elsewhere sent that anybody anywhere
+opened — hosting a room is hosting its files. Copies count against
+`limits.max_storage_bytes`. Each copy costs its size once in, and serving it to
+other servers costs its size once out per server. A file larger than
+`files.federation_copy_max_bytes` is not copied, and your members see its name
+and size with an explanation instead. Copies are removed when the message is
+deleted on its home server.
+
+#### Direct transfers
+
+In a direct conversation, a member can offer a file straight to the other
+person's device over a WebRTC data channel. The server records the offer, which
+lapses after ten minutes; relays the two devices' negotiation over the live
+connection, only once the recipient has accepted and only between those two;
+and hands out the same connection servers as calls (`calls.stun_urls`,
+`calls.turn_urls`). The file never touches this server's disk. Turn the
+`direct-transfers` feature off to stop them.
+
+Without a STUN server only devices on one network, or with public addresses,
+can reach each other; with STUN most home connections can; devices behind
+strict carrier NAT — common on mobile data — need your TURN relay. **A relayed
+transfer passes through the relay twice**: a 2 GB file costs the relay 4 GB of
+traffic, and no disk. If that is a cost you would rather not carry, set
+`files.direct_transfer_relay = false`: calls keep the relay and transfers that
+cannot connect directly offer to send the file through the server instead —
+which costs the file's size in, its size out per person who opens it, and the
+disk until it is deleted. When either person is offline, declines or does not
+answer, the same fallback is offered.
 
 ### Talking to other servers
 
@@ -1307,9 +1453,11 @@ protocol ping every 45 seconds by default. A proxy read timeout shorter than
 that closes connections constantly; clients reconnect, and nothing is lost, but
 the churn is pointless. Give it comfortably more than the keepalive interval.
 
-**Let attachments through.** Set the proxy's maximum body size to at least the
-largest upload you intend to allow, or uploads fail at the proxy with an error
-the application never sees and cannot explain.
+**Let file pieces through.** Clients upload files in pieces of
+`files.upload_piece_bytes` (4 MiB by default), so the proxy's maximum body size
+needs to be at least 8 MiB — nginx's default of 1 MiB is not — or uploads fail
+at the proxy with an error the application never sees and cannot explain. See
+[Files](#files) for the alternatives.
 
 Once TLS is in front, remove `TDC_SERVER_SECURE_COOKIES: "false"` from the
 compose file, and bind the server's port to loopback so that the plain-HTTP port
@@ -1350,7 +1498,7 @@ another machine.
 | Server settings and branding            | Runtime policy, feature switches, statuses, the legal documents, the server's signing key                                                                             | —                            |
 | Accounts and roles                      | Accounts, password hashes and second factors, roles and grants, privacy settings, automatic replies, calendar addresses, blocks                                       | —                            |
 | Channels and messages                   | Every room (or chosen channels) and everything in it: members, messages, reactions, pins, calls held, events and who is going, followed calendars, attachment records | Accounts                     |
-| Attached files                          | The bytes of those attachments and their previews                                                                                                                     | Channels                     |
+| Attached files                          | The bytes of files uploaded here and their previews — not copies of other servers' files, which are fetched again when next opened                                    | Channels                     |
 | Projects and issues                     | Projects, issues, states, cycles, milestones, views                                                                                                                   | Accounts, every channel      |
 | Directory                               | Profiles, companies, skills, enquiries, engagements and agreements                                                                                                    | Accounts, channels, projects |
 | Integrations, webhooks and applications | Applications, tokens, incoming webhooks, subscriptions and their delivery history                                                                                     | Accounts, every channel      |
@@ -1364,7 +1512,8 @@ Each event has a conversation of its own, so a backup of only some channels
 holds no events.
 
 What is never in a backup: sessions, sign-ins and recovery links in progress,
-presence and typing, who was sent an automatic reply today, and the record of backups and restarts themselves. Each
+presence and typing, who was sent an automatic reply today, uploads still in
+progress, offers of direct transfers, and the record of backups and restarts themselves. Each
 either lapses within minutes or describes the running server rather than the
 community. After a restore everybody signs in again.
 

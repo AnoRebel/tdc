@@ -414,6 +414,54 @@ The room's own rules apply to a remote join exactly as to a local one — public
 rooms only, not archived. The joining server's rules are irrelevant: the room's
 home server decides who is in its rooms, or membership means nothing.
 
+## Files
+
+A message's files travel as descriptions inside its signed content, and their
+bytes are fetched separately, only when somebody opens one:
+
+```json
+"content": {
+  "body": "",
+  "attachments": [
+    { "id": "6f1c…", "filename": "beach.png", "contentType": "image/png",
+      "size": 482113, "sha256": "9b2f…", "width": 1600, "height": 1200, "caption": "" }
+  ]
+}
+```
+
+The `sha256` is the part that matters. It is signed by the author's server, so
+bytes obtained from anywhere can be checked against it, and the server they came
+through is trusted for availability and nothing else. `filename` and
+`contentType` are the author's claims; a receiver decides the type again from
+the bytes. A description whose `sha256` is not 64 lowercase hex characters, or
+whose `size` is negative, is ignored; at most ten files are honoured per message.
+
+```
+GET /api/federation/rooms/{slug}/files/{sha256}
+```
+
+Signed like every other request, with an empty body. Answered with the raw
+bytes (`application/octet-stream`, `Content-Length` set) only when the signing
+peer participates in the room — it is in the room's peers — and a sent message
+in that room carries a file with that digest. Anything else is **404**, the
+same for "no such room", "not yours to read" and "never sent", so asking for
+digests in turn learns nothing.
+
+**Where to ask.** A replica asks the room's **home server**; the home server,
+for a file one of its remote members sent, asks **that member's server** (the
+event's `origin`). The home server is the one server every participant already
+talks to, so this follows authorisation that exists rather than needing a
+membership check no replica could make. A home server asked for a file it has
+not copied yet copies it from the origin first, then answers.
+
+**What a receiver checks** before storing a copy: it reads no more than the
+described `size` plus one byte; the length must equal `size`; the SHA-256 must
+equal `sha256`; the type is detected from the bytes and must pass the
+receiver's own type limits and scanner; and the file must be within the
+receiver's `files.federation_copy_max_bytes` and storage limit. A copy is made
+once per server, however many of its members open it, and a deletion arriving
+from the home server (`message.deleted` with `redacts`) removes it.
+
 ### Retry, and giving up
 
 Delivery retries with exponential backoff and jitter (2s doubling to 5 minutes,

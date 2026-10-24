@@ -161,6 +161,13 @@ the event type:
 | `project`        | `{id, key}`, for an event in a project or one of its issues' discussions |
 | `issue`          | `{id, key}`, for a comment in an issue's discussion                      |
 
+A `message.sent` that carries files describes them in `event.content.attachments`
+— `id`, `filename`, `contentType`, `size`, `sha256`, and `width`, `height` and
+`caption` where they apply — and its `body` may then be empty. Fetch a file with
+`GET /api/attachments/:id` using the `id` from the timeline rather than from the
+content: for a file sent from another server, the content carries that server's
+identifier and the timeline this one's.
+
 `type` is what you asked for and `event.type` what was stored, and they differ
 for the three names the server gives an event by reading it: `issue.commented`
 carries the `message.sent` it is, and `issue.closed` and `issue.reopened` the

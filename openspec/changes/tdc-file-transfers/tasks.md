@@ -45,7 +45,7 @@ Scope note: these tasks implement the file-transfer requirements of `messaging/a
 
 ## 6. Documentation and checks
 
-- [ ] 6.1 User guide: sending files, large files, files from other servers, direct transfers, what the other person sees
-- [ ] 6.2 Hosting guide: the settings, a disk and bandwidth guide for 500 and 5,000 members, proxy body sizes, quotas, relay cost, federation storage, cleanup, backups
-- [ ] 6.3 Integration guide: the upload protocol; webhooks: the `attachments` descriptors in `message.sent`
+- [x] 6.1 User guide: sending files, large files, files from other servers, direct transfers, what the other person sees
+- [x] 6.2 Hosting guide: the settings, a disk and bandwidth guide for 500 and 5,000 members, proxy body sizes, quotas, relay cost, federation storage, cleanup, backups
+- [x] 6.3 Integration guide: the upload protocol; webhooks: the `attachments` descriptors in `message.sent`
 - [ ] 6.4 Payload budget measured; a browser check against a running server

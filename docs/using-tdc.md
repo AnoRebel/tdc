@@ -546,6 +546,30 @@ While a file is uploading you see real progress — the actual transfer, not an
 animation — and you can cancel it, or retry without choosing the file again. The
 conversation stays usable throughout.
 
+**A message can be just its files.** Pick a photo and press send without
+writing anything; it goes as a message on its own, in a channel, a thread, a
+direct conversation, a message scheduled for later, or a room on another server.
+Notifications for it name the files.
+
+**Large files survive a bad connection.** Every file is sent in pieces (4 MB
+each, unless your server's operator chose otherwise). If the connection drops —
+a train going into a tunnel, Wi-Fi handing over to mobile data — the upload
+waits, asks the server how much arrived, and carries on from there instead of
+starting again. Only after a minute and a half without getting anywhere does it
+give up and offer to try again. Closing the page stops it; a half-sent file is
+removed by the server after a day.
+
+**How large?** The server's limits — by default 100 MB a file and 250 MB a
+message, at most ten files — apply however you send. Your operator may also set
+a **quota** on what your files take up altogether; where there is one, the
+attach menu shows how much you have used, and a file that would go over it is
+refused before any of it is sent. Sending the same file twice costs your quota
+once.
+
+On the desktop application, saving a file asks where to put it and writes it
+straight there, so a file of any size saves without filling the computer's
+memory.
+
 The server enforces its own size and type limits regardless of what the client
 checked, and a refusal names the limit you exceeded rather than failing vaguely.
 A file's type is determined from its contents rather than from its name or what
@@ -563,6 +587,49 @@ Images, animated images, video, audio and PDFs open in a viewer over the
 conversation, with the keyboard to dismiss it and to move between the files on
 one message. A type that cannot be displayed still shows its name, size and type
 with a download.
+
+### Files from other servers
+
+In a room shared with another server, files work as they do anywhere else: what
+you send reaches the people there, and what they send reaches you. A file from
+elsewhere is copied to your server the first time anybody here opens it, so the
+**first view may take a moment** — as long as copying it takes — and every view
+after that is as fast as a file sent here. Your server checks that what it copied
+is exactly what the sender's server signed for; if it is not, or if the file is
+larger than your server copies from elsewhere (100 MB unless your operator chose
+otherwise), you see the file's name and size with an explanation instead.
+
+### Sending a file directly
+
+In a direct conversation with one person, the attach menu has **Send directly…**.
+The file then goes straight from your device to theirs, without being stored
+on the server — useful for something very large, or something you would rather
+did not rest on a server at all. Both of you need to be online and in TDC at the
+same time.
+
+**What they see.** A card in the corner of their screen: your name, the file's
+name and size, **Accept** and **Decline**, and a note that accepting connects
+the two devices, so each can see the other's network address — and so can a
+relay, if the two cannot reach each other directly and your server provides
+one. The name and size are what your device says; nothing has been checked by
+the server, because the server never sees the file. Nothing is sent until they
+accept.
+
+**While it goes,** both of you see progress and speed, and either of you can
+stop it. On a browser that can (Chrome, Edge and other Chromium browsers),
+accepting asks where to save the file and writes it to disk as it arrives, so
+any size works. Elsewhere — Firefox, Safari, the desktop application — the file
+is gathered as it arrives and offered as a download at the end, which suits
+files up to a few gigabytes.
+
+**When it does not work** — they are offline, they decline, nobody answers in
+ten minutes, or your two devices cannot reach each other — you are offered
+**Send through the server instead**, which uploads the same file as an ordinary
+message without choosing it again. A direct transfer that breaks part way does
+not resume; sending through the server does.
+
+A direct transfer leaves nothing in the conversation. If you want a record that
+you sent something, say so in a message.
 
 ### Sensitive media
 

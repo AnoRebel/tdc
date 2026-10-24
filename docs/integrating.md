@@ -534,7 +534,9 @@ the same token returns the original message rather than posting a second one.
 Without it, a request that succeeded on the server and failed on the way back
 becomes a duplicate message every time the caller retries.
 
-`attachmentIds` carries files uploaded beforehand — see below.
+`attachmentIds` carries files uploaded beforehand — see below. A message may be
+nothing but its files: with `attachmentIds`, `body` may be empty or absent.
+With neither, it is refused as empty.
 
 Editing and deleting are `PATCH` and `DELETE` on
 `/api/rooms/:id/messages/:eventId`, and both also answer **201** with the
@@ -855,13 +857,17 @@ A file is uploaded to the room first, and the returned identifier is then
 attached to a message. That order is deliberate — a refusal costs only the
 upload, and a message that fails to send does not take the file with it.
 
+For a small file, one request:
+
 ```sh
 curl -X POST "http://localhost:8080/api/rooms/$ROOM/attachments" \
   -H "Authorization: Bearer $TOKEN" \
   -F file=@diagram.png
 ```
 
-Then send a message with `{"body":"…","attachmentIds":["<id>"]}`.
+Then send a message with `{"body":"…","attachmentIds":["<id>"]}` — or with no
+body at all. An upload never sent in a message is removed after
+`files.abandoned_after_hours` (a day by default).
 
 Ask what the server will accept before uploading:
 
@@ -869,14 +875,86 @@ Ask what the server will accept before uploading:
 curl http://localhost:8080/api/attachments/limits -H "Authorization: Bearer $TOKEN"
 ```
 
-which gives `maxFileSize`, `maxMessageSize`, `maxPerMessage`, `allowedTypes` and
-`blockedTypes`. The server enforces all of them regardless of what a client
-checked, and a refusal names the limit that was broken. The declared content
-type is not believed: the type is detected from the file's own bytes, and that
-detected type is what governs.
+which gives `maxFileSize`, `maxMessageSize`, `maxPerMessage`, `allowedTypes`,
+`blockedTypes`, the caller's `quota` (0 for none) and what they `used` of it
+(uploads in progress included), and `pieceBytes` for uploads in pieces. The
+server enforces all of them regardless of what a client checked, and a refusal
+names the limit that was broken: **413** for a file or message too large,
+**415** for a type not allowed, **507** for a quota or the server's storage.
+The declared content type is not believed: the type is detected from the file's
+own bytes, and that detected type is what governs.
 
 Downloading is `GET /api/attachments/:id`, authenticated and authorised —
 knowing where a file is stored grants nothing on its own.
+
+#### Large files: uploading in pieces
+
+A single request needs a reverse proxy that accepts a body as large as the file
+and a connection that stays up for as long as it takes. For anything large, send
+it in pieces instead — this is what both TDC clients do for every file:
+
+```sh
+# 1. Declare it. Every limit is checked here, before a byte is sent:
+#    413, 415 (later, on finish), 507, or 429 with 20 uploads already in progress.
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/uploads" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"filename":"recording.mp4","size":734003200}'
+# → 201 {"id":"…","size":734003200,"received":0,"pieces":0,"pieceBytes":4194304,…}
+
+# 2. Send pieces 0, 1, 2, … in order, each exactly pieceBytes except the last.
+split -b 4194304 -d -a 6 recording.mp4 piece.
+n=0; for f in piece.*; do
+  curl -X PUT "http://localhost:8080/api/uploads/$UPLOAD/pieces/$n" \
+    -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/octet-stream' \
+    --data-binary @"$f"
+  n=$((n+1))
+done
+
+# 3. Finish. The file takes exactly the path a single upload does — its type
+#    detected, limited and scanned — and the answer is the attachment.
+curl -X POST "http://localhost:8080/api/uploads/$UPLOAD/finish" -H "Authorization: Bearer $TOKEN"
+```
+
+A piece may instead be sent as JSON, `{"data":"<base64>"}` with
+`Content-Type: application/json`, for a transport that only carries JSON; it
+costs a third more bandwidth. What each answer means:
+
+| Answer | What to do                                                                                                    |
+| ------ | ------------------------------------------------------------------------------------------------------------- |
+| `200`  | The piece is held; the body is the upload as `GET` shows it. Send the next.                                   |
+| `409`  | Not the next piece — already received, or one was skipped. `GET /api/uploads/:id` and continue from `pieces`. |
+| `400`  | The piece is the wrong size: every piece but the last is exactly `pieceBytes`.                                |
+| `404`  | No such upload, or not yours (the two are not told apart). It may have been abandoned and removed.            |
+
+**Resuming** after an interruption is asking `GET /api/uploads/:id` and sending
+from the piece it reports — never from where the client thinks it got to, since
+a piece whose answer was lost may well have arrived. `DELETE /api/uploads/:id`
+abandons an upload; one nobody adds to for `files.abandoned_after_hours` is
+removed by the server, with its pieces. Pieces are never retrievable as files.
+
+#### Sending a file straight to somebody's device
+
+Where the server advertises `direct-transfers`, two people in a conversation
+can move a file between their devices over a WebRTC data channel without it
+resting on the server. The server keeps the offer and relays the negotiation:
+
+| Request                          | Who                 | What                                                                                                                                                         |
+| -------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /api/rooms/:id/transfers`  | a member            | `{"recipient":"<user id>","filename","size","contentType"}`. Both must be members and neither may have blocked the other (404 alike). Lapses in ten minutes. |
+| `GET /api/transfers/:id`         | sender or recipient | The offer, with `state` and, for the sender, `recipientOnline`.                                                                                              |
+| `POST /api/transfers/:id/accept` | recipient           | `offered` → `accepted`; it then has six hours to finish.                                                                                                     |
+| `POST …/decline`                 | recipient           | `offered` → `declined`.                                                                                                                                      |
+| `POST …/cancel`                  | either              | `offered` or `accepted` → `cancelled`.                                                                                                                       |
+| `POST …/finish`                  | recipient           | `accepted` → `finished`: it arrived whole.                                                                                                                   |
+| `POST …/fail`                    | either              | `accepted` → `failed`.                                                                                                                                       |
+| `GET /api/transfers/ice`         | anybody signed in   | `{"iceServers":[…],"relay":bool}` — the call servers, without the relay where `files.direct_transfer_relay` is off.                                          |
+
+A state change that no longer applies answers **409**. Both people receive
+`transfer.updated` frames on the live connection; the recipient receives
+`transfer.offered`. Negotiation is the `transfer` action — see the live
+connection below. The protocol over the channel (64 KiB binary messages,
+`{"ack":n}` every 4 MiB, `{"done":size}` at the end) is the clients' own and
+may change; integrations should treat direct transfers as something people do.
 
 ### Scheduling a message
 
@@ -1022,6 +1100,20 @@ An `event` payload looks like:
 program usually cares about are `message.sent`, `message.edited`,
 `message.deleted` and `action.pressed`.
 
+A `message.sent` carrying files describes them in its content, as signed by the
+author's server — the timeline's `attachments` is still where to find each
+file's URL:
+
+```json
+"content": {
+  "body": "",
+  "attachments": [
+    { "id": "6f1c…", "filename": "beach.png", "contentType": "image/png",
+      "size": 482113, "sha256": "9b2f…", "width": 1600, "height": 1200 }
+  ]
+}
+```
+
 **Note the time encoding differs from the REST API.** Here `createdAt` is epoch
 milliseconds as a number; the REST timeline gives `sentAt` as an RFC 3339
 string. Same instant, two encodings, and a client reading both needs to handle
@@ -1031,6 +1123,15 @@ The other actions a client may send are `unsubscribe` (same shape as
 `subscribe`), `ping`, and `viewing` with a single `room` — the conversation
 currently on screen, which is how the server knows not to raise a notification
 for something the person is already looking at. An empty `room` means none.
+
+A direct transfer's negotiation is `{"action":"transfer","transfer":"<id>","signal":{…}}`,
+where `signal` is `{"description":…}` or `{"candidate":…}`. It reaches the other
+of the transfer's two people as a `transfer.signal` frame with `transfer`,
+`from` and `signal`, and is refused with an `error` frame unless the recipient
+has accepted, the transfer has not lapsed, and both are still in the
+conversation — checked on every message. `transfer.offered` and
+`transfer.updated` frames carry the transfer as `GET /api/transfers/:id` gives
+it.
 
 Keepalives are WebSocket protocol pings sent by the server every 45 seconds by
 default (`server.keepalive`), not JSON frames. An idle connection therefore
@@ -1621,9 +1722,16 @@ Joining follows the same shape: `/api/rooms/{id}/remote/join` rather than
 A `409` whose body mentions reaching the peer is worth retrying with backoff. A
 `409` naming a rule is not: retrying will produce the same answer.
 
-**Attachments are not forwarded yet.** They are held by the server that holds
-the room, and yours has nowhere to put them that the other could read. Posting
-text into a federated room works; posting a file does not.
+**Files travel too.** Upload to your own server as usual
+(`POST /api/rooms/{id}/attachments` or the upload in pieces, with the room's
+local identifier) and pass `attachmentIds` to `/remote/messages`; a message may
+be files alone. The message describes each file — name, type, size and SHA-256
+— in content your server signs, and every other server copies the bytes the
+first time one of its members opens it, checking them against that digest. A
+file from elsewhere appears in the timeline with `origin` (the server whose
+member sent it) and `held: false` until its bytes are here; the first download
+may take as long as copying it does, and a file over that server's
+`files.federation_copy_max_bytes` is refused with **413** there.
 
 ### Finding federated rooms
 
