@@ -20,6 +20,7 @@ const eventsApi = useEvents();
 const api = useApi();
 const download = useDownload();
 const mediaUrl = useMediaUrl();
+const serverBase = useMediaBase();
 const { offers } = useServerInfo();
 const calling = useCall();
 const uploads = useUploads();
@@ -113,8 +114,9 @@ const repeatText = computed(() => {
 });
 
 /* Other calendars */
+// The event's address on the server, which on the desktop is not this page's.
 const details = computed(() =>
-  `${event.value?.description ?? ""}\n\n${window.location.href}`.trim(),
+  `${event.value?.description ?? ""}\n\n${serverBase || window.location.origin}${route.fullPath}`.trim(),
 );
 const googleHref = computed(() =>
   event.value && occurrence.value

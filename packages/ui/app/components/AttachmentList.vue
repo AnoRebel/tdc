@@ -16,6 +16,8 @@ const props = defineProps<{ attachments: Attachment[] }>();
 const { $t } = useI18n();
 
 const mediaUrl = useMediaUrl();
+// Saved through the client, which on the desktop is the only one holding the session.
+const download = useDownload();
 const { obscureSensitiveMedia } = useServerInfo();
 
 const viewing = ref<number | null>(null);
@@ -259,6 +261,7 @@ function previewStyle(attachment: Attachment) {
           v-else
           :href="mediaUrl(attachment.url)"
           :download="attachment.filename"
+          @click.prevent="download(attachment.url, attachment.filename)"
           class="flex items-center gap-2.5 rounded-lg border bg-surface px-3 py-2 transition hover:border-border-strong hover:bg-accent"
         >
           <span class="grid size-8 shrink-0 place-items-center rounded-md bg-muted">

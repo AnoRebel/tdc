@@ -25,6 +25,8 @@ const emit = defineEmits<{ close: [] }>();
 const { $t, $ts } = useI18n();
 
 const mediaUrl = useMediaUrl();
+// Saved through the client, which on the desktop is the only one holding the session.
+const download = useDownload();
 
 const index = ref(props.startAt ?? 0);
 const dialog = ref<HTMLElement | null>(null);
@@ -101,6 +103,7 @@ onBeforeUnmount(() => {
         <a
           :href="mediaUrl(current?.url)"
           :download="current?.filename"
+          @click.prevent="current && download(current.url, current.filename)"
           class="grid size-8 place-items-center rounded-md text-white/80 transition hover:bg-white/10 hover:text-white"
           :title="$ts('attachment.download')"
         >
@@ -196,6 +199,7 @@ onBeforeUnmount(() => {
           <a
             :href="mediaUrl(current?.url)"
             :download="current?.filename"
+            @click.prevent="current && download(current.url, current.filename)"
             class="btn btn-primary mt-4"
           >
             <Download class="size-3.5" />
