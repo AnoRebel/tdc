@@ -34,5 +34,6 @@ const ringing = computed(() => c.incoming.value);
 
 <template>
   <CallIncoming v-if="ringing.length" :rings="ringing" />
+  <CallRecordingNotice v-if="c.recordingNotice.value" />
   <CallWindow />
 </template>

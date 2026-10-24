@@ -837,6 +837,10 @@ func (s *Server) capabilities(ctx context.Context) []string {
 			}
 		}
 		capabilities = append(capabilities, feature)
+		// Recording is a setting within calls, offered only where calls are.
+		if settings.Feature(feature) == settings.FeatureCalls && s.settings.Get(ctx, settings.CallsRecording) == "true" {
+			capabilities = append(capabilities, "calls.recording")
+		}
 	}
 
 	return capabilities

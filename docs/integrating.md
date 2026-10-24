@@ -1409,6 +1409,7 @@ the call and relays their negotiation, and never carries the media itself.
 | `PUT`/`DELETE /api/rooms/:id/call/hand`, `DELETE …/hand/:userId`                                | Raise or lower your hand (`handRaisedAt` on the participant, oldest first); lowering somebody else's needs to be the presenter or hold `moderation.restrict`                                                                                             |
 | `POST /api/rooms/:id/call/reactions`                                                            | `{"kind": "clap"}` — one of `clap`, `laugh`, `heart`, `thumbs_up`, `surprise`, `celebrate` — passed to the call's participants as `call.reaction` and kept nowhere; 20 per person every 10 seconds                                                       |
 | `PUT`/`DELETE /api/rooms/:id/call/stage`                                                        | Start or stop presenting your screen; a second presenter is refused with 409 while the first is on the stage. `DELETE …/stage/presenter` takes whoever presents off it (needs `moderation.restrict`)                                                     |
+| `PUT`/`DELETE /api/rooms/:id/call/recording`                                                    | Start or stop recording the call on your device; starting needs `calls.recording` on the server and `call.record`, and answers only once the call's `recording` lists you, `call.recording_started` is in the conversation and the audit log has it      |
 | `POST /api/rooms/:id/call/invite`                                                               | Merge: invite the people of another call you are in, `{"users": [ids]}`                                                                                                                                                                                  |
 | `GET`/`POST`/`DELETE /api/rooms/:id/call/links[/:linkId]`                                       | List, make (`{label, passcode, lobby, expiresInHours, maxUses}`) and withdraw links to the call; needs `call.link`. The secret is in the answer to making one, and only there                                                                            |
 | `GET /api/call-links/:secret`                                                                   | What a link leads to — the conversation's name, who is in the call, whether it asks for a passcode or has a lobby. No credential needed                                                                                                                  |
@@ -1424,7 +1425,8 @@ theirs, and the reason is never disclosed. Rings are limited per caller.
 **On the live connection**, a call sends these frames:
 
 - `call.state` — the call as it now stands, whenever somebody joins, leaves or
-  changes what they send, with `presenter` naming whoever is on the stage.
+  changes what they send, with `presenter` naming whoever is on the stage and
+  `recording` listing whoever is recording it.
 - `call.ring` — somebody is calling you: the call, the conversation, who is
   calling, and `conference: true` when it is an invitation into a merged call,
   which names nothing of the conversation.

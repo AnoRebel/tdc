@@ -24,7 +24,7 @@ UPDATE call_participants SET audio = $3, video = $4, held = $5
 WHERE call_id = $1 AND user_id = $2 AND left_at IS NULL;
 
 -- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, u.username, u.display_name, (u.guest_call IS NOT NULL)::boolean AS guest
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, p.recording_since, u.username, u.display_name, (u.guest_call IS NOT NULL)::boolean AS guest
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL

@@ -12,6 +12,8 @@ import type {
 import { isApiError } from "@tdc/types";
 import { createGlobalState } from "@vueuse/core";
 
+import { nameOf } from "#layers/ui/app/lib/names";
+
 /**
  * A conversation's call, from this person's side.
  *
@@ -123,6 +125,17 @@ export const useCall = createGlobalState(() => {
   const canShareScreen = computed(
     () => !import.meta.server && Boolean(navigator.mediaDevices?.getDisplayMedia),
   );
+
+  /**
+   * A call being recorded that we are joining: who is recording it, shown
+   * before anything of ours is sent, until the person says whether to stay.
+   */
+  const recordingNotice = ref<{ room: string; names: string[] } | null>(null);
+  let answerRecordingNotice: ((stay: boolean) => void) | null = null;
+  /** Stays in a call being recorded, or leaves it before anything is sent. */
+  function answerRecording(stay: boolean) {
+    answerRecordingNotice?.(stay);
+  }
 
   /** People ringing us now, newest last. */
   const incoming = ref<CallRing[]>([]);
@@ -449,10 +462,38 @@ export const useCall = createGlobalState(() => {
       iceServers = (await api.get<IceConfiguration>("/api/calls/ice")).iceServers;
       if (options.endCurrent && roomId.value) await leave(roomId.value, { keepMedia: true });
       else await holdCurrent();
-      const started = await api.post<Call>(
+      let started = await api.post<Call>(
         options.asGuestOf ? `/api/calls/${options.asGuestOf}` : `/api/rooms/${room}/call`,
         { audio: microphone.value, video: camera.value },
       );
+      /*
+       * Being recorded: the person is told who is recording before any of
+       * their sound or picture goes out, and may leave instead. Until they
+       * answer the call is not ours here, so nothing is sent to it, and
+       * whatever negotiation arrives waits with the rest of the early signals.
+       */
+      const me = user.value?.id;
+      const recorders = (started.recording ?? []).filter((id) => id !== me);
+      if (recorders.length) {
+        const stay = await new Promise<boolean>((resolve) => {
+          recordingNotice.value = {
+            room,
+            names: started.participants
+              .filter((each) => recorders.includes(each.userId))
+              .map((each) => nameOf(each)),
+          };
+          answerRecordingNotice = resolve;
+        });
+        recordingNotice.value = null;
+        answerRecordingNotice = null;
+        if (!stay) {
+          early = [];
+          await api.delete(`/api/calls/${started.id}`).catch(() => {});
+          if (!Object.keys(calls.value).length) stopLocal();
+          return;
+        }
+        started = await api.get<Call>(`/api/calls/${started.id}`).catch(() => started);
+      }
       if (options.asGuestOf) guestOf.value = [...guestOf.value, room];
       calls.value = { ...calls.value, [room]: started };
       roomId.value = room;
@@ -899,6 +940,8 @@ export const useCall = createGlobalState(() => {
     metered,
     supported,
     isIn,
+    recordingNotice,
+    answerRecording,
     reactions,
     reactionCounts,
     onReaction,

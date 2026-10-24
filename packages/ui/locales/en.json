@@ -894,7 +894,9 @@
       "project_milestone_changed": "A milestone's name or date changes",
       "project_milestone_removed": "A milestone is removed",
       "account_created": "A new account is made",
-      "account_role_changed": "Somebody's role changes"
+      "account_role_changed": "Somebody's role changes",
+      "call_recording_started": "Somebody starts recording a call",
+      "call_recording_stopped": "A call's recording stops"
     },
     "eventGroups": {
       "messages": "Messages",
@@ -2234,7 +2236,31 @@
       "pulse": "Pulse",
       "low": "Low"
     },
-    "guest": "Guest"
+    "guest": "Guest",
+    "record": {
+      "start": "Record the call",
+      "stop": "Stop recording",
+      "indicator": "Recording",
+      "by": "Recorded by {names}",
+      "youAreRecording": "You are recording this call",
+      "started": "{names} started recording the call. Everybody in it is told.",
+      "noticeTitle": "This call is being recorded",
+      "noticeBody": "{names} is recording. What you say and show will be in the recording, which is saved to the conversation. Nothing of yours is sent until you choose.",
+      "stay": "Join and be recorded",
+      "leave": "Don't join",
+      "starting": "Telling everybody in the call…",
+      "saving": "Saving the recording to the conversation… {percent}%",
+      "saved": "The recording is in the conversation.",
+      "notKept": "The server did not take the recording: {reason}",
+      "keep": "Save it on this device",
+      "discard": "Discard it",
+      "dismiss": "Dismiss",
+      "couldNotStart": "Could not start recording.",
+      "unavailable": "This device cannot record calls.",
+      "notSent": "The recording was not sent.",
+      "couldNotSave": "Could not save the recording.",
+      "fileName": "Call recording {when}"
+    }
   },
   "names": {
     "title": "Your name",
@@ -2465,7 +2491,9 @@
       "user_suspend": "Suspend and reinstate accounts",
       "server_backup": "Take, download, upload and delete backups of the server, which hold everything on it",
       "server_restart": "Reload the server's configuration and restart it",
-      "server_restore": "Restore the server, or parts of it, from a backup"
+      "server_restore": "Restore the server, or parts of it, from a backup",
+      "call_record": "Record a call, everybody in it told first",
+      "call_link": "Make links into a conversation's call"
     }
   },
   "conversation": {

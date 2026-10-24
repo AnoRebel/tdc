@@ -492,7 +492,7 @@ func (q *Queries) LeaveStage(ctx context.Context, arg LeaveStageParams) error {
 }
 
 const listCallParticipants = `-- name: ListCallParticipants :many
-SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, u.username, u.display_name, (u.guest_call IS NOT NULL)::boolean AS guest
+SELECT p.user_id, p.joined_at, p.audio, p.video, p.held, p.screen, p.hand_raised_at, p.recording_since, u.username, u.display_name, (u.guest_call IS NOT NULL)::boolean AS guest
 FROM call_participants p
 JOIN users u ON u.id = p.user_id
 WHERE p.call_id = $1 AND p.left_at IS NULL
@@ -500,16 +500,17 @@ ORDER BY p.joined_at
 `
 
 type ListCallParticipantsRow struct {
-	UserID       uuid.UUID
-	JoinedAt     time.Time
-	Audio        bool
-	Video        bool
-	Held         bool
-	Screen       bool
-	HandRaisedAt *time.Time
-	Username     string
-	DisplayName  string
-	Guest        bool
+	UserID         uuid.UUID
+	JoinedAt       time.Time
+	Audio          bool
+	Video          bool
+	Held           bool
+	Screen         bool
+	HandRaisedAt   *time.Time
+	RecordingSince *time.Time
+	Username       string
+	DisplayName    string
+	Guest          bool
 }
 
 func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([]ListCallParticipantsRow, error) {
@@ -529,6 +530,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, callID uuid.UUID) ([
 			&i.Held,
 			&i.Screen,
 			&i.HandRaisedAt,
+			&i.RecordingSince,
 			&i.Username,
 			&i.DisplayName,
 			&i.Guest,

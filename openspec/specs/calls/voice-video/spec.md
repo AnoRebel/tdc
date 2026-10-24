@@ -252,3 +252,18 @@ The server SHALL NOT record calls unless recording is explicitly enabled by the 
 - **WHEN** a call is recorded
 - **THEN** all participants are informed before recording starts
 - **AND** the fact of recording is written to the audit log
+
+#### Scenario: Recording needs the operator's setting as well
+
+- **WHEN** recording is not enabled on the server and anybody, an administrator included, attempts it
+- **THEN** the attempt is refused, saying recording is not enabled
+
+#### Scenario: A recording ends with its recorder
+
+- **WHEN** the person recording stops, leaves the call, holds it, or their connection drops
+- **THEN** the recording stops, and its end is written to the conversation's log and the audit log
+
+#### Scenario: Recording is made on the recorder's device
+
+- **WHEN** a call is recorded
+- **THEN** the file is made by the recorder's client from what it receives, and no call media passes through the server for it beyond the attachment saved afterwards

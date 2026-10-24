@@ -3,6 +3,7 @@ import { createApiClient } from "@tdc/types";
 import { downloadKey } from "#layers/ui/app/composables/useDownload";
 import { mediaBaseKey } from "#layers/ui/app/composables/useMediaBase";
 import { mediaFetchKey } from "#layers/ui/app/composables/useMediaFetch";
+import { saveFileKey } from "#layers/ui/app/composables/useSaveFile";
 import { uploadTransferKey } from "#layers/ui/app/composables/useUploadTransfer";
 import * as Api from "#bindings/api";
 
@@ -88,6 +89,28 @@ export default defineNuxtPlugin({
      */
     nuxtApp.vueApp.provide(downloadKey, async (path, filename) => {
       await Api.Service.SaveMedia(path, filename);
+    });
+
+    /*
+     * A file made here — a call's recording — saved through Go: the webview
+     * does not save a download it is handed on every platform. A piece at a
+     * time, so a long recording never crosses the bridge whole.
+     */
+    nuxtApp.vueApp.provide(saveFileKey, async (file, filename) => {
+      const handle = await Api.Service.BeginLocalSave(filename);
+      if (!handle) return false;
+      try {
+        const piece = 4 * 1024 * 1024;
+        for (let start = 0; start < file.size; start += piece) {
+          const bytes = new Uint8Array(await file.slice(start, start + piece).arrayBuffer());
+          await Api.Service.WriteLocalSave(handle, base64FromBytes(bytes));
+        }
+        await Api.Service.FinishLocalSave(handle);
+        return true;
+      } catch (cause) {
+        void Api.Service.AbandonLocalSave(handle);
+        throw cause;
+      }
     });
   },
 });

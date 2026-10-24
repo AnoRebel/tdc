@@ -15,6 +15,8 @@ export interface CallParticipant {
   guest?: boolean;
   /** When they raised their hand, while it is up. */
   handRaisedAt?: string;
+  /** Recording the call on their device. */
+  recording?: boolean;
   joinedAt: string;
 }
 
@@ -26,6 +28,8 @@ export interface Call {
   participants: CallParticipant[];
   /** Who is presenting, if anybody: one person at a time. */
   presenter?: string;
+  /** Who is recording the call, if anybody, by user id. */
+  recording?: string[];
 }
 
 /** The servers a client connects a call through. */

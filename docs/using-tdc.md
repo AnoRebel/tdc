@@ -1202,6 +1202,28 @@ your name and is gone after a few seconds; nothing is kept. Whoever presents
 sees a running count of the reactions their presentation has drawn. With
 reduced motion, reactions fade in place instead of floating.
 
+**Recording a call.** Where the server's operator allows recording, somebody
+holding the `call.record` permission (which nobody has until an administrator
+grants it) sees a red record button in the call controls. Pressing it tells
+everybody first: before your device records anything, the server writes in the
+conversation and the audit log that you started recording, and everybody in the
+call gets a red **Recording** bar naming you, which stays up for as long as the
+recording lasts — in every size of the call window, and as a red mark on the
+minimized bar. Somebody joining a call that is being recorded is told who is
+recording before any of their sound or picture is sent, and can choose **Don't
+join** instead. The recording is made on your own device — the stage (the
+screen being presented, or everybody's tiles with their names) and everybody's
+sound mixed together — so it holds what your device received: if your
+connection dropped somebody for a while, they are missing from it. Press the
+button again to stop. Leaving the call, holding it, switching to another call,
+or losing your connection stops it too, and that is noted in the conversation
+and the audit log the same way. When it stops, the file is uploaded into the
+conversation as an ordinary attachment, under the server's usual file limits;
+if the server will not take it — it is larger than the server accepts, say —
+the call window says why and offers **Save it on this device** instead. The
+feature is about recording openly: it cannot stop anybody recording their own
+screen with other software.
+
 **Links to a call.** Somebody allowed to (the `call.link` permission, which
 an administrator grants) can make a link to a conversation's call from the
 link button in the call window: with a label, a lobby where people wait until

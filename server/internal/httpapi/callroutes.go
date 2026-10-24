@@ -122,7 +122,9 @@ type callParticipantView struct {
 	Guest bool `json:"guest,omitempty"`
 	// HandRaisedAt is when they raised their hand, while it is up.
 	HandRaisedAt string `json:"handRaisedAt,omitempty"`
-	JoinedAt     string `json:"joinedAt"`
+	// Recording says they are recording the call on their device.
+	Recording bool   `json:"recording,omitempty"`
+	JoinedAt  string `json:"joinedAt"`
 }
 
 type callView struct {
@@ -132,6 +134,9 @@ type callView struct {
 	// Presenter is who is on the stage, if anybody.
 	Presenter    string                `json:"presenter,omitempty"`
 	Participants []callParticipantView `json:"participants"`
+	// Recording is who is recording the call, if anybody: shown to everybody
+	// in it, and to anybody before they join.
+	Recording []string `json:"recording,omitempty"`
 }
 
 func (s *Server) callViewOf(roomID, callID uuid.UUID, startedAt time.Time, participants []dbgen.ListCallParticipantsRow) callView {
@@ -152,6 +157,10 @@ func (s *Server) callViewOf(roomID, callID uuid.UUID, startedAt time.Time, parti
 		}
 		if p.Screen {
 			view.Presenter = p.UserID.String()
+		}
+		if p.RecordingSince != nil {
+			view.Participants[index].Recording = true
+			view.Recording = append(view.Recording, p.UserID.String())
 		}
 	}
 	return view
@@ -202,7 +211,8 @@ func (s *Server) handleJoinCall(c *echo.Context) error {
 	}
 
 	needed := authz.PermCallJoin
-	if _, err := s.rooms.OpenCall(ctx, roomID, user.ID); errors.Is(err, rooms.ErrNoCall) {
+	open, err := s.rooms.OpenCall(ctx, roomID, user.ID)
+	if errors.Is(err, rooms.ErrNoCall) {
 		needed = authz.PermCallStart
 	} else if err != nil {
 		return callError(err)
@@ -214,6 +224,11 @@ func (s *Server) handleJoinCall(c *echo.Context) error {
 		return err
 	}
 
+	if needed == authz.PermCallJoin {
+		// Joining again — a reload, a dropped connection — ends a recording
+		// the device that made it can no longer be making.
+		s.stopRecordingOf(ctx, open.ID, user.ID, "rejoined the call")
+	}
 	limit := int(s.settings.Int(ctx, settings.CallsMaxParticipants))
 	call, started, err := s.rooms.JoinCall(ctx, roomID, user.ID, request.Audio, request.Video, limit)
 	if err != nil {
@@ -263,6 +278,7 @@ func (s *Server) handleLeaveCall(c *echo.Context) error {
 	if err != nil {
 		return callError(err)
 	}
+	s.stopRecordingOf(ctx, call.ID, user.ID, "left the call")
 	ended, err := s.rooms.LeaveCall(ctx, call.ID, user.ID)
 	if err != nil {
 		return callError(err)
@@ -429,6 +445,7 @@ func (s *Server) SweepCalls(ctx context.Context) {
 	if err != nil {
 		s.log.Warn("could not sweep calls", "error", err)
 	}
+	s.stopAbsentRecordings(ctx)
 	for _, event := range ended {
 		s.publishEvent(ctx, event)
 	}
@@ -765,6 +782,7 @@ func (s *Server) handleJoinCallByID(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
+	s.stopRecordingOf(ctx, call.ID, user.ID, "rejoined the call")
 	limit := int(s.settings.Int(ctx, settings.CallsMaxParticipants))
 	joined, err := s.rooms.JoinInvited(ctx, call.ID, user.ID, request.Audio, request.Video, limit)
 	if err != nil {
@@ -799,6 +817,7 @@ func (s *Server) handleLeaveCallByID(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	s.stopRecordingOf(ctx, call.ID, user.ID, "left the call")
 	ended, err := s.rooms.LeaveCall(ctx, call.ID, user.ID)
 	if err != nil {
 		return callError(err)

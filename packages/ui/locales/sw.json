@@ -894,7 +894,9 @@
       "project_milestone_changed": "Jina au tarehe ya hatua muhimu imebadilika",
       "project_milestone_removed": "Hatua muhimu imeondolewa",
       "account_created": "Akaunti mpya imefunguliwa",
-      "account_role_changed": "Jukumu la mtu limebadilika"
+      "account_role_changed": "Jukumu la mtu limebadilika",
+      "call_recording_started": "Mtu anaanza kurekodi simu",
+      "call_recording_stopped": "Kurekodi simu kunakoma"
     },
     "eventGroups": {
       "messages": "Ujumbe",
@@ -2234,7 +2236,31 @@
       "pulse": "Mapigo",
       "low": "Nzito"
     },
-    "guest": "Mgeni"
+    "guest": "Mgeni",
+    "record": {
+      "start": "Rekodi simu",
+      "stop": "Acha kurekodi",
+      "indicator": "Inarekodiwa",
+      "by": "Inarekodiwa na {names}",
+      "youAreRecording": "Unarekodi simu hii",
+      "started": "{names} ameanza kurekodi simu. Kila aliye ndani ameambiwa.",
+      "noticeTitle": "Simu hii inarekodiwa",
+      "noticeBody": "{names} anarekodi. Unachosema na kuonyesha kitakuwa kwenye rekodi, ambayo huhifadhiwa kwenye mazungumzo. Hakuna chako kinachotumwa hadi uchague.",
+      "stay": "Jiunge na urekodiwe",
+      "leave": "Usijiunge",
+      "starting": "Inawaambia wote walio kwenye simu…",
+      "saving": "Inahifadhi rekodi kwenye mazungumzo… {percent}%",
+      "saved": "Rekodi iko kwenye mazungumzo.",
+      "notKept": "Seva haikupokea rekodi: {reason}",
+      "keep": "Ihifadhi kwenye kifaa hiki",
+      "discard": "Itupe",
+      "dismiss": "Funga",
+      "couldNotStart": "Imeshindwa kuanza kurekodi.",
+      "unavailable": "Kifaa hiki hakiwezi kurekodi simu.",
+      "notSent": "Rekodi haikutumwa.",
+      "couldNotSave": "Imeshindwa kuhifadhi rekodi.",
+      "fileName": "Rekodi ya simu {when}"
+    }
   },
   "names": {
     "title": "Jina lako",
@@ -2465,7 +2491,9 @@
       "user_suspend": "Kusimamisha akaunti na kuzirejesha",
       "server_backup": "Kutengeneza, kupakua, kupakia na kufuta nakala rudufu za seva, ambazo zina kila kitu kilichomo",
       "server_restart": "Kupakia upya usanidi wa seva na kuiwasha upya",
-      "server_restore": "Kurejesha seva, au sehemu zake, kutoka nakala rudufu"
+      "server_restore": "Kurejesha seva, au sehemu zake, kutoka nakala rudufu",
+      "call_record": "Kurekodi simu, kila aliye ndani akiambiwa kwanza",
+      "call_link": "Kutengeneza viungo vya kuingia kwenye simu ya mazungumzo"
     }
   },
   "conversation": {

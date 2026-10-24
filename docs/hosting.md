@@ -332,9 +332,9 @@ other roles decide. `PATCH /api/admin/roles/{id}` renames or describes a role.
 /api/admin/users/{id}/permissions` (optionally `?channel=`) answers what
 somebody may do, with the role entries behind each answer.
 
-All forty catalogued permissions are enforced. Calls take `call.start` and
-`call.join`, which Member holds, and `call.link`, which nobody holds until you
-grant it. `channel.read` and
+All forty-one catalogued permissions are enforced. Calls take `call.start` and
+`call.join`, which Member holds, and `call.link` and `call.record`, which nobody
+holds until you grant them. `channel.read` and
 `channel.post` are checked per channel, on top of membership, bans and posting
 restrictions, and Member holds both everywhere until you say otherwise.
 
@@ -1337,8 +1337,30 @@ Ringing is limited to ten rings per person every five minutes. Each person
 decides who may ring them; whether people on connected servers may ring anybody
 here is the server's decision first.
 
-**Not yet:** recording; calls in conversations shared with other servers; and
-calls of more than a few people through a forwarding unit.
+**Recording.** `calls.recording` (off by default) lets people holding
+`call.record` — which nobody holds until you grant it, to a role or in one
+channel — record a call. Both are needed; either missing refuses, saying which.
+What recording is: the recorder's own browser or desktop application composes
+the stage and everybody's sound into one file (WebM, or MP4 where that is all
+the platform records) and, when they stop, uploads it into the conversation
+through the ordinary attachment path, so the attachment size limit, the
+person's quota, scanning and retention all apply to it; a file the server
+refuses is offered to the recorder to save on their own device instead. What
+recording is not: the server records nothing. No call media passes through it
+for a recording and none is kept by it, beyond the attachment the recorder
+uploads. Before the recorder's client begins, the server marks them as
+recording in the call's state, sends that to everybody in the call, and writes
+`call.recording_started` in the conversation's log and `call.recording.started`
+in the audit log; if the audit log cannot take the entry, the recording is
+refused. Stopping — by the recorder, by their leaving or holding the call, or
+by their connection dropping, which the call sweep notices within about fifteen
+seconds — writes `call.recording_stopped` and `call.recording.stopped` the same
+way. Somebody joining a recorded call is told before their media is sent. A
+participant can always record their screen with other software; the feature is
+about recording openly, with notice and a record.
+
+**Not yet:** calls in conversations shared with other servers; and calls of
+more than a few people through a forwarding unit.
 
 #### What an event costs
 

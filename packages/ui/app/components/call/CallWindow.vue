@@ -116,6 +116,7 @@ const {
     <Teleport v-if="pipTarget" :to="pipTarget">
       <div class="flex h-screen flex-col gap-2 p-2">
         <div class="min-h-0 flex-1 overflow-y-auto"><CallTiles compact /></div>
+        <CallRecordingBar />
         <CallLobbyList />
         <CallHands />
         <CallHeld />
@@ -145,6 +146,7 @@ const {
         <GripVertical class="size-3.5" aria-hidden="true" />
       </span>
       <span class="size-2 animate-pulse rounded-full bg-success" aria-hidden="true" />
+      <CallRecordingBar compact />
       <NuxtLink
         v-if="c.roomId.value && !guest"
         :to="localeRoute({ name: 'rooms-id', params: { id: c.roomId.value } })"
@@ -251,6 +253,7 @@ const {
       <div class="min-h-0 flex-1 overflow-y-auto">
         <CallTiles />
       </div>
+      <CallRecordingBar />
       <CallLobbyList />
       <CallHands />
       <CallHeld />
@@ -323,6 +326,7 @@ const {
       <div class="min-h-0 flex-1 overflow-y-auto">
         <CallTiles compact />
       </div>
+      <CallRecordingBar />
       <CallLobbyList />
       <CallHands />
       <CallHeld />

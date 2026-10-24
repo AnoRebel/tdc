@@ -1406,11 +1406,19 @@ type Querier interface {
 	// ON CONFLICT so two people starting at once both end up in one call: the
 	// second insert finds the first's row instead of failing.
 	StartCall(ctx context.Context, arg StartCallParams) (Call, error)
+	// Marks somebody in a call as recording it, unless they already are.
+	StartCallRecording(ctx context.Context, arg StartCallRecordingParams) (int64, error)
 	StartOAuthAuthorization(ctx context.Context, arg StartOAuthAuthorizationParams) (OauthAuthorization, error)
 	StartOperation(ctx context.Context, id uuid.UUID) error
 	StartPendingSignIn(ctx context.Context, arg StartPendingSignInParams) (PendingSignIn, error)
 	StartTyping(ctx context.Context, arg StartTypingParams) error
 	StartWebauthnCeremony(ctx context.Context, arg StartWebauthnCeremonyParams) (WebauthnCeremony, error)
+	// Stops the recordings of people no longer in their call — they left, their
+	// connection dropped, or the call ended — returning each with when it began.
+	StopAbsentRecordings(ctx context.Context) ([]StopAbsentRecordingsRow, error)
+	// Stops somebody's recording, returning when it began. The joined copy of the
+	// row is read before the update, which is how the old value comes back.
+	StopCallRecording(ctx context.Context, arg StopCallRecordingParams) (time.Time, error)
 	StopTyping(ctx context.Context, arg StopTypingParams) error
 	StoreForeignEvent(ctx context.Context, arg StoreForeignEventParams) (int64, error)
 	// Older translations of the same message, of a body it no longer has, go:
@@ -1450,6 +1458,9 @@ type Querier interface {
 	TransitionIssue(ctx context.Context, arg TransitionIssueParams) (Issue, error)
 	UnassignIssue(ctx context.Context, arg UnassignIssueParams) (int64, error)
 	UnblockUser(ctx context.Context, arg UnblockUserParams) error
+	// Takes back a recording that could not be recorded in the log, so nobody is
+	// shown as recording what was never announced.
+	UndoCallRecording(ctx context.Context, arg UndoCallRecordingParams) error
 	UnindexIssue(ctx context.Context, issueID uuid.UUID) error
 	UnindexMessage(ctx context.Context, eventID string) error
 	UnlabelIssue(ctx context.Context, arg UnlabelIssueParams) (int64, error)

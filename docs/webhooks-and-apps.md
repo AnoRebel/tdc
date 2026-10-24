@@ -216,6 +216,8 @@ held server-wide.
 | `room.visibility_changed`   | C S   | It was made public or private                                                               | Reading the room                                   |
 | `call.started`              | C S   | A call began in the conversation                                                            | Reading the room                                   |
 | `call.ended`                | C S   | It ended; who was in it is not recorded                                                     | Reading the room                                   |
+| `call.recording_started`    | C S   | Somebody began recording the call, everybody in it told first                               | Reading the room                                   |
+| `call.recording_stopped`    | C S   | It stopped: by the recorder, or because they left or dropped                                | Reading the room                                   |
 | `event.created`             | C     | An event was scheduled in the channel                                                       | Reading the channel; never an invite-only event    |
 | `event.updated`             | C     | Its details changed; `changed` names the fields                                             | Reading the channel; never an invite-only event    |
 | `event.cancelled`           | C     | It was cancelled; `reason` says why, if given                                               | Reading the channel; never an invite-only event    |

@@ -3,6 +3,7 @@ import { ApiError, type ErrorCode } from "@tdc/types";
 import { downloadKey } from "#layers/ui/app/composables/useDownload";
 import { mediaBaseKey } from "#layers/ui/app/composables/useMediaBase";
 import { mediaFetchKey } from "#layers/ui/app/composables/useMediaFetch";
+import { saveFileKey } from "#layers/ui/app/composables/useSaveFile";
 import { uploadTransferKey } from "#layers/ui/app/composables/useUploadTransfer";
 
 /**
@@ -77,6 +78,17 @@ export default defineNuxtPlugin({
       link.href = `${base}${path}`;
       link.download = filename;
       link.click();
+    });
+
+    // A file made here — a call's recording — handed to the browser to save.
+    nuxtApp.vueApp.provide(saveFileKey, async (file, filename) => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(file);
+      link.download = filename;
+      link.click();
+      // Long enough for the download to have begun.
+      setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
+      return true;
     });
   },
 });

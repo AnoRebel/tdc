@@ -55,6 +55,11 @@ const (
 	// between is live state rather than history.
 	TypeCallStarted Type = "call.started"
 	TypeCallEnded   Type = "call.ended"
+
+	// Somebody began or stopped recording a call, so the conversation keeps a
+	// record of who recorded and when, beside the call itself.
+	TypeCallRecordingStarted Type = "call.recording_started"
+	TypeCallRecordingStopped Type = "call.recording_stopped"
 )
 
 // Event is one entry in a room's log.

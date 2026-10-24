@@ -70,6 +70,9 @@ const (
 	PermCallStart Permission = "call.start"
 	PermCallJoin  Permission = "call.join"
 	PermCallLink  Permission = "call.link"
+	// PermCallRecord records a call, on the recorder's own device, with
+	// everybody in it told first. Held by nobody until an operator grants it.
+	PermCallRecord Permission = "call.record"
 )
 
 // Definition describes a permission for the catalogue an administrator reads.
@@ -233,6 +236,11 @@ var catalogue = map[Permission]Definition{
 	PermCallLink: {
 		Name:        PermCallLink,
 		Description: "Make links that let people into a conversation's call without joining the conversation",
+		Scopes:      []Scope{ScopeServer, ScopeChannel},
+	},
+	PermCallRecord: {
+		Name:        PermCallRecord,
+		Description: "Record a call, with everybody in it told first, and save the recording to the conversation",
 		Scopes:      []Scope{ScopeServer, ScopeChannel},
 	},
 }

@@ -150,6 +150,9 @@ export type Capability =
   | "federation"
   // Voice and video calls in conversations. Off unless an operator turns it on.
   | "calls"
+  // Recording a call on the recorder's device, where calls are on and the
+  // operator allows it.
+  | "calls.recording"
   | "webhooks"
   | "applications"
   | "interactive-messages"

@@ -42,6 +42,13 @@ const (
 		knows nothing about, and an operator should choose to admit them.
 	*/
 	CallsGuests Key = "calls.guests"
+
+	/*
+		CallsRecording lets people holding call.record record a call on their
+		own device, with everybody told first. Off by default: recording is a
+		choice an operator makes for their community, not a default.
+	*/
+	CallsRecording Key = "calls.recording"
 )
 
 func init() {
@@ -62,6 +69,11 @@ func init() {
 		CallsGuests: {
 			fallback:    "false",
 			description: "Whether people without an account may join a call through a link that allows guests.",
+			validate:    boolean,
+		},
+		CallsRecording: {
+			fallback:    "false",
+			description: "Whether people holding call.record may record a call on their own device, everybody in it told first; the file is saved to the conversation as an attachment.",
 			validate:    boolean,
 		},
 		CallsMaxParticipants: {

@@ -231,6 +231,10 @@ const (
 	ActionCallLinkPasscodeFailed Action = "call.link.passcode_failed"
 	// ActionCallGuestAdmitted is somebody without an account let in by a link.
 	ActionCallGuestAdmitted Action = "call.guest.admitted"
+	// A call being recorded, and the recording stopping — by the recorder, or
+	// because they left or their connection dropped.
+	ActionCallRecordingStarted Action = "call.recording.started"
+	ActionCallRecordingStopped Action = "call.recording.stopped"
 
 	/*
 		Operating the server.
