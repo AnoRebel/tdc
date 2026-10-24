@@ -39,6 +39,11 @@ type Attachment struct {
 	EventID string
 	// Filename is what the uploader called it, used only to name a download.
 	Filename string
+	// OriginServer is the server whose member sent this, empty for a file
+	// uploaded here.
+	OriginServer string
+	// Fetched says the bytes of a file from elsewhere have been copied here.
+	Fetched bool
 	// ContentType was detected from the content, never declared by the client.
 	ContentType string
 	Size        int64
@@ -537,6 +542,10 @@ func fromRow(row dbgen.Attachment) *Attachment {
 	if row.UploaderID != nil {
 		attachment.UploaderID = *row.UploaderID
 	}
+	if row.OriginServer != nil {
+		attachment.OriginServer = *row.OriginServer
+	}
+	attachment.Fetched = row.FetchedAt != nil
 	// Both or neither, which the schema enforces.
 	if row.SensitiveSource != nil {
 		attachment.SensitiveSource = SensitiveSource(*row.SensitiveSource)

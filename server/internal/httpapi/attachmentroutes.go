@@ -66,7 +66,12 @@ type attachmentResponse struct {
 	Animated bool `json:"animated,omitempty"`
 	// Caption is what the sender wrote about this file, which is per
 	// attachment so several sent together can each say something different.
-	Caption    string `json:"caption,omitempty"`
+	Caption string `json:"caption,omitempty"`
+	// Origin is the server whose member sent this, for a file from elsewhere,
+	// and Held says its bytes are here yet. One not held is copied the first
+	// time anybody opens it, which a client can say rather than look stuck.
+	Origin     string `json:"origin,omitempty"`
+	Held       bool   `json:"held"`
 	UploadedBy string `json:"uploadedBy"`
 	UploadedAt string `json:"uploadedAt"`
 
@@ -105,6 +110,8 @@ func attachmentResponseOf(attachment *attachments.Attachment) attachmentResponse
 		Height:      attachment.Height,
 		Caption:     attachment.Caption,
 		Animated:    attachment.Animated,
+		Origin:      attachment.OriginServer,
+		Held:        attachment.OriginServer == "" || attachment.Fetched,
 		UploadedBy:  attachment.UploaderAddress,
 		UploadedAt:  attachment.CreatedAt.UTC().Format(time.RFC3339),
 
@@ -224,6 +231,9 @@ func (s *Server) handleDownloadAttachment(c *echo.Context) error {
 	// from whoever handed the link on.
 	if _, err := s.rooms.RequireMembership(ctx, attachment.RoomID, user.ID); err != nil && !s.coverVisible(c, attachment.ID) {
 		return roomError(err)
+	}
+	if attachment, err = s.copiedHere(ctx, attachment); err != nil {
+		return err
 	}
 
 	// Where the object store can serve the bytes itself, hand the transfer over
@@ -444,6 +454,9 @@ func (s *Server) handleAttachmentPreview(c *echo.Context) error {
 	if _, err := s.rooms.RequireMembership(ctx, attachment.RoomID, user.ID); err != nil && !s.coverVisible(c, attachment.ID) {
 		return roomError(err)
 	}
+	if attachment, err = s.copiedHere(ctx, attachment); err != nil {
+		return err
+	}
 
 	/*
 		Media marked sensitive is served obscured unless the viewer asks for
@@ -483,6 +496,24 @@ func (s *Server) handleAttachmentPreview(c *echo.Context) error {
 	header.Set("Cache-Control", "private, max-age=300")
 
 	return c.Stream(http.StatusOK, attachment.PreviewType, reader)
+}
+
+/*
+copiedHere makes sure a file from another server has its bytes here before it
+is served, copying them on first view, and returns it as it now stands.
+*/
+func (s *Server) copiedHere(ctx context.Context, attachment *attachments.Attachment) (*attachments.Attachment, error) {
+	if attachment.OriginServer == "" {
+		return attachment, nil
+	}
+	room, err := s.rooms.ByID(ctx, attachment.RoomID)
+	if err != nil {
+		return nil, roomError(err)
+	}
+	if err := s.ensureCopied(ctx, room, attachment); err != nil {
+		return nil, copyError(err)
+	}
+	return s.attachments.Get(ctx, attachment.ID)
 }
 
 /*

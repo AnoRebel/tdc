@@ -114,6 +114,32 @@ func newPeerHTTPClient(allowPrivate bool) *http.Client {
 	}
 }
 
+/*
+newPeerFileClient is newPeerHTTPClient for a file's bytes.
+
+No limit on the whole exchange, because a hundred megabytes over a slow link
+takes as long as it takes; instead the peer must connect and begin answering
+promptly, and must keep sending — a peer that stalls mid-file is cut off by the
+idle bound rather than holding a copy open for ever.
+*/
+func newPeerFileClient(allowPrivate bool) *http.Client {
+	dial := unfurl.DialContext
+	if allowPrivate {
+		dial = (&net.Dialer{Timeout: fetchTimeout}).DialContext
+	}
+
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext:           dial,
+			ResponseHeaderTimeout: 30 * time.Second,
+			IdleConnTimeout:       time.Minute,
+		},
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+}
+
 // AddressAllowed reports whether an address may be reached, without dialling.
 // Exposed so a caller can refuse a peer at configuration time rather than at
 // the first delivery.

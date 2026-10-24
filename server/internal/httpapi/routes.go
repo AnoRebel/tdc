@@ -99,6 +99,10 @@ func (s *Server) routes() {
 	authenticated.POST("/rooms/:slug/leave", s.handleFederatedLeave)
 	authenticated.POST("/rooms/:slug/post", s.handleFederatedPost)
 
+	// The bytes of a file a message in a room carries, for a peer whose
+	// member opened it.
+	authenticated.GET("/rooms/:slug/files/:digest", s.handleFederatedFile)
+
 	// What this server publishes to a peer browsing it. Signed like
 	// everything else here, so the visibility rules see a peer identity this
 	// server verified rather than one the request asserted.

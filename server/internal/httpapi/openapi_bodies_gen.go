@@ -650,6 +650,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
+	"GET /api/federation/rooms/:slug/files/:digest": {
+		Raw: map[int]string{
+			200: "application/octet-stream",
+		},
+	},
 	"GET /api/federation/servers": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]connectedServer]()},
@@ -1086,6 +1091,16 @@ var routeBodies = map[string]routeBodySet{
 	"GET /api/statuses": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]map[string]any]()},
+		},
+	},
+	"GET /api/transfers/:id": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[transferView]()},
+		},
+	},
+	"GET /api/transfers/ice": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
 	"GET /api/uploads/:id": {
@@ -1976,7 +1991,8 @@ var routeBodies = map[string]routeBodySet{
 	},
 	"POST /api/rooms/:id/remote/messages": {
 		Request: reflect.TypeFor[struct {
-			Body string "json:\"body\""
+			Body          string   "json:\"body\""
+			AttachmentIDs []string "json:\"attachmentIds,omitempty\""
 		}](),
 		Responses: []responseBody{
 			{Status: 201, Type: reflect.TypeFor[map[string]any]()},
@@ -2004,6 +2020,12 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[sendMessageRequest](),
 		Responses: []responseBody{
 			{Status: 201, Type: reflect.TypeFor[messageResponse]()},
+		},
+	},
+	"POST /api/rooms/:id/transfers": {
+		Request: reflect.TypeFor[offerTransferRequest](),
+		Responses: []responseBody{
+			{Status: 201, Type: reflect.TypeFor[transferView]()},
 		},
 	},
 	"POST /api/rooms/:id/translations": {

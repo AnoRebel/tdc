@@ -481,6 +481,10 @@ func (s *Server) handleFederatedDelivery(c *echo.Context) error {
 			"peer", origin, "room", room.ID, "events", len(delivery.Events), "error", err)
 		return echo.NewHTTPError(http.StatusUnprocessableEntity, err.Error())
 	}
+	// Every event verified and is stored: what they say about files follows.
+	for _, event := range delivery.Events {
+		s.recordFederatedFiles(c.Request().Context(), room, event)
+	}
 
 	// How many were new, not how many arrived: a redelivery stores nothing,
 	// and saying otherwise would imply it did something.
@@ -990,6 +994,9 @@ func (s *Server) handleFederatedPost(c *echo.Context) error {
 	if err != nil {
 		return federationRefusal(err)
 	}
+	// Its files, described in what its author's server signed, are recorded
+	// here to be copied from that server when somebody opens one.
+	s.recordFederatedFiles(ctx, room, request.Event)
 
 	return c.JSON(http.StatusCreated, map[string]any{
 		"id":       stored.ID,
@@ -1113,10 +1120,19 @@ func (s *Server) handleSendToRemoteRoom(c *echo.Context) error {
 	}
 
 	var request struct {
-		Body string `json:"body"`
+		Body          string   `json:"body"`
+		AttachmentIDs []string `json:"attachmentIds,omitempty"`
 	}
-	if err := c.Bind(&request); err != nil || strings.TrimSpace(request.Body) == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "the message is empty")
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	attachmentIDs, err := parseAttachmentIDs(request.AttachmentIDs)
+	if err != nil {
+		return err
+	}
+	// Files alone are a message, here as anywhere.
+	if strings.TrimSpace(request.Body) == "" && len(attachmentIDs) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, rooms.ErrEmptyMessage.Error())
 	}
 
 	ctx := c.Request().Context()
@@ -1125,12 +1141,28 @@ func (s *Server) handleSendToRemoteRoom(c *echo.Context) error {
 		return err
 	}
 
+	// Uploaded here, where the person has an account, and described in the
+	// message so the home server and everybody else copy them from here.
+	var files []rooms.FileRef
+	if len(attachmentIDs) > 0 {
+		if err := s.attachments.CheckBatch(ctx, attachmentIDs); err != nil {
+			return attachmentError(err)
+		}
+		if files, err = s.describeUploads(ctx, user.ID, roomID, attachmentIDs); err != nil {
+			return attachmentError(err)
+		}
+	}
+
 	slug := ""
 	if room.Slug != nil {
 		slug = *room.Slug
 	}
 
-	content, err := json.Marshal(map[string]any{"body": request.Body})
+	payload := map[string]any{"body": strings.TrimSpace(request.Body)}
+	if len(files) > 0 {
+		payload["attachments"] = files
+	}
+	content, err := json.Marshal(payload)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "could not encode the message")
 	}

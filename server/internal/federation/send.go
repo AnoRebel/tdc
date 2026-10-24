@@ -28,6 +28,8 @@ private addresses unless permitted — happen once rather than at each call site
 // Sender delivers signed requests to peers.
 type Sender struct {
 	client *http.Client
+	// files carries a file's bytes, which take longer than any request.
+	files *http.Client
 	// origin is this server's own canonical address, sent so a peer knows
 	// whose keys to fetch. It is a claim, and the signature is what makes it
 	// worth anything.
@@ -45,6 +47,7 @@ type Sender struct {
 func NewSender(origin string, keyring *events.Keyring, trust Trust, allowPrivate bool) *Sender {
 	return &Sender{
 		client:  newPeerHTTPClient(allowPrivate),
+		files:   newPeerFileClient(allowPrivate),
 		origin:  origin,
 		keyring: keyring,
 		trust:   trust,
@@ -209,6 +212,44 @@ func (s *Sender) FetchEvents(
 		return nil, fmt.Errorf("peer %s gave an unreadable answer: %w", peer, err)
 	}
 	return answer.Events, nil
+}
+
+/*
+FetchFile asks a peer for the bytes of a file a message in a room carries.
+
+The body is returned unread, for the caller to bound and check: the peer is
+trusted to deliver bytes, never to say what they are — that is the digest the
+author's server signed, which the caller compares them against.
+*/
+func (s *Sender) FetchFile(ctx context.Context, peer, slug, digest string) (io.ReadCloser, error) {
+	if allowed, why := s.trust.Allows(peer); !allowed {
+		return nil, fmt.Errorf("refusing to reach %s: %w", peer, why)
+	}
+
+	endpoint, err := peerURL(peer, fmt.Sprintf("/api/federation/rooms/%s/files/%s", slug, digest))
+	if err != nil {
+		return nil, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build the request: %w", err)
+	}
+	request.Header.Set("TDC-Origin-Server", s.origin)
+	if err := Sign(request, nil, s.keyring, s.now()); err != nil {
+		return nil, fmt.Errorf("sign the request: %w", err)
+	}
+
+	response, err := s.files.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("reach %s: %w", peer, err)
+	}
+	if response.StatusCode != http.StatusOK {
+		reason, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		_ = response.Body.Close()
+		return nil, fmt.Errorf("peer %s refused the file: %s: %s",
+			peer, response.Status, strings.TrimSpace(string(reason)))
+	}
+	return response.Body, nil
 }
 
 /*

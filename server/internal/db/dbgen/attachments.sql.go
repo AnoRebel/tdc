@@ -148,6 +148,75 @@ func (q *Queries) CreateAttachment(ctx context.Context, arg CreateAttachmentPara
 	return i, err
 }
 
+const createRemoteAttachment = `-- name: CreateRemoteAttachment :one
+INSERT INTO attachments (
+    id, storage_key, uploader_address, room_id, event_id,
+    filename, content_type, size_bytes, width, height, caption, origin_server
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source, origin_server, fetched_at
+`
+
+type CreateRemoteAttachmentParams struct {
+	ID              uuid.UUID
+	StorageKey      string
+	UploaderAddress string
+	RoomID          uuid.UUID
+	EventID         *string
+	Filename        string
+	ContentType     string
+	SizeBytes       int64
+	Width           *int32
+	Height          *int32
+	Caption         string
+	OriginServer    *string
+}
+
+// Records a file a member of another server sent, from the description its
+// message carries. The bytes are not here yet; fetched_at stays empty until
+// somebody opens it and they are copied.
+func (q *Queries) CreateRemoteAttachment(ctx context.Context, arg CreateRemoteAttachmentParams) (Attachment, error) {
+	row := q.db.QueryRow(ctx, createRemoteAttachment,
+		arg.ID,
+		arg.StorageKey,
+		arg.UploaderAddress,
+		arg.RoomID,
+		arg.EventID,
+		arg.Filename,
+		arg.ContentType,
+		arg.SizeBytes,
+		arg.Width,
+		arg.Height,
+		arg.Caption,
+		arg.OriginServer,
+	)
+	var i Attachment
+	err := row.Scan(
+		&i.ID,
+		&i.StorageKey,
+		&i.UploaderID,
+		&i.UploaderAddress,
+		&i.RoomID,
+		&i.EventID,
+		&i.Filename,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.CreatedAt,
+		&i.PreviewKey,
+		&i.PreviewType,
+		&i.PreviewWidth,
+		&i.PreviewHeight,
+		&i.Width,
+		&i.Height,
+		&i.Caption,
+		&i.Animated,
+		&i.SensitiveBy,
+		&i.SensitiveSource,
+		&i.OriginServer,
+		&i.FetchedAt,
+	)
+	return i, err
+}
+
 const deleteAttachment = `-- name: DeleteAttachment :exec
 DELETE FROM attachments WHERE id = $1
 `
@@ -372,6 +441,93 @@ func (q *Queries) MarkAttachmentSensitive(ctx context.Context, arg MarkAttachmen
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const markRemoteAttachmentsFetched = `-- name: MarkRemoteAttachmentsFetched :exec
+UPDATE attachments
+SET fetched_at = now(),
+    content_type = $1,
+    animated = $2,
+    width = COALESCE($3, width),
+    height = COALESCE($4, height),
+    preview_key = $5,
+    preview_type = $6,
+    preview_width = $7,
+    preview_height = $8
+WHERE storage_key = $9 AND origin_server IS NOT NULL
+`
+
+type MarkRemoteAttachmentsFetchedParams struct {
+	ContentType   string
+	Animated      bool
+	Width         *int32
+	Height        *int32
+	PreviewKey    *string
+	PreviewType   *string
+	PreviewWidth  *int32
+	PreviewHeight *int32
+	StorageKey    string
+}
+
+// Every description of a file from elsewhere becomes a copy once its bytes are
+// here, whichever room it was opened in: the bytes are the same bytes.
+func (q *Queries) MarkRemoteAttachmentsFetched(ctx context.Context, arg MarkRemoteAttachmentsFetchedParams) error {
+	_, err := q.db.Exec(ctx, markRemoteAttachmentsFetched,
+		arg.ContentType,
+		arg.Animated,
+		arg.Width,
+		arg.Height,
+		arg.PreviewKey,
+		arg.PreviewType,
+		arg.PreviewWidth,
+		arg.PreviewHeight,
+		arg.StorageKey,
+	)
+	return err
+}
+
+const roomFileByKey = `-- name: RoomFileByKey :one
+SELECT id, storage_key, uploader_id, uploader_address, room_id, event_id, filename, content_type, size_bytes, created_at, preview_key, preview_type, preview_width, preview_height, width, height, caption, animated, sensitive_by, sensitive_source, origin_server, fetched_at FROM attachments
+WHERE room_id = $1 AND storage_key = $2 AND event_id IS NOT NULL
+ORDER BY (origin_server IS NULL OR fetched_at IS NOT NULL) DESC, created_at
+LIMIT 1
+`
+
+type RoomFileByKeyParams struct {
+	RoomID     uuid.UUID
+	StorageKey string
+}
+
+// The file a sent message in a room carries, by its digest: what a peer asks
+// for. A copy held here is preferred over a description of one not yet copied.
+func (q *Queries) RoomFileByKey(ctx context.Context, arg RoomFileByKeyParams) (Attachment, error) {
+	row := q.db.QueryRow(ctx, roomFileByKey, arg.RoomID, arg.StorageKey)
+	var i Attachment
+	err := row.Scan(
+		&i.ID,
+		&i.StorageKey,
+		&i.UploaderID,
+		&i.UploaderAddress,
+		&i.RoomID,
+		&i.EventID,
+		&i.Filename,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.CreatedAt,
+		&i.PreviewKey,
+		&i.PreviewType,
+		&i.PreviewWidth,
+		&i.PreviewHeight,
+		&i.Width,
+		&i.Height,
+		&i.Caption,
+		&i.Animated,
+		&i.SensitiveBy,
+		&i.SensitiveSource,
+		&i.OriginServer,
+		&i.FetchedAt,
+	)
+	return i, err
 }
 
 const setAttachmentCaption = `-- name: SetAttachmentCaption :execrows

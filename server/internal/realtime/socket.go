@@ -29,6 +29,9 @@ type clientMessage struct {
 	Call   string          `json:"call,omitempty"`
 	To     string          `json:"to,omitempty"`
 	Signal json.RawMessage `json:"signal,omitempty"`
+	// Transfer names the direct transfer a signal belongs to; its other party
+	// is the recipient, so none is named.
+	Transfer string `json:"transfer,omitempty"`
 }
 
 // Client actions.
@@ -41,6 +44,8 @@ const (
 	actionViewing = "viewing"
 	// actionSignal relays call negotiation to another participant.
 	actionSignal = "signal"
+	// actionTransfer relays a direct transfer's negotiation to its other party.
+	actionTransfer = "transfer"
 )
 
 /*
@@ -50,6 +55,9 @@ none, and signal messages are refused.
 */
 type Signaller interface {
 	Signal(ctx context.Context, from, callID, to uuid.UUID, signal json.RawMessage) error
+	// SignalTransfer passes a direct transfer's negotiation to the other of
+	// its two people, if the transfer allows it now.
+	SignalTransfer(ctx context.Context, from, transferID uuid.UUID, signal json.RawMessage) error
 }
 
 // maxClientMessageBytes bounds one client message.
@@ -202,6 +210,8 @@ func (s *Server) readLoop(ctx context.Context, socket *websocket.Conn, conn *Con
 			s.handleViewing(conn, message)
 		case actionSignal:
 			s.handleSignal(ctx, conn, message)
+		case actionTransfer:
+			s.handleTransferSignal(ctx, conn, message)
 		default:
 			s.sendError(conn, "unknown action "+message.Action)
 		}
@@ -403,5 +413,25 @@ func (s *Server) handleSignal(ctx context.Context, conn *Connection, message cli
 	}
 	if err := s.signaller.Signal(ctx, conn.UserID, callID, to, message.Signal); err != nil {
 		s.sendError(conn, "cannot signal that call")
+	}
+}
+
+/*
+handleTransferSignal passes one piece of a direct transfer's negotiation on.
+Like a call's, it is authorised on every message, and a refusal says nothing
+about whether the transfer exists.
+*/
+func (s *Server) handleTransferSignal(ctx context.Context, conn *Connection, message clientMessage) {
+	if s.signaller == nil {
+		s.sendError(conn, "direct transfers are not available")
+		return
+	}
+	transferID, err := uuid.Parse(message.Transfer)
+	if err != nil || len(message.Signal) == 0 {
+		s.sendError(conn, "a transfer signal needs a transfer and a body")
+		return
+	}
+	if err := s.signaller.SignalTransfer(ctx, conn.UserID, transferID, message.Signal); err != nil {
+		s.sendError(conn, "cannot signal that transfer")
 	}
 }

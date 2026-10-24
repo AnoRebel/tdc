@@ -816,12 +816,15 @@ func (r *restoreRun) allowFiles(ctx context.Context) error {
 	if r.opts.Mode == ModeMerge && len(r.opts.Rooms) > 0 {
 		rooms = r.opts.Rooms
 	}
+	// Copies of other servers' files were not archived, and are copied again
+	// on first view rather than reported missing.
 	_, err := r.tx.Exec(ctx, `INSERT INTO restore_files (key, content_type)
 		SELECT storage_key, content_type FROM attachments
-		WHERE $1::uuid[] IS NULL OR room_id = ANY($1::uuid[])
+		WHERE ($1::uuid[] IS NULL OR room_id = ANY($1::uuid[])) AND origin_server IS NULL
 		UNION ALL
 		SELECT preview_key, COALESCE(NULLIF(preview_type, ''), 'application/octet-stream') FROM attachments
-		WHERE preview_key IS NOT NULL AND preview_key <> '' AND ($1::uuid[] IS NULL OR room_id = ANY($1::uuid[]))
+		WHERE preview_key IS NOT NULL AND preview_key <> '' AND origin_server IS NULL
+		  AND ($1::uuid[] IS NULL OR room_id = ANY($1::uuid[]))
 		ON CONFLICT (key) DO NOTHING`, rooms)
 	if err != nil {
 		return fmt.Errorf("backup: listing files to restore: %w", err)

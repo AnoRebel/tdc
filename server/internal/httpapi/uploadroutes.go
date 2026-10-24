@@ -316,6 +316,11 @@ called it, so every file somebody picked and then thought better of stayed on
 disk for good.
 */
 func (s *Server) SweepFiles(ctx context.Context) {
+	// Lapsed direct transfers too. Each client counts down its own offer, so
+	// this only has to tidy up, not be prompt.
+	if s.queries != nil {
+		s.sweepTransfers(ctx)
+	}
 	if s.attachments == nil {
 		return
 	}

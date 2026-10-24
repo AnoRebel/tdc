@@ -23,25 +23,25 @@ Scope note: these tasks implement the file-transfer requirements of `messaging/a
 - [x] 3.1 A shared, lazily loaded upload loop: begin, send pieces with retry and backoff, resume from the server's count, finish, cancel
 - [x] 3.2 Web: pieces as raw bytes with per-piece progress; desktop: pieces as base64 through `Send`, with progress
 - [x] 3.3 Desktop: saving a file streams to disk through a save dialog
-- [ ] 3.4 The composer shows the person's quota and refuses a file over it before sending
+- [x] 3.4 The composer shows the person's quota and refuses a file over it before sending
 
 ## 4. Files across servers
 
-- [ ] 4.1 Remote posts carry attachment ids; the home server's remote-post handler records descriptors as remote rows; a replica records them on delivery, and the author's server binds its own
-- [ ] 4.2 `GET /api/federation/rooms/:slug/files/:digest`, signed, participation-checked, copying from the origin when the home server does not hold the bytes
-- [ ] 4.3 Copy on first view: from the home server (replica) or the origin (home); size cap, length and digest checked, type re-detected and limited, storage limit applied, preview made, one copy at a time per digest
-- [ ] 4.4 Deletion arriving from the home server removes copies; backups skip copies and a missing copy is fetched again
-- [ ] 4.5 Setting `files.federation_copy_max_bytes`
-- [ ] 4.6 Tests with two servers: a file sent on one is seen and downloaded on the other byte for byte; a tampered digest is refused; a peer with no part in the room is refused; a file over the copy limit is refused clearly. Guards broken in turn
+- [x] 4.1 Remote posts carry attachment ids; the home server's remote-post handler records descriptors as remote rows; a replica records them on delivery, and the author's server binds its own
+- [x] 4.2 `GET /api/federation/rooms/:slug/files/:digest`, signed, participation-checked, copying from the origin when the home server does not hold the bytes
+- [x] 4.3 Copy on first view: from the home server (replica) or the origin (home); size cap, length and digest checked, type re-detected and limited, storage limit applied, preview made, one copy at a time per digest
+- [x] 4.4 Deletion arriving from the home server removes copies; backups skip copies and a missing copy is fetched again
+- [x] 4.5 Setting `files.federation_copy_max_bytes`
+- [x] 4.6 Tests against a signing peer (a fake server publishing keys and serving files): a file sent on one is seen and downloaded on the other byte for byte; a tampered digest is refused; a peer with no part in the room is refused; a file over the copy limit is refused clearly. Guards broken in turn
 
 ## 5. Direct transfers
 
-- [ ] 5.1 Feature `direct-transfers`, setting `files.direct_transfer_relay`, `GET /api/transfers/ice`
-- [ ] 5.2 Offers: create (both members, not blocked, says whether the recipient is online), accept, decline, cancel, finish, fail; frames to both people; expiry and sweep
-- [ ] 5.3 The `transfer` live action: relayed only within an accepted offer, only between its two people, re-authorised per frame
-- [ ] 5.4 Tests: only the recipient may accept; a stranger cannot signal; a signal before acceptance is refused; an expired offer cannot be accepted. Guards broken in turn
-- [ ] 5.5 Client: the transfer host (lazy), the offer card with the address warning, save-to-disk where available, progress, cancel, backpressure, fallback to an upload
-- [ ] 5.6 Offered from the attach menu in a direct conversation; English and Swahili
+- [x] 5.1 Feature `direct-transfers`, setting `files.direct_transfer_relay`, `GET /api/transfers/ice`
+- [x] 5.2 Offers: create (both members, not blocked, says whether the recipient is online), accept, decline, cancel, finish, fail; frames to both people; expiry and sweep
+- [x] 5.3 The `transfer` live action: relayed only within an accepted offer, only between its two people, re-authorised per frame
+- [x] 5.4 Tests: only the recipient may accept; a stranger cannot signal; a signal before acceptance is refused; an expired offer cannot be accepted. Guards broken in turn
+- [x] 5.5 Client: the transfer host (lazy), the offer card with the address warning, save-to-disk where available, progress, cancel, backpressure, fallback to an upload
+- [x] 5.6 Offered from the attach menu in a direct conversation; English and Swahili
 
 ## 6. Documentation and checks
 

@@ -100,6 +100,39 @@ WHERE id = $1
     OR (uploader_id = @actor_id::uuid AND sensitive_source <> 'moderator')
   );
 
+-- Records a file a member of another server sent, from the description its
+-- message carries. The bytes are not here yet; fetched_at stays empty until
+-- somebody opens it and they are copied.
+-- name: CreateRemoteAttachment :one
+INSERT INTO attachments (
+    id, storage_key, uploader_address, room_id, event_id,
+    filename, content_type, size_bytes, width, height, caption, origin_server
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING *;
+
+-- The file a sent message in a room carries, by its digest: what a peer asks
+-- for. A copy held here is preferred over a description of one not yet copied.
+-- name: RoomFileByKey :one
+SELECT * FROM attachments
+WHERE room_id = $1 AND storage_key = $2 AND event_id IS NOT NULL
+ORDER BY (origin_server IS NULL OR fetched_at IS NOT NULL) DESC, created_at
+LIMIT 1;
+
+-- Every description of a file from elsewhere becomes a copy once its bytes are
+-- here, whichever room it was opened in: the bytes are the same bytes.
+-- name: MarkRemoteAttachmentsFetched :exec
+UPDATE attachments
+SET fetched_at = now(),
+    content_type = @content_type,
+    animated = @animated,
+    width = COALESCE(sqlc.narg(width), width),
+    height = COALESCE(sqlc.narg(height), height),
+    preview_key = sqlc.narg(preview_key),
+    preview_type = sqlc.narg(preview_type),
+    preview_width = sqlc.narg(preview_width),
+    preview_height = sqlc.narg(preview_height)
+WHERE storage_key = @storage_key AND origin_server IS NOT NULL;
+
 -- name: ListAttachmentsForEvents :many
 -- The files carried by a set of messages, so expiring the messages can remove
 -- them too.

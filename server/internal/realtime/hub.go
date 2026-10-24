@@ -72,6 +72,15 @@ const (
 	// to start, so an open client — or the desktop application, closed to its
 	// tray — can say so at once.
 	FrameEventReminder = "event.reminder"
+	// FrameTransferOffered tells somebody a file is being offered to them
+	// directly, from another person's device.
+	FrameTransferOffered = "transfer.offered"
+	// FrameTransferUpdated tells both people that a direct transfer was
+	// accepted, declined, cancelled, finished, or failed.
+	FrameTransferUpdated = "transfer.updated"
+	// FrameTransferSignal carries the other person's part of connecting a
+	// direct transfer.
+	FrameTransferSignal = "transfer.signal"
 )
 
 // Connection is one client's live connection.

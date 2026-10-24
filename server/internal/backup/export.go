@@ -290,10 +290,13 @@ func exportFiles(
 
 // attachmentKeys lists the storage keys the chosen rooms' attachments use.
 func attachmentKeys(ctx context.Context, q querier, rooms []uuid.UUID) ([]string, error) {
+	// Copies of other servers' files are left out: they can be copied again
+	// from where they came, the first time somebody opens one after a restore.
 	query := `SELECT k FROM (
-		SELECT storage_key AS k, room_id FROM attachments
+		SELECT storage_key AS k, room_id FROM attachments WHERE origin_server IS NULL
 		UNION ALL
-		SELECT preview_key, room_id FROM attachments WHERE preview_key IS NOT NULL AND preview_key <> ''
+		SELECT preview_key, room_id FROM attachments
+		WHERE preview_key IS NOT NULL AND preview_key <> '' AND origin_server IS NULL
 	) keys`
 	var args []any
 	if len(rooms) > 0 {

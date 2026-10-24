@@ -259,6 +259,7 @@ type Querier interface {
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateCycle(ctx context.Context, arg CreateCycleParams) (Cycle, error)
 	CreateDirectRoom(ctx context.Context, arg CreateDirectRoomParams) (Room, error)
+	CreateDirectTransfer(ctx context.Context, arg CreateDirectTransferParams) (DirectTransfer, error)
 	CreateEmailConfirmation(ctx context.Context, arg CreateEmailConfirmationParams) (EmailConfirmation, error)
 	// The private conversation an enquiry opens. A direct room, so everything that
 	// keeps direct conversations out of search, discovery and counts keeps this
@@ -297,6 +298,10 @@ type Querier interface {
 	CreateProjectView(ctx context.Context, arg CreateProjectViewParams) (ProjectView, error)
 	CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) (Credential, error)
 	CreateRecoveryToken(ctx context.Context, arg CreateRecoveryTokenParams) (RecoveryToken, error)
+	// Records a file a member of another server sent, from the description its
+	// message carries. The bytes are not here yet; fetched_at stays empty until
+	// somebody opens it and they are copied.
+	CreateRemoteAttachment(ctx context.Context, arg CreateRemoteAttachmentParams) (Attachment, error)
 	CreateReport(ctx context.Context, arg CreateReportParams) (Report, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, error)
@@ -320,6 +325,7 @@ type Querier interface {
 	// Removes the profile and, by cascade, its portfolio. The account, its
 	// messages and its sessions are other tables and are not touched.
 	DeleteDirectoryProfile(ctx context.Context, userID uuid.UUID) (int64, error)
+	DeleteEndedDirectTransfers(ctx context.Context, endedAt *time.Time) error
 	// Only for undoing an enquiry that failed half way; never anybody's room.
 	DeleteEnquiryRoom(ctx context.Context, id uuid.UUID) error
 	DeleteExpiredEmailConfirmations(ctx context.Context) (int64, error)
@@ -401,6 +407,8 @@ type Querier interface {
 	ErasePersonsReportedContent(ctx context.Context, senderID *uuid.UUID) (int64, error)
 	ErasePersonsSearchIndex(ctx context.Context, senderID *uuid.UUID) (int64, error)
 	EventsForPeerSince(ctx context.Context, arg EventsForPeerSinceParams) ([]Event, error)
+	// Offers and transfers whose time ran out.
+	ExpireDirectTransfers(ctx context.Context) ([]DirectTransfer, error)
 	// Redacts messages past their channel's retention period.
 	//
 	// The channel's own period where it has one, and the server's default
@@ -484,6 +492,7 @@ type Querier interface {
 	GetCredentialByExternalID(ctx context.Context, arg GetCredentialByExternalIDParams) (Credential, error)
 	GetCycle(ctx context.Context, id uuid.UUID) (Cycle, error)
 	GetDirectMessagePolicy(ctx context.Context, userID uuid.UUID) (string, error)
+	GetDirectTransfer(ctx context.Context, id uuid.UUID) (DirectTransfer, error)
 	// For moderation: whose profile a username names, if they have one.
 	GetDirectoryProfileOwnerByUsername(ctx context.Context, username string) (GetDirectoryProfileOwnerByUsernameRow, error)
 	// What this person lets a member list say about them.
@@ -1023,6 +1032,9 @@ type Querier interface {
 	MarkAttachmentSensitive(ctx context.Context, arg MarkAttachmentSensitiveParams) (int64, error)
 	MarkIssueDeleted(ctx context.Context, arg MarkIssueDeletedParams) (Issue, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
+	// Every description of a file from elsewhere becomes a copy once its bytes are
+	// here, whichever room it was opened in: the bytes are the same bytes.
+	MarkRemoteAttachmentsFetched(ctx context.Context, arg MarkRemoteAttachmentsFetchedParams) error
 	// Withdraws notifications for messages read elsewhere.
 	//
 	// Reading a conversation on a phone must clear what a laptop is showing, which
@@ -1041,6 +1053,10 @@ type Querier interface {
 	// visibility can be lowered in the same change, so abusive content can be
 	// taken out of the directory while it is dealt with.
 	ModerateDirectoryProfile(ctx context.Context, arg ModerateDirectoryProfileParams) error
+	// Moves an offer from one state to another, only if it is still in one of the
+	// states it may move from and has not lapsed — so two people acting at once
+	// cannot both win, and an offer nobody answered cannot be accepted late.
+	MoveDirectTransfer(ctx context.Context, arg MoveDirectTransferParams) (DirectTransfer, error)
 	// A change of state, only from the state the caller saw: two people acting at
 	// once cannot both move it, and nothing moves an engagement past a state it
 	// is no longer in.
@@ -1207,6 +1223,9 @@ type Querier interface {
 	RevokeOtherSessionsForUser(ctx context.Context, arg RevokeOtherSessionsForUserParams) error
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) error
 	RevokeVerification(ctx context.Context, arg RevokeVerificationParams) (int64, error)
+	// The file a sent message in a room carries, by its digest: what a peer asks
+	// for. A copy held here is preferred over a description of one not yet copied.
+	RoomFileByKey(ctx context.Context, arg RoomFileByKeyParams) (Attachment, error)
 	// One peer's participation, which is also the check for whether a peer may
 	// read a room at all.
 	RoomPeer(ctx context.Context, arg RoomPeerParams) (RoomPeer, error)
