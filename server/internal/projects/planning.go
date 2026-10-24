@@ -555,6 +555,9 @@ func (s *Service) CloseEndedCycles(ctx context.Context, now time.Time) (int, err
 }
 
 func (s *Service) closeCycle(ctx context.Context, id uuid.UUID, now time.Time) (bool, error) {
+	// To what the database keeps, so the moment the event records is the
+	// moment the row holds.
+	now = now.UTC().Truncate(time.Microsecond)
 	done := false
 	err := s.inTransaction(ctx, func(q *dbgen.Queries) error {
 		cycle, err := q.LockCycle(ctx, id)
@@ -606,7 +609,7 @@ func (s *Service) closeCycle(ctx context.Context, id uuid.UUID, now time.Time) (
 		}
 		ended := map[string]any{
 			"cycle": cycle.ID.String(), "name": cycle.Name, "policy": policy,
-			"unfinished": keys,
+			"unfinished": keys, "closedAt": now.Format(time.RFC3339Nano),
 		}
 		if next != nil {
 			ended["carriedTo"] = next.ID.String()
@@ -755,7 +758,10 @@ func (s *Service) CreateMilestone(ctx context.Context, actor Actor, access Acces
 			return fmt.Errorf("create milestone: %w", err)
 		}
 		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMilestoneAdded,
-			map[string]any{"milestone": created.ID.String(), "name": name, "targetDate": dateText(target)})
+			map[string]any{
+				"milestone": created.ID.String(), "name": name, "description": created.Description,
+				"targetDate": dateText(target),
+			})
 	})
 	return created, err
 }
@@ -803,7 +809,8 @@ func (s *Service) UpdateMilestone(ctx context.Context, actor Actor, access Acces
 		}
 		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMilestoneChanged,
 			map[string]any{
-				"milestone": id.String(), "name": name, "targetDate": dateText(target),
+				"milestone": id.String(), "name": name, "description": updated.Description,
+				"targetDate":   dateText(target),
 				"previousName": current.Name, "previousTargetDate": dateText(current.TargetDate),
 			})
 	})

@@ -24,6 +24,25 @@ const (
 	TypeProjectStateChanged  Type = "project.state_changed"
 	TypeProjectStateRemoved  Type = "project.state_removed"
 
+	// A project's labels and its priority scale, which issues refer to by
+	// identifier and so must exist in the stream before anything names them.
+	TypeProjectLabelAdded      Type = "project.label_added"
+	TypeProjectLabelChanged    Type = "project.label_changed"
+	TypeProjectLabelRemoved    Type = "project.label_removed"
+	TypeProjectPriorityAdded   Type = "project.priority_added"
+	TypeProjectPriorityChanged Type = "project.priority_changed"
+	TypeProjectPriorityRemoved Type = "project.priority_removed"
+
+	/*
+		Everything a project held at the moment its stream became complete.
+
+		Appended once, by the server, to a project made before every change
+		was an event: its content is the project's rows as they stood, and a
+		replay starts from the latest one rather than from an earlier history
+		that left things out.
+	*/
+	TypeProjectBaseline Type = "project.baseline"
+
 	// Cycles and milestones. A cycle's end is recorded by the server, which
 	// is what dealt with it, saying what became of every unfinished issue.
 	TypeProjectCycleAdded       Type = "project.cycle_added"

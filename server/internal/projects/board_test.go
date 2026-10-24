@@ -72,7 +72,7 @@ func boardProject(t *testing.T, f fixture) (projects.Actor, projects.Access) {
 		}
 	}
 	for _, name := range []string{"needs-design", "frontend", "regression"} {
-		if _, err := f.projects.AddLabel(ctx, access, name, "#2563eb"); err != nil {
+		if _, err := f.projects.AddLabel(ctx, owner, access, name, "#2563eb"); err != nil {
 			t.Fatalf("add label: %v", err)
 		}
 	}

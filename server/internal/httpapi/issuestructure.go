@@ -445,7 +445,7 @@ func (s *Server) handleAddLabel(c *echo.Context) error {
 	if request.Colour != nil {
 		colour = *request.Colour
 	}
-	label, err := s.projects.AddLabel(c.Request().Context(), access, name, colour)
+	label, err := s.projects.AddLabel(c.Request().Context(), actorOf(c), access, name, colour)
 	if err != nil {
 		return structureError(err)
 	}
@@ -465,7 +465,7 @@ func (s *Server) handleUpdateLabel(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
-	label, err := s.projects.UpdateLabel(c.Request().Context(), access, labelID, request.Name, request.Colour)
+	label, err := s.projects.UpdateLabel(c.Request().Context(), actorOf(c), access, labelID, request.Name, request.Colour)
 	if err != nil {
 		return structureError(err)
 	}
@@ -514,7 +514,7 @@ func (s *Server) handleAddPriority(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
-	priority, err := s.projects.AddPriority(c.Request().Context(), access, request.Name)
+	priority, err := s.projects.AddPriority(c.Request().Context(), actorOf(c), access, request.Name)
 	if err != nil {
 		return structureError(err)
 	}
@@ -536,7 +536,7 @@ func (s *Server) handleRenamePriority(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
-	priority, err := s.projects.RenamePriority(c.Request().Context(), access, priorityID, request.Name)
+	priority, err := s.projects.RenamePriority(c.Request().Context(), actorOf(c), access, priorityID, request.Name)
 	if err != nil {
 		return structureError(err)
 	}
@@ -562,7 +562,7 @@ func (s *Server) handleReorderPriorities(c *echo.Context) error {
 		}
 		order = append(order, id)
 	}
-	priorities, err := s.projects.ReorderPriorities(c.Request().Context(), access, order)
+	priorities, err := s.projects.ReorderPriorities(c.Request().Context(), actorOf(c), access, order)
 	if err != nil {
 		return structureError(err)
 	}

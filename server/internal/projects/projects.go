@@ -283,8 +283,13 @@ func (s *Service) Create(ctx context.Context, actor Actor, input NewProject) (db
 			return fmt.Errorf("add creator: %w", err)
 		}
 
+		/*
+			Everything the row holds that the person chose or the server
+			defaulted, so the stream alone says what the project was made as.
+		*/
 		if _, err := s.appendTo(ctx, q, stream, creator, events.TypeProjectCreated, map[string]any{
-			"key": key, "name": name, "visibility": visibility,
+			"key": key, "name": name, "description": description, "visibility": visibility,
+			"timeZone": project.TimeZone, "cyclePolicy": project.CyclePolicy,
 		}); err != nil {
 			return err
 		}
@@ -305,7 +310,7 @@ func (s *Service) Create(ctx context.Context, actor Actor, input NewProject) (db
 				return err
 			}
 		}
-		return seedPriorities(ctx, q, project.ID)
+		return s.seedPriorities(ctx, q, stream, creator)
 	})
 	return project, err
 }

@@ -66,17 +66,29 @@ const (
 var defaultPriorities = []string{"Urgent", "High", "Medium", "Low"}
 
 // seedPriorities gives a new project its starting scale, inside the
-// transaction that creates it.
-func seedPriorities(ctx context.Context, q *dbgen.Queries, projectID uuid.UUID) error {
+// transaction that creates it, each level recorded as the creator's.
+func (s *Service) seedPriorities(ctx context.Context, q *dbgen.Queries, stream dbgen.Room, creator dbgen.User) error {
 	for rank, name := range defaultPriorities {
-		if _, err := q.CreateProjectPriority(ctx, dbgen.CreateProjectPriorityParams{
-			ID: uuid.New(), ProjectID: projectID, Name: name,
+		added, err := q.CreateProjectPriority(ctx, dbgen.CreateProjectPriorityParams{
+			ID: uuid.New(), ProjectID: stream.ID, Name: name,
 			NameFolded: strings.ToLower(name), Rank: int32(rank + 1),
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("create priority: %w", err)
+		}
+		if _, err := s.appendTo(ctx, q, stream, creator, events.TypeProjectPriorityAdded, priorityContent(added)); err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func priorityContent(priority dbgen.ProjectPriority) map[string]any {
+	return map[string]any{"priority": priority.ID.String(), "name": priority.Name, "rank": priority.Rank}
+}
+
+func labelContent(label dbgen.ProjectLabel) map[string]any {
+	return map[string]any{"label": label.ID.String(), "name": label.Name, "colour": label.Colour}
 }
 
 /*
@@ -225,7 +237,7 @@ func labelFields(name, colour string) (string, string, string, error) {
 
 // AddLabel adds a label to a project's vocabulary. Labelling issues is
 // issue.label; deciding which labels exist is the same permission.
-func (s *Service) AddLabel(ctx context.Context, access Access, name, colour string) (dbgen.ProjectLabel, error) {
+func (s *Service) AddLabel(ctx context.Context, actor Actor, access Access, name, colour string) (dbgen.ProjectLabel, error) {
 	if decision := access.Allows(authz.PermIssueLabel); !decision.Allowed {
 		return dbgen.ProjectLabel{}, RefusalError{decision}
 	}
@@ -233,16 +245,21 @@ func (s *Service) AddLabel(ctx context.Context, access Access, name, colour stri
 	if err != nil {
 		return dbgen.ProjectLabel{}, err
 	}
-	label, err := s.queries.CreateProjectLabel(ctx, dbgen.CreateProjectLabelParams{
-		ID: uuid.New(), ProjectID: access.Project.ID, Name: trimmed, NameFolded: folded, Colour: colour,
+	var label dbgen.ProjectLabel
+	err = s.inTransaction(ctx, func(q *dbgen.Queries) error {
+		var err error
+		label, err = q.CreateProjectLabel(ctx, dbgen.CreateProjectLabelParams{
+			ID: uuid.New(), ProjectID: access.Project.ID, Name: trimmed, NameFolded: folded, Colour: colour,
+		})
+		if isUniqueViolation(err) {
+			return ErrLabelNameTaken
+		}
+		if err != nil {
+			return fmt.Errorf("create label: %w", err)
+		}
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectLabelAdded, labelContent(label))
 	})
-	if isUniqueViolation(err) {
-		return dbgen.ProjectLabel{}, ErrLabelNameTaken
-	}
-	if err != nil {
-		return dbgen.ProjectLabel{}, fmt.Errorf("create label: %w", err)
-	}
-	return label, nil
+	return label, err
 }
 
 // labelOf returns a label only if it is the project's own.
@@ -258,35 +275,50 @@ func labelOf(ctx context.Context, q *dbgen.Queries, projectID, labelID uuid.UUID
 }
 
 // UpdateLabel renames or recolours a label.
-func (s *Service) UpdateLabel(ctx context.Context, access Access, labelID uuid.UUID, name, colour *string) (dbgen.ProjectLabel, error) {
+func (s *Service) UpdateLabel(
+	ctx context.Context,
+	actor Actor,
+	access Access,
+	labelID uuid.UUID,
+	name, colour *string,
+) (dbgen.ProjectLabel, error) {
 	if decision := access.Allows(authz.PermIssueLabel); !decision.Allowed {
 		return dbgen.ProjectLabel{}, RefusalError{decision}
 	}
-	label, err := labelOf(ctx, s.queries, access.Project.ID, labelID)
-	if err != nil {
-		return dbgen.ProjectLabel{}, err
-	}
-	newName, newColour := label.Name, label.Colour
-	if name != nil {
-		newName = *name
-	}
-	if colour != nil {
-		newColour = *colour
-	}
-	trimmed, folded, cleanColour, err := labelFields(newName, newColour)
-	if err != nil {
-		return dbgen.ProjectLabel{}, err
-	}
-	updated, err := s.queries.UpdateProjectLabel(ctx, dbgen.UpdateProjectLabelParams{
-		ID: label.ID, Name: trimmed, NameFolded: folded, Colour: cleanColour,
+	var updated dbgen.ProjectLabel
+	err := s.inTransaction(ctx, func(q *dbgen.Queries) error {
+		label, err := labelOf(ctx, q, access.Project.ID, labelID)
+		if err != nil {
+			return err
+		}
+		newName, newColour := label.Name, label.Colour
+		if name != nil {
+			newName = *name
+		}
+		if colour != nil {
+			newColour = *colour
+		}
+		trimmed, folded, cleanColour, err := labelFields(newName, newColour)
+		if err != nil {
+			return err
+		}
+		updated, err = q.UpdateProjectLabel(ctx, dbgen.UpdateProjectLabelParams{
+			ID: label.ID, Name: trimmed, NameFolded: folded, Colour: cleanColour,
+		})
+		if isUniqueViolation(err) {
+			return ErrLabelNameTaken
+		}
+		if err != nil {
+			return fmt.Errorf("update label: %w", err)
+		}
+		if updated.Name == label.Name && updated.Colour == label.Colour {
+			return nil
+		}
+		content := labelContent(updated)
+		content["previousName"], content["previousColour"] = label.Name, label.Colour
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectLabelChanged, content)
 	})
-	if isUniqueViolation(err) {
-		return dbgen.ProjectLabel{}, ErrLabelNameTaken
-	}
-	if err != nil {
-		return dbgen.ProjectLabel{}, fmt.Errorf("update label: %w", err)
-	}
-	return updated, nil
+	return updated, err
 }
 
 /*
@@ -325,7 +357,8 @@ func (s *Service) RemoveLabel(ctx context.Context, actor Actor, access Access, l
 		if err := q.DeleteProjectLabel(ctx, label.ID); err != nil {
 			return fmt.Errorf("delete label: %w", err)
 		}
-		return nil
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectLabelRemoved,
+			map[string]any{"label": label.ID.String(), "name": label.Name})
 	})
 }
 
@@ -398,7 +431,7 @@ func priorityOf(ctx context.Context, q *dbgen.Queries, projectID, priorityID uui
 
 // AddPriority adds a level at the least urgent end of a project's scale. The
 // scale is the project's workflow as much as its states are.
-func (s *Service) AddPriority(ctx context.Context, access Access, name string) (dbgen.ProjectPriority, error) {
+func (s *Service) AddPriority(ctx context.Context, actor Actor, access Access, name string) (dbgen.ProjectPriority, error) {
 	if decision := access.Allows(authz.PermProjectConfigureStates); !decision.Allowed {
 		return dbgen.ProjectPriority{}, RefusalError{decision}
 	}
@@ -421,13 +454,19 @@ func (s *Service) AddPriority(ctx context.Context, access Access, name string) (
 		if err != nil {
 			return fmt.Errorf("create priority: %w", err)
 		}
-		return nil
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectPriorityAdded, priorityContent(added))
 	})
 	return added, err
 }
 
 // RenamePriority renames a level of the scale without moving it.
-func (s *Service) RenamePriority(ctx context.Context, access Access, priorityID uuid.UUID, name string) (dbgen.ProjectPriority, error) {
+func (s *Service) RenamePriority(
+	ctx context.Context,
+	actor Actor,
+	access Access,
+	priorityID uuid.UUID,
+	name string,
+) (dbgen.ProjectPriority, error) {
 	if decision := access.Allows(authz.PermProjectConfigureStates); !decision.Allowed {
 		return dbgen.ProjectPriority{}, RefusalError{decision}
 	}
@@ -435,24 +474,34 @@ func (s *Service) RenamePriority(ctx context.Context, access Access, priorityID 
 	if err != nil {
 		return dbgen.ProjectPriority{}, err
 	}
-	if _, err := priorityOf(ctx, s.queries, access.Project.ID, priorityID); err != nil {
-		return dbgen.ProjectPriority{}, err
-	}
-	renamed, err := s.queries.UpdateProjectPriority(ctx, dbgen.UpdateProjectPriorityParams{
-		ID: priorityID, Name: trimmed, NameFolded: folded,
+	var renamed dbgen.ProjectPriority
+	err = s.inTransaction(ctx, func(q *dbgen.Queries) error {
+		current, err := priorityOf(ctx, q, access.Project.ID, priorityID)
+		if err != nil {
+			return err
+		}
+		renamed, err = q.UpdateProjectPriority(ctx, dbgen.UpdateProjectPriorityParams{
+			ID: priorityID, Name: trimmed, NameFolded: folded,
+		})
+		if isUniqueViolation(err) {
+			return ErrPriorityTaken
+		}
+		if err != nil {
+			return fmt.Errorf("rename priority: %w", err)
+		}
+		if renamed.Name == current.Name {
+			return nil
+		}
+		content := priorityContent(renamed)
+		content["previousName"] = current.Name
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectPriorityChanged, content)
 	})
-	if isUniqueViolation(err) {
-		return dbgen.ProjectPriority{}, ErrPriorityTaken
-	}
-	if err != nil {
-		return dbgen.ProjectPriority{}, fmt.Errorf("rename priority: %w", err)
-	}
-	return renamed, nil
+	return renamed, err
 }
 
 // ReorderPriorities sets the scale's order, most urgent first. Every level
 // must be named exactly once.
-func (s *Service) ReorderPriorities(ctx context.Context, access Access, order []uuid.UUID) ([]dbgen.ProjectPriority, error) {
+func (s *Service) ReorderPriorities(ctx context.Context, actor Actor, access Access, order []uuid.UUID) ([]dbgen.ProjectPriority, error) {
 	if decision := access.Allows(authz.PermProjectConfigureStates); !decision.Allowed {
 		return nil, RefusalError{decision}
 	}
@@ -477,6 +526,16 @@ func (s *Service) ReorderPriorities(ctx context.Context, access Access, order []
 			if err := q.SetProjectPriorityRank(ctx, dbgen.SetProjectPriorityRankParams{ID: id, Rank: int32(rank + 1)}); err != nil {
 				return fmt.Errorf("set rank: %w", err)
 			}
+		}
+		// Recorded the way reordering states is: the whole order, most
+		// urgent first.
+		names := make([]string, 0, len(order))
+		for _, id := range order {
+			names = append(names, id.String())
+		}
+		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID,
+			events.TypeProjectPriorityChanged, map[string]any{"order": names}); err != nil {
+			return err
 		}
 		reordered, err = q.ListProjectPriorities(ctx, access.Project.ID)
 		return err
@@ -514,7 +573,8 @@ func (s *Service) RemovePriority(ctx context.Context, actor Actor, access Access
 		if err := q.DeleteProjectPriority(ctx, priority.ID); err != nil {
 			return fmt.Errorf("delete priority: %w", err)
 		}
-		return nil
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectPriorityRemoved,
+			map[string]any{"priority": priority.ID.String(), "name": priority.Name})
 	})
 }
 
