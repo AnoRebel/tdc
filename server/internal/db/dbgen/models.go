@@ -1128,6 +1128,11 @@ type SkillAlias struct {
 	SkillID     uuid.UUID
 }
 
+type StorageDeletion struct {
+	Key      string
+	QueuedAt time.Time
+}
+
 type ThreadRead struct {
 	RootEventID  string
 	UserID       uuid.UUID

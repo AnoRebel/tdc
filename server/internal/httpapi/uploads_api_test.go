@@ -246,3 +246,39 @@ func TestTheSweepReleasesWhatWasLeftBehind(t *testing.T) {
 		t.Errorf("%d uploads remain after the sweep (%v)", pieces, fmt.Sprint(err))
 	}
 }
+
+// An upload that goes with its room leaves its pieces queued, and the sweep
+// removes them; nothing in storage outlives the record of where it is.
+func TestPiecesOfAnUploadRemovedWithItsRoomAreSwept(t *testing.T) {
+	handler := newTestAPI(t)
+	token := completeSetup(t, handler)
+	room := makeRoom(t, handler, token, "files", "public")
+	pool := scheduledDatabase(t)
+
+	// Every piece in, but never finished: the row still holds them.
+	id := beginUpload(t, handler, token, room, "half.png", 2000, http.StatusCreated)
+	if got := sendPiece(t, handler, token, id, 0, fileOf(t, 2000)[:2000]); got.Code != http.StatusOK {
+		t.Fatalf("the piece returned %d", got.Code)
+	}
+	var keys []string
+	if err := pool.QueryRow(context.Background(), `SELECT piece_keys FROM file_uploads WHERE id = $1`, id).Scan(&keys); err != nil || len(keys) != 1 {
+		t.Fatalf("pieces recorded: %v (%v)", keys, err)
+	}
+	if _, err := pool.Exec(context.Background(), `DELETE FROM rooms WHERE id = $1`, room); err != nil {
+		t.Fatal(err)
+	}
+
+	queued := func() (n int) {
+		if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM storage_deletions WHERE key = $1`, keys[0]).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if queued() != 1 {
+		t.Fatal("the piece of an upload removed with its room was not queued for deletion")
+	}
+	serverOf(handler).SweepFiles(context.Background())
+	if queued() != 0 {
+		t.Error("the sweep left a queued piece in place")
+	}
+}

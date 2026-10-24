@@ -276,6 +276,10 @@ func newTestAPIConfigured(
 			"DELETE FROM recovery_tokens",
 			// Operating the server: none of it belongs to a user or a room.
 			"DELETE FROM operations", "DELETE FROM backups", "DELETE FROM server_nodes",
+			// A followed calendar for the whole server belongs to no room, and
+			// its creator is set aside rather than taking it with them, so it
+			// would be due in the next test's refresh pass.
+			"DELETE FROM calendar_subscriptions", "DELETE FROM storage_deletions",
 			"UPDATE maintenance SET active = FALSE, restart_required = FALSE",
 		} {
 			if _, err := pool.Exec(cleanCtx, statement); err != nil {

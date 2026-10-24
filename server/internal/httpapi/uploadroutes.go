@@ -335,6 +335,9 @@ func (s *Server) SweepFiles(ctx context.Context) {
 	} else if removed > 0 {
 		s.log.Info("removed abandoned uploads", "count", removed)
 	}
+	if _, err := s.attachments.ReclaimQueuedPieces(ctx, 500); err != nil && ctx.Err() == nil {
+		s.log.Error("sweeping the pieces of removed uploads failed", slog.String("error", err.Error()))
+	}
 	if removed, err := s.attachments.ReclaimOrphans(ctx, age, 200); err != nil && ctx.Err() == nil {
 		s.log.Error("sweeping unsent files failed", slog.String("error", err.Error()))
 	} else if removed > 0 {

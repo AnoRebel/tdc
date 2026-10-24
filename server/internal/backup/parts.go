@@ -243,6 +243,7 @@ var excluded = map[string]string{
 	"call_lobby": "who is waiting to be let into a call in progress",
 	"automatic_reply_log": "who was answered automatically today, which keeps a reply to one a day " +
 		"and lapses in a day",
+	"storage_deletions":    "objects waiting to be deleted from storage, which the next sweep removes",
 	"message_translations": "translations already made, which are made again when asked for",
 	"translation_connections": "keys for outside translation services, sealed with this server's own " +
 		"key; carrying them to another server is not this archive's to do, so people connect again",

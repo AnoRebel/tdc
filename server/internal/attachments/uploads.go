@@ -283,6 +283,30 @@ func (s *Service) ReclaimAbandonedUploads(ctx context.Context, olderThan time.Du
 	return len(rows), nil
 }
 
+/*
+ReclaimQueuedPieces deletes the pieces of uploads removed without them — those
+that went with an account or a room. Each key leaves the queue only once its
+object is gone, so a store having a bad moment is tried again next time.
+*/
+func (s *Service) ReclaimQueuedPieces(ctx context.Context, limit int32) (int, error) {
+	keys, err := s.queries.ListStorageDeletions(ctx, limit)
+	if err != nil {
+		return 0, fmt.Errorf("attachments: listing queued pieces: %w", err)
+	}
+	removed := 0
+	for _, key := range keys {
+		if err := s.store.Delete(ctx, key); err != nil {
+			s.log.Warn("cannot remove a queued piece", "key", key, "error", err)
+			continue
+		}
+		if err := s.queries.DeleteStorageDeletion(ctx, key); err != nil {
+			return removed, fmt.Errorf("attachments: dequeuing a piece: %w", err)
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 // joinedPieces reads an upload's pieces one after another.
 type joinedPieces struct {
 	ctx     context.Context

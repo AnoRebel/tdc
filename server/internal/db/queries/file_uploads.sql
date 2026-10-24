@@ -48,3 +48,9 @@ FROM (
     FROM attachments
     WHERE uploader_id = $1
 ) AS theirs;
+
+-- name: ListStorageDeletions :many
+SELECT key FROM storage_deletions ORDER BY queued_at LIMIT $1;
+
+-- name: DeleteStorageDeletion :exec
+DELETE FROM storage_deletions WHERE key = $1;

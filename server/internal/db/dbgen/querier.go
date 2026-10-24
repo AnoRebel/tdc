@@ -371,6 +371,7 @@ type Querier interface {
 	// when it is about to arrive.
 	DeleteScheduledMessage(ctx context.Context, arg DeleteScheduledMessageParams) (int64, error)
 	DeleteServerConfigValue(ctx context.Context, key string) error
+	DeleteStorageDeletion(ctx context.Context, key string) error
 	DeleteTOTPCredential(ctx context.Context, userID uuid.UUID) error
 	DeleteTranslationConnection(ctx context.Context, arg DeleteTranslationConnectionParams) error
 	DeleteTranslationRoomRule(ctx context.Context, arg DeleteTranslationRoomRuleParams) error
@@ -956,6 +957,7 @@ type Querier interface {
 	// The vocabulary for somebody choosing: every active skill matching what they
 	// typed, and their own proposals, which only they can attach.
 	ListSkills(ctx context.Context, arg ListSkillsParams) ([]Skill, error)
+	ListStorageDeletions(ctx context.Context, limit int32) ([]string, error)
 	ListSubscriptionEventUIDs(ctx context.Context, subscriptionID *uuid.UUID) ([]ListSubscriptionEventUIDsRow, error)
 	ListThreadFollowers(ctx context.Context, rootEventID string) ([]uuid.UUID, error)
 	ListThreadReplies(ctx context.Context, threadRootID *string) ([]Event, error)
