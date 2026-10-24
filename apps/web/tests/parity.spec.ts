@@ -170,14 +170,15 @@ test.describe("a conversation in use", () => {
     await page.locator('button[title="Edit"]').last().click();
 
     /*
-     * The edit box autofocuses, and it is the focused element that matters —
-     * targeting "the last textbox" found the composer instead and sent a new
-     * message, which looked like an edit that did not mark itself. Asking for
-     * the focused element rather than a class also survives the markup moving
-     * onto a component, which a class selector did not.
+     * The edit box, by its name — targeting "the last textbox" found the
+     * composer instead and sent a new message, which looked like an edit that
+     * did not mark itself. By name rather than by element: the box became a
+     * textarea when messages gained several lines, and the `input:focus` this
+     * used to ask for then matched nothing. It autofocuses, so that is
+     * checked too.
      */
-    const editor = page.locator("input:focus");
-    await editor.waitFor();
+    const editor = page.getByRole("textbox", { name: /edit this message/i });
+    await expect(editor).toBeFocused();
     await editor.fill(`${body} changed`);
     await editor.press("Enter");
 

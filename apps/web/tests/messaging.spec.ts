@@ -100,13 +100,14 @@ test("an edit and a deletion reach the other client too", async ({ browser }, te
     await sender.locator('button[title="Edit"]').last().click();
 
     /*
-     * The focused element, not "the last textbox" — that finds the composer
-     * and sends a new message instead, which reads as an edit that failed to
-     * mark itself. The parity suite records the same trap.
+     * The edit box by its name, not "the last textbox" — that finds the
+     * composer and sends a new message instead, which reads as an edit that
+     * failed to mark itself. The parity suite records the same trap, and why
+     * this is not asked for as an `input`.
      */
     const corrected = `${original} — corrected`;
-    const editor = sender.locator("input:focus");
-    await editor.waitFor();
+    const editor = sender.getByRole("textbox", { name: /edit this message/i });
+    await expect(editor).toBeFocused();
     await editor.fill(corrected);
     await editor.press("Enter");
 

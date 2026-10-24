@@ -177,7 +177,7 @@ test.describe("the pages somebody arrives at", () => {
     // The controls appear on the message, so it has to be hovered first.
     await page.getByText(body, { exact: true }).hover();
     await page.locator('button[title="Edit"]').last().click();
-    await page.locator("input:focus").waitFor();
+    await expect(page.getByRole("textbox", { name: /edit this message/i })).toBeFocused();
 
     await settled(page);
 
