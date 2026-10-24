@@ -14,6 +14,7 @@ import type {
   DiscussionSearchResult,
   Issue,
   IssueHistoryEntry,
+  ProjectHistoryEntry,
   IssueSearch,
   IssueLabel,
   IssuePriority,
@@ -50,6 +51,9 @@ export function useProjects() {
     ) => api.patch<Project>(at(key), changes),
 
     members: (key: string) => api.get<ProjectMember[]>(`${at(key)}/members`),
+    /** What happened to the project itself, newest first; before continues below a sequence. */
+    projectHistory: (key: string, before?: number) =>
+      api.get<ProjectHistoryEntry[]>(`${at(key)}/history${before ? `?before=${before}` : ""}`),
     setMember: (key: string, username: string, role: "admin" | "member") =>
       api.put<void>(`${at(key)}/members/${encodeURIComponent(username)}`, { role }),
     removeMember: (key: string, username: string) =>

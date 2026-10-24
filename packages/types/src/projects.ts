@@ -188,6 +188,13 @@ export interface IssueHistoryEntry {
 }
 
 /**
+ * One recorded change to a project itself — project.created,
+ * project.label_added and the rest — in the same shape as an issue's. The
+ * actor is the server's own name, with no "@", for what it did by itself.
+ */
+export type ProjectHistoryEntry = IssueHistoryEntry;
+
+/**
  * An issue made from one of a room's messages, as that room's reader may see
  * it. Issues in projects the reader cannot see are simply not listed.
  */

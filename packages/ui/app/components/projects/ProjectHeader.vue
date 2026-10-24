@@ -39,6 +39,11 @@ const tabs = computed(() => [
     to: localeRoute({ name: "projects-key-progress", params: { key: props.project.key } }),
   },
   {
+    name: "history",
+    label: $ts("projects.tabs.history"),
+    to: localeRoute({ name: "projects-key-history", params: { key: props.project.key } }),
+  },
+  {
     name: "settings",
     label: $ts("projects.tabs.settings"),
     to: localeRoute({ name: "projects-key-settings", params: { key: props.project.key } }),
