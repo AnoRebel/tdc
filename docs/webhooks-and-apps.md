@@ -250,9 +250,9 @@ held server-wide.
 
 Every issue event's `content` carries `issue` and `key` (`WEB-12`), and a change
 carries `field`, `previous` and `new`. **Settings → Integrations** offers them in
-the same groups: messages, members, channels, calls, the directory, projects,
-issues, planning and people. A feature that adds events of its own adds a group,
-and nothing about the ones here changes.
+the same groups: messages, members, channels, calls, events, the directory,
+projects, issues, planning and people. A feature that adds events of its own
+adds a group, and nothing about the ones here changes.
 
 A comment, as a project subscription receives it:
 
@@ -602,10 +602,10 @@ well as post, and unlike an [API token](integrating.md#api-tokens) it is not
 somebody acting through a program — it has an account of its own, permissions
 of its own, and holds none of the authority of whoever installed it.
 
-Installing one takes two steps, and they may be two people: somebody registers
-it, saying what it needs; somebody holding `server.applications.manage` —
-administrators, by default — approves it, having been shown exactly that. Both
-are in **Settings → Applications**, and both are in the audit log.
+Installing one takes two steps, and they may be two people, each holding
+`server.applications.manage` — administrators, by default: somebody registers
+it, saying what it needs; somebody approves it, having been shown exactly that.
+Both are in **Settings → Applications**, and both are in the audit log.
 
 ![Settings → Applications: an approved Deploy bot with its purpose, its one permission, the channel it acts in and what it sends off the server, and below it the form to register another](images/webhooks-and-apps/applications.webp)
 
@@ -720,8 +720,10 @@ server-wide default. Then:
   or not it exists.
 - **Joining and leaving** are refused: its channels are what its approver chose.
 - **Outside a channel**, it may use only an allowlist — who it is, the live
-  connection, attachments, and the server's own description. A route added to
-  the server later is closed to applications until somebody decides otherwise.
+  connection, attachments, its own
+  [outgoing webhooks](#being-told-about-events-at-an-address), and the server's
+  own description. A route added to the server later is closed to applications
+  until somebody decides otherwise.
 - **Administrative routes** each check their own permission, against its grant.
   An application approved with an administrative permission can do that one
   thing, and the page marks such a permission before approval.
@@ -796,7 +798,7 @@ names its subscription:
   "occurredAt": "2026-10-02T09:20:11.482Z",
   "application": "0199f4c2-…",
   "server": "chat.example.org",
-  "room": { "id": "5a1c…", "address": "#deploys:chat.example.org" },
+  "room": { "id": "5a1c…", "address": "deploys@chat.example.org" },
   "event": {
     "id": "$Hk2…",
     "type": "action.pressed",

@@ -472,8 +472,14 @@ like, which is the same failure with an extra step.
 
 `wails3 generate bindings -ts -i` writes TypeScript mirroring the Go services
 into `frontend/bindings`, which the frontend reaches through the `#bindings`
-alias. The frontend build regenerates them, so this is only needed by hand
-when compiling Go without it.
+alias. They are not committed. `wails3 task build` and `wails3 dev` regenerate
+them; anything else that compiles the frontend — `bun run typecheck` at the
+root, `bun run --cwd frontend build` — needs them generated first, with the CLI
+at the version in `go.mod`:
+
+```sh
+go run github.com/wailsapp/wails/v3/cmd/wails3 generate bindings -ts -i
+```
 
 ## The version
 

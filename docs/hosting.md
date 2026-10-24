@@ -44,8 +44,9 @@ afterwards, and there is no default credential at any point.
 ### Before anybody else uses it
 
 The shipped `compose.yaml` runs unedited so that you can look at the thing
-before committing to it. Four values in it are marked `CHANGE ME`, and all four
-matter before anybody else connects.
+before committing to it. Three things in it are marked `CHANGE ME` — the
+database password in both places it appears — and they, with one more beside
+them, matter before anybody else connects.
 
 **`TDC_SERVER_CANONICAL_ADDRESS`** — how this server is known. Set it to the
 name people will actually type, `chat.example.org`. It is never inferred from a
@@ -63,9 +64,9 @@ never sent back. **Remove that line for any deployment served over HTTPS.**
 Leaving it means session cookies travel in the clear and can be read by anybody
 on the same wire.
 
-**`TDC_SERVER_ALLOWED_ORIGINS`** — set in the shipped file for local
-development, where the web app runs on port 3000. A normal deployment serves the
-app from the same origin as the API and wants this empty.
+**`TDC_SERVER_ALLOWED_ORIGINS`** — not marked, but set in the shipped file for
+local development, where the web app runs on port 3000. A normal deployment
+serves the app from the same origin as the API and wants this empty.
 
 Two more things to do to the file for a real deployment. Remove the published
 port on the database — the server reaches it over the compose network and
@@ -119,11 +120,53 @@ both at startup, along with an unset canonical address and a database URL with
 TLS disabled. Read the startup log the first time; it is telling you what it
 thinks is wrong.
 
+The rest, which most servers leave alone:
+
+| Setting                             | Default                                  | What it does                                                    |
+| ----------------------------------- | ---------------------------------------- | --------------------------------------------------------------- |
+| `server.description`                | `A Tanzania Developers Community server` | How it describes itself                                         |
+| `server.read_timeout`               | `15s`                                    | How long reading a request may take                             |
+| `server.write_timeout`              | `30s`                                    | How long writing a response may take                            |
+| `server.idle_timeout`               | `120s`                                   | How long an idle connection is kept open                        |
+| `server.shutdown_timeout`           | `20s`                                    | How long requests are given to finish when stopping             |
+| `server.expose_internal_errors`     | `false`                                  | Return internal error detail to callers; development only       |
+| `server.web_root`                   | `/usr/share/tdc/web`                     | Where the built web application is served from                  |
+| `server.multi_node`                 | `false`                                  | See [Running more than one node](#running-more-than-one-node)   |
+| `server.restart_method`             | `auto`                                   | See [Reload and restart](#reload-and-restart)                   |
+| `database.max_connections`          | `10`                                     | Largest the connection pool grows                               |
+| `database.min_connections`          | `2`                                      | Connections kept open; not more than the maximum                |
+| `database.connect_timeout`          | `10s`                                    | How long connecting to the database may take                    |
+| `database.max_conn_lifetime`        | `1h`                                     | When a pooled connection is replaced                            |
+| `database.max_conn_idle_time`       | `30m`                                    | When an unused pooled connection is closed                      |
+| `storage.s3.endpoint`               | —                                        | Required under `s3-aws` and `s3-minio`                          |
+| `storage.s3.bucket`                 | —                                        | Required under `s3-aws` and `s3-minio`                          |
+| `storage.s3.access_key`             | —                                        | Required under `s3-aws` and `s3-minio`; redacted                |
+| `storage.s3.secret_key`             | —                                        | Required under `s3-aws` and `s3-minio`; redacted                |
+| `storage.s3.region`                 | `us-east-1`                              | The bucket's region                                             |
+| `storage.s3.path_style`             | `true`                                   | Address the bucket in the path rather than the hostname         |
+| `attachments.scanner_address`       | —                                        | A clamd `host:port`. Empty is no malware scanning               |
+| `attachments.scanner_timeout`       | `30s`                                    | How long one scan may take                                      |
+| `attachments.scanner_fail_open`     | `false`                                  | Accept a file when the scanner cannot be reached                |
+| `attachments.media_sidecar_address` | —                                        | Make previews in another container. Empty does it in-process    |
+| `attachments.media_sidecar_timeout` | `30s`                                    | How long one request to the sidecar may take                    |
+| `attachments.link_previews`         | `true`                                   | Allow link previews at all; the `link-previews` feature as well |
+| `push.vapid_public`                 | —                                        | Notifications to closed browsers. Empty is no push              |
+| `push.vapid_private`                | —                                        | Its private half; redacted                                      |
+| `push.subject`                      | —                                        | A `mailto:` or `https:` address a push service can reach you at |
+| `gifs.provider`                     | —                                        | `tenor` or `giphy`; empty is no GIF search                      |
+| `gifs.api_key`                      | —                                        | Required with a provider; redacted                              |
+| `gifs.content_filter`               | —                                        | Empty is the strictest each provider offers                     |
+| `gifs.timeout`                      | `5s`                                     | How long one search may take                                    |
+
+`tdc-server -push-keys` prints a new key pair, and a subject to fill in, as
+`TDC_PUSH_*` lines.
+
 Attachment storage, malware scanning, the media sidecar, link previews and GIF
 search are all covered in the repository's [README](../README.md), which is the
 reference for what each costs and what is lost by leaving it off. The short
-version is that only link previews reaches outside the machine by default, and
-that can be turned off too.
+version is that nothing reaches outside the machine by default: GIF search
+needs a provider, a key and the `gif-search` feature, and link previews the
+`link-previews` feature, and both features are off until you switch them on.
 
 ### Signing in through another service
 
@@ -502,6 +545,56 @@ registration during a flood of spam accounts at two in the morning should not
 require a deployment.
 
 Every such change is recorded in the audit log.
+
+The settings that have no section of their own below:
+
+| Setting                                           | Default   | What it does                                                                        |
+| ------------------------------------------------- | --------- | ----------------------------------------------------------------------------------- |
+| `registration.policy`                             | `open`    | Who may create an account: `open`, `invitation`, `closed` or `domain`               |
+| `registration.domains`                            | —         | Email domains that may register under `domain`, comma-separated, like `example.com` |
+| `limits.max_users`                                | `0`       | Most accounts; `0` is no limit                                                      |
+| `limits.max_channels`                             | `0`       | Most channels; `0` is no limit                                                      |
+| `limits.max_storage_bytes`                        | `0`       | Most attachment storage, in bytes; `0` is no limit                                  |
+| `filter.words`                                    | —         | Words to act on, comma-separated. Empty is no filtering                             |
+| `filter.action`                                   | `flag`    | What happens to a matching message: `flag`, `mask` or `block`                       |
+| `moderation.obscure_sensitive_media`              | `true`    | Hide media marked sensitive until a viewer chooses to see it                        |
+| `moderation.retention_seconds`                    | `0`       | How long messages are kept; `0` keeps them. A channel's own period overrides it     |
+| `audit.retention_days`                            | `0`       | How long audit entries are kept; `0` keeps them                                     |
+| `server.visibility`                               | `public`  | Who may discover this server: `public`, `limited` or `private`                      |
+| `server.visible_to`                               | —         | Servers that may discover it under `limited`, comma-separated                       |
+| `brand.name`                                      | —         | What it calls itself in the interface. Empty uses `server.name`                     |
+| `brand.initials`                                  | —         | At most three letters, shown where the name does not fit. Empty derives them        |
+| `brand.logo_url`                                  | —         | An `http` or `https` link to a logo shown in place of the initials                  |
+| `brand.accent`                                    | —         | The colour used for emphasis, as a CSS colour                                       |
+| `brand.palette`                                   | `default` | `default` or `congrator`, for anybody who has not chosen                            |
+| `integrations.presses_per_user_per_minute`        | `30`      | Message controls one person may activate a minute; `0` is no limit                  |
+| `integrations.presses_per_integration_per_minute` | `600`     | Activations of one integration's controls accepted a minute; `0` is no limit        |
+| `integrations.webhook_max_attempts`               | `12`      | Tries at one webhook delivery before it is abandoned                                |
+| `integrations.webhook_retry_base_seconds`         | `60`      | Delay before the first retry; each later one doubles it                             |
+| `integrations.webhook_retry_cap_seconds`          | `21600`   | Longest delay between retries                                                       |
+| `integrations.webhook_disable_after_failures`     | `24`      | Failed attempts in a row that turn a subscription off                               |
+| `integrations.webhook_deliveries_per_minute`      | `120`     | Deliveries one subscription is sent a minute; `0` is no limit                       |
+| `integrations.delivery_workers`                   | `4`       | Deliveries attempted at once across the server. Read at startup, unlike the rest    |
+| `integrations.delivery_history_days`              | `30`      | Days of finished deliveries kept for their owners to inspect                        |
+| `integrations.incoming_webhook_posts_per_minute`  | `60`      | Messages one incoming webhook may post a minute; `0` is no limit                    |
+| `integrations.application_requests_per_minute`    | `600`     | Requests one application may make a minute; `0` is no limit                         |
+
+Feature toggles are policy too, switched under `/api/admin/features/{name}` or
+in **What this server offers** on the server settings page:
+
+| Feature                | Default | What it is                                                             |
+| ---------------------- | ------- | ---------------------------------------------------------------------- |
+| `attachments`          | on      | Uploading files and images                                             |
+| `invitations`          | on      | Issuing invitation links and codes                                     |
+| `public-directory`     | on      | Listing public channels to people who have not joined them             |
+| `scheduled-messages`   | on      | Sending a message at a chosen time                                     |
+| `translation`          | on      | See [Translation](#translation)                                        |
+| `events`               | on      | See [Events](#events)                                                  |
+| `notification-digests` | on      | See [Notifications](#notifications-bursts-and-summaries-by-email)      |
+| `gif-search`           | off     | Searching a GIF library; needs `gifs.provider` as well                 |
+| `link-previews`        | off     | Fetching a summary of a linked page; needs `attachments.link_previews` |
+| `directory`            | off     | See [The directory](#the-directory)                                    |
+| `calls`                | off     | See [Calls](#calls)                                                    |
 
 ![Server settings: what the server holds against its limits, then each capability it offers with a switch, those changed from the default marked changed](images/hosting/server-settings.webp)
 

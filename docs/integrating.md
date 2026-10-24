@@ -160,10 +160,12 @@ curl http://localhost:8080/api/rooms -H "Authorization: Bearer tdc_…"
 **A token does what its scope names and what its account still holds**, and
 never more. The two are intersected on every request rather than frozen when
 the token was issued, so taking a role away from an account takes it from that
-account's tokens at the same moment. Scope names come from
-`GET /api/admin/permissions`; an unknown name is refused rather than ignored,
-and one the account does not hold is refused too — a token is a way to delegate
-authority, never a way to acquire it.
+account's tokens at the same moment. Scope names are permission names:
+`GET /api/me/permissions` lists the ones the account holds server-wide, which
+are the ones it may give a token, and `GET /api/admin/permissions` the whole
+catalogue for somebody who manages roles. An unknown name is refused rather
+than ignored (400), and one the account does not hold is refused too (403) — a
+token is a way to delegate authority, never a way to acquire it.
 
 `expiresAt` is optional. Without it the token does not expire on its own, which
 is right for a deployment that runs for years; with it, a token for an
@@ -876,6 +878,30 @@ detected type is what governs.
 Downloading is `GET /api/attachments/:id`, authenticated and authorised —
 knowing where a file is stored grants nothing on its own.
 
+### Scheduling a message
+
+Where the server advertises `scheduled-messages`, a message can be written now
+and sent later:
+
+```sh
+curl -X POST "http://localhost:8080/api/rooms/$ROOM/scheduled" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"body":"Standup in five minutes","sendAt":"2026-11-05T06:55:00Z"}'
+```
+
+`sendAt` is an RFC 3339 instant at least ten seconds and at most a year ahead;
+outside that is **400**. `attachments` (upload identifiers, as above) and
+`threadRoot` (to send it as a reply in that thread) are optional. The word
+filter is applied when it is scheduled, not when it is sent. Answers **201**
+with `id`, `roomId`, `body`, `attachments` and `threadRoot` when set, and
+`sendAt` — given back as epoch milliseconds.
+
+The caller's own are under `/api/me/scheduled`: `GET` lists them,
+`PATCH /api/me/scheduled/:id` changes `body` or `sendAt`,
+`POST /api/me/scheduled/:id/send` sends one now (201 with the message, or 409
+if posting there is no longer allowed), and `DELETE` cancels one.
+
 ### Automatic replies
 
 A person can have the server answer for them while they are away. The replies
@@ -1335,7 +1361,7 @@ exist.
 
 | Request                                                                       | What it does                                                                                                                                                                                    |
 | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/events?from=&to=&channel=&limit=`                                   | The occurrences you can see over a range (default the next 90 days, at most 400, at most 500 entries), each with `occurrenceStartsAt`/`occurrenceEndsAt` and your `myAnswer`                    |
+| `GET /api/events?from=&to=&channel=&limit=`                                   | The occurrences you can see over a range (default the next 90 days, at most 400 days, at most 500 entries), each with `occurrenceStartsAt`/`occurrenceEndsAt` and your `myAnswer`               |
 | `POST /api/events`                                                            | Schedule one (needs `event.create`, in the channel when `channelId` is given). Answers the event as `GET` does                                                                                  |
 | `GET /api/events/:id`                                                         | The event with its `hosts`, `speakers`, `sessions`, `counts`, your answer and place on the waiting list, its `next` occurrence, and what you `may` do (`edit`, `delete`, `startCall`)           |
 | `PUT /api/events/:id`                                                         | Change it — its creator, a host, or `event.manage.any`. Send every field; `hosts`, `speakers` and `sessions` may be left out to keep them. It stays in its channel                              |
@@ -1348,7 +1374,7 @@ exist.
 | `GET /api/events/:id/ics`                                                     | The event as an iCalendar file                                                                                                                                                                  |
 | `POST /api/events/import/preview`, `POST /api/events/import`                  | `{"ics": "…"}` — what importing would do (`create`, `update` or `skip`, with `warnings`); then `{"ics", "uids", "channelId", "visibility", "kind"}` to import the chosen ones. Files up to 1 MB |
 | `GET`/`POST`/`DELETE /api/calendar/subscriptions[/:id]`, `POST …/:id/refresh` | Followed external calendars — `{"url", "label", "channelId", "visibility", "kind"}`; needs `event.calendars.manage`                                                                             |
-| `GET`/`POST`/`DELETE /api/me/calendar-feed`                                   | Your calendar address: whether you have one; make or replace it (the `path` with its secret is in that answer only); revoke it. Not available to API tokens                                     |
+| `GET`/`POST`/`DELETE /api/me/calendar-feed`                                   | Your calendar address: whether you have one; make or replace it (the `path` with its secret is in that answer only); revoke it. Making one is refused to an API token                           |
 | `GET /api/calendar/feeds/:secret/events.ics`                                  | A person's feed, authenticated by the secret in the address                                                                                                                                     |
 | `GET /api/calendar/public.ics`                                                | The server's public events, where the operator publishes them (`events.public_feed`)                                                                                                            |
 
@@ -1443,6 +1469,9 @@ An empty `q` matches nothing rather than everything.
 Nothing you can put in `q` produces a syntax error. The text is treated as words
 to find rather than as a query language, so a caller passing through whatever a
 user typed does not need to sanitise it.
+
+Issues and their discussions have a search of their own,
+`GET /api/issues/search`, described in [Projects and issues](projects.md).
 
 ## Translation
 
@@ -1768,6 +1797,8 @@ each is enforced on the server. Of most use to an integration:
 | `POST /api/admin/invitations`                         | `user.invite`                     | Issue an invitation to the server                                                                                                                                                         |
 | `GET /api/admin/permissions`                          | `role.manage` or `role.assign`    | Every permission, with what it allows and where it may be granted                                                                                                                         |
 | `GET /api/admin/roles`                                | `role.manage` or `role.assign`    | Every role, with `memberCount` and every entry (`permission`, `granted`, `scope` of `server`, `channel` or `project`, and `scopeId`/`scopeName` for a scoped one)                         |
+| `POST /api/admin/roles`                               | `role.manage`                     | Create a role                                                                                                                                                                             |
+| `DELETE /api/admin/roles/:id`                         | `role.manage`                     | Delete a role                                                                                                                                                                             |
 | `PATCH /api/admin/roles/:id`                          | `role.manage`                     | Rename or describe a role; a built-in role keeps its name (409)                                                                                                                           |
 | `PUT /api/admin/roles/:id/permissions`                | `role.manage`                     | Allow (`granted: true`) or deny (`false`) a permission, server-wide or with `channel`                                                                                                     |
 | `DELETE /api/admin/roles/:id/permissions/:permission` | `role.manage`                     | Clear an entry so the role says nothing; `?channel=` for one channel's, `?confirmed=true` where it asks                                                                                   |
@@ -1794,6 +1825,7 @@ archive format are described in [hosting](hosting.md#backup); this is the API.
 | -------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `GET /api/admin/backups`                           | `server.backup` or `server.restore` | Archives, the parts a backup can hold (`needs`, `needsEveryChannel`, `notPartial`), the running job, maintenance |
 | `POST /api/admin/backups`                          | `server.backup`                     | `{ "parts": [...], "rooms": [...], "passphrase": "…" }`; answers 202 with the operation                          |
+| `GET /api/admin/backups/:id`                       | `server.backup` or `server.restore` | One archive                                                                                                      |
 | `GET /api/admin/backups/channels`                  | `server.backup` or `server.restore` | Every channel, for choosing                                                                                      |
 | `GET /api/admin/backups/:id/download`              | `server.backup`                     | The encrypted archive; honours `Range`, or redirects to the object store                                         |
 | `DELETE /api/admin/backups/:id`                    | `server.backup`                     | Delete an archive                                                                                                |

@@ -1567,6 +1567,24 @@ What the desktop client adds:
 - **Updates that verify what they downloaded** and discard anything that fails
   the check rather than installing it.
 
+What works differently, because the window is not a browser:
+
+- **Links to anywhere else open in your usual browser** — a link in a message,
+  a meeting address, **Add to Google Calendar** or **Outlook**, a guide's link
+  out. Signing in through another service happens there too, where the address
+  bar shows whose page is asking for your password.
+- **Files are fetched and saved by the application**, which holds your session:
+  attachments, an event's `.ics` file, backup archives and exports. A file you
+  attach is sent the same way, so the tray shows it when it is done rather than
+  a progress bar.
+- **Notifications come from the operating system, not from push.** The web
+  client's **Push notifications** setting is not here; calls ringing and event
+  reminders raise a system notification as well as appearing in the window,
+  even while the window is closed to the tray.
+- **Translating on this device** depends on the browser engine, and the one the
+  desktop window uses usually does not have it. **Settings → Translation** says
+  so where it is missing; choose another provider there.
+
 ### Which Linux download to take
 
 Two Linux builds are published for each architecture, and almost everybody wants
