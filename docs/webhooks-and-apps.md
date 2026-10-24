@@ -64,9 +64,23 @@ What can go wrong when subscribing, and what each looks like:
 `GET /api/webhooks/event-types` lists what can be asked for. Today:
 `message.sent`, `message.edited`, `message.deleted`, `message.updated`,
 `action.pressed`, `member.joined`, `member.left`, `member.removed`,
-`room.renamed`, `room.archived`, `room.restored` and
-`room.visibility_changed` — everything somebody
-reading a channel sees happen in it, and nothing they do not.
+`room.renamed`, `room.archived`, `room.restored`,
+`room.visibility_changed`, and `event.created`, `event.updated`,
+`event.cancelled` and `event.rsvp` — everything somebody reading a channel sees
+happen in it, and nothing they do not.
+
+**Events.** A channel's events each have a conversation of their own, and the
+four `event.*` types come from there: a subscription on the channel receives
+them with `room` naming the event's conversation and `event.content` carrying
+the event — its `event` id, `title`, `kind`, `startsAt`, `endsAt`, `timeZone`,
+`recurrence`, `location`, `visibility` and `channelId`, plus `changed` (the
+fields an update touched) or `reason` (a cancellation's). An answer's
+`event.rsvp` carries only the `event`, its `title` and the `status`, with the
+person who answered as `event.sender`. Events that are **invite-only** are never
+delivered to a channel's subscriptions, since a channel's reader may not be
+somebody the event was shown to; neither are events of the whole server, which
+belong to no channel. `event.rsvp` is sent only for people who let others see
+the events they go to.
 
 `GET /api/me/webhooks` lists yours, never with secrets. `DELETE
 /api/me/webhooks/{id}` removes one with its history. The interface for all of

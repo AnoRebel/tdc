@@ -980,6 +980,157 @@ reaching each other directly. Your server's operator can run a relay so those
 calls still connect; without one, a call between two such people fails, and
 TDC says so.
 
+## Events
+
+Meetups, talks, workshops and office hours are **events**. **Events** in the
+sidebar lists every event you can see, as an **agenda** of what is coming (or,
+under **Past**, what has been), as a **month**, or as a **week**, and can be
+narrowed to one channel. A channel also shows its next event in a line under
+its header. Each occurrence of a repeating event is its own entry.
+
+The Events page is there only where your operator offers events, which a new
+server does.
+
+### Times, in your zone and theirs
+
+An event is scheduled in a time zone — the organiser's — and stored as an
+instant, so it is the same moment for everybody. You see it in **your own
+zone**, and whenever that is a different time from the organiser's, their time
+beneath it: "15:00 – 17:00 · Thu 18:00 GMT+3 for the organiser". An all-day
+event is the same dates for everybody, wherever they are.
+
+### Scheduling one
+
+**New event** opens the form. Most of it is optional:
+
+- **Title, kind and description.** Kinds are meetup, talk, workshop, office
+  hours and other. The description is written like a message — bold, lists,
+  links, code.
+- **When.** A start and an end, or **all day**, in the **time zone** you choose;
+  the form opens in yours. Times are read in the zone shown, so choosing London
+  and typing 19:00 means 19:00 in London.
+- **Repeats.** Daily, weekly (on chosen weekdays) or monthly (on the same date,
+  or the same weekday — "the second Tuesday"), every so many days, weeks or
+  months, ending never, after a number of times, or on a date. A weekly 19:00
+  stays at 19:00 when the clocks change.
+- **Where.** A place in words, a link to a meeting somewhere else, or
+  **Host it in a call here** (below).
+- **Who.** Whether it belongs to a channel or to the whole server, who can see
+  it — everybody on the server, the channel's members, or only the people
+  invited — how many places it has, and its hosts and speakers.
+- **Agenda.** The talks or parts within it, each with a time and speakers —
+  people on this server, or named in words when they are not.
+
+A public event cannot belong to a private channel: it would tell everybody the
+channel's name. Scheduling takes the `event.create` permission, which every
+member has unless the operator has taken it away, and you must be in a channel
+to schedule one there.
+
+Whoever made an event and its hosts can change it, invite to it, give it a
+**cover image**, and **cancel** it — it stays, marked cancelled with the reason,
+and everybody going is told. Deleting it altogether is for whoever made it.
+Somebody holding `event.manage.any` can do all of that to anybody's event, and
+what they do is in the audit log.
+
+### Answering, and the waiting list
+
+On an event's page, answer **Going**, **Maybe** or **Not going**, and change
+your answer whenever you like until it is over. An answer to a repeating event
+covers every occurrence.
+
+If an event has a number of places and they are taken, **Going** puts you on the
+**waiting list**, and the page says your place in it. When somebody going
+changes their answer, the first person waiting gets the place and is told.
+Hosts and speakers do not take places.
+
+**Who is coming** lists the people going, maybe going and waiting. If you would
+rather not be seen there, turn off **Which events I am going to** under
+**Settings → Privacy → What others can see**: you are counted, not named. An
+event's organisers always see who is coming — running an event means knowing
+that.
+
+### Invitations
+
+Hosts invite **people** and whole **channels** from the event's page. Everybody
+invited is told. For an invite-only event, an invitation is what lets somebody
+see it, and inviting a channel lets everybody in it see it.
+
+### Reminders
+
+Before each occurrence of an event you are going or maybe going to, hosting or
+speaking at, you are reminded — by default a day before and a quarter of an
+hour before, though your operator chooses. A reminder is a notification like
+any other: in your list, by push where you have turned that on, as a banner from
+the desktop application, in your email summary if you chose one, and at the
+corner of the page if you have TDC open. You are also told when an event you
+are going to changes its time or place, or is cancelled.
+
+**Remind me before it starts**, on the event's page, turns an event's reminders
+off for you, and back on. (It mutes the event's own conversation, which is what
+reminders belong to.)
+
+### Hosting it in a call
+
+An event **hosted in a call here** has a call on its page. When it is time, a
+host presses **Start the call**; everybody going or maybe going then joins from
+the same place, by voice or with video. It is an ordinary TDC call, so
+everything in [Calls](#calls) applies. Somebody who is not going cannot start
+or join it, and only hosts can start it.
+
+To bring in people who have no account here, a host who may make call links
+(`call.link`) makes one from the call window once the call has started.
+
+### Putting events in your own calendar
+
+On an event's page, **Add to your calendar** offers:
+
+- **Download .ics file** — opens in any calendar application.
+- **Add to Google Calendar** and **Add to Outlook** — open their own forms with
+  the event filled in. TDC sends them nothing; your browser goes there because
+  you asked.
+
+To have **all** your events appear in your calendar, and keep up to date, use
+**your calendar address**: **Settings → Your calendar → Make my calendar
+address**. It holds the events you are going to, hosting or speaking at, and
+your channels' events, and it is **shown once** — copy it then. Anybody holding
+it can read your calendar, so treat it like a password: **Make a new address**
+replaces it and **Revoke** stops it for everything that uses it.
+
+Adding it:
+
+- **Google Calendar** — on the web, **Other calendars → + → From URL**, paste
+  the address, **Add calendar**. Google refreshes subscribed calendars on its
+  own schedule, typically every few hours, so a change can take that long to
+  appear there.
+- **Outlook** — **Calendar → Add calendar → Subscribe from web**, paste the
+  address, **Import**.
+- **Apple Calendar** — **File → New Calendar Subscription**, paste the address.
+  On an iPhone: **Settings → Calendar → Accounts → Add Account → Other → Add
+  Subscribed Calendar**.
+- Anything else that subscribes to a calendar by address (Thunderbird, GNOME
+  Calendar…) works the same way. **Open in your calendar application** offers it
+  as a `webcal://` link, which most open directly.
+
+What the address holds is decided at every fetch: leave a channel, or answer
+**Not going**, and those events leave your calendar at its next refresh.
+
+### Bringing events in
+
+**Import** on the Events page takes an `.ics` file — exported from Google
+Calendar, Outlook or anything else. Before anything is saved you see what each
+event would become: **new**, an **update** to one you already imported (events
+are matched by their identifier, so importing the same file twice creates
+nothing twice), or **skipped** because somebody else's event has that identity.
+Anything that cannot come across exactly — a repeat events here do not support,
+a time zone this server does not know — is said beside it. Choose which to
+import, where they belong and who can see them.
+
+**Followed calendars** (for people holding `event.calendars.manage`) keeps a
+calendar published elsewhere — a community's Google Calendar, a conference's
+feed — appearing here: paste its ICS or `webcal://` address, and the server
+fetches it on a schedule, adding, changing and cancelling events as it does.
+Those events change only where they come from.
+
 ## Projects
 
 When a conversation decides something needs doing, it can be tracked where it
