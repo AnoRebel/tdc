@@ -547,6 +547,7 @@ export const useCall = createGlobalState(() => {
     if (!room || !live(room) || !connections.length) return;
     let kbps: number | null = null;
     let limited = false;
+    let video = false;
     for (const { connection } of connections) {
       const reports = await connection.getStats().catch(() => null);
       reports?.forEach((report) => {
@@ -564,10 +565,12 @@ export const useCall = createGlobalState(() => {
         ) {
           limited = true;
         }
+        if (report.type === "outbound-rtp" && report.kind === "video" && report.framesSent > 0)
+          video = true;
       });
     }
     const before = quality.value.level;
-    quality.value = stepQuality(quality.value, { kbps, limited });
+    quality.value = stepQuality(quality.value, { kbps, limited, video });
     if (quality.value.level === before) return;
     qualityNotice.value = quality.value.level === 0 ? "recovered" : quality.value.level;
     if (quality.value.level === 0) {

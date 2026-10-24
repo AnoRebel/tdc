@@ -23,6 +23,12 @@ export interface QualityState {
 export interface QualitySample {
   kbps: number | null;
   limited: boolean;
+  /**
+   * Whether any video is going out. The browser's estimate only grows with
+   * what is asked of it, so with the camera off it stays low however good
+   * the connection is, and means nothing.
+   */
+  video?: boolean;
 }
 
 export const initialQuality: QualityState = { level: 0, short: 0, comfortable: 0 };
@@ -31,6 +37,9 @@ export const initialQuality: QualityState = { level: 0, short: 0, comfortable: 0
 const needs = [800, 400, 200, 60] as const;
 
 function wanted(sample: QualitySample, level: QualityLevel): QualityLevel {
+  // Below the camera step the missing video is the person's own choice, not
+  // ours, so a low estimate says nothing about the connection.
+  if (sample.video === false && level < 3) sample = { ...sample, kbps: null };
   if (sample.kbps === null)
     return (sample.limited ? Math.min(4, level + 1) : level) as QualityLevel;
   const fits = needs.findIndex((need) => sample.kbps! >= need);

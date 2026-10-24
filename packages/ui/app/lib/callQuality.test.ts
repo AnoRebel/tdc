@@ -38,4 +38,11 @@ describe("stepping a call down and back up", () => {
     expect(feed(initialQuality, 5000, 2, true).level).toBe(1);
     expect(feed(initialQuality, null, 10).level).toBe(0);
   });
+
+  it("pays no mind to a low estimate while the camera is off by choice", () => {
+    let state = initialQuality;
+    for (let i = 0; i < 10; i++)
+      state = stepQuality(state, { kbps: 40, limited: false, video: false });
+    expect(state.level).toBe(0);
+  });
 });
