@@ -911,6 +911,12 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[projects.Progress]()},
 		},
 	},
+	"GET /api/projects/:key/history": {
+		Query: []string{"before", "limit"},
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]historyEntry]()},
+		},
+	},
 	"GET /api/projects/:key/issues": {
 		Query: []string{"assignee", "before", "limit", "sort"},
 		Responses: []responseBody{

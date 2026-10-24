@@ -147,6 +147,7 @@ func TestAPrivateProjectDoesNotExistToAnOutsider(t *testing.T) {
 		{http.MethodGet, "/api/projects/SEC"},
 		{http.MethodGet, "/api/projects/SEC/issues"},
 		{http.MethodGet, "/api/projects/SEC/members"},
+		{http.MethodGet, "/api/projects/SEC/history"},
 		{http.MethodPost, "/api/projects/SEC/issues"},
 		{http.MethodGet, "/api/issues/SEC-1"},
 		{http.MethodGet, "/api/issues/SEC-1/history"},
@@ -349,6 +350,65 @@ func TestAnIssuesHistoryIsOrderedAndReadOnly(t *testing.T) {
 		nil, founder, http.StatusOK).Body.Bytes())
 	if len(again) != len(history) {
 		t.Errorf("the history changed from %d to %d entries", len(history), len(again))
+	}
+}
+
+/*
+What happens to a project itself is its history too: making it, its labels
+and its priority scale, newest first, each said by whoever did it, a page at a
+time — and nothing writes it.
+*/
+func TestAProjectsOwnHistoryIsRecorded(t *testing.T) {
+	handler := newTestAPI(t)
+	founder := completeSetup(t, handler)
+	startProject(t, handler, founder, "OWN", "public")
+	fileIssue(t, handler, founder, "OWN", "Not part of the project's own history")
+
+	label := decode(t, mustCall(t, handler, http.MethodPost, "/api/projects/OWN/labels",
+		map[string]any{"name": "backend"}, founder, http.StatusCreated))
+	mustCall(t, handler, http.MethodPatch, "/api/projects/OWN/labels/"+label["id"].(string),
+		map[string]any{"name": "server"}, founder, http.StatusOK)
+	mustCall(t, handler, http.MethodPost, "/api/projects/OWN/priorities",
+		map[string]any{"name": "Someday"}, founder, http.StatusCreated)
+
+	history := decodeRows(t, mustCall(t, handler, http.MethodGet, "/api/projects/OWN/history",
+		nil, founder, http.StatusOK).Body.Bytes())
+	want := []string{
+		"project.priority_added", "project.label_changed", "project.label_added",
+		// The usual scale and the usual three states, made with the project.
+		"project.priority_added", "project.priority_added", "project.priority_added", "project.priority_added",
+		"project.state_added", "project.state_added", "project.state_added",
+		"project.created",
+	}
+	if len(history) != len(want) {
+		t.Fatalf("the history has %d entries, want %d: %v", len(history), len(want), history)
+	}
+	for i, entry := range history {
+		if entry["type"] != want[i] {
+			t.Errorf("entry %d is %v, want %s", i, entry["type"], want[i])
+		}
+		if entry["actor"] != "founder@tdc.test" {
+			t.Errorf("entry %d names %v as its actor", i, entry["actor"])
+		}
+	}
+	renamed := history[1]["content"].(map[string]any)
+	if renamed["name"] != "server" || renamed["previousName"] != "backend" {
+		t.Errorf("the rename does not say what changed: %v", renamed)
+	}
+
+	// A page before the oldest entry already shown.
+	older := decodeRows(t, mustCall(t, handler, http.MethodGet,
+		fmt.Sprintf("/api/projects/OWN/history?limit=2&before=%.0f", history[1]["sequence"].(float64)),
+		nil, founder, http.StatusOK).Body.Bytes())
+	if len(older) != 2 || older[0]["type"] != "project.label_added" {
+		t.Errorf("the page before the rename is %v", older)
+	}
+
+	for _, method := range []string{http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodPost} {
+		recorder := call(t, handler, method, "/api/projects/OWN/history", map[string]any{}, founder)
+		if recorder.Code != http.StatusMethodNotAllowed && recorder.Code != http.StatusNotFound {
+			t.Errorf("%s on a project's history answered %d", method, recorder.Code)
+		}
 	}
 }
 

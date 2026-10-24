@@ -557,6 +557,13 @@ type Querier interface {
 	GetPresence(ctx context.Context, userID uuid.UUID) (UserPresence, error)
 	GetProjectByID(ctx context.Context, id uuid.UUID) (Project, error)
 	GetProjectByKey(ctx context.Context, keyFolded string) (Project, error)
+	// A project's rows as its stream describes them, and the stream's own pages.
+	//
+	// People are named here by username, never by account: the stream names them
+	// by address, and a projection rebuilt on another server has accounts of its
+	// own. Somebody since removed from the server is the empty string, which is
+	// what the column holds once their account has gone.
+	GetProjectForStream(ctx context.Context, id uuid.UUID) (GetProjectForStreamRow, error)
 	GetProjectLabel(ctx context.Context, id uuid.UUID) (ProjectLabel, error)
 	GetProjectMemberRole(ctx context.Context, arg GetProjectMemberRoleParams) (string, error)
 	GetProjectPriority(ctx context.Context, id uuid.UUID) (ProjectPriority, error)
@@ -759,6 +766,7 @@ type Querier interface {
 	ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]ListChannelBansRow, error)
 	ListCredentialsForUser(ctx context.Context, userID uuid.UUID) ([]Credential, error)
 	ListCyclesForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListCyclesForIssuesRow, error)
+	ListCyclesForStream(ctx context.Context, projectID uuid.UUID) ([]ListCyclesForStreamRow, error)
 	ListCyclesOfProject(ctx context.Context, projectID uuid.UUID) ([]Cycle, error)
 	// Cycles that have ended and whose end has not been dealt with, oldest first.
 	ListCyclesToClose(ctx context.Context, arg ListCyclesToCloseParams) ([]Cycle, error)
@@ -788,6 +796,8 @@ type Querier interface {
 	// to see what has been withdrawn, not only what still works.
 	ListInvitationsForRoom(ctx context.Context, arg ListInvitationsForRoomParams) ([]Invitation, error)
 	ListIssueAssignees(ctx context.Context, issueID uuid.UUID) ([]ListIssueAssigneesRow, error)
+	ListIssueAssigneesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueAssigneesForStreamRow, error)
+	ListIssueCyclesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueCyclesForStreamRow, error)
 	// One issue's history: its project's stream, filtered to it. The partial
 	// expression index events_issue_idx serves exactly this.
 	ListIssueEvents(ctx context.Context, arg ListIssueEventsParams) ([]Event, error)
@@ -796,7 +806,12 @@ type Querier interface {
 	ListIssueIDsInState(ctx context.Context, stateID uuid.UUID) ([]uuid.UUID, error)
 	ListIssueIDsWithLabel(ctx context.Context, labelID uuid.UUID) ([]uuid.UUID, error)
 	ListIssueIDsWithPriority(ctx context.Context, priorityID *uuid.UUID) ([]uuid.UUID, error)
+	ListIssueLabelsForStream(ctx context.Context, projectID uuid.UUID) ([]IssueLabel, error)
+	ListIssueMilestonesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueMilestonesForStreamRow, error)
+	ListIssueRelationsForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueRelationsForStreamRow, error)
 	ListIssueStates(ctx context.Context, projectID uuid.UUID) ([]IssueState, error)
+	// Deleted issues included: a deleted issue is still a row, still numbered.
+	ListIssuesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssuesForStreamRow, error)
 	// The issues made from a room's messages, that this person may see.
 	//
 	// The project's visibility is the authorisation, joined rather than filtered
@@ -813,6 +828,7 @@ type Querier interface {
 	// The cycles a milestone's issues are in: what it spans.
 	ListMilestoneCycles(ctx context.Context, milestoneID uuid.UUID) ([]Cycle, error)
 	ListMilestonesForIssues(ctx context.Context, issueIds []uuid.UUID) ([]ListMilestonesForIssuesRow, error)
+	ListMilestonesForStream(ctx context.Context, projectID uuid.UUID) ([]ListMilestonesForStreamRow, error)
 	ListMilestonesOfProject(ctx context.Context, projectID uuid.UUID) ([]Milestone, error)
 	ListMyCalendarAnswers(ctx context.Context, userID uuid.UUID) ([]ListMyCalendarAnswersRow, error)
 	// Somebody's own associations, answered and unanswered.
@@ -856,6 +872,9 @@ type Querier interface {
 	// The engagements linked to a project that the viewer is a party to. Nobody
 	// else learns that a project has any.
 	ListProjectEngagementsFor(ctx context.Context, arg ListProjectEngagementsForParams) ([]ListProjectEngagementsForRow, error)
+	// What happened to a project itself, rather than to one of its issues, newest
+	// first, a page at a time before a position in its stream.
+	ListProjectHistory(ctx context.Context, arg ListProjectHistoryParams) ([]Event, error)
 	// A page of a project's issues, newest first.
 	//
 	// Callers check the project is visible to the person asking before calling
@@ -868,6 +887,7 @@ type Querier interface {
 	ListProjectIssues(ctx context.Context, arg ListProjectIssuesParams) ([]Issue, error)
 	ListProjectLabels(ctx context.Context, projectID uuid.UUID) ([]ProjectLabel, error)
 	ListProjectMembers(ctx context.Context, projectID uuid.UUID) ([]ListProjectMembersRow, error)
+	ListProjectMembersForStream(ctx context.Context, projectID uuid.UUID) ([]ListProjectMembersForStreamRow, error)
 	ListProjectPriorities(ctx context.Context, projectID uuid.UUID) ([]ProjectPriority, error)
 	// Every edge of one kind in a project, for walking the graph to refuse a
 	// cycle. A project holds hundreds or a few thousand issues, so reading its
@@ -879,6 +899,7 @@ type Querier interface {
 	// are in. A private project they are not in never appears, which is what keeps
 	// its existence undisclosed — the same rule as ListRoomsForUser.
 	ListProjectsForUser(ctx context.Context, userID uuid.UUID) ([]ListProjectsForUserRow, error)
+	ListProjectsWithIncompleteStreams(ctx context.Context) ([]uuid.UUID, error)
 	ListProposalResponses(ctx context.Context, engagementID uuid.UUID) ([]ProposalResponse, error)
 	ListProposalVersions(ctx context.Context, engagementID uuid.UUID) ([]ProposalVersion, error)
 	ListPublicCalendarEvents(ctx context.Context, since time.Time) ([]ListPublicCalendarEventsRow, error)
@@ -1048,6 +1069,9 @@ type Querier interface {
 	MarkAttachmentSensitive(ctx context.Context, arg MarkAttachmentSensitiveParams) (int64, error)
 	MarkIssueDeleted(ctx context.Context, arg MarkIssueDeletedParams) (Issue, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
+	// Only once: the second server to try finds the row already marked, and
+	// appends nothing.
+	MarkProjectStreamComplete(ctx context.Context, id uuid.UUID) (int64, error)
 	// Every description of a file from elsewhere becomes a copy once its bytes are
 	// here, whichever room it was opened in: the bytes are the same bytes.
 	MarkRemoteAttachmentsFetched(ctx context.Context, arg MarkRemoteAttachmentsFetchedParams) error

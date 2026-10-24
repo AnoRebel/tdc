@@ -147,7 +147,7 @@ const createProject = `-- name: CreateProject :one
 
 INSERT INTO projects (id, key, key_folded, name, description, visibility, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete
 `
 
 type CreateProjectParams struct {
@@ -185,6 +185,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.UpdatedAt,
 		&i.TimeZone,
 		&i.CyclePolicy,
+		&i.StreamComplete,
 	)
 	return i, err
 }
@@ -271,7 +272,7 @@ func (q *Queries) GetIssueState(ctx context.Context, id uuid.UUID) (IssueState, 
 }
 
 const getProjectByID = `-- name: GetProjectByID :one
-SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy FROM projects WHERE id = $1
+SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete FROM projects WHERE id = $1
 `
 
 func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, error) {
@@ -290,12 +291,13 @@ func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, er
 		&i.UpdatedAt,
 		&i.TimeZone,
 		&i.CyclePolicy,
+		&i.StreamComplete,
 	)
 	return i, err
 }
 
 const getProjectByKey = `-- name: GetProjectByKey :one
-SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy FROM projects WHERE key_folded = $1
+SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete FROM projects WHERE key_folded = $1
 `
 
 func (q *Queries) GetProjectByKey(ctx context.Context, keyFolded string) (Project, error) {
@@ -314,6 +316,7 @@ func (q *Queries) GetProjectByKey(ctx context.Context, keyFolded string) (Projec
 		&i.UpdatedAt,
 		&i.TimeZone,
 		&i.CyclePolicy,
+		&i.StreamComplete,
 	)
 	return i, err
 }
@@ -623,7 +626,7 @@ func (q *Queries) ListProjectStream(ctx context.Context, arg ListProjectStreamPa
 }
 
 const listProjectsForUser = `-- name: ListProjectsForUser :many
-SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, COALESCE(project_members.role, '')::text AS my_role
+SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, COALESCE(project_members.role, '')::text AS my_role
 FROM projects
 LEFT JOIN project_members
        ON project_members.project_id = projects.id
@@ -646,6 +649,7 @@ type ListProjectsForUserRow struct {
 	UpdatedAt       time.Time
 	TimeZone        string
 	CyclePolicy     string
+	StreamComplete  bool
 	MyRole          string
 }
 
@@ -674,6 +678,7 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, userID uuid.UUID) ([]
 			&i.UpdatedAt,
 			&i.TimeZone,
 			&i.CyclePolicy,
+			&i.StreamComplete,
 			&i.MyRole,
 		); err != nil {
 			return nil, err
@@ -915,7 +920,7 @@ const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET name = $2, description = $3, visibility = $4, updated_at = NOW()
 WHERE id = $1
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete
 `
 
 type UpdateProjectParams struct {
@@ -946,6 +951,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.UpdatedAt,
 		&i.TimeZone,
 		&i.CyclePolicy,
+		&i.StreamComplete,
 	)
 	return i, err
 }

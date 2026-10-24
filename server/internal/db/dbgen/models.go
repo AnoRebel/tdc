@@ -872,6 +872,7 @@ type Project struct {
 	UpdatedAt       time.Time
 	TimeZone        string
 	CyclePolicy     string
+	StreamComplete  bool
 }
 
 type ProjectLabel struct {

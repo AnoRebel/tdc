@@ -453,6 +453,16 @@ func (s *Server) Run(ctx context.Context) error {
 	*/
 	if s.projects != nil {
 		go s.projects.CloseCyclesPeriodically(ctx)
+		/*
+			Projects made before every change was an event are given their
+			baseline, once each, so every project's stream describes it. A
+			failure is retried at the next start: nothing depends on it yet.
+		*/
+		go func() {
+			if _, err := s.projects.CompleteStreams(ctx); err != nil && ctx.Err() == nil {
+				s.log.Error("recording project baselines failed", "error", err.Error())
+			}
+		}()
 	}
 
 	/*

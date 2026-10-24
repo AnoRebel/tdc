@@ -15,6 +15,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/projects"
 )
@@ -52,6 +53,7 @@ func init() {
 		group.POST("", s.handleCreateProject)
 		group.GET("/:key", s.handleGetProject)
 		group.PATCH("/:key", s.handleUpdateProject)
+		group.GET("/:key/history", s.handleProjectHistory)
 		group.GET("/:key/members", s.handleListProjectMembers)
 		group.PUT("/:key/members/:username", s.handleSetProjectMember)
 		group.DELETE("/:key/members/:username", s.handleRemoveProjectMember)
@@ -79,6 +81,7 @@ func init() {
 		"GET /api/projects/:key":                       {Summary: "A project", Authentication: "session or token"},
 		"PATCH /api/projects/:key":                     {Summary: "Rename a project or change its visibility", Authentication: "session or token", Permission: "project.administer"},
 		"GET /api/projects/:key/members":               {Summary: "A project's members", Authentication: "session or token"},
+		"GET /api/projects/:key/history":               {Summary: "What happened to a project itself, newest first", Authentication: "session or token"},
 		"PUT /api/projects/:key/members/:username":     {Summary: "Add a project member or change their role", Authentication: "session or token", Permission: "project.administer"},
 		"DELETE /api/projects/:key/members/:username":  {Summary: "Remove a project member", Authentication: "session or token", Permission: "project.administer"},
 		"POST /api/projects/:key/states":               {Summary: "Add a state", Authentication: "session or token", Permission: "project.configure_states"},
@@ -976,6 +979,43 @@ func (s *Server) handleIssueHistory(c *echo.Context) error {
 			At:       time.UnixMilli(event.CreatedAt).UTC(),
 			Sequence: event.Sequence,
 			Content:  json.RawMessage(event.Content),
+		})
+	}
+	return c.JSON(http.StatusOK, response)
+}
+
+/*
+handleProjectHistory is what happened to a project itself, newest first, a page
+at a time: ?before= the sequence of the oldest entry already shown.
+
+A baseline's content is left out. It is every row the project held, which is
+for a projection to read rather than a person, and would make one page of
+history weigh as much as the whole project.
+*/
+func (s *Server) handleProjectHistory(c *echo.Context) error {
+	access, err := s.projectFrom(c)
+	if err != nil {
+		return err
+	}
+	before, _ := strconv.ParseInt(c.QueryParam("before"), 10, 64)
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	history, err := s.projects.ProjectHistory(c.Request().Context(), access, before, limit)
+	if err != nil {
+		return err
+	}
+	response := make([]historyEntry, 0, len(history))
+	for _, event := range history {
+		content := json.RawMessage(event.Content)
+		if events.Type(event.Type) == events.TypeProjectBaseline {
+			content = json.RawMessage(`{}`)
+		}
+		response = append(response, historyEntry{
+			ID:       event.ID,
+			Type:     event.Type,
+			Actor:    event.SenderAddress,
+			At:       time.UnixMilli(event.CreatedAt).UTC(),
+			Sequence: event.Sequence,
+			Content:  content,
 		})
 	}
 	return c.JSON(http.StatusOK, response)

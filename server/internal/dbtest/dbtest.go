@@ -40,6 +40,15 @@ func URL(t *testing.T, suite string) string {
 
 	base := os.Getenv("TDC_TEST_DATABASE_URL")
 	if base == "" {
+		/*
+			A skipped test passes, so in CI a missing database would turn
+			every test that needs one green without running it — the replay
+			of a project's stream among them, which is what stops an event
+			type without a projection from being merged.
+		*/
+		if os.Getenv("CI") != "" {
+			t.Fatal("TDC_TEST_DATABASE_URL is not set, and in CI a database test must run rather than skip")
+		}
 		t.Skip("set TDC_TEST_DATABASE_URL to run database tests")
 	}
 

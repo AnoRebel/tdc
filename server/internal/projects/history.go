@@ -124,3 +124,27 @@ func (s *Service) Stream(ctx context.Context, projectID uuid.UUID) ([]dbgen.Even
 		after = page[len(page)-1].Sequence
 	}
 }
+
+// defaultHistoryPage is how much of a project's own history one read returns.
+const defaultHistoryPage = 50
+
+/*
+ProjectHistory is what happened to a project itself — its details, members,
+states, labels, priorities, cycles and milestones — newest first, a page
+before a position in its stream; zero is the newest.
+
+Read, never written, like an issue's history, and for the same reason: what was
+recorded stays recorded.
+*/
+func (s *Service) ProjectHistory(ctx context.Context, access Access, before int64, limit int) ([]dbgen.Event, error) {
+	if limit <= 0 || limit > maxIssuePage {
+		limit = defaultHistoryPage
+	}
+	history, err := s.queries.ListProjectHistory(ctx, dbgen.ListProjectHistoryParams{
+		ProjectID: access.Project.ID, BeforeSequence: before, PageSize: int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read project history: %w", err)
+	}
+	return history, nil
+}
