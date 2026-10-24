@@ -787,6 +787,44 @@ time one does it is written to the audit log. A report about somebody's status
 cannot be judged without reading it, so the answer is not to refuse the access
 but to account for it — which is what lets you see that it happened.
 
+### Where you are
+
+You can say where you are, under Settings → **Location**. It is one setting for
+the account, shown with your name on your directory profile and in the member
+lists you appear in. **Nobody sees it until you choose who may**: it starts as
+_Only you_.
+
+![The location setting: Set it myself or Detect it automatically, the place you typed, and who can see it — Anyone, Members or Only you](images/using-tdc/location.webp)
+
+There are two ways to keep it:
+
+- **Set it myself** — type a town or region, up to 80 characters. It stays as
+  you wrote it.
+- **Detect it automatically** — your browser asks once whether TDC may know
+  where you are. If you allow it, your device's position goes to **this server
+  only**, which names the nearest town from a list it carries (for example
+  _Arusha, Tanzania_) and keeps that name. **The position itself is never
+  stored or recorded**, and nothing is sent to any other company or service.
+  While you use TDC it is checked again every few hours, and only if you have
+  already allowed it — you are never asked twice. If your browser refuses, or
+  the app cannot tell where it is (the Linux desktop app usually cannot), it
+  says so and you can type it instead. Switching back to typing keeps the last
+  detected town as the starting text.
+
+Who may see it is the same three-way choice the directory uses:
+
+| Setting      | Who sees your location                                                           |
+| ------------ | -------------------------------------------------------------------------------- |
+| **Anyone**   | anybody allowed to see you at all, including people on servers this one talks to |
+| **Members**  | people signed in to this server                                                  |
+| **Only you** | nobody else                                                                      |
+
+Your directory profile shows the same location, but **never more widely than
+what you wrote on the profile**: a location set to _Anyone_ on a profile whose
+details are for _Members_ is seen by members only. As with the other details
+here, a location somebody may not see is left out of what the server sends, and
+a directory search by location does not find you unless they could see it.
+
 ### Typing indicators
 
 You see who is composing, and the indicator disappears by itself when it stops

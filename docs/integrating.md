@@ -980,6 +980,22 @@ The caller's own are under `/api/me/scheduled`: `GET` lists them,
 `POST /api/me/scheduled/:id/send` sends one now (201 with the message, or 409
 if posting there is no longer allowed), and `DELETE` cancels one.
 
+### A person's location
+
+`GET /api/me/location` answers the caller's own setting:
+`{"place": "Arusha, Tanzania", "mode": "manual", "visibility": "members"}`, with
+`detectedAt` once a place has been detected. `PUT /api/me/location` saves
+`mode` (`manual` or `automatic`), `place` (at most 80 characters, used only in
+manual mode) and `visibility` (`public`, `members` or `hidden`; hidden when left
+out). `POST /api/me/location/detect` takes `{"latitude": …, "longitude": …}`,
+names the nearest town from the server's own list, switches the setting to
+automatic and answers the setting; **404** when no town is near enough, **400**
+for something that is not a position. The position is not kept.
+
+Other people's locations arrive as `location` on what already describes them —
+`GET /api/rooms/:id/members`, a directory profile, a directory search result —
+and are **absent** wherever the caller may not see them.
+
 ### Automatic replies
 
 A person can have the server answer for them while they are away. The replies

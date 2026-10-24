@@ -138,6 +138,34 @@ A status MAY carry an expiry after which it reverts automatically.
 - **WHEN** a user sets a status in either client
 - **THEN** they may choose when it clears — after a fixed time, at the end of the day or week, at a chosen time, or never — and are shown how long it has left
 
+### Requirement: Location
+
+A user SHALL be able to state where they are as a place name on their account, either typed by them or detected from their device, and SHALL choose who may see it: anyone permitted to see them (including people on other servers), members of this server, or nobody. It MUST default to nobody.
+
+Detection MUST resolve a position to a place name on the user's own server, from data the server carries, without contacting any third party; only the place name MAY be stored, and the position MUST NOT be stored or logged. A client MUST NOT prompt for the device's position except when the user asks for detection; it MAY refresh a detected place periodically only where permission was already granted.
+
+Every response that describes a person to somebody else MUST apply the same visibility rule, and MUST omit the location where the viewer is not entitled to it rather than send it empty. Where the location appears inside something with its own visibility, such as a directory profile, it MUST NOT be more visible than that container.
+
+#### Scenario: Location starts hidden
+
+- **WHEN** a user has never changed their location setting
+- **THEN** nobody else is shown a location for them
+
+#### Scenario: Members-only location is withheld from outsiders
+
+- **WHEN** a user's location is visible to members and somebody not signed in to this server views them
+- **THEN** the response describing that user carries no location, and a search by location does not find them
+
+#### Scenario: Detection keeps only a place name
+
+- **WHEN** a user asks for their location to be detected and allows it
+- **THEN** the server stores the name of the nearest town and nothing about the position it was given
+
+#### Scenario: Detection unavailable
+
+- **WHEN** a device refuses or cannot provide its position
+- **THEN** the client says so and offers to have the user type their location instead
+
 ### Requirement: Automatic replies
 
 Users SHALL be able to keep automatic replies that the server posts on their behalf while they are away, in answer to a direct message or to being mentioned in a channel. Each reply MUST carry its text (at most 500 characters), and MAY be tied to one or more statuses, to a window of time with either end open, or to both; a reply tied to nothing applies until it is turned off. The server MUST mark every automatic reply in the message's own content as automatic, so that no client, export or delivery presents it as the person typing.

@@ -39,7 +39,10 @@ directory is a layer of its own:
 A profile can say:
 
 - a **headline** — one line on what you do;
-- your **location** and **experience**;
+- your **experience**;
+- your **location** — which is your account's, set under Settings → Location
+  and shown here rather than kept separately (see
+  [Where you are](using-tdc.md#where-you-are));
 - an **about** section;
 - **portfolio links** — up to twenty, each a title, a web link and an optional
   description. Links rather than uploads: your work already lives somewhere, and
@@ -69,8 +72,10 @@ The three settings govern:
 
 1. **The profile as a whole** — whether it appears in the directory at all.
    Defaults to _Members_.
-2. **What you wrote** — headline, location, experience, about, portfolio,
-   skills, availability and companies. Defaults to _Members_.
+2. **What you wrote** — headline, experience, about, portfolio, skills,
+   availability and companies, and the location shown with them. Defaults to
+   _Members_. The location has its own visibility on your account as well, and
+   the profile shows it to whoever both allow.
 3. **Your contact details.** Separate, because being findable by strangers and
    being reachable by them are different things. Defaults to **_Only you_**, so
    a profile saved without touching this setting publishes no contact details
@@ -155,7 +160,6 @@ touched — this is leaving the directory, not the server.
   "profile": {
     "headline": "Backend developer",
     "bio": "Go and Postgres.",
-    "location": "Dar es Salaam",
     "experience": "Eight years",
     "contactEmail": "amina@example.com",
     "contactPhone": "",

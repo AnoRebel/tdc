@@ -8,6 +8,8 @@ Defines the developer and company profiles that make TDC members discoverable â€
 
 A user SHALL be able to maintain a profile describing their skills, experience, portfolio links, and a short biography.
 
+A profile SHALL show the user's account location (see `messaging/realtime`, Location) rather than hold a location of its own, and MUST NOT show it more widely than the profile's own details.
+
 Profile completion MUST be voluntary; no user may be prevented from using messaging because their profile is incomplete.
 
 #### Scenario: Profile is created and viewable

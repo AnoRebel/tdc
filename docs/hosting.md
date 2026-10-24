@@ -1073,6 +1073,26 @@ all kept and reappear as they were when it is switched back on. The private
 conversation each enquiry opened is an ordinary direct conversation and stays
 available to the two people in it, like any other.
 
+### Where people are
+
+People can set a location on their account by typing it, or have their device
+detect it. Detection needs nothing from you and **talks to nobody but this
+server**: the browser sends its position to `POST /api/me/location/detect`,
+which names the nearest town from a list compiled into the server binary and
+stores only that name. The position is not written to the database, the logs or
+the audit trail, and no geocoding service is called — so detection works
+offline, costs nothing, and tells no third party where your members are.
+
+The list is [GeoNames](https://www.geonames.org)' towns of 15 000 people or more
+(about 34 000 places, 340 KB compressed), used under the
+[Creative Commons Attribution 4.0 licence](https://creativecommons.org/licenses/by/4.0/);
+the attribution is in `NOTICE`. A position more than 150 km from any of them is
+answered "no town nearby", and the person types it instead. The list is
+regenerated, from source, with `go generate ./internal/places` in `server/` and
+the result committed; the build itself never downloads anything.
+
+Locations are part of the **Accounts and roles** backup part.
+
 ### Projects
 
 Projects need nothing configured and nothing extra running: they are tables in
@@ -1763,7 +1783,7 @@ another machine.
 | Part                                    | What is in it                                                                                                                                                         | Brings with it               |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Server settings and branding            | Runtime policy, feature switches, statuses, the legal documents, the server's signing key                                                                             | —                            |
-| Accounts and roles                      | Accounts, password hashes and second factors, roles and grants, privacy settings, automatic replies, calendar addresses, blocks                                       | —                            |
+| Accounts and roles                      | Accounts, password hashes and second factors, roles and grants, privacy settings, locations, automatic replies, calendar addresses, blocks                            | —                            |
 | Channels and messages                   | Every room (or chosen channels) and everything in it: members, messages, reactions, pins, calls held, events and who is going, followed calendars, attachment records | Accounts                     |
 | Attached files                          | The bytes of files uploaded here and their previews — not copies of other servers' files, which are fetched again when next opened                                    | Channels                     |
 | Projects and issues                     | Projects, issues, states, cycles, milestones, views                                                                                                                   | Accounts, every channel      |
