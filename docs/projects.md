@@ -123,6 +123,26 @@ is what happened.
 
 ![An issue's page: its title and description, where it came from, its history of changes, the fields for state, assignees, labels, priority, cycle, milestone and relationships, and its discussion on the right](images/projects/issue.webp)
 
+### The project's own history
+
+What happens to the project itself is recorded the same way, and shown on its
+**History** tab, newest first: starting it, renaming it or changing who can see
+it, its calendar, who is in it and with what role, every state, label and
+priority level added, changed or removed, and every cycle and milestone planned,
+changed, ended or removed. What happens to one issue stays on that issue's page.
+
+Together the two are everything the project holds. The issues, states, labels,
+priorities, cycles, milestones, members, assignments and relationships can all
+be worked out again from the recorded events alone, in order — and the server's
+tests do exactly that for a project taken through every kind of change, then
+compare the board, lists and progress figures with the original's.
+
+A project started before this was true — before labels, priority levels and a
+milestone's description were recorded — is given one entry when the server
+first starts on a version that records them: _The server recorded everything the
+project held, so its history is complete from here._ Nothing earlier is lost;
+that entry is the point from which the record alone describes the project.
+
 ## Tracking: who, what kind, how urgent, and what depends on what
 
 The panel beside an issue sets everything else about it. Each change is made

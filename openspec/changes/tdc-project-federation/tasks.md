@@ -10,11 +10,11 @@ Scope note: these tasks extend `projects/boards`, `projects/issues` and `federat
 
 Goal: everything a project records is an event, so the stream alone describes the project. Nothing is shared yet.
 
-- [ ] 1.1 Audit every write path in `server/internal/projects` and list those that change rows without appending an event (expected: state, label and priority configuration; cycles and milestones; membership; rename and visibility); verify the list against the code by a test that fails when a write path appends nothing
-- [ ] 1.2 Add an event type for each, carrying everything needed to reproduce the change, appended in the same transaction as the row change; verify each is signed, ordered and shown in the project's history
-- [ ] 1.3 Implement the projector: a pure function from (rows, next event) to rows for every project event type, unused on the home server for now; verify replaying a project's stream into an empty database reproduces the home server's rows exactly, for a project exercising every event type
-- [ ] 1.4 Add the replay test to CI, so a new event type without a projection fails the build
-- [ ] **MILESTONE 1** — Demonstrate: a project with states, labels, priorities, cycles, milestones, members and issues in every state is replayed from its stream into an empty database and the board, lists and progress figures read identically. Tag `v1.41.0-dev`.
+- [x] 1.1 Audit every write path in `server/internal/projects` and list those that change rows without appending an event (expected: state, label and priority configuration; cycles and milestones; membership; rename and visibility); verify the list against the code by a test that fails when a write path appends nothing
+- [x] 1.2 Add an event type for each, carrying everything needed to reproduce the change, appended in the same transaction as the row change; verify each is signed, ordered and shown in the project's history
+- [x] 1.3 Implement the projector: a pure function from (rows, next event) to rows for every project event type, unused on the home server for now; verify replaying a project's stream into an empty database reproduces the home server's rows exactly, for a project exercising every event type
+- [x] 1.4 Add the replay test to CI, so a new event type without a projection fails the build
+- [x] **MILESTONE 1** — Demonstrate: a project with states, labels, priorities, cycles, milestones, members and issues in every state is replayed from its stream into an empty database and the board, lists and progress figures read identically. Tag `v1.41.0-dev`.
 
 ## 2. Phase 2 — Remote members
 

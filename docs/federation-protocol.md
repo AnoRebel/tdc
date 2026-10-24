@@ -8,7 +8,8 @@ Federation is optional. A server with it switched off is a complete TDC server;
 nothing on this page is needed to run one.
 
 > **Status.** This document covers discovery, identity, request signing, room
-> replication, remote membership and posting, files, and calls. Cross-server browsing and
+> replication, remote membership and posting, files, calls, and the events a
+> project's stream holds, though projects are not shared yet. Cross-server browsing and
 > moderation are still being built. Version `tdc/1` is not frozen until they
 > land.
 
@@ -623,6 +624,92 @@ room it may rename `roomId` to its own copy of the room.
 
 Raising hands, presenting and recording are not yet carried between servers:
 a person on another server sees them in the call's state but cannot do them.
+
+## A project's stream
+
+> **Status.** Projects are not yet shared between servers: nothing below is
+> sent to a peer today. It is written down now because a server holding a copy
+> of a project will rebuild the project from exactly this, and the event family
+> is part of what `tdc/1` will carry.
+
+A project is a room of kind `project`, sharing its identifier with the
+project. Its log holds no messages: every change to the project and to every
+issue in it is an event, signed and sequenced like any other (see
+[Replicating a room](#replicating-a-room)), appended by the project's home
+server in the same transaction as the change itself. People are named by
+address, `name@server`. An event the server made by itself — a cycle reaching
+its end, a baseline — has the server's bare name as its `sender`, with no `@`.
+
+### The project event family
+
+Identifiers are UUIDs as strings. Days are `YYYY-MM-DD` in the project's
+calendar. Content may carry more fields than listed — names as they were, for
+a reader of the history — and a receiver ignores what it does not use.
+
+| Type                                                                       | Content a projection reads                                                                                                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `project.created`                                                          | `key`, `name`, `description`, `visibility`, `timeZone`, `cyclePolicy`. The sender becomes the project's first administrator.                                                   |
+| `project.updated`                                                          | One or more of `name`, `description`, `visibility`, `timeZone`, `cyclePolicy`, each `{previous, new}`.                                                                         |
+| `project.member_added`                                                     | `member` (address), `role` (`admin` or `member`), `previous` (the role before, empty for somebody new).                                                                        |
+| `project.member_removed`                                                   | `member`.                                                                                                                                                                      |
+| `project.state_added`                                                      | `state`, `name`, `position`, `isCompletion`.                                                                                                                                   |
+| `project.state_changed`                                                    | Either `state`, `name`, `isCompletion` (and `previous`), or `order`: every state, left to right.                                                                               |
+| `project.state_removed`                                                    | `state`. Its issues were moved out first, each by its own `issue.state_changed`.                                                                                               |
+| `project.label_added`                                                      | `label`, `name`, `colour` (`#rrggbb`).                                                                                                                                         |
+| `project.label_changed`                                                    | `label`, `name`, `colour`, and `previousName`, `previousColour`.                                                                                                               |
+| `project.label_removed`                                                    | `label`. It came off every issue first, each by its own `issue.unlabeled`.                                                                                                     |
+| `project.priority_added`                                                   | `priority`, `name`, `rank` (1 is most urgent).                                                                                                                                 |
+| `project.priority_changed`                                                 | Either `priority`, `name` (and `previousName`), or `order`: every level, most urgent first.                                                                                    |
+| `project.priority_removed`                                                 | `priority`. Every issue at that level was cleared first, each by its own `issue.priority_changed`.                                                                             |
+| `project.cycle_added`, `project.cycle_changed`                             | `cycle`, `name`, `startsOn`, `endsOn`.                                                                                                                                         |
+| `project.cycle_removed`                                                    | `cycle`.                                                                                                                                                                       |
+| `project.cycle_ended`                                                      | `cycle`, `policy`, `closedAt` (RFC 3339), and what became of each unfinished issue was recorded before it as `issue.cycle_changed` with `reason: "cycle_ended"`.               |
+| `project.milestone_added`, `project.milestone_changed`                     | `milestone`, `name`, `description`, `targetDate` (a day or `null`).                                                                                                            |
+| `project.milestone_removed`                                                | `milestone`.                                                                                                                                                                   |
+| `project.baseline`                                                         | Every row the project held when it was appended. See below.                                                                                                                    |
+| `issue.created`                                                            | `issue`, `key` (`WEB-12`, whose number is the issue's), `title`, `description`, `state`. The sender is its author.                                                             |
+| `issue.state_changed`, `issue.title_changed`, `issue.description_changed`  | `issue`, `field`, `previous`, `new`.                                                                                                                                           |
+| `issue.priority_changed`, `issue.cycle_changed`, `issue.milestone_changed` | `issue`, `field`, `previous`, `new` — an identifier, or `null` for none.                                                                                                       |
+| `issue.deleted`                                                            | `issue`. Hidden, never removed; its number is never reused.                                                                                                                    |
+| `issue.assigned`, `issue.unassigned`                                       | `issue`, `assignee` (address).                                                                                                                                                 |
+| `issue.labeled`, `issue.unlabeled`                                         | `issue`, `label`.                                                                                                                                                              |
+| `issue.related`, `issue.unrelated`                                         | `issue`, `kind` (`parent`, `child`, `blocks`, `blocked_by` — what this issue is to the other), `other`. Recorded twice, once from each issue; both name the same relationship. |
+
+### Rebuilding a project from its stream
+
+A projection applies the stream in sequence order, one event at a time, as a
+function of nothing but the rows so far and the next event — no clock, no
+other table. Applied to the same stream it gives the same rows wherever it
+runs. The rules a second implementation needs:
+
+- **A cycle's and a milestone's instants are worked out, never sent**: a
+  cycle runs from the start of `startsOn` to the end of `endsOn` in the
+  project's `timeZone`, a milestone is due at the end of its `targetDate`, and
+  a `timeZone` change recomputes every one of them on the same days.
+- **Removing a cycle or a milestone takes any issue still in it out of it**,
+  as a database's cascade would; only a deleted issue can still be in one.
+- **A `project.baseline` replaces everything.** Its content is the project's
+  rows — the project, members by address, states, labels, priorities, cycles,
+  milestones, issues with their labels, assignees, cycle and milestone, and
+  relationships — as they stood when it was appended. Replay starts from the
+  latest baseline in the stream; what came before it is already in it. A home
+  server appends one, once, to a project made before every change was an
+  event, so that its stream alone describes it from there on.
+- **An event of a type the projection does not know stops it.** It does not
+  skip the event: a projection that skipped what it did not understand would
+  disagree with its source without saying so. The project stays as it was at
+  the event before, and says why.
+
+Not in the stream, and so never part of a projection: when each row was
+written on the home server, saved views, who follows a discussion, and the
+search index, which a server works out from the rows itself.
+
+**Erasure is the exception.** When a person's data is erased, the content of
+everything they sent is emptied — project events included — and their account,
+with its memberships and assignments, is removed without events recording it.
+An erased person's events cannot be applied, and a projection reaching one
+stops as for an unknown type. This conflict between erasure and a complete
+history is not yet resolved; it is recorded in the project federation design.
 
 ## Whether a server will deal with you at all
 

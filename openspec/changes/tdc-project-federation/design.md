@@ -23,6 +23,31 @@ On the home server nothing changes: the service writes the row and the event tog
 
 Corollary: **every change becomes an event.** An audit of every write path in `projects` finds those that change rows without appending (expected: state, label and priority configuration; cycles and milestones; membership; project rename and visibility). Each gains an event type carrying everything the projector needs. This is the bulk of Phase 1 and is valuable on its own: a project's history becomes complete.
 
+### What the audit found
+
+Read against the code (Phase 1), the write paths in `projects` that changed rows without recording enough were fewer than expected, and of a different kind. Membership, rename and visibility, states, cycles and milestones already appended events. What did not:
+
+- **Labels**: adding, renaming or recolouring, and removing a label wrote no event (removing one did record each issue losing it, but not the label going).
+- **The priority scale**: the four levels every project starts with, adding, renaming, reordering and removing a level — none recorded.
+- **Incomplete content** where an event existed: `project.created` lacked the description, calendar and cycle policy; milestone events lacked the description; `project.cycle_ended` lacked the instant the cycle was closed.
+- **The database's own cascades**: removing a cycle or milestone silently takes a *deleted* issue out of it. Not an event, and not needed as one — the projector applies the same cascade.
+
+Each now has an event (`project.label_added|changed|removed`, `project.priority_added|changed|removed`) or the missing fields, appended in the same transaction. Outside the package, no handler writes a project table directly. Saved views, discussion watching, admitting a mentioned person to a discussion room and the search index are deliberately not project rows. The guard is a test that walks every exported method of the service: each is either exercised by the replay scenario — which checks that a step changing rows grew the stream and that the projection still equals the tables — or listed with the reason it is not a write.
+
+"Rows" means the columns the stream decides. When a row was written (`created_at`, `joined_at`, `assigned_at`, …) is not among them: it is when that database wrote it, which a replica answers differently and correctly. People are compared by address.
+
+### An existing project's stream is completed by one baseline
+
+A project made before this change has a history that leaves out its labels and priority scale. Replaying it cannot reproduce the project, and the missing events cannot be invented after the fact with honest timestamps or authors.
+
+So such a project is given one **`project.baseline`** event, appended by the server and signed by it, whose content is every row the project holds at that moment. A replay starts from the latest baseline; everything before it is already in it. `projects.stream_complete` records which projects have one or never needed one: existing rows start `false`, new projects `true`. At startup the server appends a baseline for each incomplete project, each in its own transaction holding the project's stream lock, so a concurrent change lands either inside the baseline or after it, and marking the row first means two servers sharing a database append one between them.
+
+*Why not a migration?* A migration cannot sign: the keyring belongs to the running server. *Why not synthesise the missing events?* They would claim a person did something at a time nobody knows.
+
+### Erasure and a complete stream conflict (open)
+
+Erasing a person empties the content of every event they sent, project events included, and deleting their account cascades their project memberships and assignments with no event. An erased person's `issue.created` therefore cannot be applied, and the projector stops there rather than skip it. (The same emptied event already makes the progress trend's replay fail for that project.) This is the erasure/verifiability conflict again, now with reproducibility as the casualty. It must be decided before replicas exist — candidates are a server-signed baseline appended as part of an erasure that touched a project, or keeping project events' structural fields through erasure — and is left open here.
+
 ### Changes from a replica are requests to the home server
 
 A person on a replica who files or moves an issue does not change any local row. Their server sends the home server a signed federated request naming the author (`user@server`) and the change; the home server authorises it against **its** membership and permission records — the same `Access` and permission checks a local request passes — applies it, appends the event, and replicates it. The replica's interface shows the change when the event arrives back; a short pending state covers the round trip, as remote messages already do.
@@ -60,4 +85,4 @@ Never federated. The engagement→project link is a column on the engagement on 
 
 ## Migration Plan
 
-Additive. Existing projects are not shared until opened. Phase 1 (events for every change) ships before anything federates and changes no behaviour except fuller history.
+Additive. Existing projects are not shared until opened. Phase 1 (events for every change) ships before anything federates and changes no behaviour except fuller history — and a project history page showing it — plus one baseline event per existing project, appended at the first start on the new version.

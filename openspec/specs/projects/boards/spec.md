@@ -25,6 +25,36 @@ A project's visibility MUST be controllable so that client-facing work can be se
 - **WHEN** an issue is created in a project
 - **THEN** its identifier incorporates the project's key
 
+### Requirement: A project's history is complete
+
+Every change to a project's rows — its configuration, membership, planning and issues — SHALL be recorded as a signed event in the project's stream, in the same transaction as the change.
+
+Replaying the stream alone in order MUST arrive at exactly the rows the project holds. A project whose history predates this SHALL be given one baseline event recording its rows.
+
+#### Scenario: The stream reproduces the project
+
+- **WHEN** a project's stream is replayed into an empty database
+- **THEN** its board, lists and progress figures read exactly as the original's
+
+#### Scenario: An older project becomes complete
+
+- **WHEN** a server starts with a project made before every change was recorded
+- **THEN** it appends one baseline of that project's rows, and a replay from it reproduces the project
+
+### Requirement: A project's own history is shown
+
+What happens to a project itself — rather than to one of its issues — SHALL be shown as the project's history, newest first, each entry saying who did what and when. Like an issue's history it MUST NOT be editable.
+
+#### Scenario: A configuration change is recorded
+
+- **WHEN** somebody adds, renames or removes a label or a priority level
+- **THEN** the project's history shows it with who did it and when
+
+#### Scenario: History cannot be rewritten
+
+- **WHEN** anybody attempts to change or remove an entry in a project's history
+- **THEN** no such capability exists
+
 ### Requirement: Boards
 
 Projects SHALL offer a board view presenting issues in columns derived from their states, where an issue can be moved between columns.
