@@ -72,6 +72,8 @@ export interface EventDetail extends CalendarEvent {
   may: { edit: boolean; delete: boolean; startCall: boolean };
   /** In the event's conversation, and so able to join its call. */
   member: boolean;
+  /** Its conversation silenced, and with it its reminders. */
+  muted: boolean;
 }
 
 export interface EventSessionInput {

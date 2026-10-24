@@ -289,6 +289,9 @@ type eventDetailView struct {
 	// Member says the caller is in the event's conversation — and so can join
 	// its call once it has started.
 	Member bool `json:"member"`
+	// Muted says the caller has silenced the event's conversation, and with
+	// it the event's reminders.
+	Muted bool `json:"muted"`
 }
 
 type occurrenceView struct {
@@ -367,6 +370,9 @@ func (s *Server) eventDetail(ctx context.Context, viewer calendar.Viewer, event 
 		detail.Next = &occurrenceView{StartsAt: rfc3339(next.Start), EndsAt: rfc3339(next.End)}
 	}
 	detail.Member, _ = s.queries.IsRoomMember(ctx, dbgen.IsRoomMemberParams{RoomID: event.ID, UserID: viewer.UserID})
+	if s.notify != nil {
+		detail.Muted = s.notify.Muted(ctx, viewer.UserID, event.ID)
+	}
 	return detail, nil
 }
 

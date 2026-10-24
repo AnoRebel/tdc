@@ -2310,6 +2310,7 @@
     "privacy": {
       "showsAttendance": "Which events I am going to",
       "showsAttendanceHint": "Others see you among the people going. The organisers of an event always see who is coming."
-    }
+    },
+    "remindMe": "Remind me before it starts"
   }
 }

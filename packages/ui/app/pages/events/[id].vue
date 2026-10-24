@@ -3,6 +3,7 @@ import { isApiError, type Call, type EventAnswer, type EventDetail } from "@tdc/
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Input } from "#layers/ui/app/components/ui/input";
+import { Switch } from "#layers/ui/app/components/ui/switch";
 import { googleCalendarLink, outlookLink, parseRule } from "#layers/ui/app/lib/events";
 
 /**
@@ -149,6 +150,21 @@ async function confirmDelete() {
   try {
     await eventsApi.remove(event.value.id);
     await router.push(localeRoute({ name: "events" }));
+  } catch (cause) {
+    refusal.value = isApiError(cause) ? cause.message : $ts("events.couldNotSave");
+  }
+}
+
+/* Reminders, which muting the event's conversation silences. */
+async function setMuted(muted: boolean) {
+  if (!event.value) return;
+  try {
+    await api.put("/api/me/preferences/notifications", {
+      room: event.value.id,
+      level: "mentions",
+      muted,
+    });
+    event.value = { ...event.value, muted };
   } catch (cause) {
     refusal.value = isApiError(cause) ? cause.message : $ts("events.couldNotSave");
   }
@@ -478,6 +494,17 @@ const answers = computed(() => [
                   : $t("events.placesLeft", { count: placesLeft, capacity: event.capacity ?? 0 })
               }}
             </p>
+            <div
+              v-if="event.member && !cancelled"
+              class="mt-3 flex items-center gap-2 border-t pt-3 text-xs"
+            >
+              <Switch
+                :model-value="!event.muted"
+                :label="$ts('events.remindMe')"
+                @update:model-value="setMuted(!$event)"
+              />
+              <span>{{ $t("events.remindMe") }}</span>
+            </div>
             <p v-if="refusal" class="mt-2 text-xs text-destructive" role="alert">{{ refusal }}</p>
           </section>
 

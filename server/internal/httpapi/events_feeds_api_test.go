@@ -1,9 +1,11 @@
 package httpapi_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 /*
@@ -78,5 +80,43 @@ func TestThePublicFeedIsTheOperatorsChoice(t *testing.T) {
 	one := mustCall(t, handler, http.MethodGet, "/api/events/"+private+"/ics", nil, admin, http.StatusOK).Body.String()
 	if !strings.Contains(one, "UID:"+private) {
 		t.Error("one event's file does not carry it")
+	}
+}
+
+/*
+A channel's webhooks hear about its events, from each event's own
+conversation — and never about an invite-only one, whose channel's readers
+may not be people it was shown to. Sabotage-verified: forwarding invite-only
+events delivers the second title.
+*/
+func TestAChannelsWebhooksHearAboutItsEvents(t *testing.T) {
+	handler, owner, roomID := webhookFixture(t, nil)
+	endpoint := newReceiver(t, answering(http.StatusNoContent))
+	subscribe(t, handler, owner, roomID, endpoint.URL, "event.created", "event.cancelled")
+
+	open := makeEvent(t, handler, owner, map[string]any{"title": "Open meetup", "channelId": roomID})["id"].(string)
+	makeEvent(t, handler, owner, map[string]any{"title": "Closed meetup", "channelId": roomID, "visibility": "invite"})
+	mustCall(t, handler, http.MethodPost, "/api/events/"+open+"/cancel", map[string]any{"reason": "rain"}, owner, http.StatusOK)
+
+	eventually(t, 5*time.Second, "two deliveries", func() bool { return len(endpoint.deliveries()) >= 2 })
+	time.Sleep(300 * time.Millisecond)
+	types := []string{}
+	for _, got := range endpoint.deliveries() {
+		var payload struct {
+			Type  string `json:"type"`
+			Event struct {
+				Content map[string]any `json:"content"`
+			} `json:"event"`
+		}
+		if err := json.Unmarshal(got.body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Event.Content["title"] == "Closed meetup" {
+			t.Error("an invite-only event was delivered to the channel's webhook")
+		}
+		types = append(types, payload.Type)
+	}
+	if len(types) != 2 || types[0] != "event.created" || types[1] != "event.cancelled" {
+		t.Errorf("the channel's webhook received %v", types)
 	}
 }

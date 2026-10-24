@@ -2310,6 +2310,7 @@
     "privacy": {
       "showsAttendance": "Matukio nitakayohudhuria",
       "showsAttendanceHint": "Wengine wanakuona miongoni mwa wanaohudhuria. Waandaaji wa tukio huwaona wanaohudhuria daima."
-    }
+    },
+    "remindMe": "Nikumbushe kabla halijaanza"
   }
 }
