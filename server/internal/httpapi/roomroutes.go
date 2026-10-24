@@ -14,6 +14,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/moderation"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
@@ -110,11 +111,15 @@ func (s *Server) roomResponse(room dbgen.Room, member bool) roomResponse {
 
 // messageResponse is the public shape of an event in a timeline.
 type messageResponse struct {
-	ID       string          `json:"id"`
-	Type     string          `json:"type"`
-	Sender   string          `json:"sender"`
-	Sequence int64           `json:"sequence"`
-	Content  json.RawMessage `json:"content"`
+	ID     string `json:"id"`
+	Type   string `json:"type"`
+	Sender string `json:"sender"`
+	// SenderName is what to call the sender: their display name, or their
+	// username without one. Absent for somebody on another server, whom a
+	// client calls by their address.
+	SenderName string          `json:"senderName,omitempty"`
+	Sequence   int64           `json:"sequence"`
+	Content    json.RawMessage `json:"content"`
 	// Attachments is absent when a message carries no files, which is most of
 	// them.
 	Attachments []attachmentResponse `json:"attachments,omitempty"`
@@ -384,8 +389,11 @@ can never come to show less than a message does.
 func (s *Server) messagesFor(ctx context.Context, readerID uuid.UUID, page []dbgen.Event) ([]messageResponse, error) {
 	response := make([]messageResponse, 0, len(page))
 	eventIDs := make([]string, 0, len(page))
+	names := newNameBook(s.rooms)
 	for _, event := range page {
-		response = append(response, s.withAttachments(ctx, messageResponseOf(event)))
+		message := messageResponseOf(event)
+		message.SenderName = names.sender(ctx, event)
+		response = append(response, s.withAttachments(ctx, message))
 		if event.RedactedAt == nil {
 			eventIDs = append(eventIDs, event.ID)
 		}
@@ -1006,7 +1014,7 @@ func (s *Server) notifyRecipients(
 	}
 	if event.SenderID != nil {
 		if sender, err := s.queries.GetUserByID(ctx, *event.SenderID); err == nil {
-			about.Sender = sender.DisplayName
+			about.Sender = identity.NameOf(sender.Username, sender.DisplayName)
 		}
 	}
 

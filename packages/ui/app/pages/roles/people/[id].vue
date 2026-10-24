@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { ArrowLeft, Check, Hash, Info, Minus, Search, ShieldCheck, X } from "lucide-vue-next";
 
 import { isApiError } from "@tdc/types";
@@ -42,7 +43,7 @@ const filter = ref("");
 const error = ref<string | null>(null);
 
 const refused = computed(() => isApiError(failure.value) && failure.value.status === 403);
-const name = computed(() => answer.value?.user.displayName || answer.value?.user.username || "");
+const name = computed(() => (answer.value ? nameOf(answer.value.user) : ""));
 
 useHead({
   title: () => (name.value ? $ts("roles.personTitle", { name: name.value }) : $ts("roles.title")),

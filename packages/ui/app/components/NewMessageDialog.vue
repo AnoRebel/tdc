@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { PersonHit } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { onKeyStroke } from "@vueuse/core";
@@ -196,11 +197,11 @@ const listId = "new-message-people";
                     class="flex items-center gap-1 rounded-md bg-accent py-0.5 pr-0.5 pl-1 text-xs"
                   >
                     <Avatar :name="person.address" size="sm" class="size-4 text-[0.5rem]" />
-                    {{ person.displayName }}
+                    {{ nameOf(person) }}
                     <button
                       type="button"
                       class="grid size-4 cursor-pointer place-items-center rounded-sm text-muted-foreground hover:bg-background hover:text-foreground"
-                      :aria-label="$ts('newMessage.remove', { name: person.displayName })"
+                      :aria-label="$ts('newMessage.remove', { name: nameOf(person) })"
                       @click="remove(person)"
                     >
                       <X class="size-3" aria-hidden="true" />
@@ -250,7 +251,7 @@ const listId = "new-message-people";
                   @mousemove="active = index"
                 >
                   <Avatar :name="person.address" size="sm" />
-                  <span class="truncate font-medium">{{ person.displayName }}</span>
+                  <span class="truncate font-medium">{{ nameOf(person) }}</span>
                   <span class="truncate text-xs text-muted-foreground">@{{ person.username }}</span>
                   <Check
                     v-if="index === active"

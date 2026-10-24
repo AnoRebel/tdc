@@ -59,7 +59,7 @@ import { atTime, onDay } from "#layers/ui/app/lib/dates";
 import { isTyping } from "#layers/ui/app/lib/shortcuts";
 import { plainText } from "#layers/ui/app/lib/formatting";
 import { foldMessages, groupMessages } from "#layers/ui/app/lib/timeline";
-import { isOwnAddress } from "#layers/ui/app/lib/names";
+import { isOwnAddress, nameAt, nameOf } from "#layers/ui/app/lib/names";
 import IssueFromMessage from "#layers/ui/app/components/projects/IssueFromMessage.vue";
 import TranslationRoomToggle from "#layers/ui/app/components/translation/TranslationRoomToggle.vue";
 
@@ -105,7 +105,7 @@ const directTransferOffered = computed(
   () =>
     room.value?.kind === "direct" &&
     !room.value.homeServer &&
-    otherParticipants(room.value, user.value?.displayName).length === 1 &&
+    otherParticipants(room.value, user.value ? nameOf(user.value) : undefined).length === 1 &&
     serverOffers("direct-transfers"),
 );
 
@@ -113,7 +113,7 @@ const directTransferOffered = computed(
 const title = computed(() => {
   if (!room.value) return $ts("room.loading");
   return room.value.kind === "direct"
-    ? otherParticipants(room.value, user.value?.displayName).join(", ")
+    ? otherParticipants(room.value, user.value ? nameOf(user.value) : undefined).join(", ")
     : room.value.name;
 });
 
@@ -553,7 +553,7 @@ function bodyOf(message: Message): string {
 async function copySelected() {
   const lines = visible.value
     .filter((message) => selected.value.has(message.id))
-    .map((message) => `${shortName(message.sender)}: ${message.body}`);
+    .map((message) => `${nameAt(message.sender)}: ${message.body}`);
 
   try {
     await navigator.clipboard?.writeText(lines.join("\n"));
@@ -656,6 +656,7 @@ const live = useLiveConnection({
       id: payload.id,
       type: payload.type,
       sender: payload.sender,
+      senderName: payload.senderName,
       sequence,
       content: payload.content,
       attachments: payload.attachments,
@@ -1264,7 +1265,7 @@ function menuFor(
     // Blocking the person, which is a personal boundary rather than a report:
     // nobody is told, least of all them.
     items.push({
-      label: $ts("room.blockPerson", { who: shortName(sender) }),
+      label: $ts("room.blockPerson", { who: nameAt(sender) }),
       icon: UserX,
       destructive: true,
       action: () => {
@@ -1276,7 +1277,7 @@ function menuFor(
     // it appears only for whoever holds that authority.
     if (can("moderation.restrict")) {
       items.push({
-        label: $ts("room.banPersonFromChannel", { who: shortName(sender) }),
+        label: $ts("room.banPersonFromChannel", { who: nameAt(sender) }),
         icon: ShieldOff,
         destructive: true,
         action: () => {
@@ -1468,6 +1469,7 @@ async function refreshThreadCounts() {
   }
 }
 
+/** The username in a local address, which is what finds the person to block or ban. */
 function shortName(address: string): string {
   return address.split("@")[0] ?? address;
 }
@@ -1703,10 +1705,14 @@ watch(roomId, load, { immediate: true });
               class="flex w-full cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent"
               @click="jumpTo(item.message.id)"
             >
-              <Avatar :name="item.message.sender" size="sm" class="mt-0.5 shrink-0" />
+              <Avatar
+                :name="item.message.senderName || nameAt(item.message.sender)"
+                size="sm"
+                class="mt-0.5 shrink-0"
+              />
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-xs font-medium">
-                  {{ shortName(item.message.sender) }}
+                  {{ item.message.senderName || nameAt(item.message.sender) }}
                 </span>
                 <span class="block truncate text-xs text-muted-foreground">
                   {{ plainText(bodyOf(item.message)) }}
@@ -1962,7 +1968,7 @@ watch(roomId, load, { immediate: true });
     <ConfirmDialog
       v-if="blocking"
       :title="$ts('room.blockThisPerson')"
-      :detail="$ts('room.blockDetail', { name: shortName(blocking.sender) })"
+      :detail="$ts('room.blockDetail', { name: nameAt(blocking.sender) })"
       :confirm-label="$ts('room.block')"
       @cancel="blocking = null"
       @confirm="blockSender(blocking.sender)"
@@ -1978,7 +1984,7 @@ watch(roomId, load, { immediate: true });
 
     <BanDialog
       v-if="banning"
-      :username="shortName(banning.sender)"
+      :name="nameAt(banning.sender)"
       @cancel="banning = null"
       @ban="(reason, hours) => banSender(banning!.sender, reason, hours)"
     />

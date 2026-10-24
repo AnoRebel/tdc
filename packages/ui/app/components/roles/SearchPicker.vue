@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { Hash, Search } from "lucide-vue-next";
 
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
@@ -49,7 +50,7 @@ watch(typed, async (value) => {
             .filter((person) => !excluded.has(person.id))
             .map((person) => ({
               id: person.id,
-              name: person.displayName || person.username,
+              name: nameOf(person),
               detail: person.address,
             }))
         : found.rooms

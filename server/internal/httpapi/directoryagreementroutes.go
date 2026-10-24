@@ -11,6 +11,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/directory"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 )
 
 /*
@@ -210,9 +211,12 @@ func (api *directoryAPI) handlePropose(c *echo.Context) error {
 	if err != nil {
 		return agreementError(err)
 	}
-	summary := fmt.Sprintf("%s sent version %d of the proposal", user.Username, version.Version)
+	// Announced in the conversation, where people read names; the agreement's
+	// own record keeps the username as the identifier.
+	who := identity.NameOf(user.Username, user.DisplayName)
+	summary := fmt.Sprintf("%s sent version %d of the proposal", who, version.Version)
 	if version.Revision > 0 {
-		summary = fmt.Sprintf("%s sent version %d in revision %d of the agreement", user.Username, version.Version, version.Revision)
+		summary = fmt.Sprintf("%s sent version %d in revision %d of the agreement", who, version.Version, version.Revision)
 	}
 	api.announce(ctx, engagement, user.ID, summary)
 	return c.JSON(http.StatusCreated, versionViewOf(version))
@@ -250,10 +254,11 @@ func (api *directoryAPI) handleRespond(c *echo.Context) error {
 	if answer.Revision > 0 {
 		what = fmt.Sprintf("revision %d of the agreement", answer.Revision)
 	}
+	who := identity.NameOf(user.Username, user.DisplayName)
 	summary := map[directory.ResponseKind]string{
-		directory.Accept:         user.Username + " accepted " + what,
-		directory.Decline:        user.Username + " declined " + what,
-		directory.RequestChanges: user.Username + " asked for changes to " + request.Part + " in " + what + ": " + request.Comment,
+		directory.Accept:         who + " accepted " + what,
+		directory.Decline:        who + " declined " + what,
+		directory.RequestChanges: who + " asked for changes to " + request.Part + " in " + what + ": " + request.Comment,
 	}[directory.ResponseKind(request.Kind)]
 	switch {
 	case answer.Agreed && answer.Revision > 0:
@@ -264,7 +269,7 @@ func (api *directoryAPI) handleRespond(c *echo.Context) error {
 		summary += ". The agreement in force is unchanged."
 	}
 	api.announce(ctx, engagement, user.ID, summary)
-	return c.JSON(http.StatusCreated, api.engagementViewOf(engagement, user.ID))
+	return c.JSON(http.StatusCreated, api.engagementViewOf(ctx, engagement, user.ID))
 }
 
 func (api *directoryAPI) handleStartWork(c *echo.Context) error {
@@ -278,8 +283,8 @@ func (api *directoryAPI) handleStartWork(c *echo.Context) error {
 	if err != nil {
 		return agreementError(err)
 	}
-	api.announce(ctx, engagement, user.ID, user.Username+" started the agreed work")
-	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
+	api.announce(ctx, engagement, user.ID, identity.NameOf(user.Username, user.DisplayName)+" started the agreed work")
+	return c.JSON(http.StatusOK, api.engagementViewOf(ctx, engagement, user.ID))
 }
 
 type completeRequest struct {
@@ -301,8 +306,8 @@ func (api *directoryAPI) handleRequestCompletion(c *echo.Context) error {
 	if err != nil {
 		return agreementError(err)
 	}
-	api.announce(ctx, engagement, user.ID, user.Username+" says the work is complete, and asks you to confirm")
-	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
+	api.announce(ctx, engagement, user.ID, identity.NameOf(user.Username, user.DisplayName)+" says the work is complete, and asks you to confirm")
+	return c.JSON(http.StatusOK, api.engagementViewOf(ctx, engagement, user.ID))
 }
 
 func (api *directoryAPI) handleConfirmCompletion(c *echo.Context) error {
@@ -316,8 +321,8 @@ func (api *directoryAPI) handleConfirmCompletion(c *echo.Context) error {
 	if err != nil {
 		return agreementError(err)
 	}
-	api.announce(ctx, engagement, user.ID, user.Username+" confirmed the work is complete")
-	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
+	api.announce(ctx, engagement, user.ID, identity.NameOf(user.Username, user.DisplayName)+" confirmed the work is complete")
+	return c.JSON(http.StatusOK, api.engagementViewOf(ctx, engagement, user.ID))
 }
 
 func (api *directoryAPI) handleExportAgreement(c *echo.Context) error {
@@ -364,7 +369,7 @@ func (api *directoryAPI) handleOpenRevision(c *echo.Context) error {
 	}
 	api.announce(ctx, engagement, user.ID, fmt.Sprintf(
 		"%s proposed revision %d of the agreement (version %d): %s. The agreement in force stands until you both accept.",
-		user.Username, revision.Number, version.Version, revision.Reason))
+		identity.NameOf(user.Username, user.DisplayName), revision.Number, version.Version, revision.Reason))
 	return c.JSON(http.StatusCreated, map[string]any{
 		"revision": revisionViewOf(revision), "version": versionViewOf(version),
 	})
@@ -394,7 +399,7 @@ func (api *directoryAPI) handleWithdrawRevision(c *echo.Context) error {
 		return agreementError(err)
 	}
 	api.announce(ctx, engagement, user.ID, fmt.Sprintf(
-		"%s withdrew revision %d of the agreement. The agreement in force is unchanged.", user.Username, revision.Number))
+		"%s withdrew revision %d of the agreement. The agreement in force is unchanged.", identity.NameOf(user.Username, user.DisplayName), revision.Number))
 	return c.JSON(http.StatusOK, revisionViewOf(revision))
 }
 

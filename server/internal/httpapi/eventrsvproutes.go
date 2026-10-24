@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/settings"
 )
@@ -116,12 +117,15 @@ func (s *Server) handleEventAttendees(c *echo.Context) error {
 }
 
 type inviteView struct {
-	ID        string `json:"id"`
-	UserID    string `json:"userId,omitempty"`
-	Username  string `json:"username,omitempty"`
-	ChannelID string `json:"channelId,omitempty"`
-	Channel   string `json:"channel,omitempty"`
-	CreatedAt string `json:"createdAt"`
+	ID       string `json:"id"`
+	UserID   string `json:"userId,omitempty"`
+	Username string `json:"username,omitempty"`
+	// DisplayName is the invited person's display name, empty when they have
+	// not set one.
+	DisplayName string `json:"displayName,omitempty"`
+	ChannelID   string `json:"channelId,omitempty"`
+	Channel     string `json:"channel,omitempty"`
+	CreatedAt   string `json:"createdAt"`
 }
 
 func (s *Server) handleListEventInvites(c *echo.Context) error {
@@ -140,7 +144,10 @@ func (s *Server) handleListEventInvites(c *echo.Context) error {
 	}
 	views := make([]inviteView, 0, len(rows))
 	for _, row := range rows {
-		view := inviteView{ID: row.ID.String(), Username: row.Username, Channel: row.ChannelName, CreatedAt: rfc3339(row.CreatedAt)}
+		view := inviteView{
+			ID: row.ID.String(), Username: row.Username, DisplayName: row.DisplayName,
+			Channel: row.ChannelName, CreatedAt: rfc3339(row.CreatedAt),
+		}
 		if row.UserID != nil {
 			view.UserID = row.UserID.String()
 		}
@@ -205,7 +212,7 @@ func (s *Server) handleInviteToEvent(c *echo.Context) error {
 	s.tell(ctx, eventNotice{
 		event: event.CalendarEvent, reason: notify.ReasonEventInvite, entry: s.anchorOf(ctx, id),
 		actorID: user.ID, actorAddress: s.rooms.UserAddress(user.Username),
-		pushTitle: user.Username + " invited you", pushBody: event.Title + " — " + whenIn(event.StartsAt, event.TimeZone),
+		pushTitle: identity.NameOf(user.Username, user.DisplayName) + " invited you", pushBody: event.Title + " — " + whenIn(event.StartsAt, event.TimeZone),
 	}, uniqueIDs(told))
 	return c.JSON(http.StatusOK, map[string]any{"invited": len(invited.Invites)})
 }

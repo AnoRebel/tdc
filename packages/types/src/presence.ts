@@ -95,6 +95,7 @@ export interface NotificationPreferences {
 /** Someone currently composing a message. */
 export interface TypingPerson {
   userId: string;
+  /** What to call them: their display name, or their username without one. */
   displayName: string;
   /** The thread they are replying in, when they are writing a reply. */
   threadRoot?: string;

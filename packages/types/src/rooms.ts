@@ -77,6 +77,11 @@ export interface Message {
   type: string;
   /** The sender's federated address. */
   sender: string;
+  /**
+   * What to call the sender: their display name, or their username without
+   * one. Absent for somebody on another server, who is called by their address.
+   */
+  senderName?: string;
   /** Position in the room's total order, used to detect a gap. */
   sequence: number;
   content: MessageContent;
@@ -194,6 +199,11 @@ export interface LiveEventPayload {
   id: string;
   type: string;
   sender: string;
+  /**
+   * What to call the sender: their display name, or their username without
+   * one. Absent for somebody on another server, who is called by their address.
+   */
+  senderName?: string;
   content: MessageContent;
   createdAt: number;
   redacted: boolean;
@@ -478,6 +488,13 @@ export interface Notification {
    * sender is usually the person being notified.
    */
   actor: string;
+  /**
+   * What to call the sender and the actor: a display name, or a username
+   * without one. Absent for somebody on another server, who is called by
+   * their address.
+   */
+  senderName?: string;
+  actorName?: string;
   /** What the reason needs — the emoji, for a reaction. */
   detail?: string;
   /**
@@ -542,7 +559,11 @@ export interface GifSearchResults {
 export interface ChannelBan {
   userId: string;
   username: string;
+  /** What to call them: their display name, or their username without one. */
+  displayName: string;
   bannedBy: string;
+  /** What to call whoever banned them, absent for somebody this server does not know. */
+  bannedByName?: string;
   reason: string;
   /** Absent means permanent. */
   expiresAt?: string;

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { Check, X } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -31,14 +32,14 @@ const waiting = computed(() =>
       :key="person.userId"
       class="flex items-center gap-2 rounded px-1 py-0.5"
     >
-      <Avatar :name="person.displayName || person.username" size="sm" />
+      <Avatar :name="nameOf(person)" size="sm" />
       <span class="min-w-0 flex-1 truncate text-xs">
-        {{ person.displayName || person.username }}
+        {{ nameOf(person) }}
       </span>
       <Button
         size="small"
         class="h-6 px-2 text-xs"
-        :label="$ts('calls.lobby.admitWhom', { name: person.displayName || person.username })"
+        :label="$ts('calls.lobby.admitWhom', { name: nameOf(person) })"
         @click="c.admit(person.userId, true)"
       >
         <Check class="size-3" aria-hidden="true" />
@@ -48,7 +49,7 @@ const waiting = computed(() =>
         variant="ghost"
         size="icon"
         class="size-6"
-        :label="$ts('calls.lobby.turnAwayWhom', { name: person.displayName || person.username })"
+        :label="$ts('calls.lobby.turnAwayWhom', { name: nameOf(person) })"
         @click="c.admit(person.userId, false)"
       >
         <X class="size-3" />

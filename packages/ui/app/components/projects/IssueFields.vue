@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import {
   isApiError,
   type Issue,
@@ -61,7 +62,7 @@ const assignable = computed(() =>
     .filter((member) => !props.issue.assignees.some((a) => a.username === member.username))
     .map((member) => ({
       value: member.username,
-      label: member.displayName || member.username,
+      label: nameOf(member),
     })),
 );
 
@@ -174,16 +175,14 @@ function unrelate(kind: RelationKind, other: RelatedIssue) {
           :key="person.username"
           class="flex items-center gap-2"
         >
-          <UiAvatar :name="person.displayName || person.username" size="sm" />
-          <span class="min-w-0 flex-1 truncate text-xs">{{
-            person.displayName || person.username
-          }}</span>
+          <UiAvatar :name="nameOf(person)" size="sm" />
+          <span class="min-w-0 flex-1 truncate text-xs">{{ nameOf(person) }}</span>
           <Button
             v-if="can?.assign"
             variant="ghost"
             size="icon"
             class="size-6"
-            :label="$ts('projects.unassign', { who: person.username })"
+            :label="$ts('projects.unassign', { who: nameOf(person) })"
             @click="change(() => projectsApi.unassign(props.issue.key, person.username))"
           >
             <Icon name="lucide:x" class="size-3" />

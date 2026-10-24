@@ -97,8 +97,9 @@ export interface Engagement {
   id: string;
   title: string;
   state: EngagementState;
-  client: { username: string; address: string };
-  developer: { username: string; address: string };
+  /** Each side, with what to call them: a display name, or the username without one. */
+  client: { username: string; displayName: string; address: string };
+  developer: { username: string; displayName: string; address: string };
   /** Which party the viewer is. */
   you: "client" | "developer";
   roomId?: string;

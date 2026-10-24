@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
 import {
   isApiError,
   type DiscussionSearchResult,
@@ -334,7 +335,7 @@ async function confirmDelete() {
                   class="block rounded px-1.5 py-1 hover:bg-accent"
                 >
                   <span class="block text-[0.6875rem] text-muted-foreground">
-                    {{ said.sender.split("@")[0] }}
+                    {{ nameAt(said.sender) }}
                   </span>
                   <SearchExcerpt :html="said.highlighted" class="block text-xs" />
                 </NuxtLink>

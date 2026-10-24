@@ -26,6 +26,11 @@ type notificationResponse struct {
 	// everything else: a reaction's event is the message reacted to, whose
 	// sender is usually the person being notified.
 	Actor string `json:"actor"`
+	// SenderName and ActorName are what to call those two people: a display
+	// name, or a username without one. Absent for somebody on another server,
+	// whom a client calls by their address.
+	SenderName string `json:"senderName,omitempty"`
+	ActorName  string `json:"actorName,omitempty"`
 	// Detail is what the reason needs — the emoji, for a reaction.
 	Detail string `json:"detail,omitempty"`
 	// Count is how many unread notifications this entry stands for, when the
@@ -69,18 +74,21 @@ func (s *Server) handleListNotifications(c *echo.Context) error {
 	}
 
 	response := make([]notificationResponse, 0, len(notifications))
+	names := newNameBook(s.rooms)
 	for _, n := range notifications {
 		response = append(response, notificationResponse{
-			ID:      n.ID.String(),
-			RoomID:  n.RoomID.String(),
-			EventID: n.EventID,
-			Reason:  string(n.Reason),
-			Sender:  n.Sender,
-			Preview: n.Preview,
-			Actor:   n.Actor,
-			Detail:  n.Detail,
-			Count:   n.Count,
-			Actors:  n.Actors,
+			ID:         n.ID.String(),
+			RoomID:     n.RoomID.String(),
+			EventID:    n.EventID,
+			Reason:     string(n.Reason),
+			Sender:     n.Sender,
+			Preview:    n.Preview,
+			Actor:      n.Actor,
+			Detail:     n.Detail,
+			SenderName: names.at(ctx, n.Sender),
+			ActorName:  names.at(ctx, n.Actor),
+			Count:      n.Count,
+			Actors:     n.Actors,
 		})
 	}
 

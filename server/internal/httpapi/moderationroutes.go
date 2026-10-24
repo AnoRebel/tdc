@@ -27,12 +27,18 @@ type banRequest struct {
 
 // banResponse is one active ban.
 type banResponse struct {
-	UserID    string `json:"userId"`
-	Username  string `json:"username"`
-	BannedBy  string `json:"bannedBy"`
-	Reason    string `json:"reason"`
-	ExpiresAt string `json:"expiresAt,omitempty"`
-	CreatedAt string `json:"createdAt"`
+	UserID   string `json:"userId"`
+	Username string `json:"username"`
+	// DisplayName is what to call the person banned: their display name, or
+	// their username without one.
+	DisplayName string `json:"displayName"`
+	BannedBy    string `json:"bannedBy"`
+	// BannedByName is what to call whoever banned them, absent for somebody
+	// this server does not know.
+	BannedByName string `json:"bannedByName,omitempty"`
+	Reason       string `json:"reason"`
+	ExpiresAt    string `json:"expiresAt,omitempty"`
+	CreatedAt    string `json:"createdAt"`
 }
 
 /*
@@ -128,13 +134,16 @@ func (s *Server) handleListChannelBans(c *echo.Context) error {
 	}
 
 	response := make([]banResponse, 0, len(bans))
+	names := newNameBook(s.rooms)
 	for _, ban := range bans {
 		item := banResponse{
-			UserID:    ban.UserID.String(),
-			Username:  ban.Username,
-			BannedBy:  ban.BannedBy,
-			Reason:    ban.Reason,
-			CreatedAt: ban.CreatedAt.UTC().Format(time.RFC3339),
+			UserID:       ban.UserID.String(),
+			Username:     ban.Username,
+			DisplayName:  identity.NameOf(ban.Username, ban.DisplayName),
+			BannedBy:     ban.BannedBy,
+			BannedByName: names.at(c.Request().Context(), ban.BannedBy),
+			Reason:       ban.Reason,
+			CreatedAt:    ban.CreatedAt.UTC().Format(time.RFC3339),
 		}
 		if ban.ExpiresAt != nil {
 			item.ExpiresAt = ban.ExpiresAt.UTC().Format(time.RFC3339)

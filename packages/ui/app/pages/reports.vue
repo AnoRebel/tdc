@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
 import type { Report } from "@tdc/types";
 import { ArrowLeft, Check, Flag, ShieldAlert, X } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
@@ -72,9 +73,9 @@ function when(value: number): string {
   return onDayAtTime(value);
 }
 
-/** The local part of an address, which is what a person is called here. */
+/** What to call the person at an address. */
 function name(address: string): string {
-  return address.split("@")[0] ?? address;
+  return nameAt(address);
 }
 </script>
 

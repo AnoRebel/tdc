@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { shownName } from "#layers/ui/app/lib/call-names";
+import { nameOf } from "#layers/ui/app/lib/names";
 import {
   Maximize2,
   Mic,
@@ -94,7 +94,7 @@ const { user: me } = useAuth();
 const title = computed(() => {
   const others = (c.call.value?.participants ?? [])
     .filter((each) => each.userId !== me.value?.id)
-    .map((each) => shownName(each));
+    .map((each) => nameOf(each));
   if (roomName.value && !roomName.value.includes(",")) return roomName.value;
   return others.length ? others.join(", ") : roomName.value || $ts("calls.inProgress");
 });

@@ -8,6 +8,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 )
 
 // ViaAutomaticReply is the "via" kind of a reply the server posted on
@@ -43,7 +44,7 @@ func (s *Service) PostAutomaticReply(
 
 	payload := map[string]any{
 		"body": trimmed,
-		"via":  Via{Kind: ViaAutomaticReply, ID: person.ID.String(), Name: person.DisplayName},
+		"via":  Via{Kind: ViaAutomaticReply, ID: person.ID.String(), Name: identity.NameOf(person.Username, person.DisplayName)},
 	}
 	if threadRoot != nil {
 		payload["threadRoot"] = *threadRoot

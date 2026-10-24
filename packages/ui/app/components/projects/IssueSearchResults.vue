@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
 import type { IssueSearch } from "@tdc/types";
 import SearchExcerpt from "#layers/ui/app/components/SearchExcerpt.vue";
 import { whenBriefly } from "#layers/ui/app/lib/dates";
@@ -87,7 +88,7 @@ const props = defineProps<{ results: IssueSearch; showProject?: boolean }>();
             <span class="flex items-center gap-2 text-xs text-muted-foreground">
               <span class="font-mono">{{ said.issueKey }}</span>
               <span class="min-w-0 flex-1 truncate">{{ said.issueTitle }}</span>
-              <span>{{ said.sender.split("@")[0] }} · {{ whenBriefly(said.sentAt) }}</span>
+              <span>{{ nameAt(said.sender) }} · {{ whenBriefly(said.sentAt) }}</span>
             </span>
             <SearchExcerpt :html="said.highlighted" class="mt-1 block" />
           </NuxtLink>

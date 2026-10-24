@@ -74,9 +74,12 @@ func (s *Server) handleListPinned(c *echo.Context) error {
 	}
 
 	response := make([]pinnedResponse, 0, len(pinned))
+	names := newNameBook(s.rooms)
 	for _, item := range pinned {
+		message := messageResponseOf(item.Event)
+		message.SenderName = names.sender(c.Request().Context(), item.Event)
 		response = append(response, pinnedResponse{
-			Message:  messageResponseOf(item.Event),
+			Message:  message,
 			PinnedBy: item.PinnedBy,
 			PinnedAt: item.PinnedAt,
 		})

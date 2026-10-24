@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { ProfileView } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { ArrowLeft, SearchX } from "lucide-vue-next";
@@ -91,11 +92,7 @@ const sentEnquiry = ref(false);
 
       <DirectoryProfileCard v-else-if="profile" :profile="profile">
         <template #actions>
-          <CallPerson
-            v-if="!isMe"
-            :username="profile.username"
-            :name="profile.displayName || profile.username"
-          />
+          <CallPerson v-if="!isMe" :username="profile.username" :name="nameOf(profile)" />
           <p v-if="isMe" class="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
             {{ $t("directory.profile.thisIsYou") }}
             <NuxtLink
@@ -113,7 +110,7 @@ const sentEnquiry = ref(false);
            clear this is their choice and not a fault. -->
       <section v-if="profile && !isMe" class="mt-8 space-y-3 border-t pt-6">
         <h2 class="text-sm font-semibold">
-          {{ $t("directory.enquiry.sendTo", { name: profile.displayName || profile.username }) }}
+          {{ $t("directory.enquiry.sendTo", { name: nameOf(profile) }) }}
         </h2>
         <p v-if="sentEnquiry" class="rounded-md bg-primary/10 px-3 py-2 text-sm" role="status">
           {{ $t("directory.enquiry.wasSent") }}
@@ -127,11 +124,11 @@ const sentEnquiry = ref(false);
         <DirectoryEnquiryForm
           v-else-if="profile.acceptsEnquiries"
           :username="profile.username"
-          :name="profile.displayName || profile.username"
+          :name="nameOf(profile)"
           @sent="sentEnquiry = true"
         />
         <p v-else class="text-sm text-muted-foreground">
-          {{ $t("directory.enquiry.notTaking", { name: profile.displayName || profile.username }) }}
+          {{ $t("directory.enquiry.notTaking", { name: nameOf(profile) }) }}
         </p>
       </section>
     </div>

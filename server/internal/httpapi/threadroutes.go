@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 )
 
 // threadResponse is a thread's root and its replies, with where the reader
@@ -498,7 +499,7 @@ func (s *Server) handleListTyping(c *echo.Context) error {
 	for _, row := range typing {
 		entry := map[string]string{
 			"userId":      row.UserID.String(),
-			"displayName": row.DisplayName,
+			"displayName": identity.NameOf(row.Username, row.DisplayName),
 		}
 		// Absent for the channel itself, so each view shows its own writers.
 		if row.ThreadRootID != nil {

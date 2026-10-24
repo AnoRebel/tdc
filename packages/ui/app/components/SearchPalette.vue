@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt, nameOf } from "#layers/ui/app/lib/names";
 import type { PersonHit, RoomHit } from "@tdc/types";
 import type { Command } from "#layers/ui/app/composables/useCommands";
 import { Hash, Lock, MessageSquare, Search, User } from "lucide-vue-next";
@@ -356,7 +357,7 @@ function iconFor(room: RoomHit) {
                   @mousemove="active = peopleFrom + index"
                 >
                   <Avatar :name="person.address" size="sm" class="shrink-0" />
-                  <span class="truncate font-medium">{{ person.displayName }}</span>
+                  <span class="truncate font-medium">{{ nameOf(person) }}</span>
                   <span class="truncate text-xs text-muted-foreground">@{{ person.username }}</span>
                   <!-- Said only on the row it applies to, so it reads as an
                        option for this person rather than a rule to learn. -->
@@ -394,7 +395,7 @@ function iconFor(room: RoomHit) {
                   <MessageSquare class="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <span class="min-w-0 flex-1 text-left">
                     <span class="block truncate text-xs text-muted-foreground">
-                      {{ message.sender }}
+                      {{ message.senderName || nameAt(message.sender) }}
                     </span>
                     <!-- The server's marks are kept, but the text still goes
                          through the same sanitiser as any message: a client is

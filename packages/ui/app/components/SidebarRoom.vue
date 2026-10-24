@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Room } from "@tdc/types";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { nameOf } from "#layers/ui/app/lib/names";
 import { otherParticipants } from "#layers/ui/app/lib/sidebar";
 
 /**
@@ -32,7 +33,9 @@ const { $ts } = useI18n();
 const { user } = useAuth();
 
 const others = computed(() =>
-  props.room.kind === "direct" ? otherParticipants(props.room, user.value?.displayName) : [],
+  props.room.kind === "direct"
+    ? otherParticipants(props.room, user.value ? nameOf(user.value) : undefined)
+    : [],
 );
 const name = computed(() =>
   props.room.kind === "direct" ? others.value.join(", ") : props.room.name,

@@ -104,3 +104,18 @@ func (s *Service) UsernameHeld(ctx context.Context, folded string, except uuid.U
 	}
 	return held, nil
 }
+
+/*
+NameOf is what to call somebody wherever one person is named to another: their
+display name, or their username when they have not set one.
+
+The username stays the identifier — in mentions, addresses and links — but it
+is not what people read as a name. A guest's username is generated, and a guest
+always has a display name, so a guest is called by the name they gave.
+*/
+func NameOf(username, displayName string) string {
+	if name := strings.TrimSpace(displayName); name != "" {
+		return name
+	}
+	return username
+}

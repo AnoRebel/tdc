@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
@@ -289,10 +290,10 @@ function when(value: string): string {
               :key="person.id"
               class="flex items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
             >
-              <Avatar :name="person.displayName || person.username" size="sm" />
+              <Avatar :name="nameOf(person)" size="sm" />
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm font-medium">
-                  {{ person.displayName || person.username }}
+                  {{ nameOf(person) }}
                   <span
                     v-if="person.suspended"
                     class="ml-1.5 rounded bg-destructive/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-destructive"
@@ -327,7 +328,7 @@ function when(value: string): string {
                 v-if="can('role.manage') || can('role.assign')"
                 :to="localeRoute({ name: 'roles-people-id', params: { id: person.id } })"
                 class="btn btn-ghost h-7 shrink-0 px-2 text-xs"
-                :aria-label="$ts('roles.rolesOf', { name: person.displayName || person.username })"
+                :aria-label="$ts('roles.rolesOf', { name: nameOf(person) })"
               >
                 <KeyRound class="size-3.5" aria-hidden="true" />
                 {{ $t("roles.roles") }}
@@ -373,7 +374,7 @@ function when(value: string): string {
     >
       <div class="w-[min(26rem,100%)] rounded-xl border border-border bg-card p-4 shadow-2xl">
         <h2 class="text-sm font-semibold">
-          {{ $t("admin.suspendWhom", { who: suspending.displayName || suspending.username }) }}
+          {{ $t("admin.suspendWhom", { who: nameOf(suspending) }) }}
         </h2>
         <p class="mt-1 text-xs text-muted-foreground">
           {{ $t("admin.suspendConsequenceHint") }}

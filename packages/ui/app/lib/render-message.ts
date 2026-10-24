@@ -250,6 +250,62 @@ export function renderMessage(body: string, labels: RenderLabels): string {
 }
 
 /*
+ * The server's mention rule (server/internal/notify): "@name" at the start of a
+ * word. Read the same way here, so what is drawn as a mention is what notified
+ * somebody.
+ */
+const MENTION = /(^|\s)@([a-zA-Z0-9._-]{1,64})\b/g;
+
+/**
+ * Draws each "@username" in rendered markup as the person's name, the way it
+ * reads in conversation, with the username it was written as kept on hover.
+ *
+ * Only where `nameFor` knows the name: a mention of nobody, or of somebody
+ * this client has not been told about, stays exactly as typed. Never inside
+ * code or a link. The name is set as text, so nothing in it becomes markup.
+ */
+export function nameMentions(html: string, nameFor: (username: string) => string | undefined) {
+  if (!html.includes("@")) return html;
+
+  const holder = document.createElement("template");
+  holder.innerHTML = html;
+  let changed = false;
+
+  const walker = (node: Node) => {
+    for (const child of [...node.childNodes]) {
+      if (child.nodeType === 1) {
+        if (!NO_LINKS.has((child as Element).tagName)) walker(child);
+        continue;
+      }
+      if (child.nodeType !== 3) continue;
+      const text = child.textContent ?? "";
+      const pieces: Node[] = [];
+      let last = 0;
+      for (const match of text.matchAll(MENTION)) {
+        const username = match[2]!;
+        const name = nameFor(username);
+        if (!name || name === username) continue;
+        const at = match.index + match[1]!.length;
+        pieces.push(document.createTextNode(text.slice(last, at)));
+        const mention = document.createElement("span");
+        mention.className = "mention";
+        mention.title = `@${username}`;
+        mention.textContent = name;
+        pieces.push(mention);
+        last = at + username.length + 1;
+      }
+      if (!pieces.length) continue;
+      pieces.push(document.createTextNode(text.slice(last)));
+      child.replaceWith(...pieces);
+      changed = true;
+    }
+  };
+  walker(holder.content);
+
+  return changed ? holder.innerHTML : html;
+}
+
+/*
  * Syntax highlighting, loaded only when a code block names a language.
  *
  * The highlighter and its languages are one small module that nobody pays for

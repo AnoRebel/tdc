@@ -26,7 +26,7 @@ SELECT EXISTS (
 
 -- name: ListChannelBans :many
 SELECT b.room_id, b.user_id, b.banned_by_address, b.reason, b.expires_at, b.created_at,
-       u.username
+       u.username, u.display_name
 FROM channel_bans b
 JOIN users u ON u.id = b.user_id
 WHERE b.room_id = $1 AND (b.expires_at IS NULL OR b.expires_at > now())

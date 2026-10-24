@@ -36,13 +36,15 @@ const maxReason = 1000
 
 // Ban is somebody kept out of one channel.
 type Ban struct {
-	RoomID    uuid.UUID
-	UserID    uuid.UUID
-	Username  string
-	BannedBy  string
-	Reason    string
-	ExpiresAt *time.Time
-	CreatedAt time.Time
+	RoomID   uuid.UUID
+	UserID   uuid.UUID
+	Username string
+	// DisplayName is empty for somebody who has not set one.
+	DisplayName string
+	BannedBy    string
+	Reason      string
+	ExpiresAt   *time.Time
+	CreatedAt   time.Time
 }
 
 /*
@@ -128,13 +130,14 @@ func (s *Service) BansIn(ctx context.Context, roomID uuid.UUID) ([]Ban, error) {
 	bans := make([]Ban, 0, len(rows))
 	for _, row := range rows {
 		bans = append(bans, Ban{
-			RoomID:    row.RoomID,
-			UserID:    row.UserID,
-			Username:  row.Username,
-			BannedBy:  row.BannedByAddress,
-			Reason:    row.Reason,
-			ExpiresAt: row.ExpiresAt,
-			CreatedAt: row.CreatedAt,
+			RoomID:      row.RoomID,
+			UserID:      row.UserID,
+			Username:    row.Username,
+			DisplayName: row.DisplayName,
+			BannedBy:    row.BannedByAddress,
+			Reason:      row.Reason,
+			ExpiresAt:   row.ExpiresAt,
+			CreatedAt:   row.CreatedAt,
 		})
 	}
 	return bans, nil

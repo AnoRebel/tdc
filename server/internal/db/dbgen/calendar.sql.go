@@ -1085,7 +1085,7 @@ func (q *Queries) ListCalendarEventsInRange(ctx context.Context, arg ListCalenda
 }
 
 const listCalendarInvites = `-- name: ListCalendarInvites :many
-SELECT i.id, i.event_id, i.user_id, i.channel_id, i.invited_by, i.created_at, COALESCE(u.username, '')::text AS username, COALESCE(c.name, '')::text AS channel_name
+SELECT i.id, i.event_id, i.user_id, i.channel_id, i.invited_by, i.created_at, COALESCE(u.username, '')::text AS username, COALESCE(u.display_name, '')::text AS display_name, COALESCE(c.name, '')::text AS channel_name
 FROM calendar_invites i
 LEFT JOIN users u ON u.id = i.user_id
 LEFT JOIN rooms c ON c.id = i.channel_id
@@ -1101,6 +1101,7 @@ type ListCalendarInvitesRow struct {
 	InvitedBy   *uuid.UUID
 	CreatedAt   time.Time
 	Username    string
+	DisplayName string
 	ChannelName string
 }
 
@@ -1121,6 +1122,7 @@ func (q *Queries) ListCalendarInvites(ctx context.Context, eventID uuid.UUID) ([
 			&i.InvitedBy,
 			&i.CreatedAt,
 			&i.Username,
+			&i.DisplayName,
 			&i.ChannelName,
 		); err != nil {
 			return nil, err

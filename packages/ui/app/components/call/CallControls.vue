@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import {
   BellRing,
   Link2,
@@ -30,10 +31,10 @@ const guest = computed(() => Boolean(c.roomId.value && c.guestOf.value.includes(
     {{
       c.declined.value.message
         ? $t("calls.declinedSaying", {
-            name: c.declined.value.username,
+            name: nameOf(c.declined.value),
             message: c.declined.value.message,
           })
-        : $t("calls.declinedNotice", { name: c.declined.value.username })
+        : $t("calls.declinedNotice", { name: nameOf(c.declined.value) })
     }}
   </p>
   <p

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
@@ -110,12 +111,12 @@ const repeat = ref<Repeat>(parseRule(existing?.recurrence, startingZone));
 const hosts = ref<Picked[]>(
   (existing?.hosts ?? [])
     .filter((person) => person.userId !== existing?.createdBy?.userId)
-    .map((person) => ({ id: person.userId, name: person.username, kind: "person" as const })),
+    .map((person) => ({ id: person.userId, name: nameOf(person), kind: "person" as const })),
 );
 const speakers = ref<Picked[]>(
   (existing?.speakers ?? []).map((person) => ({
     id: person.userId,
-    name: person.username,
+    name: nameOf(person),
     kind: "person" as const,
   })),
 );
@@ -136,7 +137,7 @@ const sessions = ref<SessionRow[]>(
     end: toLocalInput(session.endsAt, startingZone),
     speakers: session.speakers.map((person) => ({
       id: person.userId,
-      name: person.username,
+      name: nameOf(person),
       kind: "person" as const,
     })),
     guestSpeakers: session.guestSpeakers ?? "",

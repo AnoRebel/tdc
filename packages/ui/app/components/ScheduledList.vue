@@ -7,6 +7,7 @@ import { CalendarClock, Clock, Pencil, SendHorizontal, Trash2, X } from "lucide-
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Textarea } from "#layers/ui/app/components/ui/textarea";
 import { howLongAgo, onWeekdayAtTime } from "#layers/ui/app/lib/dates";
+import { nameOf } from "#layers/ui/app/lib/names";
 import { otherParticipants } from "#layers/ui/app/lib/sidebar";
 
 /**
@@ -69,11 +70,11 @@ onKeyStroke("Escape", (event) => {
   else close();
 });
 
-function nameOf(id: string): string {
+function roomNameOf(id: string): string {
   const room = props.rooms.find((candidate) => candidate.id === id);
   if (!room) return $ts("scheduled.aConversation");
   return room.kind === "direct"
-    ? otherParticipants(room, user.value?.displayName).join(", ")
+    ? otherParticipants(room, user.value ? nameOf(user.value) : undefined).join(", ")
     : `#${room.name}`;
 }
 
@@ -216,7 +217,7 @@ async function goTo(id: string) {
                       class="ml-auto cursor-pointer truncate hover:text-foreground hover:underline"
                       @click="goTo(item.roomId)"
                     >
-                      {{ nameOf(item.roomId) }}
+                      {{ roomNameOf(item.roomId) }}
                     </button>
                   </div>
 

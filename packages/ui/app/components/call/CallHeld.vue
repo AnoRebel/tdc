@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { shownName } from "#layers/ui/app/lib/call-names";
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { Call } from "@tdc/types";
 import { ArrowLeftRight, Merge, PhoneOff } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -17,7 +17,7 @@ const c = useCall();
 function who(call: Call) {
   const names = call.participants
     .filter((each) => each.userId !== user.value?.id)
-    .map((each) => shownName(each));
+    .map((each) => nameOf(each));
   return names.length ? names.join(", ") : $ts("calls.inProgress");
 }
 </script>

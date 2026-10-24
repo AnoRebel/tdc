@@ -19,6 +19,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/push"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
@@ -465,8 +466,19 @@ type ringFrame struct {
 	From       struct {
 		UserID   string `json:"userId"`
 		Username string `json:"username"`
-		Address  string `json:"address"`
+		// DisplayName is what to call them: their display name, or their
+		// username without one.
+		DisplayName string `json:"displayName"`
+		Address     string `json:"address"`
 	} `json:"from"`
+}
+
+// ringFrameFrom fills in who a ring is from.
+func (s *Server) ringFrameFrom(frame *ringFrame, caller dbgen.User) {
+	frame.From.UserID = caller.ID.String()
+	frame.From.Username = caller.Username
+	frame.From.DisplayName = identity.NameOf(caller.Username, caller.DisplayName)
+	frame.From.Address = s.rooms.UserAddress(caller.Username)
 }
 
 /*
@@ -531,9 +543,7 @@ func (s *Server) handleRing(c *echo.Context) error {
 	}
 
 	frame := ringFrame{Call: call.ID.String(), RoomID: roomID.String(), RoomName: room.Name, Kind: room.Kind}
-	frame.From.UserID = caller.ID.String()
-	frame.From.Username = caller.Username
-	frame.From.Address = s.rooms.UserAddress(caller.Username)
+	s.ringFrameFrom(&frame, caller)
 	payload, _ := json.Marshal(frame)
 
 	rung := []string{}
@@ -546,7 +556,7 @@ func (s *Server) handleRing(c *echo.Context) error {
 		s.whisperElsewhere(ctx, target, ring, here)
 		rung = append(rung, target.String())
 		s.missedIfUnanswered(target, caller, call)
-		s.pushRing(target, caller.Username, room, call.ID)
+		s.pushRing(target, identity.NameOf(caller.Username, caller.DisplayName), room, call.ID)
 	}
 	return c.JSON(http.StatusOK, map[string]any{"rung": rung, "notRung": len(targets) - len(rung)})
 }
@@ -647,7 +657,7 @@ func (s *Server) handleDeclineRing(c *echo.Context) error {
 
 	payload, _ := json.Marshal(map[string]string{
 		"call": call.ID.String(), "userId": user.ID.String(), "username": user.Username,
-		"message": message,
+		"displayName": identity.NameOf(user.Username, user.DisplayName), "message": message,
 	})
 	frame := realtime.Frame{Type: realtime.FrameCallDeclined, RoomID: roomID.String(), Payload: payload}
 	for _, participant := range call.Participants {
@@ -704,9 +714,7 @@ func (s *Server) handleInviteToCall(c *echo.Context) error {
 	}
 
 	frame := ringFrame{Call: call.ID.String(), RoomID: roomID.String(), Kind: "conference", Conference: true}
-	frame.From.UserID = caller.ID.String()
-	frame.From.Username = caller.Username
-	frame.From.Address = s.rooms.UserAddress(caller.Username)
+	s.ringFrameFrom(&frame, caller)
 	payload, _ := json.Marshal(frame)
 	names := []string{}
 	for _, target := range invited {
@@ -946,7 +954,8 @@ func (s *Server) handleCallReaction(c *echo.Context) error {
 	}
 	payload, _ := json.Marshal(map[string]string{
 		"call": call.ID.String(), "roomId": call.RoomID.String(),
-		"from": user.ID.String(), "username": shownUsername(user), "kind": request.Kind,
+		"from": user.ID.String(), "username": user.Username,
+		"displayName": identity.NameOf(user.Username, user.DisplayName), "kind": request.Kind,
 	})
 	frame := realtime.Frame{Type: realtime.FrameCallReaction, Payload: payload}
 	if s.hub != nil {
@@ -976,13 +985,4 @@ func (s *Server) dismissRemaining(ctx context.Context, roomID uuid.UUID, call ro
 		here := s.hub.SendToUser(participant.UserID, frame)
 		s.whisperElsewhere(ctx, participant.UserID, frame, here)
 	}
-}
-
-// shownUsername is the name to show somebody by in a call: a guest's generated
-// username means nothing to anybody, so a guest is shown by the name they gave.
-func shownUsername(user dbgen.User) string {
-	if user.GuestCall != nil {
-		return user.DisplayName
-	}
-	return user.Username
 }

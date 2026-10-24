@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Input } from "#layers/ui/app/components/ui/input";
@@ -35,7 +36,7 @@ watchDebounced(
       found.value = [
         ...(results.people ?? []).map((person) => ({
           id: person.id,
-          name: person.username,
+          name: nameOf(person),
           kind: "person" as const,
         })),
         ...(props.channels

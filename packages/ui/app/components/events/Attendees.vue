@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { EventAttendance, EventDetail } from "@tdc/types";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 
@@ -52,7 +53,7 @@ const groups = computed(() => {
             :key="person.userId"
             class="flex items-center gap-1.5 rounded-full border bg-surface py-0.5 pr-2.5 pl-0.5 text-xs"
           >
-            <Avatar :name="person.username" size="sm" />{{ person.displayName || person.username }}
+            <Avatar :name="nameOf(person)" size="sm" />{{ nameOf(person) }}
           </li>
           <li
             v-if="group.unnamed"

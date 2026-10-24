@@ -13,6 +13,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/presence"
 	"github.com/AnoRebel/tdc/server/internal/realtime"
 	"github.com/AnoRebel/tdc/server/internal/settings"
@@ -97,7 +98,7 @@ func (s *Server) transferViewOf(ctx context.Context, row dbgen.DirectTransfer) t
 		State: row.State, ExpiresAt: row.ExpiresAt.UTC().Format(time.RFC3339),
 	}
 	if sender, err := s.identity.UserByID(ctx, row.SenderID); err == nil {
-		view.Sender = shownUsername(sender)
+		view.Sender = identity.NameOf(sender.Username, sender.DisplayName)
 	}
 	// Appearing offline is honoured: somebody who chose it is reported
 	// offline to the sender as to everybody else.

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
 import type { Notification } from "@tdc/types";
 import {
   AtSign,
@@ -108,7 +109,7 @@ function when(notification: Notification): string {
         @click="go(notification)"
       >
         <span class="relative mt-0.5 shrink-0">
-          <Avatar :name="notification.actor" size="sm" />
+          <Avatar :name="notification.actorName || nameAt(notification.actor)" size="sm" />
           <!-- The reason, on the avatar rather than beside it: the list stays
                one column and the icon is where the eye already is. -->
           <span

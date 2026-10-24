@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
@@ -557,13 +558,13 @@ async function takeOut(person: RolePerson) {
               :key="person.id"
               class="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent"
             >
-              <Avatar :name="person.displayName || person.username" size="sm" />
+              <Avatar :name="nameOf(person)" size="sm" />
               <NuxtLink
                 :to="localeRoute({ name: 'roles-people-id', params: { id: person.id } })"
                 class="min-w-0 flex-1 rounded focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <span class="block truncate text-sm font-medium">
-                  {{ person.displayName || person.username }}
+                  {{ nameOf(person) }}
                 </span>
                 <span class="block truncate text-xs text-muted-foreground">{{
                   person.address
@@ -575,7 +576,7 @@ async function takeOut(person: RolePerson) {
                 size="icon"
                 :label="
                   $ts('roles.removeFromRole', {
-                    name: person.displayName || person.username,
+                    name: nameOf(person),
                     role: role.name,
                   })
                 "

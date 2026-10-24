@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { Company, CompanyMember } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { useForm } from "@tanstack/vue-form";
@@ -178,7 +179,7 @@ await load();
               :key="member.username"
               class="flex items-center gap-3 rounded-lg border p-3"
             >
-              <Avatar :name="member.displayName || member.username" size="sm" />
+              <Avatar :name="nameOf(member)" size="sm" />
               <div class="min-w-0 flex-1">
                 <NuxtLink
                   :to="
@@ -189,7 +190,7 @@ await load();
                   "
                   class="text-sm font-medium hover:underline"
                 >
-                  {{ member.displayName || member.username }}
+                  {{ nameOf(member) }}
                 </NuxtLink>
                 <p class="text-xs text-muted-foreground">
                   {{ member.role || $t("directory.company.member") }}
@@ -202,7 +203,7 @@ await load();
                 v-if="company.administered"
                 variant="ghost"
                 size="icon"
-                :label="$ts('directory.company.removeWho', { name: member.username })"
+                :label="$ts('directory.company.removeWho', { name: nameOf(member) })"
                 @click="removing = member"
               >
                 <X class="size-3.5" />
@@ -273,7 +274,7 @@ await load();
                 :key="member.username"
                 class="flex items-center gap-2"
               >
-                <span class="flex-1">{{ member.displayName || member.username }}</span>
+                <span class="flex-1">{{ nameOf(member) }}</span>
                 <Button variant="ghost" size="small" @click="removing = member">
                   {{ $t("directory.company.withdraw") }}
                 </Button>
@@ -300,7 +301,7 @@ await load();
     />
     <ConfirmDialog
       v-if="removing"
-      :title="$ts('directory.company.removeTitle', { name: removing.username })"
+      :title="$ts('directory.company.removeTitle', { name: nameOf(removing) })"
       :detail="$ts('directory.company.removeDetail')"
       :confirm-label="$ts('directory.company.remove')"
       @cancel="removing = null"

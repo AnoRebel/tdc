@@ -14,6 +14,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/mail"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/settings"
@@ -354,11 +355,7 @@ func (s *Server) deliverDigest(ctx context.Context, row dbgen.NotificationDigest
 		conversations = conversations[:limit]
 	}
 
-	recipient := user.DisplayName
-	if recipient == "" {
-		recipient = user.Username
-	}
-	digest := notify.ComposeDigest(s.serverDisplayName(ctx), recipient, schedule.Frequency,
+	digest := notify.ComposeDigest(s.serverDisplayName(ctx), identity.NameOf(user.Username, user.DisplayName), schedule.Frequency,
 		conversations, more, s.appLink("/settings"))
 
 	if err := s.mail.Send(ctx, mail.Message{

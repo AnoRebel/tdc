@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { Session } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import {
@@ -43,7 +44,7 @@ const tour = useTour();
  * before the person is able to reach them again — which is the part that
  * cannot be taken back.
  */
-const unblocking = ref<{ id: string; username: string } | null>(null);
+const unblocking = ref<{ id: string; username: string; displayName?: string } | null>(null);
 
 async function confirmUnblock() {
   const person = unblocking.value;
@@ -341,9 +342,9 @@ function deviceName(userAgent: string): string {
 
       <section>
         <div class="flex items-center gap-3">
-          <Avatar :name="user?.displayName ?? $ts('room.you')" size="lg" online />
+          <Avatar :name="user ? nameOf(user) : $ts('room.you')" size="lg" online />
           <div class="min-w-0">
-            <p class="truncate font-medium">{{ user?.displayName }}</p>
+            <p class="truncate font-medium">{{ user && nameOf(user) }}</p>
             <p class="truncate text-sm text-muted-foreground">{{ user?.address }}</p>
           </div>
         </div>
@@ -705,9 +706,9 @@ function deviceName(userAgent: string): string {
             :key="person.id"
             class="flex items-center gap-2 rounded-lg px-2 py-1.5"
           >
-            <Avatar :name="person.username" size="sm" />
+            <Avatar :name="nameOf(person)" size="sm" />
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-medium">{{ person.displayName }}</span>
+              <span class="block truncate text-sm font-medium">{{ nameOf(person) }}</span>
               <span class="block truncate text-xs text-muted-foreground">
                 @{{ person.username }}
               </span>
@@ -826,7 +827,7 @@ function deviceName(userAgent: string): string {
 
   <ConfirmDialog
     v-if="unblocking"
-    :title="$ts('settings.unblockTitle', { username: unblocking.username })"
+    :title="$ts('settings.unblockTitle', { name: nameOf(unblocking) })"
     :detail="$ts('settings.unblockDetail')"
     :confirm-label="$ts('settings.unblock')"
     @cancel="unblocking = null"
