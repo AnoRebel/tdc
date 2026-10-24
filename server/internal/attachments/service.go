@@ -28,8 +28,11 @@ var ErrNotFound = errors.New("attachments: not found")
 
 // Attachment is a stored file and what is known about it.
 type Attachment struct {
-	ID              uuid.UUID
-	StorageKey      string
+	ID         uuid.UUID
+	StorageKey string
+	// UploaderID is the uploader's account here, or zero for a file another
+	// server's member sent.
+	UploaderID      uuid.UUID
 	UploaderAddress string
 	RoomID          uuid.UUID
 	// EventID is empty until the message carrying this file is sent.
@@ -491,6 +494,9 @@ func fromRow(row dbgen.Attachment) *Attachment {
 	}
 	if row.EventID != nil {
 		attachment.EventID = *row.EventID
+	}
+	if row.UploaderID != nil {
+		attachment.UploaderID = *row.UploaderID
 	}
 	// Both or neither, which the schema enforces.
 	if row.SensitiveSource != nil {

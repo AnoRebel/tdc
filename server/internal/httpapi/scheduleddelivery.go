@@ -79,6 +79,7 @@ func (s *Server) scheduledDelivery() rooms.ScheduledDelivery {
 	}
 	if s.attachments != nil {
 		delivery.Bind = s.attachments.Bind
+		delivery.Describe = s.describeUploads
 	}
 	return delivery
 }

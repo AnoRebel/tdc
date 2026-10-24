@@ -279,7 +279,8 @@ async function submit() {
 async function scheduleDraft(sendAt: Date) {
   const body = draft.value.trim();
   scheduling.value = false;
-  if (!body) return;
+  // A message may be nothing but its files, later as much as now.
+  if (!body && uploads.completed.value.length === 0) return;
 
   try {
     await roomsApi.schedule(
@@ -526,7 +527,7 @@ defineExpose({
         variant="ghost"
         size="icon"
         class="shrink-0"
-        :disabled="disabled || !draft.trim()"
+        :disabled="disabled || (!draft.trim() && uploads.completed.value.length === 0)"
         :label="$ts('room.sendLater')"
         :title="$ts('room.sendLater')"
         @click="scheduling = true"

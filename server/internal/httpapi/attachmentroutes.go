@@ -16,6 +16,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/attachments"
 	"github.com/AnoRebel/tdc/server/internal/audit"
 	"github.com/AnoRebel/tdc/server/internal/authz"
+	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
 
 // presignedLifetime is how long a redirect to the object store stays valid.
@@ -462,6 +463,50 @@ func (s *Server) handleAttachmentPreview(c *echo.Context) error {
 	header.Set("Cache-Control", "private, max-age=300")
 
 	return c.Stream(http.StatusOK, attachment.PreviewType, reader)
+}
+
+/*
+describeUploads says what a sender's uploads are, for the content of the
+message that will carry them.
+
+Each must be the sender's own, in this room, and not already sent — the same
+scope binding applies — so a message cannot describe somebody else's file, and
+one that names a file it may not carry is refused rather than posted without
+it.
+*/
+func (s *Server) describeUploads(
+	ctx context.Context,
+	uploaderID, roomID uuid.UUID,
+	ids []uuid.UUID,
+) ([]rooms.FileRef, error) {
+	files := make([]rooms.FileRef, 0, len(ids))
+	for _, id := range ids {
+		attachment, err := s.attachments.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if attachment.UploaderID != uploaderID || attachment.RoomID != roomID || attachment.EventID != "" {
+			return nil, attachments.ErrNotFound
+		}
+		files = append(files, fileRefOf(attachment))
+	}
+	return files, nil
+}
+
+// fileRefOf is the description of a file that travels in a message.
+func fileRefOf(attachment *attachments.Attachment) rooms.FileRef {
+	return rooms.FileRef{
+		ID:          attachment.ID.String(),
+		Filename:    attachment.Filename,
+		ContentType: attachment.ContentType,
+		Size:        attachment.Size,
+		// The storage key is the content's SHA-256, which is what makes it
+		// usable as a digest here.
+		SHA256:  attachment.StorageKey,
+		Width:   attachment.Width,
+		Height:  attachment.Height,
+		Caption: attachment.Caption,
+	}
 }
 
 // parseAttachmentIDs turns the identifiers a client sent into UUIDs.

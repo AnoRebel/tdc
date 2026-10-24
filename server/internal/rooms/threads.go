@@ -30,8 +30,20 @@ func (s *Service) ReplyInThread(
 	rootEventID, body, clientToken string,
 	offered ...actions.Action,
 ) (dbgen.Event, error) {
+	return s.ReplyInThreadWithFiles(ctx, roomID, senderID, rootEventID, body, clientToken, nil, offered...)
+}
+
+// ReplyInThreadWithFiles is ReplyInThread for a reply carrying files, whose
+// text may then be empty.
+func (s *Service) ReplyInThreadWithFiles(
+	ctx context.Context,
+	roomID, senderID uuid.UUID,
+	rootEventID, body, clientToken string,
+	files []FileRef,
+	offered ...actions.Action,
+) (dbgen.Event, error) {
 	trimmed := strings.TrimSpace(body)
-	if trimmed == "" {
+	if trimmed == "" && len(files) == 0 {
 		return dbgen.Event{}, ErrEmptyMessage
 	}
 	// A reply is a message, and its buttons are checked as a message's are.
@@ -96,6 +108,9 @@ func (s *Service) ReplyInThread(
 	}
 	if len(offered) > 0 {
 		reply["actions"] = offered
+	}
+	if len(files) > 0 {
+		reply["attachments"] = files
 	}
 	if err := s.markIfProgram(ctx, sender, reply); err != nil {
 		return dbgen.Event{}, err

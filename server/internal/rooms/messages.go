@@ -170,8 +170,26 @@ func (s *Service) SendMessage(
 	clientToken string,
 	offered ...actions.Action,
 ) (dbgen.Event, error) {
+	return s.SendMessageWithFiles(ctx, roomID, senderID, body, clientToken, nil, offered...)
+}
+
+/*
+SendMessageWithFiles posts a message that carries files, described in its
+content.
+
+The text may be empty when there are files: a photograph needs no caption to be
+worth sending. Neither text nor a file is still nothing, and refused.
+*/
+func (s *Service) SendMessageWithFiles(
+	ctx context.Context,
+	roomID, senderID uuid.UUID,
+	body string,
+	clientToken string,
+	files []FileRef,
+	offered ...actions.Action,
+) (dbgen.Event, error) {
 	trimmed := strings.TrimSpace(body)
-	if trimmed == "" {
+	if trimmed == "" && len(files) == 0 {
 		return dbgen.Event{}, ErrEmptyMessage
 	}
 
@@ -223,6 +241,9 @@ func (s *Service) SendMessage(
 	// content is exactly what it was before actions existed.
 	if len(offered) > 0 {
 		payload["actions"] = offered
+	}
+	if len(files) > 0 {
+		payload["attachments"] = files
 	}
 	if err := s.markIfProgram(ctx, sender, payload); err != nil {
 		return dbgen.Event{}, err

@@ -27,6 +27,55 @@ Limits MUST be enforced by the server, and a rejected upload MUST state which li
 - **WHEN** a client bypasses its own validation and submits a file violating a limit
 - **THEN** the server refuses it
 
+#### Scenario: A message may be only its files
+
+- **WHEN** a person sends one or more files with no text — in a channel, a thread, a direct or group conversation, a scheduled message, or a room another server holds
+- **THEN** the message is posted with its files
+- **AND** a message with neither text nor a file is still refused
+
+### Requirement: Large files arrive reliably
+
+Uploads SHALL be resumable: a client MUST be able to send a file in pieces, learn how much the server holds, and continue from there after an interruption rather than starting again.
+
+Every limit that applies to a file MUST be checked against its declared size before the first piece is accepted, and checked again against what actually arrived. Pieces MUST be accepted only in order, only from the person who began the upload, and MUST NOT be retrievable as attachments. A piece MUST be small enough to pass a reverse proxy with a modest body limit, and the operator MUST be able to set its size.
+
+#### Scenario: An interrupted upload resumes
+
+- **WHEN** the connection drops part way through an upload
+- **THEN** the client asks the server how much it holds and sends only the rest
+- **AND** the stored file is identical to the one picked
+
+#### Scenario: A limit refuses before the transfer
+
+- **WHEN** somebody begins an upload larger than the file limit, their quota, or the space the server has left
+- **THEN** the upload is refused before any piece is sent, naming the limit
+
+#### Scenario: Somebody else's upload is out of reach
+
+- **WHEN** a person names an upload somebody else began
+- **THEN** it is reported as not existing, and nothing they send is added to it
+
+#### Scenario: Pieces are not files
+
+- **WHEN** anybody asks for a piece of an upload as though it were an attachment
+- **THEN** nothing is served
+
+### Requirement: Limits and quotas are the operator's to change
+
+The largest file, the largest message, what one person's files may occupy, what the whole server's files may occupy, and the size of upload pieces SHALL be settings an operator changes while the server runs.
+
+The server-wide and per-person limits MUST count uploads in progress at their declared size, so that many uploads at once cannot together exceed them. A person MUST be able to see their quota and how much of it they use before they pick a file.
+
+#### Scenario: A change applies without a restart
+
+- **WHEN** an operator lowers the largest file allowed
+- **THEN** the next upload over the new limit is refused
+
+#### Scenario: Many uploads at once cannot overrun the limit
+
+- **WHEN** several uploads begin together whose declared sizes exceed the space left
+- **THEN** those that would exceed it are refused when they begin
+
 ### Requirement: Storage backend is pluggable
 
 Attachment storage SHALL be accessed through an interface supporting at minimum the local filesystem and any S3-compatible object store, selectable by configuration.
@@ -155,7 +204,6 @@ A reduced copy is the default because most sharing is of photographs to be looke
 
 An operator MAY set a size above which the original is refused, and that refusal MUST name the limit as any other refusal does.
 
-Where a person wants to transfer a file the server will not store — because it exceeds the limits, or because they would rather it did not rest on a server at all — the client MAY offer a direct transfer between the two devices. Such a transfer MUST be offered as an alternative and never as the only route, MUST require the recipient to accept it, and MUST NOT be presented as more private than it is: the participants' addresses are visible to each other and to whatever relays the connection.
 
 #### Scenario: The reduced copy is the default
 
@@ -173,10 +221,36 @@ Where a person wants to transfer a file the server will not store — because it
 - **WHEN** an original exceeds what the operator permits
 - **THEN** the refusal states the limit it exceeded
 
+### Requirement: Direct transfers
+
+Where a person wants to transfer a file the server will not store — because it exceeds the limits, or because they would rather it did not rest on a server at all — the client MAY offer a direct transfer between the two devices. Such a transfer MUST be offered as an alternative and never as the only route, MUST require the recipient to accept it, and MUST NOT be presented as more private than it is: the participants' addresses are visible to each other and to whatever relays the connection.
+
+The negotiation SHALL travel over the server's existing authorised live connection, using the same connection servers as calls, and MUST be authorised on every message: only between the two people of an offer the recipient has accepted, both still members of the conversation. The file's bytes MUST NOT pass through or be stored by the server, except through a relay the operator runs and has allowed for this.
+
+When the recipient is offline, declines, does not answer, or the connection cannot be made or fails part way, the sender MUST be offered an ordinary upload of the same file instead.
+
+An operator MUST be able to turn direct transfers off, and to withhold the relay from them while keeping it for calls.
+
 #### Scenario: A direct transfer is accepted before it begins
 
 - **WHEN** a direct transfer is offered
 - **THEN** nothing is sent until the recipient accepts
+
+#### Scenario: Only the two people negotiate
+
+- **WHEN** anybody other than the sender and the recipient of an accepted offer sends a negotiation message for it, or either sends one before it is accepted
+- **THEN** it is refused and nothing is relayed
+
+#### Scenario: A failed transfer falls back
+
+- **WHEN** a direct transfer cannot connect or fails part way
+- **THEN** the sender is offered an ordinary upload of the same file
+
+#### Scenario: The recipient is warned honestly
+
+- **WHEN** an offer is shown to its recipient
+- **THEN** it says who is sending what and how large it is
+- **AND** that accepting lets each device see the other's network address, and any relay see both
 
 ### Requirement: Deletion
 
@@ -189,8 +263,8 @@ Deleting a message SHALL make its attachments unretrievable, and storage occupie
 
 #### Scenario: Orphaned storage is reclaimable
 
-- **WHEN** an operator runs the documented cleanup procedure
-- **THEN** storage for attachments with no remaining references is released
+- **WHEN** a file was uploaded but never sent in a message, or an upload was begun and abandoned, for longer than the operator's chosen period
+- **THEN** its storage is released without anybody having to run anything
 - **AND** attachments still referenced are untouched
 
 ### Requirement: Malware scanning hook

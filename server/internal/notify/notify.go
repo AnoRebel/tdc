@@ -483,6 +483,11 @@ func (s *Service) forMessage(
 		if s.pushing != nil && !s.heldBack(ctx, member.ID, event.RoomID, event.ID) {
 			delivery := about
 			delivery.Body = body
+			// A message that is only its files says which files, rather
+			// than arriving as a blank notification.
+			if strings.TrimSpace(body) == "" {
+				delivery.Body = previewOf(event.Content)
+			}
 			delivery.RoomID = event.RoomID
 			delivery.EventID = event.ID
 			delivery.Private = delivery.Private || directRoom
@@ -764,7 +769,10 @@ func (s *Service) Preferences(
 // platforms is a lock screen.
 func previewOf(content []byte) string {
 	var parsed struct {
-		Body string `json:"body"`
+		Body        string `json:"body"`
+		Attachments []struct {
+			Filename string `json:"filename"`
+		} `json:"attachments"`
 	}
 	if json.Unmarshal(content, &parsed) != nil {
 		return ""
@@ -772,6 +780,15 @@ func previewOf(content []byte) string {
 
 	// The body is Markdown source; a preview shows the words, not the markers.
 	body := strings.Join(strings.Fields(markup.PlainText(parsed.Body)), " ")
+	// Nothing but files: their names are what there is to show. Names are
+	// not translated, so they say the same thing in every language.
+	if body == "" && len(parsed.Attachments) > 0 {
+		names := make([]string, 0, len(parsed.Attachments))
+		for _, file := range parsed.Attachments {
+			names = append(names, file.Filename)
+		}
+		body = "📎 " + strings.Join(names, ", ")
+	}
 	if len([]rune(body)) > 140 {
 		return string([]rune(body)[:140]) + "…"
 	}

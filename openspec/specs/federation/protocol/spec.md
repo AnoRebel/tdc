@@ -134,6 +134,34 @@ A server that has been unreachable MUST be able to obtain the events it missed o
 - **WHEN** a peer remains unreachable beyond the configured limit
 - **THEN** the server stops retrying, records the fact, and informs the operator
 
+### Requirement: Files travel with messages
+
+A message's files SHALL reach every server participating in its room. Each file MUST be described in the message's signed content by its name, type, size and SHA-256 digest, so that a server obtaining the bytes from anywhere can check them against what the author's server signed.
+
+A server SHALL obtain a file's bytes only when one of its members asks for them, from the room's home server — or, on the home server, from the server that originated the message — with a signed request. The serving server MUST answer only a peer participating in the room, and only for a file a message in that room carries. The receiving server MUST check the length and digest, MUST determine the type from the bytes rather than the description, and MUST apply its own limits, including a largest file it will copy that its operator sets. A copy MUST be made once per server, not once per reader.
+
+Deleting the message on its home server MUST remove the copies on servers that receive the deletion.
+
+#### Scenario: A file sent on one server is read on another
+
+- **WHEN** a member on one server sends a file into a room shared with another
+- **THEN** a member on the other server sees it and downloads exactly the bytes that were sent
+
+#### Scenario: Altered bytes are refused
+
+- **WHEN** the bytes a server receives do not match the digest in the signed message
+- **THEN** nothing is stored and the member is told the file could not be fetched
+
+#### Scenario: A server with no part in the room is refused
+
+- **WHEN** a peer that does not participate in a room asks for one of its files
+- **THEN** it is refused, as though the file did not exist
+
+#### Scenario: A file over the copy limit says so
+
+- **WHEN** a file is larger than the receiving server copies
+- **THEN** its name and size are still shown, with an explanation in place of the file
+
 ### Requirement: Content verification
 
 A server SHALL verify the signature of every event it receives from a peer against the signing keys of the server that originated it, and MUST reject an event that fails verification.

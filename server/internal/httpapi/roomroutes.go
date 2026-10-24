@@ -483,8 +483,14 @@ func (s *Server) postMessage(
 	if err != nil {
 		return err
 	}
+	var files []rooms.FileRef
 	if len(attachmentIDs) > 0 {
 		if err := s.attachments.CheckBatch(ctx, attachmentIDs); err != nil {
+			return attachmentError(err)
+		}
+		// Described in the message itself, which is what another server
+		// sees and what the author's signature covers.
+		if files, err = s.describeUploads(ctx, user.ID, roomID, attachmentIDs); err != nil {
 			return attachmentError(err)
 		}
 	}
@@ -504,10 +510,11 @@ func (s *Server) postMessage(
 
 	var event dbgen.Event
 	if threadRoot == "" {
-		event, err = s.rooms.SendMessage(ctx, roomID, user.ID, filtered.Body, request.ClientToken, request.Actions...)
+		event, err = s.rooms.SendMessageWithFiles(ctx, roomID, user.ID, filtered.Body,
+			request.ClientToken, files, request.Actions...)
 	} else {
-		event, err = s.rooms.ReplyInThread(ctx, roomID, user.ID,
-			threadRoot, filtered.Body, request.ClientToken, request.Actions...)
+		event, err = s.rooms.ReplyInThreadWithFiles(ctx, roomID, user.ID,
+			threadRoot, filtered.Body, request.ClientToken, files, request.Actions...)
 	}
 	if err != nil {
 		return roomError(err)

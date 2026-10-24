@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -59,6 +60,10 @@ func (s *Service) Schedule(
 	threadRootID string,
 	sendAt time.Time,
 ) (ScheduledMessage, error) {
+	// Refused now rather than at send time, when nobody is there to be told.
+	if strings.TrimSpace(body) == "" && len(attachmentIDs) == 0 {
+		return ScheduledMessage{}, ErrEmptyMessage
+	}
 	if _, err := s.RequireMembership(ctx, roomID, senderID); err != nil {
 		return ScheduledMessage{}, err
 	}
@@ -145,6 +150,8 @@ server rather than here, so they are handed in.
 type ScheduledDelivery struct {
 	// Bind ties the message's files to it once it exists.
 	Bind AttachmentBinder
+	// Describe says what the files are, for the message's content.
+	Describe AttachmentDescriber
 	// MayPost is asked at send time, as it is when somebody posts directly:
 	// a ban, a restriction or a withdrawn permission made after scheduling
 	// stops the message as it would have stopped them typing it.
@@ -314,6 +321,18 @@ type AttachmentBinder func(
 	ids []uuid.UUID,
 ) (int64, error)
 
+/*
+AttachmentDescriber says what a sender's not-yet-sent uploads are, for the
+content of the message that will carry them. Refuses any that are not the
+sender's own uploads in that room, so a description cannot claim somebody
+else's file.
+*/
+type AttachmentDescriber func(
+	ctx context.Context,
+	uploaderID, roomID uuid.UUID,
+	ids []uuid.UUID,
+) ([]FileRef, error)
+
 // deliver sends one scheduled message as an ordinary one.
 func (s *Service) deliver(
 	ctx context.Context,
@@ -344,10 +363,20 @@ func (s *Service) deliver(
 	// request from a client, and this is not one.
 	token := uuid.New().String()
 
+	// The files are described in the message as they are when it goes, so a
+	// caption written after scheduling is the one sent.
+	var files []FileRef
+	if delivery.Describe != nil && len(row.AttachmentIds) > 0 {
+		files, err = delivery.Describe(ctx, row.SenderID, row.RoomID, row.AttachmentIds)
+		if err != nil {
+			return dbgen.Event{}, err
+		}
+	}
+
 	if threadRootID != "" {
-		event, err = s.ReplyInThread(ctx, row.RoomID, row.SenderID, threadRootID, row.Body, token)
+		event, err = s.ReplyInThreadWithFiles(ctx, row.RoomID, row.SenderID, threadRootID, row.Body, token, files)
 	} else {
-		event, err = s.SendMessage(ctx, row.RoomID, row.SenderID, row.Body, token)
+		event, err = s.SendMessageWithFiles(ctx, row.RoomID, row.SenderID, row.Body, token, files)
 	}
 	if err != nil {
 		return dbgen.Event{}, err
