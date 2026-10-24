@@ -42,7 +42,7 @@ func init() {
 	documentRoutes(map[string]entry{
 		"GET /api/events/:eventId/ics":               {Summary: "An event as an iCalendar file", Authentication: "session or token"},
 		"GET /api/me/calendar-feed":                  {Summary: "Whether you have a calendar subscription address, and when it was last used", Authentication: "session or token"},
-		"POST /api/me/calendar-feed":                 {Summary: "Make or replace your calendar subscription address; its secret is shown once", Authentication: "session or token"},
+		"POST /api/me/calendar-feed":                 {Summary: "Make or replace your calendar subscription address; its secret is shown once", Authentication: "session"},
 		"DELETE /api/me/calendar-feed":               {Summary: "Revoke your calendar subscription address", Authentication: "session or token"},
 		"GET /api/calendar/feeds/:secret/events.ics": {Summary: "A person's events as an iCalendar feed", Authentication: "the secret in the address"},
 		"GET /api/calendar/public.ics":               {Summary: "The server's public events as an iCalendar feed, where the operator publishes it", Authentication: "none"},

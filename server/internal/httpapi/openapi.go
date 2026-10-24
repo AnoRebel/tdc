@@ -106,6 +106,9 @@ func (s *Server) operation(endpoint Endpoint, reflector *schemaReflector) map[st
 		operation["security"] = []any{}
 	case "optional":
 		operation["security"] = []any{map[string]any{}, map[string]any{"token": []string{}}, map[string]any{"session": []string{}}}
+	case "session":
+		// Refused to an API token: something only the person, signed in, may do.
+		operation["security"] = []any{map[string]any{"session": []string{}}}
 	case "federation signature":
 		operation["security"] = []any{}
 		operation["description"] = "Server to server: signed with HTTP Message Signatures as the federation protocol describes."
