@@ -66,6 +66,10 @@ a change and the event recording it are written together or not at all — what
 projects do for issues, and the calendar for events.
 
 The sender's account may be nil for something the server did by itself.
+
+Nothing is told of the event here: until the caller commits, nobody else can
+read it or what it records, and a webhook queued now would look for the
+change and not find it. The caller passes it to Told once committed.
 */
 func (s *Service) AppendIn(
 	ctx context.Context,
@@ -78,6 +82,7 @@ func (s *Service) AppendIn(
 ) (dbgen.Event, error) {
 	within := *s
 	within.store = q
+	within.appended = nil
 	return within.appendAs(ctx, room, senderID, senderAddress, eventType, content, "", nil)
 }
 

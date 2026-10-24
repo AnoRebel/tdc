@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -27,6 +28,10 @@ type Service struct {
 	queries *dbgen.Queries
 	rooms   *rooms.Service
 	log     *slog.Logger
+
+	// uncommitted holds what each open transaction has appended, keyed by
+	// its queries, to be told about once it commits.
+	uncommitted sync.Map
 }
 
 // NewService builds the calendar over the pool and the rooms its events are.
@@ -43,11 +48,20 @@ func (s *Service) inTransaction(ctx context.Context, work func(*dbgen.Queries) e
 		return fmt.Errorf("begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := work(dbgen.New(tx)); err != nil {
+
+	q := dbgen.New(tx)
+	var appended []dbgen.Event
+	s.uncommitted.Store(q, &appended)
+	defer s.uncommitted.Delete(q)
+
+	if err := work(q); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit: %w", err)
+	}
+	for _, event := range appended {
+		s.rooms.Told(ctx, event)
 	}
 	return nil
 }
@@ -84,10 +98,22 @@ func (s *Service) append(
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("encode %s: %w", eventType, err)
 	}
-	if actor == nil {
-		return s.rooms.AppendIn(ctx, q, room, nil, s.rooms.ServerName(), eventType, encoded)
+	sender, address := (*uuid.UUID)(nil), s.rooms.ServerName()
+	if actor != nil {
+		sender, address = &actor.ID, s.rooms.UserAddress(actor.Username)
 	}
-	return s.rooms.AppendIn(ctx, q, room, &actor.ID, s.rooms.UserAddress(actor.Username), eventType, encoded)
+	event, err := s.rooms.AppendIn(ctx, q, room, sender, address, eventType, encoded)
+	if err != nil {
+		return dbgen.Event{}, err
+	}
+	// Told once the transaction it belongs to commits, or now outside one.
+	if pending, ok := s.uncommitted.Load(q); ok {
+		list := pending.(*[]dbgen.Event)
+		*list = append(*list, event)
+	} else {
+		s.rooms.Told(ctx, event)
+	}
+	return event, nil
 }
 
 /*

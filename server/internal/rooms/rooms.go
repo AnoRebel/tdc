@@ -80,6 +80,10 @@ Called once while the server is being built, before it serves anything.
 */
 func (s *Service) OnAppended(tell func(context.Context, dbgen.Event)) { s.appended = tell }
 
+// Told hands an event appended with AppendIn to whatever asked to hear of
+// it, once the transaction that wrote it has committed.
+func (s *Service) Told(ctx context.Context, event dbgen.Event) { s.told(ctx, event) }
+
 // told hands a stored event to whatever asked to hear of it.
 func (s *Service) told(ctx context.Context, event dbgen.Event) {
 	if s.appended != nil {

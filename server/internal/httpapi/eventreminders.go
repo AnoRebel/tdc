@@ -111,6 +111,7 @@ func (s *Server) remind(ctx context.Context, event dbgen.CalendarEvent, occurren
 		s.log.Warn("could not record a reminder", "event", event.ID, "error", err)
 		return false
 	}
+	s.rooms.Told(ctx, entry)
 	s.publishEvent(ctx, entry)
 
 	people := s.recipientsOf(ctx, event.ID)
