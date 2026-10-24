@@ -1,6 +1,48 @@
 import { describe, expect, it } from "vitest";
 
-import { displayNameProblem, isOwnAddress, usernameProblem } from "./names";
+import {
+  displayNameProblem,
+  isOwnAddress,
+  learnName,
+  learnNames,
+  nameAt,
+  nameOf,
+  usernameProblem,
+} from "./names";
+
+describe("nameOf", () => {
+  it("calls somebody by their display name", () => {
+    expect(nameOf({ username: "amina", displayName: "Amina Juma" })).toBe("Amina Juma");
+    expect(nameOf({ username: "amina", displayName: "  Amina Juma " })).toBe("Amina Juma");
+  });
+
+  it("falls back to the username when there is no display name", () => {
+    expect(nameOf({ username: "amina" })).toBe("amina");
+    expect(nameOf({ username: "amina", displayName: "" })).toBe("amina");
+    expect(nameOf({ username: "amina", displayName: "   " })).toBe("amina");
+    expect(nameOf({ username: "amina", displayName: null })).toBe("amina");
+  });
+
+  it("calls a guest by the name they gave", () => {
+    expect(nameOf({ username: "guest-7f3a", displayName: "Visitor" })).toBe("Visitor");
+  });
+});
+
+describe("nameAt", () => {
+  it("calls somebody by the name it was told", () => {
+    learnName("amina@tdc.test", "Amina Juma");
+    expect(nameAt("amina@tdc.test")).toBe("Amina Juma");
+  });
+
+  it("learns from a list of people, falling back to the username", () => {
+    learnNames([{ address: "baraka@tdc.test", username: "baraka", displayName: "  " }]);
+    expect(nameAt("baraka@tdc.test")).toBe("baraka");
+  });
+
+  it("calls somebody it knows nothing of by their address's first half", () => {
+    expect(nameAt("zawadi@elsewhere.test")).toBe("zawadi");
+  });
+});
 
 describe("usernameProblem", () => {
   it("accepts what the server accepts", () => {

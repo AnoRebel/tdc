@@ -14,6 +14,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/actions"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 )
 
 // ErrNotAThreadRoot reports a reply to something that cannot start a thread.
@@ -384,7 +385,7 @@ func (s *Service) OpenDirect(ctx context.Context, participants []uuid.UUID) (dbg
 		if err != nil {
 			return dbgen.Room{}, fmt.Errorf("read participant: %w", err)
 		}
-		names = append(names, user.DisplayName)
+		names = append(names, identity.NameOf(user.Username, user.DisplayName))
 	}
 
 	room, err := s.store.CreateDirectRoom(ctx, dbgen.CreateDirectRoomParams{

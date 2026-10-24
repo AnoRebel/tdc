@@ -91,9 +91,15 @@ if (engagement.value && engagement.value.state !== "discussion") view.value = "p
 
 const otherParty = computed(() =>
   engagement.value?.you === "client"
-    ? engagement.value.developer.username
-    : (engagement.value?.client.username ?? ""),
+    ? engagement.value.developer.displayName
+    : (engagement.value?.client.displayName ?? ""),
 );
+
+/** What to call whoever a step in the history names by username. */
+function partyName(label: string): string {
+  const parties = [engagement.value?.client, engagement.value?.developer];
+  return parties.find((party) => party?.username === label)?.displayName ?? label;
+}
 
 async function confirmWithdraw(reason: string) {
   withdrawing.value = false;
@@ -208,7 +214,7 @@ const reached = computed(() => {
             ·
             {{
               $t("directory.engagement.moved", {
-                who: step.actor,
+                who: partyName(step.actor),
                 to: $ts(`directory.engagement.states.${step.to}`),
               })
             }}

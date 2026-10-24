@@ -327,7 +327,7 @@ func (s *Server) tellRemoved(ctx context.Context, target uuid.UUID, event dbgen.
 	if s.hub == nil {
 		return
 	}
-	frame, err := eventFrame(event, nil)
+	frame, err := eventFrame(event, nil, s.rooms.SenderName(ctx, event))
 	if err != nil {
 		s.log.Error("cannot render a removal for the person removed", "eventId", event.ID, "error", err)
 		return

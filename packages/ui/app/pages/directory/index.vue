@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { DirectoryFilters, DirectoryHit } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import { useForm } from "@tanstack/vue-form";
@@ -242,10 +243,10 @@ const filtered = computed(() => Object.values(fromQuery()).some(Boolean));
               "
               class="flex gap-3 rounded-lg border p-3 transition-colors hover:bg-accent"
             >
-              <Avatar :name="hit.displayName || hit.username" />
+              <Avatar :name="nameOf(hit)" />
               <span class="min-w-0 flex-1">
                 <span class="flex flex-wrap items-center gap-2">
-                  <span class="text-sm font-medium">{{ hit.displayName || hit.username }}</span>
+                  <span class="text-sm font-medium">{{ nameOf(hit) }}</span>
                   <span
                     v-if="hit.available"
                     class="flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[0.6875rem]"

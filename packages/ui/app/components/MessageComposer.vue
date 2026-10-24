@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { RoomMember } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import {
@@ -511,7 +512,7 @@ defineExpose({
           @mousemove="highlighted = index"
         >
           <Avatar :name="member.address" size="sm" />
-          <span class="truncate font-medium">{{ member.displayName }}</span>
+          <span class="truncate font-medium">{{ nameOf(member) }}</span>
           <span class="truncate text-xs text-muted-foreground">@{{ member.username }}</span>
         </li>
       </ul>

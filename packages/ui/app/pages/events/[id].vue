@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { isApiError, type Call, type EventAnswer, type EventDetail } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
@@ -366,7 +367,7 @@ const answers = computed(() => [
                 <p class="text-xs text-muted-foreground">
                   <template v-if="!event.member">{{ $t("events.call.answerFirst") }}</template>
                   <template v-else-if="roomCall?.participants.length">{{
-                    roomCall.participants.map((each) => each.username).join(", ")
+                    roomCall.participants.map((each) => nameOf(each)).join(", ")
                   }}</template>
                   <template v-else-if="event.may.startCall">{{
                     $t("events.call.youStart")
@@ -429,10 +430,7 @@ const answers = computed(() => [
                     class="mt-0.5 text-xs text-muted-foreground"
                   >
                     {{
-                      [
-                        ...session.speakers.map((each) => each.displayName || each.username),
-                        session.guestSpeakers,
-                      ]
+                      [...session.speakers.map((each) => nameOf(each)), session.guestSpeakers]
                         .filter(Boolean)
                         .join(", ")
                     }}
@@ -519,9 +517,7 @@ const answers = computed(() => [
                   :key="person.userId"
                   class="flex items-center gap-2 text-sm"
                 >
-                  <Avatar :name="person.username" size="sm" />{{
-                    person.displayName || person.username
-                  }}
+                  <Avatar :name="nameOf(person)" size="sm" />{{ nameOf(person) }}
                 </li>
               </ul>
             </div>
@@ -535,9 +531,7 @@ const answers = computed(() => [
                   :key="person.userId"
                   class="flex items-center gap-2 text-sm"
                 >
-                  <Avatar :name="person.username" size="sm" />{{
-                    person.displayName || person.username
-                  }}
+                  <Avatar :name="nameOf(person)" size="sm" />{{ nameOf(person) }}
                 </li>
               </ul>
             </div>

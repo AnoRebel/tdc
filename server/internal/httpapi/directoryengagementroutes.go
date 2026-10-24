@@ -10,6 +10,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/directory"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 	"github.com/AnoRebel/tdc/server/internal/notify"
 	"github.com/AnoRebel/tdc/server/internal/rooms"
 )
@@ -58,7 +59,22 @@ func (api *directoryAPI) mountEngagements(directoryGroup, me *echo.Group) {
 
 type partyView struct {
 	Username string `json:"username"`
-	Address  string `json:"address"`
+	// DisplayName is what to call them: their display name, or their username
+	// without one, or the username kept on the engagement once the account is
+	// gone.
+	DisplayName string `json:"displayName"`
+	Address     string `json:"address"`
+}
+
+// partyViewOf is one side of an engagement, called by the name they have now.
+func (api *directoryAPI) partyViewOf(ctx context.Context, id *uuid.UUID, label string) partyView {
+	party := partyView{Username: label, DisplayName: label, Address: api.rooms.UserAddress(label)}
+	if id != nil {
+		if user, err := api.queries.GetUserByID(ctx, *id); err == nil {
+			party.DisplayName = identity.NameOf(user.Username, user.DisplayName)
+		}
+	}
+	return party
 }
 
 type transitionView struct {
@@ -95,11 +111,11 @@ type engagementView struct {
 	UpdatedAt string             `json:"updatedAt"`
 }
 
-func (api *directoryAPI) engagementViewOf(engagement directory.Engagement, viewer uuid.UUID) engagementView {
+func (api *directoryAPI) engagementViewOf(ctx context.Context, engagement directory.Engagement, viewer uuid.UUID) engagementView {
 	view := engagementView{
 		ID: engagement.ID.String(), Title: engagement.Title, State: string(engagement.State),
-		Client:       partyView{Username: engagement.ClientLabel, Address: api.rooms.UserAddress(engagement.ClientLabel)},
-		Developer:    partyView{Username: engagement.DeveloperLabel, Address: api.rooms.UserAddress(engagement.DeveloperLabel)},
+		Client:       api.partyViewOf(ctx, engagement.ClientID, engagement.ClientLabel),
+		Developer:    api.partyViewOf(ctx, engagement.DeveloperID, engagement.DeveloperLabel),
 		You:          "client",
 		Withdrawable: engagement.State.Withdrawable(),
 		CreatedAt:    engagement.CreatedAt.UTC().Format(time.RFC3339),
@@ -191,8 +207,8 @@ func (api *directoryAPI) handleAcceptEnquiry(c *echo.Context) error {
 	if err != nil {
 		return enquiryError(err)
 	}
-	api.announce(ctx, engagement, user.ID, user.Username+" took up the enquiry")
-	return c.JSON(http.StatusCreated, api.engagementViewOf(engagement, user.ID))
+	api.announce(ctx, engagement, user.ID, identity.NameOf(user.Username, user.DisplayName)+" took up the enquiry")
+	return c.JSON(http.StatusCreated, api.engagementViewOf(ctx, engagement, user.ID))
 }
 
 func (api *directoryAPI) closeEnquiry(c *echo.Context, status directory.EnquiryStatus) error {
@@ -225,7 +241,7 @@ func (api *directoryAPI) handleListEngagements(c *echo.Context) error {
 	}
 	views := make([]engagementView, 0, len(engagements))
 	for _, engagement := range engagements {
-		views = append(views, api.engagementViewOf(engagement, user.ID))
+		views = append(views, api.engagementViewOf(c.Request().Context(), engagement, user.ID))
 	}
 	return c.JSON(http.StatusOK, views)
 }
@@ -252,7 +268,7 @@ type linkedProjectView struct {
 // project it is linked to if the requester may see that project.
 func (api *directoryAPI) engagementWithProject(c *echo.Context, engagement directory.Engagement) engagementView {
 	user, _ := currentUser(c)
-	view := api.engagementViewOf(engagement, user.ID)
+	view := api.engagementViewOf(c.Request().Context(), engagement, user.ID)
 	if engagement.ProjectID != nil && api.projects != nil {
 		access, err := api.projects.ProjectByID(c.Request().Context(), actorOf(c), *engagement.ProjectID)
 		if err == nil {
@@ -308,7 +324,7 @@ func (api *directoryAPI) handleLinkProject(c *echo.Context) error {
 	if err != nil {
 		return engagementError(err)
 	}
-	api.announce(ctx, engagement, user.ID, user.Username+" linked the engagement to a project")
+	api.announce(ctx, engagement, user.ID, identity.NameOf(user.Username, user.DisplayName)+" linked the engagement to a project")
 	return c.JSON(http.StatusOK, api.engagementWithProject(c, engagement))
 }
 
@@ -325,7 +341,7 @@ func (api *directoryAPI) handleUnlinkProject(c *echo.Context) error {
 	if err != nil {
 		return engagementError(err)
 	}
-	api.announce(ctx, engagement, user.ID, user.Username+" unlinked the engagement from its project")
+	api.announce(ctx, engagement, user.ID, identity.NameOf(user.Username, user.DisplayName)+" unlinked the engagement from its project")
 	return c.JSON(http.StatusOK, api.engagementWithProject(c, engagement))
 }
 
@@ -383,8 +399,8 @@ func (api *directoryAPI) handleWithdrawEngagement(c *echo.Context) error {
 	if err != nil {
 		return engagementError(err)
 	}
-	api.announce(ctx, engagement, user.ID, user.Username+" withdrew from the engagement")
-	return c.JSON(http.StatusOK, api.engagementViewOf(engagement, user.ID))
+	api.announce(ctx, engagement, user.ID, identity.NameOf(user.Username, user.DisplayName)+" withdrew from the engagement")
+	return c.JSON(http.StatusOK, api.engagementViewOf(ctx, engagement, user.ID))
 }
 
 func engagementError(err error) error {

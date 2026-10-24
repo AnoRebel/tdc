@@ -1,4 +1,5 @@
 import type { Attachment, ControlsUpdate, Message, MessageAction } from "@tdc/types";
+import { learnName } from "./names";
 
 /*
  * What a conversation shows, worked out from the events that make it up.
@@ -37,6 +38,9 @@ export function foldMessages(events: Message[]): ShownMessage[] {
   const updated = new Map<string, ControlsUpdate>();
 
   for (const message of events) {
+    // Every message says what its sender is called, which is how a reply's
+    // quote or a reaction elsewhere comes to call them the same.
+    learnName(message.sender, message.senderName);
     if (message.type === "message.edited" && message.content.replaces) {
       replaced.set(message.content.replaces, message.content.body ?? "");
       continue;

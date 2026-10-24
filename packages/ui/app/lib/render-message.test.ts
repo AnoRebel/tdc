@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 
-import { highlighterLanguage, renderMessage } from "./render-message";
+import { highlighterLanguage, nameMentions, renderMessage } from "./render-message";
 
 const render = (body: string) => renderMessage(body, { copy: "Copy" });
 
@@ -193,5 +193,30 @@ describe("naming a language for the highlighter", () => {
     expect(highlighterLanguage("TypeScript")).toBe("ts");
     expect(highlighterLanguage("golang")).toBe("go");
     expect(highlighterLanguage("brainfreeze")).toBeNull();
+  });
+});
+
+describe("nameMentions", () => {
+  const names: Record<string, string> = { amina: "Amina Juma", baraka: "baraka" };
+  const named = (html: string) => nameMentions(html, (username) => names[username]);
+
+  it("draws a mention as the person's name, keeping the username on hover", () => {
+    const html = named(render("thanks @amina!"));
+    expect(html).toContain('<span class="mention" title="@amina">Amina Juma</span>');
+    expect(html).not.toContain("@amina!");
+  });
+
+  it("leaves a mention of somebody without a display name, or unknown, as typed", () => {
+    expect(named(render("ask @baraka or @zawadi"))).toBe(render("ask @baraka or @zawadi"));
+  });
+
+  it("does not touch code, links or email addresses", () => {
+    const body = "`@amina` and amina@example.com";
+    expect(named(render(body))).not.toContain("mention");
+  });
+
+  it("sets a name as text, never markup", () => {
+    const html = nameMentions(render("hi @amina"), () => "<b>x</b>");
+    expect(html).toContain("&lt;b&gt;x&lt;/b&gt;");
   });
 });

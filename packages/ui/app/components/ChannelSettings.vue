@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
@@ -447,22 +448,18 @@ const others = computed(() => members.value.filter((member) => member.id !== use
               :key="member.id"
               class="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5"
             >
-              <Avatar :name="member.displayName || member.username" size="sm" />
+              <Avatar :name="nameOf(member)" size="sm" />
               <span class="min-w-0 flex-1">
-                <span class="block truncate text-sm">{{
-                  member.displayName || member.username
-                }}</span>
+                <span class="block truncate text-sm">{{ nameOf(member) }}</span>
                 <span class="block truncate text-[0.6875rem] text-muted-foreground">
                   {{ member.address }}
                 </span>
               </span>
-              <CallPerson :user-id="member.id" :name="member.displayName || member.username" />
+              <CallPerson :user-id="member.id" :name="nameOf(member)" />
               <Button
                 variant="danger"
                 size="icon"
-                :label="
-                  $ts('channelAdmin.removeWhom', { name: member.displayName || member.username })
-                "
+                :label="$ts('channelAdmin.removeWhom', { name: nameOf(member) })"
                 :disabled="busy"
                 @click="removing = member"
               >
@@ -487,7 +484,7 @@ const others = computed(() => members.value.filter((member) => member.id !== use
 
   <ConfirmDialog
     v-if="removing && room"
-    :title="$ts('channelAdmin.removeTitle', { name: removing.displayName || removing.username })"
+    :title="$ts('channelAdmin.removeTitle', { name: nameOf(removing) })"
     :detail="
       room.visibility === 'private'
         ? $ts('channelAdmin.removePrivateConsequence')

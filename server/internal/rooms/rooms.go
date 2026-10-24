@@ -15,6 +15,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
+	"github.com/AnoRebel/tdc/server/internal/identity"
 )
 
 // Errors a caller is expected to handle.
@@ -336,3 +337,42 @@ peer holding only the published half, and by the tests that prove an event can
 be checked without the database it came from.
 */
 func (s *Service) Keyring() *events.Keyring { return s.keyring }
+
+/*
+SenderName is what to call whoever sent an event, for a reader: a local
+sender's display name, or their username without one.
+
+Empty for an event from another server, whose sender this server knows only by
+address; a client calls them by that address instead. Read by identifier rather
+than address, so a sender who has since changed their username is called what
+they are called now.
+*/
+func (s *Service) SenderName(ctx context.Context, event dbgen.Event) string {
+	if event.SenderID == nil {
+		return ""
+	}
+	user, err := s.store.GetUserByID(ctx, *event.SenderID)
+	if err != nil {
+		return ""
+	}
+	return identity.NameOf(user.Username, user.DisplayName)
+}
+
+/*
+NameAt is what to call the person at an address, for a reader: a local
+person's display name, or their username without one.
+
+Empty for an address elsewhere, or one nobody here holds. An address under a
+name somebody has since given up still finds them, as the name lookup does.
+*/
+func (s *Service) NameAt(ctx context.Context, address string) string {
+	local, host, found := strings.Cut(address, "@")
+	if !found || !strings.EqualFold(host, s.serverName) {
+		return ""
+	}
+	user, err := s.store.GetUserByUsername(ctx, identity.NormaliseUsername(local))
+	if err != nil {
+		return ""
+	}
+	return identity.NameOf(user.Username, user.DisplayName)
+}

@@ -2,7 +2,8 @@
 import DOMPurify from "dompurify";
 
 import { linkify } from "#layers/ui/app/lib/linkify";
-import { highlightWithin, renderMessage } from "#layers/ui/app/lib/render-message";
+import { mentionedName } from "#layers/ui/app/lib/names";
+import { highlightWithin, nameMentions, renderMessage } from "#layers/ui/app/lib/render-message";
 
 /**
  * A message's text: its formatting rendered, its links made clickable.
@@ -24,10 +25,11 @@ const props = defineProps<{ body: string }>();
 
 const { $ts } = useI18n();
 const { formatting } = useInterfacePreferences();
+const { user } = useAuth();
 
 const root = ref<HTMLElement | null>(null);
 
-const safe = computed(() =>
+const rendered = computed(() =>
   formatting.value
     ? renderMessage(props.body, { copy: $ts("room.formatting.copyCode") })
     : DOMPurify.sanitize(linkify(props.body), {
@@ -35,6 +37,16 @@ const safe = computed(() =>
         ALLOWED_ATTR: ["href", "target", "rel"],
         ADD_ATTR: ["target", "rel"],
       }),
+);
+
+/*
+ * A mention reads as the person's name, as it does everywhere else they are
+ * named; the username it was typed as is kept on hover. Done after rendering,
+ * which is kept, so a name learned later redraws only this.
+ */
+const server = computed(() => user.value?.address.split("@")[1] ?? "");
+const safe = computed(() =>
+  nameMentions(rendered.value, (username) => mentionedName(username, server.value)),
 );
 
 /** Whether the body holds blocks, and so fills its bubble rather than sitting inline. */
@@ -96,6 +108,11 @@ async function onClick(event: MouseEvent) {
 
 .message-body :deep(a:hover) {
   @apply decoration-current;
+}
+
+/* A mention, named: bold rather than coloured, for the same reason as a link. */
+.message-body :deep(.mention) {
+  @apply font-semibold;
 }
 
 /*

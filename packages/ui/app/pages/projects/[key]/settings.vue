@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { useForm } from "@tanstack/vue-form";
 import * as v from "valibot";
 
@@ -484,11 +485,9 @@ async function setPolicy(cyclePolicy: CyclePolicy | undefined) {
                 :key="member.username"
                 class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-accent"
               >
-                <UiAvatar :name="member.displayName || member.username" size="sm" />
+                <UiAvatar :name="nameOf(member)" size="sm" />
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm">{{
-                    member.displayName || member.username
-                  }}</span>
+                  <span class="block truncate text-sm">{{ nameOf(member) }}</span>
                   <span class="block truncate text-xs text-muted-foreground">{{
                     member.address
                   }}</span>
@@ -502,7 +501,7 @@ async function setPolicy(cyclePolicy: CyclePolicy | undefined) {
                   v-if="canAdminister"
                   variant="ghost"
                   size="icon"
-                  :label="$ts('projects.removeMember', { who: member.username })"
+                  :label="$ts('projects.removeMember', { who: nameOf(member) })"
                   @click="attempt(() => projectsApi.removeMember(key, member.username))"
                 >
                   <Icon name="lucide:user-minus" class="size-3.5" />

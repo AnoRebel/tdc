@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { shownName } from "#layers/ui/app/lib/call-names";
+import { nameOf } from "#layers/ui/app/lib/names";
 import { MonitorX } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
 
@@ -21,7 +21,7 @@ const presenter = computed(() => c.call.value?.presenter ?? null);
 const mine = computed(() => Boolean(presenter.value && presenter.value === user.value?.id));
 const who = computed(() => {
   const person = c.call.value?.participants.find((each) => each.userId === presenter.value);
-  return person ? shownName(person) : "";
+  return person ? nameOf(person) : "";
 });
 const stream = computed(() =>
   mine.value

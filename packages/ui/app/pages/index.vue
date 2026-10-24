@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { Room } from "@tdc/types";
 import { Hash, MessagesSquare } from "lucide-vue-next";
 
@@ -30,7 +31,7 @@ try {
 const joined = computed(() => rooms.value.filter((room) => room.member));
 
 /** Just the first name, which is how people greet each other. */
-const firstName = computed(() => user.value?.displayName?.split(" ")[0] ?? "");
+const firstName = computed(() => (user.value ? (nameOf(user.value).split(" ")[0] ?? "") : ""));
 </script>
 
 <template>

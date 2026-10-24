@@ -1,4 +1,5 @@
 import type { Notification } from "@tdc/types";
+import { nameAt } from "#layers/ui/app/lib/names";
 
 /**
  * What has happened that somebody should know about.
@@ -92,7 +93,9 @@ export function describeNotification(
   notification: Notification,
   say: (key: string, params?: Record<string, string | number>) => string,
 ): string {
-  const who = shortNameOf(notification.actor);
+  // Their display name, sent with the notification; somebody on another server
+  // is called by their address.
+  const who = notification.actorName || nameAt(notification.actor);
   const detail = notification.detail ?? "";
   const eventName = () => detail || say("notification.reasons.anEvent");
 
@@ -151,8 +154,4 @@ export function describeNotification(
     default:
       return say("notification.reasons.other", { who });
   }
-}
-
-function shortNameOf(address: string): string {
-  return address.split("@")[0] ?? address;
 }

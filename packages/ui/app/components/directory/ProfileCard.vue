@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { ProfileView } from "@tdc/types";
 import {
   BriefcaseBusiness,
@@ -34,10 +35,10 @@ const hasContact = computed(
 <template>
   <article class="space-y-6">
     <header class="flex items-start gap-4">
-      <Avatar :name="props.profile.displayName || props.profile.username" size="lg" />
+      <Avatar :name="nameOf(props.profile)" size="lg" />
       <div class="min-w-0">
         <h1 class="text-lg font-semibold break-words">
-          {{ props.profile.displayName || props.profile.username }}
+          {{ nameOf(props.profile) }}
         </h1>
         <p class="text-xs text-muted-foreground">{{ props.profile.address }}</p>
         <p

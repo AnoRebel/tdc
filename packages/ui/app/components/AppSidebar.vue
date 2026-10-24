@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { isMac } from "#layers/ui/app/lib/platform";
 import type { ConnectedServer, Room, UnreadCounts } from "@tdc/types";
 import type { Notification } from "@tdc/types";
@@ -447,7 +448,7 @@ function isCurrent(roomId: string): boolean {
         @click="openUserMenu"
       >
         <span class="relative shrink-0">
-          <Avatar :name="user?.displayName ?? $ts('room.you')" size="sm" />
+          <Avatar :name="user ? nameOf(user) : $ts('room.you')" size="sm" />
           <span
             class="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-surface-sunken transition-colors duration-(--motion-duration-fast)"
             :class="presenceDotClass(ownStatus.own.value.status, ownStatus.own.value.invisible)"
@@ -455,7 +456,7 @@ function isCurrent(roomId: string): boolean {
           />
         </span>
         <span class="min-w-0 flex-1">
-          <span class="block truncate text-xs font-medium">{{ user?.displayName }}</span>
+          <span class="block truncate text-xs font-medium">{{ user && nameOf(user) }}</span>
           <span class="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
             <!-- Visible however much of the line the width cuts off; the
                  words are in the line and the button's name. -->

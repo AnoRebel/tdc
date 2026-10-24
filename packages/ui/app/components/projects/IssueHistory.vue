@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
 import type { IssueHistoryEntry } from "@tdc/types";
 import { fully, whenBriefly } from "#layers/ui/app/lib/dates";
 
@@ -16,11 +17,11 @@ const { $ts } = useI18n();
  */
 const props = defineProps<{ entries: IssueHistoryEntry[] }>();
 
-/** The person, without the server when it is this one's. */
+/** What to call the person. */
 function who(address: string): string {
   // No person in it: something the server did by itself, on schedule.
   if (!address.includes("@")) return $ts("projects.history.server");
-  return address.split("@")[0] ?? address;
+  return nameAt(address);
 }
 
 function text(value: unknown): string {

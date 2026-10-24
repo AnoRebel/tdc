@@ -82,17 +82,27 @@ you want if you are changing it because you think somebody else has it.
 
 You have two names, and both are changed from **Your name** in your settings.
 
-Your **display name** is what people read beside your messages and in member
-lists. Change it whenever you like; it saves at once, and others see it the next
-time a list or a profile is loaded. Leave it empty to show your username. Any
+Your **display name** is what people call you. It is shown everywhere you are
+named to somebody else: beside your messages, in member lists and search, on a
+call and when you ring somebody, in their notifications and in the banners on
+their phone or desktop, and in the conversation's name when you write to them
+directly. Where you are picked from a list, your `@username` sits beside it, so
+two people with the same display name can still be told apart. A mention you
+are sent is drawn as your display name, with the `@username` it was typed as
+shown on hover. Change it whenever you like; it saves at once, and others see it
+the next time a list or a profile is loaded. Leave it empty and your username
+is shown instead. Somebody on another server is shown by the first half of
+their address, which is all this server knows them by. Any
 script is fine, emoji included. What is refused is only what can deceive: an
 invisible or right-to-left character hidden inside a name, a control character,
 or a name that is one of the server's reserved words — "Admin", "System",
 "Moderator" — however it is spelt. The limit is 64 characters.
 
-Your **username** is the first half of your address, `you@server`, and it is
-what links, mentions and other servers know you by. So changing it is allowed,
-but with care:
+Your **username** is the first half of your address, `you@server`. It is not
+what people read as your name; it is what identifies you: in links, in
+`@mentions` (type either your username or your display name after `@` and the
+list offers you), and to other servers. So changing it is allowed, but with
+care:
 
 - As you type a new one, the field says whether it is free. A name that is
   taken, reserved, or was given up by somebody else recently is not.
@@ -106,8 +116,8 @@ but with care:
   else takes it.
 - **Messages you already sent keep the address they were sent under.** Every
   message is signed with its sender's address, and rewriting it would break the
-  signature, so old messages show the old name. They are still yours: you can
-  edit and delete them as before.
+  signature. They still show your display name, as everything you write does,
+  and they are still yours: you can edit and delete them as before.
 - Mentions are text. A message that said `@oldname` still says it; a new
   mention needs your new name.
 - You can change it again after a wait (30 days unless your server says

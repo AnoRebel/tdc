@@ -209,10 +209,13 @@ type liveFrame struct {
 	Type    string `json:"type"`
 	RoomID  string `json:"roomId"`
 	Payload struct {
-		ID      string `json:"id"`
-		Type    string `json:"type"`
-		Sender  string `json:"sender"`
-		Content struct {
+		ID     string `json:"id"`
+		Type   string `json:"type"`
+		Sender string `json:"sender"`
+		// SenderName is what to call the sender, absent for somebody on
+		// another server.
+		SenderName string `json:"senderName"`
+		Content    struct {
 			Body string `json:"body"`
 		} `json:"content"`
 		Redacted bool `json:"redacted"`
@@ -272,12 +275,17 @@ func (b *LiveBridge) notify(data []byte) {
 	server := b.service.current
 	b.service.mu.RUnlock()
 
-	// The sender's own address is the title: the room's name is not in the
-	// frame, and "someone@server" says more about whether to look than a
-	// channel identifier would.
+	// Who wrote it is the title: the room's name is not in the frame, and a
+	// person's name says more about whether to look than a channel identifier
+	// would. Their display name, or for somebody on another server, whose name
+	// this server does not know, their address.
 	//
 	// The body is Markdown source; a banner shows its words, not its markers.
-	_ = b.notifier.Show(frame.Payload.Sender, plainText(frame.Payload.Content.Body), Target{
+	title := frame.Payload.SenderName
+	if title == "" {
+		title = frame.Payload.Sender
+	}
+	_ = b.notifier.Show(title, plainText(frame.Payload.Content.Body), Target{
 		Server:  server,
 		Room:    frame.RoomID,
 		Message: frame.Payload.ID,
@@ -298,8 +306,9 @@ func (b *LiveBridge) announceRing(data []byte) {
 			RoomName string `json:"roomName"`
 			Kind     string `json:"kind"`
 			From     struct {
-				Username string `json:"username"`
-				Address  string `json:"address"`
+				Username    string `json:"username"`
+				DisplayName string `json:"displayName"`
+				Address     string `json:"address"`
 			} `json:"from"`
 		} `json:"payload"`
 	}
@@ -320,7 +329,12 @@ func (b *LiveBridge) announceRing(data []byte) {
 	server := b.service.current
 	b.service.mu.RUnlock()
 
-	_ = b.notifier.Show(ring.Payload.From.Username+" is calling", where, Target{
+	// Called by their display name, or their username without one.
+	from := ring.Payload.From.DisplayName
+	if strings.TrimSpace(from) == "" {
+		from = ring.Payload.From.Username
+	}
+	_ = b.notifier.Show(from+" is calling", where, Target{
 		Server: server,
 		Room:   ring.RoomID,
 	})

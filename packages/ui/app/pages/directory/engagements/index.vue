@@ -77,8 +77,8 @@ try {
                 $t("directory.engagement.with", {
                   name:
                     engagement.you === "client"
-                      ? engagement.developer.username
-                      : engagement.client.username,
+                      ? engagement.developer.displayName
+                      : engagement.client.displayName,
                 })
               }}
             </span>

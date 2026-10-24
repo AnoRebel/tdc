@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
 import type { IssueOrigin } from "@tdc/types";
 import { fully, whenBriefly } from "#layers/ui/app/lib/dates";
 import { plainText } from "#layers/ui/app/lib/formatting";
@@ -16,7 +17,7 @@ const { $t, $ts, $localeRoute: localeRoute } = useI18n();
 const props = defineProps<{ origin: IssueOrigin }>();
 
 function who(address: string): string {
-  return address.split("@")[0] ?? address;
+  return nameAt(address);
 }
 </script>
 

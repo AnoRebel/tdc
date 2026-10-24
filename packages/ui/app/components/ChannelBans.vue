@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
 import { ShieldOff } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -18,7 +19,7 @@ const props = defineProps<{ roomId: string }>();
 const roomId = computed(() => props.roomId);
 const bans = useChannelBans(roomId);
 
-const lifting = ref<{ userId: string; username: string } | null>(null);
+const lifting = ref<{ userId: string; name: string } | null>(null);
 
 onMounted(() => void bans.refresh());
 watch(roomId, () => void bans.refresh());
@@ -73,11 +74,11 @@ function until(ban: { expiresAt?: string }): string {
           :key="ban.userId"
           class="flex items-start gap-2 rounded-lg border border-border px-3 py-2"
         >
-          <Avatar :name="ban.username" size="sm" class="mt-0.5" />
+          <Avatar :name="ban.displayName" size="sm" class="mt-0.5" />
 
           <span class="min-w-0 flex-1">
             <span class="flex items-center gap-2">
-              <span class="truncate text-sm font-medium">{{ ban.username }}</span>
+              <span class="truncate text-sm font-medium">{{ ban.displayName }}</span>
               <span class="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
                 {{ until(ban) }}
               </span>
@@ -86,14 +87,14 @@ function until(ban: { expiresAt?: string }): string {
                  nobody can see is one nobody can review. -->
             <span class="mt-0.5 block text-xs text-muted-foreground">{{ ban.reason }}</span>
             <span class="block text-[0.6875rem] text-muted-foreground">
-              {{ $ts("moderation.byWhom", { who: ban.bannedBy.split("@")[0] ?? ban.bannedBy }) }}
+              {{ $ts("moderation.byWhom", { who: ban.bannedByName || nameAt(ban.bannedBy) }) }}
             </span>
           </span>
 
           <Button
             variant="ghost"
             class="h-7 shrink-0 px-2 text-xs"
-            @click="lifting = { userId: ban.userId, username: ban.username }"
+            @click="lifting = { userId: ban.userId, name: ban.displayName }"
           >
             {{ $t("moderation.liftBan") }}
           </Button>
@@ -104,7 +105,7 @@ function until(ban: { expiresAt?: string }): string {
     <ConfirmDialog
       v-if="lifting"
       :title="$ts('moderation.liftThisBan')"
-      :detail="$ts('moderation.liftBanConsequence', { username: lifting.username })"
+      :detail="$ts('moderation.liftBanConsequence', { name: lifting.name })"
       :confirm-label="$ts('moderation.liftBan')"
       @cancel="lifting = null"
       @confirm="lift(lifting.userId)"

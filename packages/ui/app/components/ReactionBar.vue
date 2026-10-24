@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
 import type { Reaction } from "@tdc/types";
 import { SmilePlus } from "lucide-vue-next";
 import { quickReactions } from "#layers/ui/app/lib/emoji";
@@ -41,7 +42,7 @@ onBeforeUnmount(() => document.removeEventListener("click", onDocumentClick));
 
 /** Who reacted, for the tooltip, with the reader named as themselves. */
 function whoReacted(reaction: Reaction): string {
-  const names = reaction.users.map((address) => address.split("@")[0] ?? address);
+  const names = reaction.users.map((address) => nameAt(address));
 
   if (names.length <= 6) return names.join(", ");
   return $ts("room.namesAndMore", { names: names.slice(0, 6).join(", "), count: names.length - 6 });

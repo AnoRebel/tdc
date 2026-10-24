@@ -3,6 +3,7 @@ import type { MessageVia } from "@tdc/types";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { MessageGroup } from "#layers/ui/app/components/ui/message";
 import { atTime } from "#layers/ui/app/lib/dates";
+import { nameAt } from "#layers/ui/app/lib/names";
 import type { MessageRun } from "#layers/ui/app/lib/timeline";
 import type { useReactions } from "#layers/ui/app/composables/useReactions";
 
@@ -29,17 +30,18 @@ function viaOf(run: MessageRun): MessageVia | undefined {
   return (run.items[0]?.content as { via?: MessageVia } | undefined)?.via;
 }
 
-function shortName(address: string): string {
-  return address.split("@")[0] ?? address;
+/** What to call whoever sent a run: a program by its name, a person by theirs. */
+function senderOf(run: MessageRun): string {
+  return viaOf(run)?.name || run.items[0]?.senderName || nameAt(run.sender);
 }
 </script>
 
 <template>
   <MessageGroup :mine="run.mine">
     <div class="flex items-center gap-2 px-0.5" :class="run.mine ? 'flex-row-reverse' : 'flex-row'">
-      <Avatar :name="viaOf(run)?.name ?? run.sender" size="sm" />
+      <Avatar :name="senderOf(run)" size="sm" />
       <span class="text-xs font-semibold">
-        {{ run.mine ? $t("room.you") : (viaOf(run)?.name ?? shortName(run.sender)) }}
+        {{ run.mine ? $t("room.you") : senderOf(run) }}
       </span>
       <!-- A program is named as one, in words, so nobody reads a webhook's or
            a bot's message as a person's. -->

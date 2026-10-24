@@ -55,6 +55,12 @@ const them = computed(() =>
     ? props.engagement.developer.username
     : props.engagement.client.username,
 );
+/** What to call the other side, where they are named rather than compared. */
+const themName = computed(() =>
+  props.engagement.you === "client"
+    ? props.engagement.developer.displayName
+    : props.engagement.client.displayName,
+);
 
 // Saying the work is complete, with a note for the other person if wanted.
 // Made here, before anything is awaited, while the component can still be found.
@@ -212,7 +218,7 @@ async function exportAgreement() {
         <li>
           {{
             $t("directory.agreement.clientAccepted", {
-              who: props.engagement.client.username,
+              who: props.engagement.client.displayName,
               when: fully(negotiation.agreement.clientAcceptedAt),
             })
           }}
@@ -220,7 +226,7 @@ async function exportAgreement() {
         <li>
           {{
             $t("directory.agreement.developerAccepted", {
-              who: props.engagement.developer.username,
+              who: props.engagement.developer.displayName,
               when: fully(negotiation.agreement.developerAcceptedAt),
             })
           }}
@@ -259,7 +265,7 @@ async function exportAgreement() {
       >
         <completion.Field name="note">
           <template #default="{ field }">
-            <Field :label="$ts('directory.agreement.completeNote', { name: them })">
+            <Field :label="$ts('directory.agreement.completeNote', { name: themName })">
               <template #default="{ id: noteId, describedBy }">
                 <Textarea
                   :id="noteId"
@@ -276,7 +282,7 @@ async function exportAgreement() {
           {{ $t("directory.revision.settleFirst") }}
         </p>
         <Button type="submit" :disabled="busy || revising">
-          {{ $t("directory.agreement.complete", { name: them }) }}
+          {{ $t("directory.agreement.complete", { name: themName }) }}
         </Button>
       </form>
 
@@ -287,11 +293,11 @@ async function exportAgreement() {
           role="status"
           data-completion-outstanding
         >
-          {{ $t("directory.agreement.awaitingTheirs", { name: them }) }}
+          {{ $t("directory.agreement.awaitingTheirs", { name: themName }) }}
         </p>
         <template v-else>
           <p class="rounded-md bg-muted px-3 py-2 text-sm" role="status">
-            {{ $t("directory.agreement.awaitingYours", { name: them }) }}
+            {{ $t("directory.agreement.awaitingYours", { name: themName }) }}
           </p>
           <p v-if="revising" class="text-xs text-muted-foreground" role="status">
             {{ $t("directory.revision.settleFirst") }}
@@ -337,10 +343,10 @@ async function exportAgreement() {
 
           <template v-if="open">
             <p v-if="youAccepted" class="text-xs" role="status">
-              {{ $t("directory.agreement.youAccepted", { name: them }) }}
+              {{ $t("directory.agreement.youAccepted", { name: themName }) }}
             </p>
             <p v-else-if="theyAccepted" class="text-xs" role="status">
-              {{ $t("directory.agreement.theyAccepted", { name: them }) }}
+              {{ $t("directory.agreement.theyAccepted", { name: themName }) }}
             </p>
             <div v-if="!youAccepted && !askingChange" class="flex flex-wrap gap-2">
               <Button :disabled="busy" @click="accept">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 /**
  * Reactions floating up over the call and fading — each with who sent it, for
  * a screen reader as for the eye. With reduced motion they fade in place.
@@ -29,9 +30,9 @@ function lane(id: number) {
     >
       <span class="text-3xl" aria-hidden="true">{{ emoji[reaction.kind] }}</span>
       <span class="rounded bg-black/60 px-1 text-[0.625rem] text-white">{{
-        reaction.username
+        nameOf(reaction)
       }}</span>
-      <span class="sr-only">{{ reaction.username }} {{ reaction.kind }}</span>
+      <span class="sr-only">{{ nameOf(reaction) }} {{ reaction.kind }}</span>
     </span>
   </div>
 </template>

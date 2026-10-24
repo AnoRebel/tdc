@@ -13,7 +13,7 @@ import { Textarea } from "#layers/ui/app/components/ui/textarea";
 
 const { $t, $ts } = useI18n();
 
-defineProps<{ username: string }>();
+defineProps<{ name: string }>();
 
 const emit = defineEmits<{
   cancel: [];
@@ -56,7 +56,7 @@ function submit() {
     <div class="w-[min(26rem,100%)] rounded-xl border border-border bg-card p-4 shadow-2xl">
       <h2 class="flex items-center gap-2 text-sm font-semibold">
         <ShieldOff class="size-4" />
-        {{ $t("moderation.banWhomFromChannel", { username }) }}
+        {{ $t("moderation.banWhomFromChannel", { name }) }}
       </h2>
 
       <p class="mt-2 text-xs text-muted-foreground">

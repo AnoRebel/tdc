@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { useForm } from "@tanstack/vue-form";
 import type { AnyFieldApi } from "@tanstack/vue-form";
 import * as v from "valibot";
@@ -215,7 +216,7 @@ const columns = [
         row.original.assignees.map((person) =>
           h(Avatar, {
             key: person.username,
-            name: person.displayName || person.username,
+            name: nameOf(person),
             size: "sm",
           }),
         ),

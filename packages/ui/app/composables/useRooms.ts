@@ -12,6 +12,7 @@ import type {
   TypingPerson,
   UnreadCounts,
 } from "@tdc/types";
+import { learnNames } from "#layers/ui/app/lib/names";
 
 /** Reading and writing rooms and their messages. */
 export function useRooms() {
@@ -80,8 +81,11 @@ export function useRooms() {
     return api.get<Message[]>(`/api/rooms/${roomId}/timeline`);
   }
 
-  function members(roomId: string): Promise<RoomMember[]> {
-    return api.get<RoomMember[]>(`/api/rooms/${roomId}/members`);
+  async function members(roomId: string): Promise<RoomMember[]> {
+    const people = await api.get<RoomMember[]>(`/api/rooms/${roomId}/members`);
+    // Whoever reacted or read a message is named by address there.
+    learnNames(people);
+    return people;
   }
 
   /**

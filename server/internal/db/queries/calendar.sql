@@ -220,7 +220,7 @@ ON CONFLICT DO NOTHING
 RETURNING *;
 
 -- name: ListCalendarInvites :many
-SELECT i.*, COALESCE(u.username, '')::text AS username, COALESCE(c.name, '')::text AS channel_name
+SELECT i.*, COALESCE(u.username, '')::text AS username, COALESCE(u.display_name, '')::text AS display_name, COALESCE(c.name, '')::text AS channel_name
 FROM calendar_invites i
 LEFT JOIN users u ON u.id = i.user_id
 LEFT JOIN rooms c ON c.id = i.channel_id

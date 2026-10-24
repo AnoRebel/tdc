@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import type { CallRing } from "@tdc/types";
 import {
   BellOff,
@@ -99,7 +100,7 @@ function where(ring: CallRing) {
     :style="style"
     role="alertdialog"
     aria-modal="false"
-    :aria-label="$ts('calls.incoming', { name: newestFirst[0]?.from.username ?? '' })"
+    :aria-label="$ts('calls.incoming', { name: newestFirst[0] ? nameOf(newestFirst[0].from) : '' })"
     data-incoming-call
   >
     <div class="flex items-center gap-1 px-1 pb-1">
@@ -169,9 +170,9 @@ function where(ring: CallRing) {
     <ul class="max-h-80 space-y-1.5 overflow-y-auto">
       <li v-for="ring in newestFirst" :key="ring.call" class="rounded-lg border bg-background p-2">
         <div class="flex items-center gap-2.5">
-          <Avatar :name="ring.from.username" size="md" class="ring-pulse" />
+          <Avatar :name="nameOf(ring.from)" size="md" class="ring-pulse" />
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-semibold">{{ ring.from.username }}</p>
+            <p class="truncate text-sm font-semibold">{{ nameOf(ring.from) }}</p>
             <p v-if="ring.conference" class="text-xs text-muted-foreground">
               {{ where(ring) }}
             </p>
@@ -182,8 +183,8 @@ function where(ring: CallRing) {
           <select
             class="h-7 max-w-24 rounded-md border bg-background px-1 text-xs"
             :value="ringtones.settings.value.byPerson[ring.from.address] ?? ''"
-            :aria-label="$ts('calls.toneForPerson', { name: ring.from.username })"
-            :title="$ts('calls.toneForPerson', { name: ring.from.username })"
+            :aria-label="$ts('calls.toneForPerson', { name: nameOf(ring.from) })"
+            :title="$ts('calls.toneForPerson', { name: nameOf(ring.from) })"
             @change="
               ringtones.setPersonTone(
                 ring.from.address,

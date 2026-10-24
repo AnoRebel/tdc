@@ -84,8 +84,9 @@ func (r roomReplayer) EventsSince(
 	}
 
 	frames := make([]realtime.Frame, 0, len(missed))
+	names := newNameBook(r.rooms)
 	for _, event := range missed {
-		frame, err := eventFrame(event, r.attachmentsFor(ctx, event.ID))
+		frame, err := eventFrame(event, r.attachmentsFor(ctx, event.ID), names.sender(ctx, event))
 		if err != nil {
 			return nil, false, err
 		}
@@ -100,8 +101,9 @@ func (r roomReplayer) EventsSince(
 // Attachments are passed in rather than looked up here, so that the two callers
 // — live delivery and replay after a reconnection — decide for themselves how
 // to fetch them. A frame without them would show a message arriving with its
-// files missing until the page was reloaded.
-func eventFrame(event dbgen.Event, files []attachmentResponse) (realtime.Frame, error) {
+// files missing until the page was reloaded. The sender's name is passed in for
+// the same reason, and is empty for a sender on another server.
+func eventFrame(event dbgen.Event, files []attachmentResponse, senderName string) (realtime.Frame, error) {
 	body := map[string]any{
 		"id":        event.ID,
 		"type":      event.Type,
@@ -109,6 +111,9 @@ func eventFrame(event dbgen.Event, files []attachmentResponse) (realtime.Frame, 
 		"content":   json.RawMessage(event.Content),
 		"createdAt": event.CreatedAt,
 		"redacted":  event.RedactedAt != nil,
+	}
+	if senderName != "" {
+		body["senderName"] = senderName
 	}
 	if len(files) > 0 {
 		body["attachments"] = files
@@ -157,7 +162,7 @@ func (s *Server) handleWebSocket(c *echo.Context) error {
 // in the log, so a client that misses it will receive it on reconnection. The
 // send must not fail because a fanout did.
 func (s *Server) publishEvent(ctx context.Context, event dbgen.Event) {
-	frame, err := eventFrame(event, roomReplayer{attachments: s.attachments}.attachmentsFor(ctx, event.ID))
+	frame, err := eventFrame(event, roomReplayer{attachments: s.attachments}.attachmentsFor(ctx, event.ID), s.rooms.SenderName(ctx, event))
 	if err != nil {
 		s.log.Error("cannot render event for delivery",
 			"eventId", event.ID, "error", err)
@@ -224,7 +229,7 @@ func (s *Server) deliverAnnounced(ctx context.Context, announcement realtime.Ann
 		return
 	}
 
-	frame, err := eventFrame(event, roomReplayer{attachments: s.attachments}.attachmentsFor(ctx, event.ID))
+	frame, err := eventFrame(event, roomReplayer{attachments: s.attachments}.attachmentsFor(ctx, event.ID), s.rooms.SenderName(ctx, event))
 	if err != nil {
 		s.log.Error("cannot render an announced event for delivery",
 			"eventId", event.ID, "error", err)

@@ -7,6 +7,8 @@
  * a name, are only known there.
  */
 
+import { shallowReactive, toRaw } from "vue";
+
 export const usernameLength = { min: 2, max: 32 } as const;
 export const displayNameMax = 64;
 
@@ -58,4 +60,61 @@ export function isOwnAddress(
 ): boolean {
   if (!user || !address) return false;
   return address === user.address || (user.formerAddresses ?? []).includes(address);
+}
+
+/**
+ * The name to call somebody by wherever one person is named to another: their
+ * display name, or their username when they have not set one. A guest's
+ * username is generated, so the name they gave is always their display name.
+ */
+export function nameOf(person: { username: string; displayName?: string | null }): string {
+  return person.displayName?.trim() || person.username;
+}
+
+/*
+ * What people are called, by address.
+ *
+ * Messages, reactions and receipts name people by address, which is what is
+ * signed and what stays put; what to call them comes separately — with each
+ * message, and with every list of people this client is shown. Remembered here
+ * so a name learned from one is used by all the others, and reactive so a
+ * reaction drawn before the member list arrived is renamed when it does.
+ */
+const known = shallowReactive(new Map<string, string>());
+
+/** Remembers what the person at an address is called. */
+export function learnName(address: string | undefined, name: string | undefined) {
+  const trimmed = name?.trim();
+  // Compared without tracking: this runs while a timeline is being folded, and
+  // reading the book there would make every fold depend on every name.
+  if (address && trimmed && toRaw(known).get(address) !== trimmed) known.set(address, trimmed);
+}
+
+/** Remembers what each of these people is called. */
+export function learnNames(
+  people: readonly { address?: string; username: string; displayName?: string | null }[],
+) {
+  for (const person of people) learnName(person.address, nameOf(person));
+}
+
+/**
+ * What to call the person at an address: the name this client has been told,
+ * or the address's first half — their username here, or the only name a person
+ * on another server is known by.
+ */
+export function nameAt(address: string): string {
+  return known.get(address) ?? address.split("@")[0] ?? address;
+}
+
+/**
+ * What to call somebody mentioned as "@username" on this server, when this
+ * client has been told. Usernames are matched without regard to case, as the
+ * server matches a mention.
+ */
+export function mentionedName(username: string, server: string): string | undefined {
+  const exact = known.get(`${username}@${server}`);
+  if (exact) return exact;
+  const wanted = `${username}@${server}`.toLowerCase();
+  for (const [address, name] of known) if (address.toLowerCase() === wanted) return name;
+  return undefined;
 }

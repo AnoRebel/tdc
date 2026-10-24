@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { BellRing } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -16,7 +17,7 @@ const { user } = useAuth();
 const c = useCall();
 const api = useApi();
 
-const members = ref<{ id: string; username: string }[]>([]);
+const members = ref<{ id: string; username: string; displayName?: string }[]>([]);
 const rung = ref(new Set<string>());
 
 onMounted(async () => {
@@ -49,14 +50,14 @@ async function ringOne(id: string) {
       :key="member.id"
       class="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-muted"
     >
-      <Avatar :name="member.username" size="sm" />
-      <span class="min-w-0 flex-1 truncate text-xs">{{ member.username }}</span>
+      <Avatar :name="nameOf(member)" size="sm" />
+      <span class="min-w-0 flex-1 truncate text-xs">{{ nameOf(member) }}</span>
       <Button
         size="small"
         variant="ghost"
         class="h-6 px-2 text-xs"
         :disabled="rung.has(member.id)"
-        :label="$ts('calls.ringPerson', { name: member.username })"
+        :label="$ts('calls.ringPerson', { name: nameOf(member) })"
         @click="ringOne(member.id)"
       >
         <BellRing class="size-3" aria-hidden="true" />

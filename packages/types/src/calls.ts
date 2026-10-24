@@ -53,7 +53,8 @@ export interface CallRing {
    * in its conversation, and `roomName` is empty.
    */
   conference?: boolean;
-  from: { userId: string; username: string; address: string };
+  /** Who is ringing; `displayName` is what to call them, never empty. */
+  from: { userId: string; username: string; displayName: string; address: string };
 }
 
 /** Somebody you rang declined. */
@@ -61,6 +62,8 @@ export interface CallDeclined {
   call: string;
   userId: string;
   username: string;
+  /** What to call them: their display name, or their username without one. */
+  displayName: string;
   /** A few words sent with the decline, if any. */
   message?: string;
 }
@@ -113,5 +116,7 @@ export interface CallReaction {
   roomId: string;
   from: string;
   username: string;
+  /** What to call them: their display name, or their username without one. */
+  displayName: string;
   kind: CallReactionKind;
 }

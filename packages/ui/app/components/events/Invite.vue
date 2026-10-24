@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nameOf } from "#layers/ui/app/lib/names";
 import { isApiError, type EventDetail, type EventInvite } from "@tdc/types";
 import { Button } from "#layers/ui/app/components/ui/button";
 import type { Picked } from "#layers/ui/app/lib/events";
@@ -50,6 +51,13 @@ async function withdraw(invite: EventInvite) {
   await eventsApi.uninvite(props.event.id, invite.id);
   await load();
 }
+
+/** What to call somebody invited by name. */
+function inviteeName(invite: EventInvite): string {
+  return invite.username
+    ? nameOf({ username: invite.username, displayName: invite.displayName })
+    : "";
+}
 </script>
 
 <template>
@@ -76,12 +84,12 @@ async function withdraw(invite: EventInvite) {
         class="flex items-center gap-1 rounded-full bg-muted py-0.5 pr-0.5 pl-2 text-xs"
       >
         <Icon v-if="invite.channel" name="lucide:hash" class="size-3" aria-hidden="true" />
-        {{ invite.channel || invite.username }}
+        {{ invite.channel || inviteeName(invite) }}
         <Button
           variant="ghost"
           size="icon"
           class="size-5"
-          :label="$ts('events.invite.withdraw', { name: invite.channel || invite.username || '' })"
+          :label="$ts('events.invite.withdraw', { name: invite.channel || inviteeName(invite) })"
           @click="withdraw(invite)"
         >
           <Icon name="lucide:x" class="size-3" aria-hidden="true" />

@@ -53,6 +53,12 @@ const them = computed(() =>
     ? props.engagement.developer.username
     : props.engagement.client.username,
 );
+/** What to call the other side, where they are named rather than compared. */
+const themName = computed(() =>
+  props.engagement.you === "client"
+    ? props.engagement.developer.displayName
+    : props.engagement.client.displayName,
+);
 
 const revisions = computed(() => props.negotiation.revisions ?? []);
 const agreements = computed(() => props.negotiation.agreements ?? []);
@@ -297,10 +303,10 @@ const outcomeLabel = (revision: AgreementRevision) =>
         {{ $t("directory.revision.waitingVersion") }}
       </p>
       <p v-else-if="youAccepted" class="text-xs" role="status" data-you-accepted>
-        {{ $t("directory.revision.youAccepted", { name: them }) }}
+        {{ $t("directory.revision.youAccepted", { name: themName }) }}
       </p>
       <p v-else-if="theyAccepted" class="text-xs" role="status">
-        {{ $t("directory.revision.theyAccepted", { name: them }) }}
+        {{ $t("directory.revision.theyAccepted", { name: themName }) }}
       </p>
 
       <div v-if="!askingChange" class="flex flex-wrap gap-2">

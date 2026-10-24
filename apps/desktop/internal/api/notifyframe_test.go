@@ -90,6 +90,18 @@ func TestAMessageFromSomebodyElseIsAnnounced(t *testing.T) {
 	}
 }
 
+// Somebody with a display name is called by it, not by their address.
+func TestAMessageBannerCallsTheSenderByTheirName(t *testing.T) {
+	bridge, spy := bridgeWith(t, "me@example.test")
+	bridge.notify(messageFrame("amina@example.test", "Are you around?", func(f map[string]any) {
+		f["payload"].(map[string]any)["senderName"] = "Amina Juma"
+	}))
+
+	if spy.count() != 1 || spy.shown[0].title != "Amina Juma" {
+		t.Errorf("the banner reads %+v", spy.shown)
+	}
+}
+
 /*
 The one that makes people turn notifications off.
 
@@ -194,6 +206,25 @@ func TestARingIsAnnounced(t *testing.T) {
 	shown := spy.shown[0]
 	if shown.title != "amina is calling" || shown.body != "In #standup" || shown.target.Room != "room-7" {
 		t.Errorf("the ring's banner reads %+v", shown)
+	}
+}
+
+// A caller with a display name is called by it.
+func TestARingCallsTheCallerByTheirName(t *testing.T) {
+	bridge, spy := bridgeWith(t, "me@example.test")
+	raw, _ := json.Marshal(map[string]any{
+		"type": "call.ring", "roomId": "room-7",
+		"payload": map[string]any{
+			"call": "call-1", "roomId": "room-7", "roomName": "standup", "kind": "channel",
+			"from": map[string]any{
+				"userId": "u1", "username": "amina", "displayName": "Amina Juma", "address": "amina@example.test",
+			},
+		},
+	})
+	bridge.notify(raw)
+
+	if spy.count() != 1 || spy.shown[0].title != "Amina Juma is calling" {
+		t.Errorf("the ring's banner reads %+v", spy.shown)
 	}
 }
 

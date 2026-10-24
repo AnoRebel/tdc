@@ -254,7 +254,7 @@ func (q *Queries) ListBlocked(ctx context.Context, blockerID uuid.UUID) ([]ListB
 
 const listChannelBans = `-- name: ListChannelBans :many
 SELECT b.room_id, b.user_id, b.banned_by_address, b.reason, b.expires_at, b.created_at,
-       u.username
+       u.username, u.display_name
 FROM channel_bans b
 JOIN users u ON u.id = b.user_id
 WHERE b.room_id = $1 AND (b.expires_at IS NULL OR b.expires_at > now())
@@ -269,6 +269,7 @@ type ListChannelBansRow struct {
 	ExpiresAt       *time.Time
 	CreatedAt       time.Time
 	Username        string
+	DisplayName     string
 }
 
 func (q *Queries) ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]ListChannelBansRow, error) {
@@ -288,6 +289,7 @@ func (q *Queries) ListChannelBans(ctx context.Context, roomID uuid.UUID) ([]List
 			&i.ExpiresAt,
 			&i.CreatedAt,
 			&i.Username,
+			&i.DisplayName,
 		); err != nil {
 			return nil, err
 		}

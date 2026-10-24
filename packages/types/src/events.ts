@@ -121,6 +121,8 @@ export interface EventInvite {
   id: string;
   userId?: string;
   username?: string;
+  /** The invited person's display name, absent when they have not set one. */
+  displayName?: string;
   channelId?: string;
   channel?: string;
   createdAt: string;
