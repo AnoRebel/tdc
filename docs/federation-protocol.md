@@ -704,12 +704,15 @@ Not in the stream, and so never part of a projection: when each row was
 written on the home server, saved views, who follows a discussion, and the
 search index, which a server works out from the rows itself.
 
-**Erasure is the exception.** When a person's data is erased, the content of
-everything they sent is emptied — project events included — and their account,
-with its memberships and assignments, is removed without events recording it.
-An erased person's events cannot be applied, and a projection reaching one
-stops as for an unknown type. This conflict between erasure and a complete
-history is not yet resolved; it is recorded in the project federation design.
+**After an erasure, a baseline.** When a person's data is erased, the content
+of everything they sent is emptied — project events included — and their
+account, with its memberships and assignments, is removed without events
+recording it. Their emptied events can no longer be applied, so the home server
+appends a fresh `project.baseline` to every project the person sent anything
+in, belonged to or was assigned in, within a minute of the account going. A
+projection starts from the latest baseline and never reaches the emptied
+events. One that has not yet received that baseline stops at the first of
+them, as for an unknown type.
 
 ## Whether a server will deal with you at all
 

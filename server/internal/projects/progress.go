@@ -207,6 +207,26 @@ func ReplayProgress(stream []dbgen.Event, done map[uuid.UUID]bool, scope Progres
 		if next == len(boundaries) {
 			break
 		}
+		/*
+			What erasure emptied says nothing any more, and is passed over: the
+			issue it made counts from the baseline that followed the erasure.
+			A baseline is the project as it stood, so counting starts again
+			from it.
+		*/
+		if event.RedactedAt != nil {
+			continue
+		}
+		if events.Type(event.Type) == events.TypeProjectBaseline {
+			baseline := emptyRows()
+			if err := decode(event, &baseline); err != nil {
+				return nil, err
+			}
+			issues = map[uuid.UUID]*replayed{}
+			for id, row := range baseline.Issues {
+				issues[id] = &replayed{exists: !row.Deleted, state: row.State, cycle: idText(row.Cycle), milestone: idText(row.Milestone)}
+			}
+			continue
+		}
 		var content struct {
 			Issue string `json:"issue"`
 			State string `json:"state"`
@@ -261,4 +281,12 @@ func ReplayProgress(stream []dbgen.Event, done map[uuid.UUID]bool, scope Progres
 		counts[next] = count()
 	}
 	return counts, nil
+}
+
+// idText is an identifier as the events write it, or nothing for none.
+func idText(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
 }

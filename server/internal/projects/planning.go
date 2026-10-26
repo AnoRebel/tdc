@@ -628,19 +628,30 @@ func (s *Service) closeCycle(ctx context.Context, id uuid.UUID, now time.Time) (
 	return done, err
 }
 
-// cycleCloseInterval is how often ended cycles are looked for. A cycle ends at
-// midnight in its project's calendar; within a minute of that is soon enough.
-const cycleCloseInterval = time.Minute
+// maintenanceInterval is how often the server looks for work of its own. A
+// cycle ends at midnight in its project's calendar, and an account deleted by
+// hand leaves its projects waiting for a baseline; within a minute is soon
+// enough for both.
+const maintenanceInterval = time.Minute
 
-// CloseCyclesPeriodically closes ended cycles until the context ends.
-func (s *Service) CloseCyclesPeriodically(ctx context.Context) {
-	ticker := time.NewTicker(cycleCloseInterval)
+/*
+MaintainPeriodically does what the server does to projects by itself, until the
+context ends: closes ended cycles, and gives a baseline to every project whose
+stream has stopped describing it. The first is a project's policy; the second
+happens after an account is deleted or erased, which may be done by hand
+against the database, so it is looked for rather than told of.
+*/
+func (s *Service) MaintainPeriodically(ctx context.Context) {
+	ticker := time.NewTicker(maintenanceInterval)
 	defer ticker.Stop()
 	for {
+		// Logged rather than fatal: the next pass tries again, and nothing
+		// is lost by either being a minute late.
 		if _, err := s.CloseEndedCycles(ctx, time.Now()); err != nil && ctx.Err() == nil {
-			// Logged rather than fatal: the next pass tries again, and
-			// nothing is lost by a cycle being closed a minute late.
 			s.log.Error("closing ended cycles failed", "error", err.Error())
+		}
+		if _, err := s.CompleteStreams(ctx); err != nil && ctx.Err() == nil {
+			s.log.Error("recording project baselines failed", "error", err.Error())
 		}
 		select {
 		case <-ctx.Done():

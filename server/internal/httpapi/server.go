@@ -448,21 +448,14 @@ func (s *Server) Run(ctx context.Context) error {
 
 	/*
 		Projects: cycles that have ended are dealt with by the server, once a
-		minute, under each project's policy. Started here for the same reason
-		as the sweep above: a server with projects always runs it.
+		minute, under each project's policy, and a project whose stream no
+		longer describes it — made before every change was an event, or left
+		behind by an account's deletion — is given a baseline. Started here for
+		the same reason as the sweep above: a server with projects always runs
+		it.
 	*/
 	if s.projects != nil {
-		go s.projects.CloseCyclesPeriodically(ctx)
-		/*
-			Projects made before every change was an event are given their
-			baseline, once each, so every project's stream describes it. A
-			failure is retried at the next start: nothing depends on it yet.
-		*/
-		go func() {
-			if _, err := s.projects.CompleteStreams(ctx); err != nil && ctx.Err() == nil {
-				s.log.Error("recording project baselines failed", "error", err.Error())
-			}
-		}()
+		go s.projects.MaintainPeriodically(ctx)
 	}
 
 	/*

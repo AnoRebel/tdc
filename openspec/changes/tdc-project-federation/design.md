@@ -44,9 +44,13 @@ So such a project is given one **`project.baseline`** event, appended by the ser
 
 *Why not a migration?* A migration cannot sign: the keyring belongs to the running server. *Why not synthesise the missing events?* They would claim a person did something at a time nobody knows.
 
-### Erasure and a complete stream conflict (open)
+### An account's deletion is followed by a baseline
 
-Erasing a person empties the content of every event they sent, project events included, and deleting their account cascades their project memberships and assignments with no event. An erased person's `issue.created` therefore cannot be applied, and the projector stops there rather than skip it. (The same emptied event already makes the progress trend's replay fail for that project.) This is the erasure/verifiability conflict again, now with reproducibility as the casualty. It must be decided before replicas exist — candidates are a server-signed baseline appended as part of an erasure that touched a project, or keeping project events' structural fields through erasure — and is left open here.
+Erasing a person empties the content of every event they sent, project events included, and deleting their account cascades their project memberships and assignments with no event. An erased person's `issue.created` cannot be applied, so the stream stops describing the project — exactly what `stream_complete` already says, so the same remedy applies. A `BEFORE DELETE` trigger on `users` marks incomplete every project the person sent an event in, belonged to or was assigned in, and the server's once-a-minute maintenance pass (the one that closes ended cycles) appends a baseline to each. Replay starts from the latest baseline, so the emptied events are never needed again; the progress trend also restarts its count at each baseline and passes over emptied events.
+
+*Why a trigger?* Accounts are deleted by hand against the database too — that is how an operator carries out an erasure — and Go never sees that. *Why not keep project events' structural fields through erasure?* It would make "the content of everything you sent is removed" untrue for one kind of event, and a baseline gets the same result without that exception.
+
+What remains: events other people sent still name the erased person by address — an `issue.assigned`, a `project.member_added`, an earlier baseline — as other people's messages that mention them do. That is the boundary erasure already documents.
 
 ### Changes from a replica are requests to the home server
 

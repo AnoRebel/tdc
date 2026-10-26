@@ -43,16 +43,16 @@ var notWrites = map[string]string{
 	"ProjectByID": "reads", "ProjectByKey": "reads", "ProjectHistory": "reads", "Relations": "reads",
 	"States": "reads", "Stream": "reads", "Visible": "reads",
 
-	"SaveView":                "a saved view is its owner's and never part of the project",
-	"UpdateView":              "a saved view is its owner's and never part of the project",
-	"DeleteView":              "a saved view is its owner's and never part of the project",
-	"OpenView":                "reads a saved view",
-	"Views":                   "reads saved views",
-	"Participate":             "following a discussion is a person's own setting",
-	"AdmitMentioned":          "admits to a discussion room, recorded in that room's own log",
-	"Reindex":                 "rewrites the search index, which is worked out from the rows",
-	"OnAppended":              "wiring, done once while the server is built",
-	"CloseCyclesPeriodically": "runs CloseEndedCycles on a timer",
+	"SaveView":             "a saved view is its owner's and never part of the project",
+	"UpdateView":           "a saved view is its owner's and never part of the project",
+	"DeleteView":           "a saved view is its owner's and never part of the project",
+	"OpenView":             "reads a saved view",
+	"Views":                "reads saved views",
+	"Participate":          "following a discussion is a person's own setting",
+	"AdmitMentioned":       "admits to a discussion room, recorded in that room's own log",
+	"Reindex":              "rewrites the search index, which is worked out from the rows",
+	"OnAppended":           "wiring, done once while the server is built",
+	"MaintainPeriodically": "runs CloseEndedCycles and CompleteStreams on a timer",
 }
 
 // step is one change the scenario makes, named by the method it goes through.

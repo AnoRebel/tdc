@@ -425,6 +425,11 @@ Kept, and why:
   removed. A log with holes in it is not a log.
 - **Reports other people made** about your messages, with the copied content
   removed. The complaint belongs to whoever made it.
+- **What other people recorded about you.** Their messages that mention you, and
+  a project's history of somebody adding you or assigning you an issue, still
+  name you by address. Those are their records, and erasure empties only what
+  you sent. Each project you were part of is given a fresh snapshot without you,
+  so its current state no longer names you.
 
 One consequence worth stating: an erased message can no longer be
 cryptographically verified. The sender's address is part of what this server
