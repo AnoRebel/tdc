@@ -320,8 +320,8 @@ github.com/transparency-dev/formats v0.1.1 h1:4bVHJc+KdBgpA1OJD1yjI+g0i5Z1graCpp
 github.com/transparency-dev/formats v0.1.1/go.mod h1:qtZ8goRuJ8FTBG9c9+Bj0rn2rUG7eG/AUTkr+Aw3jFw=
 github.com/transparency-dev/merkle v0.0.2 h1:Q9nBoQcZcgPamMkGn7ghV8XiTZ/kRxn1yCG81+twTK4=
 github.com/transparency-dev/merkle v0.0.2/go.mod h1:pqSy+OXefQ1EDUVmAJ8MUhHB9TXGuzVAT58PqBoHz1A=
-github.com/wailsapp/wails/v3 v3.0.0-beta.34 h1:3p/s+rk6olaquzaDWWowVTJ1ZMIBDHEsTUqxsffR4Zw=
-github.com/wailsapp/wails/v3 v3.0.0-beta.34/go.mod h1:Tk3i8pyehpIdV4aS9GfpgGjk7eOjuSpCrpyJXpS6y64=
+github.com/wailsapp/wails/v3 v3.0.0 h1:lBe89kFu23bVz1dc1H9v0srkHQgWsy7BAKpH4sLQuDw=
+github.com/wailsapp/wails/v3 v3.0.0/go.mod h1:U3p3/QfSer2XxXM3XWhwis9O7LvvuNKN/AcGoEFD+K8=
 github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 h1:ilQV1hzziu+LLM3zUTJ0trRztfwgjqKnBWNtSRkbmwM=
 github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78/go.mod h1:aL8wCCfTfSfmXjznFBSZNN13rSJjlIOI1fUNAtF7rmI=
 github.com/zalando/go-keyring v0.2.6 h1:r7Yc3+H+Ux0+M72zacZoItR3UDxeWfKTcabvkI8ua9s=

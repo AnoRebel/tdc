@@ -1,13 +1,13 @@
 module github.com/AnoRebel/tdc/apps/desktop
 
-go 1.27.0
+go 1.27.3
 
 require (
 	github.com/99designs/keyring v1.2.2
 	github.com/coder/websocket v1.8.15
 	github.com/jezek/xgb v1.3.1
 	github.com/sigstore/sigstore-go v1.3.0
-	github.com/wailsapp/wails/v3 v3.0.0-beta.34
+	github.com/wailsapp/wails/v3 v3.0.0
 )
 
 require (

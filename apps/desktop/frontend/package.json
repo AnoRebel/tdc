@@ -16,12 +16,13 @@
     "@tanstack/vue-form": "^1.33.5",
     "@tdc/types": "workspace:*",
     "@tdc/ui": "workspace:*",
-    "@wailsio/runtime": "3.0.0-beta.34",
+    "@wailsio/runtime": "3.0.0",
     "date-fns": "^4.4.0",
     "lucide-vue-next": "^1.0.0",
     "nuxt": "catalog:vue",
     "valibot": "^1.5.0",
-    "vue": "catalog:vue"
+    "vue": "catalog:vue",
+    "vue-router": "catalog:vue"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.133",

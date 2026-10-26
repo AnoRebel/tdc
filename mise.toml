@@ -4,9 +4,7 @@
 # the same toolchain. Run "mise install" after cloning.
 #
 # These are exact versions rather than ranges: a toolchain that drifts between
-# contributors produces failures that are hard to reproduce, and Wails v3 in
-# particular ships near-daily beta builds where an unpinned "latest" can
-# regress without warning.
+# contributors produces failures that are hard to reproduce.
 #
 # This file governs local development. Continuous integration is deliberately
 # different: it takes the latest release of the runtimes that publish one
@@ -15,9 +13,9 @@
 # there, for the reason above.
 
 [tools]
-go = "1.27.0"
+go = "1.27.3"
 sqlc = "1.31.1"
 air = "1.67.4"
-golangci-lint = "2.13.1"
-task = "3.53.1"
-bun = "1.4.2"
+golangci-lint = "2.15.0"
+task = "3.54.0"
+bun = "1.4.4"

@@ -24,7 +24,7 @@ notifications, the window and updates.
 You need [Go](https://go.dev) 1.27, [Bun](https://bun.sh), and the Wails CLI:
 
 ```sh
-go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 wails3 doctor    # names anything missing for your platform
 ```
 

@@ -1,6 +1,6 @@
 module github.com/AnoRebel/tdc/server
 
-go 1.27
+go 1.27.3
 
 require (
 	filippo.io/age v1.3.2
