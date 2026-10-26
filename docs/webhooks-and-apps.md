@@ -230,6 +230,12 @@ held server-wide.
 | `project.state_added`       | P S   | A state was added to its workflow                                                           | Seeing the project                                 |
 | `project.state_changed`     | P S   | A state was renamed or moved                                                                | Seeing the project                                 |
 | `project.state_removed`     | P S   | A state was removed                                                                         | Seeing the project                                 |
+| `project.label_added`       | P S   | A label was added to its list                                                               | Seeing the project                                 |
+| `project.label_changed`     | P S   | A label was renamed or recoloured                                                           | Seeing the project                                 |
+| `project.label_removed`     | P S   | A label was removed, and taken off every issue                                              | Seeing the project                                 |
+| `project.priority_added`    | P S   | A level was added to its priority scale                                                     | Seeing the project                                 |
+| `project.priority_changed`  | P S   | A priority level was renamed or moved                                                       | Seeing the project                                 |
+| `project.priority_removed`  | P S   | A priority level was removed                                                                | Seeing the project                                 |
 | `issue.created`             | P S   | An issue was filed                                                                          | Seeing the project                                 |
 | `issue.title_changed`       | P S   | Its title changed                                                                           | Seeing the project                                 |
 | `issue.description_changed` | P S   | Its description changed                                                                     | Seeing the project                                 |
