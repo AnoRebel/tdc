@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 
 // A relative path, not an alias: this runs while the configuration is being
 // evaluated, before Nuxt has resolved any of its own aliases.
-import { PREPAINT_THEME_SCRIPT } from "./app/lib/theme";
-import { PREPAINT_INTERFACE_SCRIPT } from "./app/lib/interface";
+import { PREPAINT_THEME_SCRIPT } from "./app/lib/theme.ts";
+import { PREPAINT_INTERFACE_SCRIPT } from "./app/lib/interface.ts";
 
 /*
  * This layer's own directory.
@@ -65,6 +65,14 @@ export default defineNuxtConfig({
   nitro: {
     publicAssets: [{ dir: `${here}../../docs/images`, baseURL: "/guide-images" }],
   },
+
+  /*
+   * Nitro's server auto-imports, which compatibility version 5 turns off.
+   * nuxt-i18n-micro's server code imports useRuntimeConfig from #imports, and
+   * without them neither client builds. Drop this once the module imports
+   * from nuxt/server.
+   */
+  experimental: { nitroAutoImports: true },
 
   app: {
     head: {
@@ -205,6 +213,13 @@ export default defineNuxtConfig({
      */
     strategy: "no_prefix",
     translationDir: "locales",
+    /*
+     * One file per language, not one per page. Every string lives in the
+     * shared files, so per-page files were empty — and each page still got
+     * its own merged copy of everything, 14 MB of identical translations that
+     * the web build served and the desktop binary embedded.
+     */
+    disablePageLocales: true,
   },
 
   /*

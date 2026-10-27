@@ -21,26 +21,26 @@
     },
     "catalogs": {
       "vue": {
-        "nuxt": "^4.5.2",
-        "vue": "^3.5.43",
-        "vue-router": "^5.3.1",
-        "@vueuse/core": "^14.4.0",
-        "@vueuse/nuxt": "^14.4.0",
+        "nuxt": "^4.6.2",
+        "vue": "^3.5.44",
+        "vue-router": "^5.4.0",
+        "@vueuse/core": "^15.0.0",
+        "@vueuse/nuxt": "^15.0.0",
         "reka-ui": "^2.10.4"
       },
       "tooling": {
         "typescript": "^6.0.3",
-        "vue-tsc": "^3.3.11",
-        "eslint": "^10.10.0",
-        "eslint-plugin-vue": "^10.11.0",
+        "vue-tsc": "3.3.11",
+        "eslint": "^10.13.0",
+        "eslint-plugin-vue": "^10.12.0",
         "vue-eslint-parser": "^10.4.1",
-        "typescript-eslint": "^8.70.0",
+        "typescript-eslint": "^8.72.1",
         "@eslint/js": "^10.0.1",
-        "globals": "^17.12.0",
-        "prettier": "^3.9.7"
+        "globals": "^17.13.0",
+        "prettier": "^3.9.10"
       },
       "testing": {
-        "vitest": "^5.0.1",
+        "vitest": "^5.0.5",
         "@vue/test-utils": "^2.5.1",
         "happy-dom": "^20.14.5",
         "@vitejs/plugin-vue": "^6.0.9"
@@ -57,12 +57,12 @@
   },
   "devDependencies": {
     "@eslint/js": "catalog:tooling",
-    "@types/node": "^26.6.1",
+    "@types/node": "^26.6.5",
     "eslint": "catalog:tooling",
     "eslint-plugin-vue": "catalog:tooling",
-    "eslint-plugin-vuejs-accessibility": "^2.6.0",
+    "eslint-plugin-vuejs-accessibility": "^2.6.3",
     "globals": "catalog:tooling",
-    "lefthook": "^2.1.14",
+    "lefthook": "^2.2.2",
     "prettier": "catalog:tooling",
     "typescript": "catalog:tooling",
     "typescript-eslint": "catalog:tooling",

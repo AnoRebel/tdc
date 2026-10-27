@@ -3,10 +3,7 @@ export default defineAppConfig({
    * Off, deliberately. The layer builds its "Edit this page" link as
    * <repo>/edit/<branch>/content/<file>, and the guides are not in content/.
    * The site's own links (DocsAsideRightBottom, AppHeaderCTA) know where they are.
-   * The layer's pages test it for truthiness, so false is honoured; its type
-   * only describes the object.
    */
-  // @ts-expect-error see above
   github: false,
 
   header: {

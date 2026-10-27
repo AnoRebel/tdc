@@ -6,7 +6,7 @@ import type { Notification } from "@tdc/types";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Kbd } from "#layers/ui/app/components/ui/kbd";
 import { Button } from "#layers/ui/app/components/ui/button";
-import { useNow } from "@vueuse/core";
+import { useIntervalFn, useNow } from "@vueuse/core";
 import { appearOfflineKey } from "#layers/ui/app/composables/useOwnStatus";
 import { arrangeSidebar, showsUnreadBadge } from "#layers/ui/app/lib/sidebar";
 import { presenceDotClass } from "#layers/ui/app/lib/presencedot";
@@ -97,7 +97,7 @@ const ownStatus = useOwnStatus();
 const statusOpen = useState("status.open", () => false);
 const userMenu = useContextMenu();
 
-const now = useNow({ interval: 30_000 });
+const now = useNow({ scheduler: (tick) => useIntervalFn(tick, 30_000) });
 const statusLine = computed(() => {
   const own = ownStatus.own.value;
   const parts: string[] = [];

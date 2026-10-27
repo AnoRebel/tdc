@@ -279,13 +279,19 @@ function insertEmoji(emoji: string) {
 const format = (chosen: Format) => formatField(composer.value, draft, chosen, fitComposer);
 
 // The server expires an indication on its own, so this only has to be sent
-// often enough to keep it alive while somebody is actually writing.
-const announceTyping = useThrottleFn(() => {
-  // Not announced at all by somebody who turned it off, rather than sent and
-  // ignored: what is never sent cannot be shown.
-  if (typingPreference.sends.value === false) return;
-  void roomsApi.startTyping(props.roomId, props.threadRoot).catch(() => {});
-}, 4000);
+// often enough to keep it alive while somebody is actually writing. Leading
+// edge only: a trailing call would announce typing seconds after the message
+// had been sent.
+const announceTyping = useThrottleFn(
+  () => {
+    // Not announced at all by somebody who turned it off, rather than sent and
+    // ignored: what is never sent cannot be shown.
+    if (typingPreference.sends.value === false) return;
+    void roomsApi.startTyping(props.roomId, props.threadRoot).catch(() => {});
+  },
+  4000,
+  false,
+);
 
 async function submit() {
   const body = draft.value.trim();
