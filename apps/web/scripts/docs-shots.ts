@@ -636,6 +636,49 @@ export const shots: Shot[] = [
       return window(await open(studio, "neema", "/projects/WEB/settings"));
     },
   },
+  {
+    guide: "projects",
+    name: "sharing",
+    async take(studio) {
+      // Federation on just for this, and back off after, so the other
+      // screens show the server as the seed left it.
+      await as(studio, "neema", "PUT", "/api/admin/settings/federation.enabled", {
+        value: "true",
+      });
+      await as(studio, "neema", "PUT", "/api/projects/WEB/federation", { federated: true });
+      await as(studio, "neema", "PUT", "/api/projects/WEB/members/kofi@accra.dev.example", {
+        role: "member",
+      });
+      try {
+        // The members, one of them from elsewhere, down to the switch below.
+        const page = await open(studio, "neema", "/projects/WEB/settings");
+        const members = page.locator("section", { has: page.locator("#members-heading") });
+        const sharing = page.locator("section", { has: page.locator("#federation-heading") });
+        // Scrolled to the switch's end, which leaves the members' heading
+        // clear of the tabs that stay at the top of the page.
+        await sharing.evaluate((element) => element.scrollIntoView({ block: "end" }));
+        await page.waitForTimeout(300);
+        const top = (await members.boundingBox())!;
+        const bottom = (await sharing.boundingBox())!;
+        return await page.screenshot({
+          clip: {
+            x: Math.max(0, top.x - 16),
+            y: Math.max(0, top.y - 16),
+            width: top.width + 32,
+            height:
+              Math.min(page.viewportSize()!.height, bottom.y + bottom.height + 16) -
+              Math.max(0, top.y - 16),
+          },
+        });
+      } finally {
+        await as(studio, "neema", "DELETE", "/api/projects/WEB/members/kofi@accra.dev.example");
+        await as(studio, "neema", "PUT", "/api/projects/WEB/federation", { federated: false });
+        await as(studio, "neema", "PUT", "/api/admin/settings/federation.enabled", {
+          value: "false",
+        });
+      }
+    },
+  },
 
   /* ----------------------------------------------------------- directory */
   {

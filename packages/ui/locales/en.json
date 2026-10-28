@@ -875,6 +875,7 @@
       "project_priority_added": "A priority level is added",
       "project_priority_changed": "A priority level is renamed or reordered",
       "project_priority_removed": "A priority level is removed",
+      "project_federation_changed": "A project is opened or closed to other servers",
       "issue_created": "An issue is filed",
       "issue_title_changed": "An issue's title changes",
       "issue_description_changed": "An issue's description changes",
@@ -1499,6 +1500,16 @@
       "carriedOut": "When {from} ended, the server took this out of it, with no next cycle to carry it to",
       "server": "The server"
     },
+    "federation": {
+      "title": "Other servers",
+      "label": "Open to other servers",
+      "hint": "Lets people on servers this one federates with be members. Closing it keeps them listed but shares nothing.",
+      "opened": "The project is open to other servers.",
+      "closed": "The project is closed to other servers.",
+      "remote": "Elsewhere",
+      "remoteHint": "On another server. Their role here is decided by this project.",
+      "addressHint": "A username here, or name@server for somebody on another server."
+    },
     "projectHistory": {
       "title": "What happened to this project",
       "hint": "Changes to the project itself, newest first. What happened to each issue is in that issue's own history.",
@@ -1539,7 +1550,9 @@
       "milestoneAdded": "{actor} added the milestone {name}",
       "milestoneChanged": "{actor} changed the milestone {name}",
       "milestoneRemoved": "{actor} removed the milestone {name}",
-      "baseline": "The server recorded everything the project held, so its history is complete from here"
+      "baseline": "The server recorded everything the project held, so its history is complete from here",
+      "federationOpened": "{actor} opened the project to other servers",
+      "federationClosed": "{actor} closed the project to other servers"
     },
     "priority": {
       "none": "no priority",

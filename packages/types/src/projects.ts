@@ -103,14 +103,19 @@ export interface Project {
   timeZone: string;
   /** What happens to unfinished issues when a cycle ends. */
   cyclePolicy: CyclePolicy;
+  /** Whether its administrators have opened it to other servers. */
+  federated: boolean;
 }
 
 export interface ProjectMember {
+  /** A username here, or the address of somebody on another server. */
   username: string;
   displayName: string;
   address: string;
   role: "admin" | "member";
   joinedAt: string;
+  /** Somebody on another server, whose role this server holds. */
+  remote?: boolean;
 }
 
 /** What the requester may do to one issue. */

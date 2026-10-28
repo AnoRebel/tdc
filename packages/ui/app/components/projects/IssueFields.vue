@@ -59,6 +59,9 @@ async function change(work: () => Promise<Issue>) {
 
 const assignable = computed(() =>
   members.value
+    // Somebody on another server cannot be assigned until their server can
+    // act on the project for them.
+    .filter((member) => !member.remote)
     .filter((member) => !props.issue.assignees.some((a) => a.username === member.username))
     .map((member) => ({
       value: member.username,

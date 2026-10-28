@@ -58,6 +58,8 @@ export function useProjects() {
       api.put<void>(`${at(key)}/members/${encodeURIComponent(username)}`, { role }),
     removeMember: (key: string, username: string) =>
       api.delete<void>(`${at(key)}/members/${encodeURIComponent(username)}`),
+    setFederated: (key: string, federated: boolean) =>
+      api.put<Project>(`${at(key)}/federation`, { federated }),
 
     addState: (key: string, state: { name: string; isCompletion: boolean }) =>
       api.post<IssueState>(`${at(key)}/states`, state),

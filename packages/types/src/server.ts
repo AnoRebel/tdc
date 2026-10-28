@@ -163,6 +163,8 @@ export type Capability =
   | "web-push"
   | "disposable-chats"
   | "projects"
+  // Projects opened to other servers, where this server federates.
+  | "projects.federated"
   // Meetups, talks, workshops and office hours. On unless an operator turns
   // it off.
   | "events"

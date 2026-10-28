@@ -875,6 +875,7 @@
       "project_priority_added": "Kiwango cha kipaumbele kimeongezwa",
       "project_priority_changed": "Kiwango cha kipaumbele kimebadilishwa jina au mpangilio",
       "project_priority_removed": "Kiwango cha kipaumbele kimeondolewa",
+      "project_federation_changed": "Mradi umefunguliwa au umefungwa kwa seva nyingine",
       "issue_created": "Suala limewasilishwa",
       "issue_title_changed": "Kichwa cha suala kimebadilika",
       "issue_description_changed": "Maelezo ya suala yamebadilika",
@@ -1499,6 +1500,16 @@
       "carriedOut": "{from} ulipoisha, seva ililiondoa humo, kwa kuwa hapakuwa na mzunguko unaofuata",
       "server": "Seva"
     },
+    "federation": {
+      "title": "Seva nyingine",
+      "label": "Fungua kwa seva nyingine",
+      "hint": "Huruhusu watu wa seva ambazo seva hii inashirikiana nazo kuwa wanachama. Ukiufunga, wanabaki kwenye orodha lakini hakuna kinachoshirikiwa.",
+      "opened": "Mradi umefunguliwa kwa seva nyingine.",
+      "closed": "Mradi umefungwa kwa seva nyingine.",
+      "remote": "Seva nyingine",
+      "remoteHint": "Yuko kwenye seva nyingine. Nafasi yake hapa inaamuliwa na mradi huu.",
+      "addressHint": "Jina la mtumiaji hapa, au jina@seva kwa mtu aliye kwenye seva nyingine."
+    },
     "projectHistory": {
       "title": "Yaliyotokea katika mradi huu",
       "hint": "Mabadiliko ya mradi wenyewe, ya karibuni kwanza. Yaliyotokea kwa kila suala yako katika historia ya suala hilo.",
@@ -1539,7 +1550,9 @@
       "milestoneAdded": "{actor} aliongeza hatua muhimu {name}",
       "milestoneChanged": "{actor} alibadilisha hatua muhimu {name}",
       "milestoneRemoved": "{actor} aliondoa hatua muhimu {name}",
-      "baseline": "Seva ilirekodi kila kitu ambacho mradi ulikuwa nacho, hivyo historia yake imekamilika kuanzia hapa"
+      "baseline": "Seva ilirekodi kila kitu ambacho mradi ulikuwa nacho, hivyo historia yake imekamilika kuanzia hapa",
+      "federationOpened": "{actor} amefungua mradi kwa seva nyingine",
+      "federationClosed": "{actor} amefunga mradi kwa seva nyingine"
     },
     "priority": {
       "none": "bila kipaumbele",

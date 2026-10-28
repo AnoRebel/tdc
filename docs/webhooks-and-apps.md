@@ -199,69 +199,70 @@ sent: to read the room it happened in — the channel, the project (by being in
 it, or its being public), the issue — or, for an event in no room, a permission
 held server-wide.
 
-| Type                        | Where | What it is                                                                                  | Needs                                              |
-| --------------------------- | ----- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `message.sent`              | C S   | A message, a reply in a thread, a forward                                                   | Reading the room                                   |
-| `message.edited`            | C S   | A message changed; `content.replaces` names it                                              | Reading the room                                   |
-| `message.deleted`           | C S   | A message taken down                                                                        | Reading the room                                   |
-| `message.updated`           | C S   | A program replaced its message's text or controls                                           | Reading the room                                   |
-| `action.pressed`            | C S   | Somebody pressed a button on a message                                                      | Reading the room                                   |
-| `member.joined`             | C S   | Somebody joined, or was invited — `content.invitedBy` says by whom                          | Reading the room                                   |
-| `member.left`               | C S   | Somebody left                                                                               | Reading the room                                   |
-| `member.removed`            | C S   | Somebody was removed                                                                        | Reading the room                                   |
-| `room.created`              | S     | A channel was made                                                                          | Reading it: a private one reaches its members only |
-| `room.renamed`              | C S   | Its name or topic changed                                                                   | Reading the room                                   |
-| `room.archived`             | C S   | It was archived                                                                             | Reading the room                                   |
-| `room.restored`             | C S   | It was brought back                                                                         | Reading the room                                   |
-| `room.visibility_changed`   | C S   | It was made public or private                                                               | Reading the room                                   |
-| `call.started`              | C S   | A call began in the conversation                                                            | Reading the room                                   |
-| `call.ended`                | C S   | It ended; who was in it is not recorded                                                     | Reading the room                                   |
-| `call.recording_started`    | C S   | Somebody began recording the call, everybody in it told first                               | Reading the room                                   |
-| `call.recording_stopped`    | C S   | It stopped: by the recorder, or because they left or dropped                                | Reading the room                                   |
-| `event.created`             | C     | An event was scheduled in the channel                                                       | Reading the channel; never an invite-only event    |
-| `event.updated`             | C     | Its details changed; `changed` names the fields                                             | Reading the channel; never an invite-only event    |
-| `event.cancelled`           | C     | It was cancelled; `reason` says why, if given                                               | Reading the channel; never an invite-only event    |
-| `event.rsvp`                | C     | Somebody answered it, if they let others see what they go to                                | Reading the channel; never an invite-only event    |
-| `engagement.changed`        | C S   | A directory engagement moved on, in its own conversation                                    | Being in that conversation                         |
-| `project.created`           | S     | A project was started                                                                       | Seeing the project                                 |
-| `project.updated`           | P S   | Its name, description or visibility changed, each as `previous` and `new`                   | Seeing the project                                 |
-| `project.member_added`      | P S   | Somebody was added, or their role changed                                                   | Seeing the project                                 |
-| `project.member_removed`    | P S   | Somebody was taken out                                                                      | Seeing the project                                 |
-| `project.state_added`       | P S   | A state was added to its workflow                                                           | Seeing the project                                 |
-| `project.state_changed`     | P S   | A state was renamed or moved                                                                | Seeing the project                                 |
-| `project.state_removed`     | P S   | A state was removed                                                                         | Seeing the project                                 |
-| `project.label_added`       | P S   | A label was added to its list                                                               | Seeing the project                                 |
-| `project.label_changed`     | P S   | A label was renamed or recoloured                                                           | Seeing the project                                 |
-| `project.label_removed`     | P S   | A label was removed, and taken off every issue                                              | Seeing the project                                 |
-| `project.priority_added`    | P S   | A level was added to its priority scale                                                     | Seeing the project                                 |
-| `project.priority_changed`  | P S   | A priority level was renamed or moved                                                       | Seeing the project                                 |
-| `project.priority_removed`  | P S   | A priority level was removed                                                                | Seeing the project                                 |
-| `issue.created`             | P S   | An issue was filed                                                                          | Seeing the project                                 |
-| `issue.title_changed`       | P S   | Its title changed                                                                           | Seeing the project                                 |
-| `issue.description_changed` | P S   | Its description changed                                                                     | Seeing the project                                 |
-| `issue.state_changed`       | P S   | It moved between states; `completed` and `wasCompleted` say whether each is a finishing one | Seeing the project                                 |
-| `issue.closed`              | P S   | It moved into a finishing state from one that is not                                        | Seeing the project                                 |
-| `issue.reopened`            | P S   | It moved out of a finishing state                                                           | Seeing the project                                 |
-| `issue.commented`           | P S   | A message in its discussion                                                                 | Seeing the issue                                   |
-| `issue.assigned`            | P S   | Somebody was assigned                                                                       | Seeing the project                                 |
-| `issue.unassigned`          | P S   | Somebody was unassigned                                                                     | Seeing the project                                 |
-| `issue.labeled`             | P S   | A label was put on it                                                                       | Seeing the project                                 |
-| `issue.unlabeled`           | P S   | A label was taken off                                                                       | Seeing the project                                 |
-| `issue.priority_changed`    | P S   | Its priority changed                                                                        | Seeing the project                                 |
-| `issue.related`             | P S   | It was linked to another issue                                                              | Seeing the project                                 |
-| `issue.unrelated`           | P S   | A link was removed                                                                          | Seeing the project                                 |
-| `issue.deleted`             | P S   | It was deleted                                                                              | Seeing the project                                 |
-| `issue.cycle_changed`       | P S   | It was moved into, out of or between cycles                                                 | Seeing the project                                 |
-| `issue.milestone_changed`   | P S   | It was counted towards another milestone, or none                                           | Seeing the project                                 |
-| `project.cycle_added`       | P S   | A cycle was planned                                                                         | Seeing the project                                 |
-| `project.cycle_changed`     | P S   | Its name or dates changed                                                                   | Seeing the project                                 |
-| `project.cycle_ended`       | P S   | It ended, saying what became of each unfinished issue; sent by the server                   | Seeing the project                                 |
-| `project.cycle_removed`     | P S   | It was removed                                                                              | Seeing the project                                 |
-| `project.milestone_added`   | P S   | A milestone was set                                                                         | Seeing the project                                 |
-| `project.milestone_changed` | P S   | Its name or target date changed                                                             | Seeing the project                                 |
-| `project.milestone_removed` | P S   | It was removed                                                                              | Seeing the project                                 |
-| `account.created`           | S     | A new account on the server                                                                 | `user.read.all`                                    |
-| `account.role_changed`      | S     | Somebody was given a role or had one taken away                                             | `user.read.all`                                    |
+| Type                         | Where | What it is                                                                                  | Needs                                              |
+| ---------------------------- | ----- | ------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `message.sent`               | C S   | A message, a reply in a thread, a forward                                                   | Reading the room                                   |
+| `message.edited`             | C S   | A message changed; `content.replaces` names it                                              | Reading the room                                   |
+| `message.deleted`            | C S   | A message taken down                                                                        | Reading the room                                   |
+| `message.updated`            | C S   | A program replaced its message's text or controls                                           | Reading the room                                   |
+| `action.pressed`             | C S   | Somebody pressed a button on a message                                                      | Reading the room                                   |
+| `member.joined`              | C S   | Somebody joined, or was invited — `content.invitedBy` says by whom                          | Reading the room                                   |
+| `member.left`                | C S   | Somebody left                                                                               | Reading the room                                   |
+| `member.removed`             | C S   | Somebody was removed                                                                        | Reading the room                                   |
+| `room.created`               | S     | A channel was made                                                                          | Reading it: a private one reaches its members only |
+| `room.renamed`               | C S   | Its name or topic changed                                                                   | Reading the room                                   |
+| `room.archived`              | C S   | It was archived                                                                             | Reading the room                                   |
+| `room.restored`              | C S   | It was brought back                                                                         | Reading the room                                   |
+| `room.visibility_changed`    | C S   | It was made public or private                                                               | Reading the room                                   |
+| `call.started`               | C S   | A call began in the conversation                                                            | Reading the room                                   |
+| `call.ended`                 | C S   | It ended; who was in it is not recorded                                                     | Reading the room                                   |
+| `call.recording_started`     | C S   | Somebody began recording the call, everybody in it told first                               | Reading the room                                   |
+| `call.recording_stopped`     | C S   | It stopped: by the recorder, or because they left or dropped                                | Reading the room                                   |
+| `event.created`              | C     | An event was scheduled in the channel                                                       | Reading the channel; never an invite-only event    |
+| `event.updated`              | C     | Its details changed; `changed` names the fields                                             | Reading the channel; never an invite-only event    |
+| `event.cancelled`            | C     | It was cancelled; `reason` says why, if given                                               | Reading the channel; never an invite-only event    |
+| `event.rsvp`                 | C     | Somebody answered it, if they let others see what they go to                                | Reading the channel; never an invite-only event    |
+| `engagement.changed`         | C S   | A directory engagement moved on, in its own conversation                                    | Being in that conversation                         |
+| `project.created`            | S     | A project was started                                                                       | Seeing the project                                 |
+| `project.updated`            | P S   | Its name, description or visibility changed, each as `previous` and `new`                   | Seeing the project                                 |
+| `project.member_added`       | P S   | Somebody was added, or their role changed                                                   | Seeing the project                                 |
+| `project.member_removed`     | P S   | Somebody was taken out                                                                      | Seeing the project                                 |
+| `project.state_added`        | P S   | A state was added to its workflow                                                           | Seeing the project                                 |
+| `project.state_changed`      | P S   | A state was renamed or moved                                                                | Seeing the project                                 |
+| `project.state_removed`      | P S   | A state was removed                                                                         | Seeing the project                                 |
+| `project.label_added`        | P S   | A label was added to its list                                                               | Seeing the project                                 |
+| `project.label_changed`      | P S   | A label was renamed or recoloured                                                           | Seeing the project                                 |
+| `project.label_removed`      | P S   | A label was removed, and taken off every issue                                              | Seeing the project                                 |
+| `project.priority_added`     | P S   | A level was added to its priority scale                                                     | Seeing the project                                 |
+| `project.priority_changed`   | P S   | A priority level was renamed or moved                                                       | Seeing the project                                 |
+| `project.priority_removed`   | P S   | A priority level was removed                                                                | Seeing the project                                 |
+| `project.federation_changed` | P S   | It was opened to other servers, or closed to them                                           | Seeing the project                                 |
+| `issue.created`              | P S   | An issue was filed                                                                          | Seeing the project                                 |
+| `issue.title_changed`        | P S   | Its title changed                                                                           | Seeing the project                                 |
+| `issue.description_changed`  | P S   | Its description changed                                                                     | Seeing the project                                 |
+| `issue.state_changed`        | P S   | It moved between states; `completed` and `wasCompleted` say whether each is a finishing one | Seeing the project                                 |
+| `issue.closed`               | P S   | It moved into a finishing state from one that is not                                        | Seeing the project                                 |
+| `issue.reopened`             | P S   | It moved out of a finishing state                                                           | Seeing the project                                 |
+| `issue.commented`            | P S   | A message in its discussion                                                                 | Seeing the issue                                   |
+| `issue.assigned`             | P S   | Somebody was assigned                                                                       | Seeing the project                                 |
+| `issue.unassigned`           | P S   | Somebody was unassigned                                                                     | Seeing the project                                 |
+| `issue.labeled`              | P S   | A label was put on it                                                                       | Seeing the project                                 |
+| `issue.unlabeled`            | P S   | A label was taken off                                                                       | Seeing the project                                 |
+| `issue.priority_changed`     | P S   | Its priority changed                                                                        | Seeing the project                                 |
+| `issue.related`              | P S   | It was linked to another issue                                                              | Seeing the project                                 |
+| `issue.unrelated`            | P S   | A link was removed                                                                          | Seeing the project                                 |
+| `issue.deleted`              | P S   | It was deleted                                                                              | Seeing the project                                 |
+| `issue.cycle_changed`        | P S   | It was moved into, out of or between cycles                                                 | Seeing the project                                 |
+| `issue.milestone_changed`    | P S   | It was counted towards another milestone, or none                                           | Seeing the project                                 |
+| `project.cycle_added`        | P S   | A cycle was planned                                                                         | Seeing the project                                 |
+| `project.cycle_changed`      | P S   | Its name or dates changed                                                                   | Seeing the project                                 |
+| `project.cycle_ended`        | P S   | It ended, saying what became of each unfinished issue; sent by the server                   | Seeing the project                                 |
+| `project.cycle_removed`      | P S   | It was removed                                                                              | Seeing the project                                 |
+| `project.milestone_added`    | P S   | A milestone was set                                                                         | Seeing the project                                 |
+| `project.milestone_changed`  | P S   | Its name or target date changed                                                             | Seeing the project                                 |
+| `project.milestone_removed`  | P S   | It was removed                                                                              | Seeing the project                                 |
+| `account.created`            | S     | A new account on the server                                                                 | `user.read.all`                                    |
+| `account.role_changed`       | S     | Somebody was given a role or had one taken away                                             | `user.read.all`                                    |
 
 Every issue event's `content` carries `issue` and `key` (`WEB-12`), and a change
 carries `field`, `previous` and `new`. **Settings → Integrations** offers them in

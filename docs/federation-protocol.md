@@ -632,6 +632,12 @@ a person on another server sees them in the call's state but cannot do them.
 > of a project will rebuild the project from exactly this, and the event family
 > is part of what `tdc/1` will carry.
 
+A project is shared only once its administrators open it to federation, and
+until then a federated request about it is answered as though it did not
+exist. Its home server alone decides who is in it, people on other servers
+included: they are held there by address, with a project role that alone
+decides what they may do in it — nothing their own server grants them applies.
+
 A project is a room of kind `project`, sharing its identifier with the
 project. Its log holds no messages: every change to the project and to every
 issue in it is an event, signed and sequenced like any other (see
@@ -650,8 +656,9 @@ a reader of the history — and a receiver ignores what it does not use.
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `project.created`                                                          | `key`, `name`, `description`, `visibility`, `timeZone`, `cyclePolicy`. The sender becomes the project's first administrator.                                                   |
 | `project.updated`                                                          | One or more of `name`, `description`, `visibility`, `timeZone`, `cyclePolicy`, each `{previous, new}`.                                                                         |
-| `project.member_added`                                                     | `member` (address), `role` (`admin` or `member`), `previous` (the role before, empty for somebody new).                                                                        |
+| `project.member_added`                                                     | `member` (address, here or on another server), `role` (`admin` or `member`), `previous` (the role before, empty for somebody new).                                             |
 | `project.member_removed`                                                   | `member`.                                                                                                                                                                      |
+| `project.federation_changed`                                               | `federated`: whether the project's administrators have opened it to other servers.                                                                                             |
 | `project.state_added`                                                      | `state`, `name`, `position`, `isCompletion`.                                                                                                                                   |
 | `project.state_changed`                                                    | Either `state`, `name`, `isCompletion` (and `previous`), or `order`: every state, left to right.                                                                               |
 | `project.state_removed`                                                    | `state`. Its issues were moved out first, each by its own `issue.state_changed`.                                                                                               |

@@ -480,6 +480,31 @@ A refusal says which permission would have allowed the action.
 Commenting on an issue has no permission of its own: it is posting in the
 issue's discussion, which is governed like posting in any conversation.
 
+## People on other servers
+
+On a server that federates, a project's administrators can let people from
+other servers into it. It starts closed. **Settings → Other servers → Open to
+other servers** opens it; this is recorded in the project's history and in the
+server's audit log.
+
+Once it is open, add somebody from elsewhere under **Members** by their address,
+`name@their.server`, with a role, as you would add somebody here by username.
+They are marked **Elsewhere**. A server this one has blocked, or does not list
+when it federates only with a list, is refused.
+
+![A project's members, one of them on another server and marked Elsewhere, above the switch that opens the project to other servers](images/projects/sharing.webp)
+
+Their permissions here come from their role in the project and nothing else: an
+administrator here may do what the table above gives the project's
+administrators, and a member what it gives members. Roles their own server gives
+them, and grants this server's roles carry, do not apply to them. Only
+administrators on this server count towards a project's last administrator.
+
+Closing a project again keeps its members from elsewhere listed and shares
+nothing with anybody. Nothing about a project reaches another server yet, and
+somebody on another server cannot yet be assigned an issue: both come with
+sharing a project's contents, which is still being built.
+
 ## Discussing an issue
 
 Every issue has a discussion beside it, and it is a conversation like any

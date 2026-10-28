@@ -864,6 +864,15 @@ Every change here is in the audit log under its own name —
 "when did we start federating with them, and who decided that" is a question
 the log answers directly.
 
+### Projects and other servers
+
+Turning federation on does not share any project. Each project's own
+administrators decide whether theirs is opened to other servers, under
+**Settings → Other servers**, and every opening and closing is in the audit log
+as `project.federation.changed`. People from other servers are then added to a
+project by address, refused if their server is one you do not federate with. See
+[People on other servers](projects.md#people-on-other-servers).
+
 ### If a signing key is compromised
 
 Rotate it. That is the only mechanism, and you should know what it does not do.

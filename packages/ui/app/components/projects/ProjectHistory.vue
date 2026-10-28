@@ -176,6 +176,12 @@ function describe(entry: ProjectHistoryEntry): string[] {
       return [$ts("projects.projectHistory.milestoneRemoved", { actor, name })];
     case "project.baseline":
       return [$ts("projects.projectHistory.baseline")];
+    case "project.federation_changed":
+      return [
+        content.federated
+          ? $ts("projects.projectHistory.federationOpened", { actor })
+          : $ts("projects.projectHistory.federationClosed", { actor }),
+      ];
     default:
       return [$ts("projects.history.other", { actor, type: entry.type })];
   }

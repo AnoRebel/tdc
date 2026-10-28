@@ -15,6 +15,7 @@ import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 import { Field } from "#layers/ui/app/components/ui/field";
 import { Input } from "#layers/ui/app/components/ui/input";
 import { Select } from "#layers/ui/app/components/ui/select";
+import { Switch } from "#layers/ui/app/components/ui/switch";
 
 const { $t, $ts } = useI18n();
 
@@ -32,6 +33,7 @@ definePageMeta({ middleware: "auth", layout: "app" });
 const route = useRoute();
 const key = computed(() => String(route.params.key).toUpperCase());
 const projectsApi = useProjects();
+const { offers } = useServerInfo();
 
 const project = ref<Project | null>(null);
 const members = ref<ProjectMember[]>([]);
@@ -194,6 +196,20 @@ const memberForm = useForm({
     await attempt(() => projectsApi.setMember(key.value, value.username.trim(), value.role));
     if (!error.value) memberForm.reset();
   },
+});
+
+/*
+ * Sharing with other servers. Shown where this server federates, and on a
+ * project already opened even where it no longer does, so it can be closed.
+ */
+const sharable = computed(() => offers("projects.federated") || Boolean(project.value?.federated));
+const federated = computed({
+  get: () => Boolean(project.value?.federated),
+  set: (value: boolean) =>
+    void attempt(
+      () => projectsApi.setFederated(key.value, value),
+      value ? $ts("projects.federation.opened") : $ts("projects.federation.closed"),
+    ),
 });
 
 /* Who can see it. */
@@ -492,6 +508,14 @@ async function setPolicy(cyclePolicy: CyclePolicy | undefined) {
                     member.address
                   }}</span>
                 </span>
+                <span
+                  v-if="member.remote"
+                  class="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                  :title="$ts('projects.federation.remoteHint')"
+                >
+                  <Icon name="lucide:globe" class="size-3" aria-hidden="true" />
+                  {{ $t("projects.federation.remote") }}
+                </span>
                 <span class="text-xs text-muted-foreground">
                   {{
                     member.role === "admin" ? $t("projects.roleAdmin") : $t("projects.roleMember")
@@ -517,6 +541,7 @@ async function setPolicy(cyclePolicy: CyclePolicy | undefined) {
                 <template #default="{ field }">
                   <Field
                     :label="$ts('projects.username')"
+                    :hint="project.federated ? $ts('projects.federation.addressHint') : undefined"
                     class="min-w-40 flex-1"
                     :error="
                       field.state.meta.isTouched && field.state.meta.errors.length
@@ -555,6 +580,24 @@ async function setPolicy(cyclePolicy: CyclePolicy | undefined) {
               </memberForm.Field>
               <Button type="submit" class="self-end">{{ $t("projects.addMember") }}</Button>
             </form>
+          </section>
+
+          <section v-if="sharable" :aria-labelledby="'federation-heading'">
+            <h2 id="federation-heading" class="text-sm font-semibold">
+              {{ $t("projects.federation.title") }}
+            </h2>
+            <div class="mt-2 flex items-start gap-2.5">
+              <Switch
+                v-model="federated"
+                :disabled="!canAdminister"
+                :label="$ts('projects.federation.label')"
+                class="mt-0.5"
+              />
+              <div>
+                <p class="text-xs">{{ $t("projects.federation.label") }}</p>
+                <p class="text-xs text-muted-foreground">{{ $t("projects.federation.hint") }}</p>
+              </div>
+            </div>
           </section>
 
           <section v-if="canAdminister" :aria-labelledby="'visibility-heading'">
