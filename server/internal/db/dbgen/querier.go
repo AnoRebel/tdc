@@ -30,6 +30,7 @@ type Querier interface {
 	// loses deletes the object it stored.
 	AddFileUploadPiece(ctx context.Context, arg AddFileUploadPieceParams) (FileUpload, error)
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
+	AddProjectRemoteMember(ctx context.Context, arg AddProjectRemoteMemberParams) error
 	// Reacting twice with the same emoji is the same as reacting once.
 	//
 	// ON CONFLICT DO NOTHING rather than an error: a double click, or two devices
@@ -567,6 +568,7 @@ type Querier interface {
 	GetProjectLabel(ctx context.Context, id uuid.UUID) (ProjectLabel, error)
 	GetProjectMemberRole(ctx context.Context, arg GetProjectMemberRoleParams) (string, error)
 	GetProjectPriority(ctx context.Context, id uuid.UUID) (ProjectPriority, error)
+	GetProjectRemoteMemberRole(ctx context.Context, arg GetProjectRemoteMemberRoleParams) (string, error)
 	GetProjectView(ctx context.Context, id uuid.UUID) (ProjectView, error)
 	// Read without spending, so the client can tell somebody their link has expired
 	// before asking them to type a new password into a form that cannot work.
@@ -893,6 +895,8 @@ type Querier interface {
 	// cycle. A project holds hundreds or a few thousand issues, so reading its
 	// edges is cheap, and a walk in memory is simple enough to be obviously right.
 	ListProjectRelations(ctx context.Context, arg ListProjectRelationsParams) ([]ListProjectRelationsRow, error)
+	ListProjectRemoteMembers(ctx context.Context, projectID uuid.UUID) ([]ListProjectRemoteMembersRow, error)
+	ListProjectRemoteMembersForStream(ctx context.Context, projectID uuid.UUID) ([]ListProjectRemoteMembersForStreamRow, error)
 	// A project's stream in order, for replaying it.
 	ListProjectStream(ctx context.Context, arg ListProjectStreamParams) ([]Event, error)
 	// The projects somebody may see: every public one, and the private ones they
@@ -1220,6 +1224,7 @@ type Querier interface {
 	// discussion's notifications to somebody who may no longer read it.
 	RemoveFromProjectDiscussions(ctx context.Context, arg RemoveFromProjectDiscussionsParams) error
 	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) error
+	RemoveProjectRemoteMember(ctx context.Context, arg RemoveProjectRemoteMemberParams) error
 	RemoveReaction(ctx context.Context, arg RemoveReactionParams) error
 	RemoveRemoteMember(ctx context.Context, arg RemoveRemoteMemberParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
@@ -1413,6 +1418,8 @@ type Querier interface {
 	// Recording an address somebody has asked to prove, which does not touch the
 	// one they already have.
 	SetPendingEmail(ctx context.Context, arg SetPendingEmailParams) error
+	// Rows changed, so opening an already opened project records nothing.
+	SetProjectFederated(ctx context.Context, arg SetProjectFederatedParams) (int64, error)
 	// Cycles and milestones.
 	SetProjectPlanning(ctx context.Context, arg SetProjectPlanningParams) (Project, error)
 	SetProjectPriorityRank(ctx context.Context, arg SetProjectPriorityRankParams) error

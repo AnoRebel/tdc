@@ -43,6 +43,10 @@ const (
 	*/
 	TypeProjectBaseline Type = "project.baseline"
 
+	// Whether the project may be shared with other servers, as its
+	// administrators decided.
+	TypeProjectFederationChanged Type = "project.federation_changed"
+
 	// Cycles and milestones. A cycle's end is recorded by the server, which
 	// is what dealt with it, saying what became of every unfinished issue.
 	TypeProjectCycleAdded       Type = "project.cycle_added"

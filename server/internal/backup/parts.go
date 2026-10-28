@@ -171,6 +171,7 @@ var partTables = map[Part][]tableSpec{
 	PartProjects: {
 		{name: "projects"},
 		{name: "project_members"},
+		{name: "project_remote_members"},
 		{name: "project_views"},
 		{name: "project_labels"},
 		{name: "project_priorities"},

@@ -62,6 +62,10 @@ The request is signed by the author's server and its author must belong to that 
 
 `project_members` gains remote members by address, alongside local ones by account. A remote member's role is held by the home server; the replica shows it but cannot change it. The baseline rule (`Member` role overridable per scope) applies unchanged to remote members' server-level grants on *their own* server and not at all to the project's home: a project's permissions for a remote member come only from their project role.
 
+As built (Phase 2): a table of their own, `project_remote_members`, keyed by address with the server half stored, beside `project_members` — which requires a local account, as `remote_members` is beside `room_members` for rooms. The member routes take `name@server` wherever they take a username; this server's own name is somebody here. `RemoteAccess` resolves a remote member's access with no permissions of its own, so `Allows` answers from the role alone and refuses exactly as it would refuse a local member with that role. Only administrators here count towards a project's last administrator, since nobody elsewhere can act on it until Phase 4. A remote member is the projector's ordinary member, keyed by address, so their changes need no new event types.
+
+The switch is `projects.federated`, not the project room's `rooms.federated`: that flag opens a room to the room federation endpoints, and a project's stream must leave by the project's rules alone. Opening is `project.federation_changed` in the stream and `project.federation.changed` in the audit log; it is refused on a server that does not federate, closing never is, and a project closed again keeps its remote members, inert. Adding somebody from a server the trust settings refuse is refused before it is recorded.
+
 ### Who receives a project
 
 - **Not opened to federation:** nobody. The default, as with rooms.

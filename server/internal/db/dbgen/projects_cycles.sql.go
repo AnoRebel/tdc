@@ -846,7 +846,7 @@ const setProjectPlanning = `-- name: SetProjectPlanning :one
 
 UPDATE projects SET time_zone = $1, cycle_policy = $2
 WHERE id = $3
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated
 `
 
 type SetProjectPlanningParams struct {
@@ -873,6 +873,7 @@ func (q *Queries) SetProjectPlanning(ctx context.Context, arg SetProjectPlanning
 		&i.TimeZone,
 		&i.CyclePolicy,
 		&i.StreamComplete,
+		&i.Federated,
 	)
 	return i, err
 }

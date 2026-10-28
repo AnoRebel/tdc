@@ -2380,6 +2380,14 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[userResponse]()},
 		},
 	},
+	"PUT /api/projects/:key/federation": {
+		Request: reflect.TypeFor[struct {
+			Federated bool "json:\"federated\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[projectResponse]()},
+		},
+	},
 	"PUT /api/projects/:key/members/:username": {
 		Request: reflect.TypeFor[struct {
 			Role string "json:\"role\""

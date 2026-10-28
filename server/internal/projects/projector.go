@@ -60,6 +60,8 @@ type ProjectRow struct {
 	CyclePolicy     string    `json:"cyclePolicy"`
 	NextIssueNumber int64     `json:"nextIssueNumber"`
 	CreatedBy       string    `json:"createdBy,omitempty"`
+	// Federated is whether the project may be shared with other servers.
+	Federated bool `json:"federated,omitempty"`
 }
 
 // MemberRow is somebody's place in the project, keyed by their address.
@@ -391,6 +393,15 @@ var projections = map[events.Type]func(*Rows, dbgen.Event) error{
 		// A change of role keeps who first added them, as the row does.
 		member.Role = content.Role
 		rows.Members[content.Member] = member
+		return nil
+	},
+
+	events.TypeProjectFederationChanged: func(rows *Rows, event dbgen.Event) error {
+		var content struct{ Federated bool }
+		if err := decode(event, &content); err != nil {
+			return err
+		}
+		rows.Project.Federated = content.Federated
 		return nil
 	},
 
@@ -905,6 +916,7 @@ func (s *Service) rowsOf(ctx context.Context, q *dbgen.Queries, projectID uuid.U
 		ID: project.ID, Key: project.Key, Name: project.Name, Description: project.Description,
 		Visibility: project.Visibility, TimeZone: project.TimeZone, CyclePolicy: project.CyclePolicy,
 		NextIssueNumber: project.NextIssueNumber, CreatedBy: address(project.CreatedByUsername),
+		Federated: project.Federated,
 	}
 
 	members, err := q.ListProjectMembersForStream(ctx, projectID)
@@ -913,6 +925,13 @@ func (s *Service) rowsOf(ctx context.Context, q *dbgen.Queries, projectID uuid.U
 	}
 	for _, member := range members {
 		rows.Members[address(member.Username)] = MemberRow{Role: member.Role, AddedBy: address(member.AddedByUsername)}
+	}
+	remote, err := q.ListProjectRemoteMembersForStream(ctx, projectID)
+	if err != nil {
+		return Rows{}, fmt.Errorf("read remote members: %w", err)
+	}
+	for _, member := range remote {
+		rows.Members[member.Address] = MemberRow{Role: member.Role, AddedBy: address(member.AddedByUsername)}
 	}
 
 	states, err := q.ListIssueStates(ctx, projectID)

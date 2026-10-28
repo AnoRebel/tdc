@@ -171,3 +171,23 @@ SELECT * FROM events
 WHERE room_id = @project_id AND sequence > @after_sequence
 ORDER BY sequence
 LIMIT @page_size;
+
+-- name: SetProjectFederated :execrows
+-- Rows changed, so opening an already opened project records nothing.
+UPDATE projects SET federated = $2, updated_at = NOW() WHERE id = $1 AND federated <> $2;
+
+-- name: AddProjectRemoteMember :exec
+INSERT INTO project_remote_members (project_id, address, home_server, role, added_by)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (project_id, address) DO UPDATE SET role = EXCLUDED.role;
+
+-- name: RemoveProjectRemoteMember :exec
+DELETE FROM project_remote_members WHERE project_id = $1 AND address = $2;
+
+-- name: GetProjectRemoteMemberRole :one
+SELECT role FROM project_remote_members WHERE project_id = $1 AND address = $2;
+
+-- name: ListProjectRemoteMembers :many
+SELECT address, role, joined_at FROM project_remote_members
+WHERE project_id = $1
+ORDER BY role, address;

@@ -15,7 +15,7 @@ import (
 
 const getProjectForStream = `-- name: GetProjectForStream :one
 
-SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, COALESCE(creator.username, '')::text AS created_by_username
+SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, COALESCE(creator.username, '')::text AS created_by_username
 FROM projects
 LEFT JOIN users creator ON creator.id = projects.created_by
 WHERE projects.id = $1
@@ -35,6 +35,7 @@ type GetProjectForStreamRow struct {
 	TimeZone          string
 	CyclePolicy       string
 	StreamComplete    bool
+	Federated         bool
 	CreatedByUsername string
 }
 
@@ -61,6 +62,7 @@ func (q *Queries) GetProjectForStream(ctx context.Context, id uuid.UUID) (GetPro
 		&i.TimeZone,
 		&i.CyclePolicy,
 		&i.StreamComplete,
+		&i.Federated,
 		&i.CreatedByUsername,
 	)
 	return i, err
@@ -471,6 +473,39 @@ func (q *Queries) ListProjectMembersForStream(ctx context.Context, projectID uui
 	for rows.Next() {
 		var i ListProjectMembersForStreamRow
 		if err := rows.Scan(&i.Username, &i.Role, &i.AddedByUsername); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProjectRemoteMembersForStream = `-- name: ListProjectRemoteMembersForStream :many
+SELECT project_remote_members.address, project_remote_members.role, COALESCE(adder.username, '')::text AS added_by_username
+FROM project_remote_members
+LEFT JOIN users adder ON adder.id = project_remote_members.added_by
+WHERE project_remote_members.project_id = $1
+`
+
+type ListProjectRemoteMembersForStreamRow struct {
+	Address         string
+	Role            string
+	AddedByUsername string
+}
+
+func (q *Queries) ListProjectRemoteMembersForStream(ctx context.Context, projectID uuid.UUID) ([]ListProjectRemoteMembersForStreamRow, error) {
+	rows, err := q.db.Query(ctx, listProjectRemoteMembersForStream, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectRemoteMembersForStreamRow{}
+	for rows.Next() {
+		var i ListProjectRemoteMembersForStreamRow
+		if err := rows.Scan(&i.Address, &i.Role, &i.AddedByUsername); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

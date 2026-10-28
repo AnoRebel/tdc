@@ -854,6 +854,11 @@ func (s *Server) capabilities(ctx context.Context) []string {
 			capabilities = append(capabilities, "calls.federated")
 		}
 	}
+	// Sharing projects with other servers, offered wherever this server
+	// federates at all; each project is then opened by its administrators.
+	if s.projects != nil && s.settings.Get(ctx, settings.FederationEnabled) == "true" {
+		capabilities = append(capabilities, "projects.federated")
+	}
 
 	return capabilities
 }

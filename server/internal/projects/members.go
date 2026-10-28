@@ -25,9 +25,13 @@ func (s *Service) Members(ctx context.Context, access Access) ([]dbgen.ListProje
 /*
 SetMember adds somebody to a project, or changes their role in it.
 
+Somebody is named by username, or by name@server for somebody on another
+server — who may join only a project opened to federation.
+
 Demoting the last administrator is refused: a project nobody can administer
 cannot have its members or its states changed again except by the server's
-own administrators.
+own administrators. Only administrators here count, since nobody elsewhere can
+act on the project until changes from other servers arrive.
 */
 func (s *Service) SetMember(ctx context.Context, actor Actor, access Access, username, role string) error {
 	if decision := access.Allows(authz.PermProjectAdminister); !decision.Allowed {
@@ -40,7 +44,15 @@ func (s *Service) SetMember(ctx context.Context, actor Actor, access Access, use
 		return ErrMemberRole
 	}
 
-	person, err := s.queries.GetUserByUsername(ctx, identity.NormaliseUsername(username))
+	address, server, remote, err := s.remoteAddress(username)
+	if err != nil {
+		return err
+	}
+	if remote {
+		return s.setRemoteMember(ctx, actor, access, address, server, role)
+	}
+
+	person, err := s.queries.GetUserByUsername(ctx, identity.NormaliseUsername(s.localName(username)))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNoSuchPerson
 	}
@@ -95,7 +107,15 @@ who may no longer read it.
 Somebody may always remove themselves, except as the last administrator.
 */
 func (s *Service) RemoveMember(ctx context.Context, actor Actor, access Access, username string) error {
-	person, err := s.queries.GetUserByUsername(ctx, identity.NormaliseUsername(username))
+	address, _, remote, err := s.remoteAddress(username)
+	if err != nil {
+		return err
+	}
+	if remote {
+		return s.removeRemoteMember(ctx, actor, access, address)
+	}
+
+	person, err := s.queries.GetUserByUsername(ctx, identity.NormaliseUsername(s.localName(username)))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNoSuchPerson
 	}

@@ -18,6 +18,12 @@ JOIN users member ON member.id = project_members.user_id
 LEFT JOIN users adder ON adder.id = project_members.added_by
 WHERE project_members.project_id = $1;
 
+-- name: ListProjectRemoteMembersForStream :many
+SELECT project_remote_members.address, project_remote_members.role, COALESCE(adder.username, '')::text AS added_by_username
+FROM project_remote_members
+LEFT JOIN users adder ON adder.id = project_remote_members.added_by
+WHERE project_remote_members.project_id = $1;
+
 -- name: ListIssuesForStream :many
 -- Deleted issues included: a deleted issue is still a row, still numbered.
 SELECT issues.id, issues.number, issues.title, issues.description, issues.state_id,

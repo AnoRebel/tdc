@@ -873,6 +873,7 @@ type Project struct {
 	TimeZone        string
 	CyclePolicy     string
 	StreamComplete  bool
+	Federated       bool
 }
 
 type ProjectLabel struct {
@@ -899,6 +900,15 @@ type ProjectPriority struct {
 	NameFolded string
 	Rank       int32
 	CreatedAt  time.Time
+}
+
+type ProjectRemoteMember struct {
+	ProjectID  uuid.UUID
+	Address    string
+	HomeServer string
+	Role       string
+	JoinedAt   time.Time
+	AddedBy    *uuid.UUID
 }
 
 type ProjectView struct {

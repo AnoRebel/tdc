@@ -35,6 +35,31 @@ func (q *Queries) AddProjectMember(ctx context.Context, arg AddProjectMemberPara
 	return err
 }
 
+const addProjectRemoteMember = `-- name: AddProjectRemoteMember :exec
+INSERT INTO project_remote_members (project_id, address, home_server, role, added_by)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (project_id, address) DO UPDATE SET role = EXCLUDED.role
+`
+
+type AddProjectRemoteMemberParams struct {
+	ProjectID  uuid.UUID
+	Address    string
+	HomeServer string
+	Role       string
+	AddedBy    *uuid.UUID
+}
+
+func (q *Queries) AddProjectRemoteMember(ctx context.Context, arg AddProjectRemoteMemberParams) error {
+	_, err := q.db.Exec(ctx, addProjectRemoteMember,
+		arg.ProjectID,
+		arg.Address,
+		arg.HomeServer,
+		arg.Role,
+		arg.AddedBy,
+	)
+	return err
+}
+
 const allocateIssueNumber = `-- name: AllocateIssueNumber :one
 UPDATE projects
 SET next_issue_number = next_issue_number + 1
@@ -147,7 +172,7 @@ const createProject = `-- name: CreateProject :one
 
 INSERT INTO projects (id, key, key_folded, name, description, visibility, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated
 `
 
 type CreateProjectParams struct {
@@ -186,6 +211,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.TimeZone,
 		&i.CyclePolicy,
 		&i.StreamComplete,
+		&i.Federated,
 	)
 	return i, err
 }
@@ -272,7 +298,7 @@ func (q *Queries) GetIssueState(ctx context.Context, id uuid.UUID) (IssueState, 
 }
 
 const getProjectByID = `-- name: GetProjectByID :one
-SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete FROM projects WHERE id = $1
+SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated FROM projects WHERE id = $1
 `
 
 func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, error) {
@@ -292,12 +318,13 @@ func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, er
 		&i.TimeZone,
 		&i.CyclePolicy,
 		&i.StreamComplete,
+		&i.Federated,
 	)
 	return i, err
 }
 
 const getProjectByKey = `-- name: GetProjectByKey :one
-SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete FROM projects WHERE key_folded = $1
+SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated FROM projects WHERE key_folded = $1
 `
 
 func (q *Queries) GetProjectByKey(ctx context.Context, keyFolded string) (Project, error) {
@@ -317,6 +344,7 @@ func (q *Queries) GetProjectByKey(ctx context.Context, keyFolded string) (Projec
 		&i.TimeZone,
 		&i.CyclePolicy,
 		&i.StreamComplete,
+		&i.Federated,
 	)
 	return i, err
 }
@@ -332,6 +360,22 @@ type GetProjectMemberRoleParams struct {
 
 func (q *Queries) GetProjectMemberRole(ctx context.Context, arg GetProjectMemberRoleParams) (string, error) {
 	row := q.db.QueryRow(ctx, getProjectMemberRole, arg.ProjectID, arg.UserID)
+	var role string
+	err := row.Scan(&role)
+	return role, err
+}
+
+const getProjectRemoteMemberRole = `-- name: GetProjectRemoteMemberRole :one
+SELECT role FROM project_remote_members WHERE project_id = $1 AND address = $2
+`
+
+type GetProjectRemoteMemberRoleParams struct {
+	ProjectID uuid.UUID
+	Address   string
+}
+
+func (q *Queries) GetProjectRemoteMemberRole(ctx context.Context, arg GetProjectRemoteMemberRoleParams) (string, error) {
+	row := q.db.QueryRow(ctx, getProjectRemoteMemberRole, arg.ProjectID, arg.Address)
 	var role string
 	err := row.Scan(&role)
 	return role, err
@@ -573,6 +617,38 @@ func (q *Queries) ListProjectMembers(ctx context.Context, projectID uuid.UUID) (
 	return items, nil
 }
 
+const listProjectRemoteMembers = `-- name: ListProjectRemoteMembers :many
+SELECT address, role, joined_at FROM project_remote_members
+WHERE project_id = $1
+ORDER BY role, address
+`
+
+type ListProjectRemoteMembersRow struct {
+	Address  string
+	Role     string
+	JoinedAt time.Time
+}
+
+func (q *Queries) ListProjectRemoteMembers(ctx context.Context, projectID uuid.UUID) ([]ListProjectRemoteMembersRow, error) {
+	rows, err := q.db.Query(ctx, listProjectRemoteMembers, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProjectRemoteMembersRow{}
+	for rows.Next() {
+		var i ListProjectRemoteMembersRow
+		if err := rows.Scan(&i.Address, &i.Role, &i.JoinedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProjectStream = `-- name: ListProjectStream :many
 SELECT id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash FROM events
 WHERE room_id = $1 AND sequence > $2
@@ -626,7 +702,7 @@ func (q *Queries) ListProjectStream(ctx context.Context, arg ListProjectStreamPa
 }
 
 const listProjectsForUser = `-- name: ListProjectsForUser :many
-SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, COALESCE(project_members.role, '')::text AS my_role
+SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, COALESCE(project_members.role, '')::text AS my_role
 FROM projects
 LEFT JOIN project_members
        ON project_members.project_id = projects.id
@@ -650,6 +726,7 @@ type ListProjectsForUserRow struct {
 	TimeZone        string
 	CyclePolicy     string
 	StreamComplete  bool
+	Federated       bool
 	MyRole          string
 }
 
@@ -679,6 +756,7 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, userID uuid.UUID) ([]
 			&i.TimeZone,
 			&i.CyclePolicy,
 			&i.StreamComplete,
+			&i.Federated,
 			&i.MyRole,
 		); err != nil {
 			return nil, err
@@ -773,6 +851,20 @@ func (q *Queries) RemoveProjectMember(ctx context.Context, arg RemoveProjectMemb
 	return err
 }
 
+const removeProjectRemoteMember = `-- name: RemoveProjectRemoteMember :exec
+DELETE FROM project_remote_members WHERE project_id = $1 AND address = $2
+`
+
+type RemoveProjectRemoteMemberParams struct {
+	ProjectID uuid.UUID
+	Address   string
+}
+
+func (q *Queries) RemoveProjectRemoteMember(ctx context.Context, arg RemoveProjectRemoteMemberParams) error {
+	_, err := q.db.Exec(ctx, removeProjectRemoteMember, arg.ProjectID, arg.Address)
+	return err
+}
+
 const setIssueDescription = `-- name: SetIssueDescription :one
 UPDATE issues SET description = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
 `
@@ -843,6 +935,24 @@ func (q *Queries) SetIssueTitle(ctx context.Context, arg SetIssueTitleParams) (I
 		&i.PriorityID,
 	)
 	return i, err
+}
+
+const setProjectFederated = `-- name: SetProjectFederated :execrows
+UPDATE projects SET federated = $2, updated_at = NOW() WHERE id = $1 AND federated <> $2
+`
+
+type SetProjectFederatedParams struct {
+	ID        uuid.UUID
+	Federated bool
+}
+
+// Rows changed, so opening an already opened project records nothing.
+func (q *Queries) SetProjectFederated(ctx context.Context, arg SetProjectFederatedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setProjectFederated, arg.ID, arg.Federated)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const transitionIssue = `-- name: TransitionIssue :one
@@ -920,7 +1030,7 @@ const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET name = $2, description = $3, visibility = $4, updated_at = NOW()
 WHERE id = $1
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated
 `
 
 type UpdateProjectParams struct {
@@ -952,6 +1062,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.TimeZone,
 		&i.CyclePolicy,
 		&i.StreamComplete,
+		&i.Federated,
 	)
 	return i, err
 }

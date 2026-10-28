@@ -20,10 +20,10 @@ Goal: everything a project records is an event, so the stream alone describes th
 
 Goal: the home server can hold people from other servers in a project, before anything is replicated.
 
-- [ ] 2.1 Extend `project_members` to hold remote members by address, with a role; verify a remote member's role is recorded, listed and changeable only on the home server
-- [ ] 2.2 Resolve permissions for remote members from their project role alone; verify a remote member without `issue.transition` is refused exactly as a local member would be, naming the permission
-- [ ] 2.3 Add the project-level federation switch (opened / not opened), administered by `project.administer`, audited; verify a project not opened refuses every federated request about it as missing
-- [ ] **MILESTONE 2** — Demonstrate: a project on server A lists a member from server B with a role, the switch is shown and audited, and nothing has left server A. Tag `v1.42.0-dev`.
+- [x] 2.1 Extend `project_members` to hold remote members by address, with a role; verify a remote member's role is recorded, listed and changeable only on the home server
+- [x] 2.2 Resolve permissions for remote members from their project role alone; verify a remote member without `issue.transition` is refused exactly as a local member would be, naming the permission
+- [x] 2.3 Add the project-level federation switch (opened / not opened), administered by `project.administer`, audited; verify a project not opened refuses every federated request about it as missing
+- [x] **MILESTONE 2** — Demonstrate: a project on server A lists a member from server B with a role, the switch is shown and audited, and nothing has left server A. Tag `v1.42.0-dev`.
 
 ## 3. Phase 3 — Replicas
 

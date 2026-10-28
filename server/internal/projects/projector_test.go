@@ -41,6 +41,7 @@ var notWrites = map[string]string{
 	"Members": "reads", "MilestoneByID": "reads", "MilestoneCycles": "reads", "Milestones": "reads",
 	"MyIssues": "reads", "OriginOf": "reads", "Priorities": "reads", "Progress": "reads",
 	"ProjectByID": "reads", "ProjectByKey": "reads", "ProjectHistory": "reads", "Relations": "reads",
+	"RemoteAccess": "reads", "RemoteMembers": "reads",
 	"States": "reads", "Stream": "reads", "Visible": "reads",
 
 	"SaveView":             "a saved view is its owner's and never part of the project",
@@ -159,6 +160,21 @@ func TestAProjectsStreamReproducesItsRows(t *testing.T) {
 		}},
 		{method: "RemoveMember", run: func(t *testing.T) {
 			must(t, f.projects.RemoveMember(ctx, amina, access, "chausiku"))
+		}},
+		{method: "SetFederated", run: func(t *testing.T) {
+			must(t, f.projects.SetFederated(ctx, amina, access, true))
+			refresh(t)
+		}},
+		// Somebody on another server, kept by address as the stream names them.
+		{method: "SetMember", run: func(t *testing.T) {
+			must(t, f.projects.SetMember(ctx, amina, access, "dalila@elsewhere.example", "member"))
+			must(t, f.projects.SetMember(ctx, amina, access, "esi@elsewhere.example", "admin"))
+		}},
+		{method: "SetMember", run: func(t *testing.T) {
+			must(t, f.projects.SetMember(ctx, amina, access, "esi@elsewhere.example", "member"))
+		}},
+		{method: "RemoveMember", run: func(t *testing.T) {
+			must(t, f.projects.RemoveMember(ctx, amina, access, "esi@elsewhere.example"))
 		}},
 		{method: "AddState", run: func(t *testing.T) {
 			_, err := f.projects.AddState(ctx, amina, access, projects.NewState{Name: "Review"})
@@ -694,7 +710,16 @@ func (r replica) write(t *testing.T, home fixture, rows projects.Rows, stream []
 	_, err = r.pool.Exec(ctx, "UPDATE projects SET next_issue_number = $2 WHERE id = $1", project.ID, project.NextIssueNumber)
 	must(err)
 
+	_, err = r.queries.SetProjectFederated(ctx, dbgen.SetProjectFederatedParams{ID: project.ID, Federated: project.Federated})
+	must(err)
+
 	for address, member := range rows.Members {
+		if _, server, _ := strings.Cut(address, "@"); server != testServerName {
+			must(r.queries.AddProjectRemoteMember(ctx, dbgen.AddProjectRemoteMemberParams{
+				ProjectID: project.ID, Address: address, HomeServer: server, Role: member.Role, AddedBy: who(member.AddedBy),
+			}))
+			continue
+		}
 		must(r.queries.AddProjectMember(ctx, dbgen.AddProjectMemberParams{
 			ProjectID: project.ID, UserID: *who(address), Role: member.Role, AddedBy: who(member.AddedBy),
 		}))

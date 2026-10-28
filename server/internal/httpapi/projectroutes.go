@@ -57,6 +57,7 @@ func init() {
 		group.GET("/:key/members", s.handleListProjectMembers)
 		group.PUT("/:key/members/:username", s.handleSetProjectMember)
 		group.DELETE("/:key/members/:username", s.handleRemoveProjectMember)
+		group.PUT("/:key/federation", s.handleSetProjectFederation)
 		group.POST("/:key/states", s.handleAddState)
 		group.PUT("/:key/states", s.handleReorderStates)
 		group.PATCH("/:key/states/:state", s.handleUpdateState)
@@ -84,6 +85,7 @@ func init() {
 		"GET /api/projects/:key/history":               {Summary: "What happened to a project itself, newest first", Authentication: "session or token"},
 		"PUT /api/projects/:key/members/:username":     {Summary: "Add a project member or change their role", Authentication: "session or token", Permission: "project.administer"},
 		"DELETE /api/projects/:key/members/:username":  {Summary: "Remove a project member", Authentication: "session or token", Permission: "project.administer"},
+		"PUT /api/projects/:key/federation":            {Summary: "Open a project to other servers, or close it to them", Authentication: "session or token", Permission: "project.administer"},
 		"POST /api/projects/:key/states":               {Summary: "Add a state", Authentication: "session or token", Permission: "project.configure_states"},
 		"PUT /api/projects/:key/states":                {Summary: "Reorder states", Authentication: "session or token", Permission: "project.configure_states"},
 		"PATCH /api/projects/:key/states/:state":       {Summary: "Rename a state", Authentication: "session or token", Permission: "project.configure_states"},
@@ -142,7 +144,8 @@ func projectError(err error) error {
 		errors.Is(err, projects.ErrStateNameTaken),
 		errors.Is(err, projects.ErrStateInUse),
 		errors.Is(err, projects.ErrLastState),
-		errors.Is(err, projects.ErrLastAdmin):
+		errors.Is(err, projects.ErrLastAdmin),
+		errors.Is(err, projects.ErrNotOpened):
 		return echo.NewHTTPError(http.StatusConflict, err.Error())
 	case errors.Is(err, projects.ErrNoSuchPerson),
 		errors.Is(err, projects.ErrNotAMember):
@@ -153,7 +156,8 @@ func projectError(err error) error {
 		errors.Is(err, projects.ErrStateName),
 		errors.Is(err, projects.ErrTitle),
 		errors.Is(err, projects.ErrDescription),
-		errors.Is(err, projects.ErrMemberRole):
+		errors.Is(err, projects.ErrMemberRole),
+		errors.Is(err, projects.ErrRemoteAddress):
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	default:
 		return err
@@ -231,6 +235,8 @@ type projectResponse struct {
 	// unfinished issues when a cycle ends: "carry-forward" or "remain".
 	TimeZone    string `json:"timeZone"`
 	CyclePolicy string `json:"cyclePolicy"`
+	// Federated is whether it may be shared with other servers.
+	Federated bool `json:"federated"`
 }
 
 func projectResponseOf(project dbgen.Project, role string) projectResponse {
@@ -244,6 +250,7 @@ func projectResponseOf(project dbgen.Project, role string) projectResponse {
 		Role:        role,
 		TimeZone:    project.TimeZone,
 		CyclePolicy: project.CyclePolicy,
+		Federated:   project.Federated,
 	}
 }
 
@@ -426,11 +433,15 @@ func (s *Server) handleUpdateProject(c *echo.Context) error {
 }
 
 type projectMemberResponse struct {
+	// Username is somebody here's username, or the address of somebody on
+	// another server — what the member routes take to name them.
 	Username    string    `json:"username"`
 	DisplayName string    `json:"displayName"`
 	Address     string    `json:"address"`
 	Role        string    `json:"role"`
 	JoinedAt    time.Time `json:"joinedAt"`
+	// Remote is somebody on another server.
+	Remote bool `json:"remote,omitempty"`
 }
 
 func (s *Server) handleListProjectMembers(c *echo.Context) error {
@@ -449,7 +460,42 @@ func (s *Server) handleListProjectMembers(c *echo.Context) error {
 			Address: s.rooms.UserAddress(member.Username), Role: member.Role, JoinedAt: member.JoinedAt,
 		})
 	}
+	remote, err := s.projects.RemoteMembers(c.Request().Context(), access)
+	if err != nil {
+		return err
+	}
+	for _, member := range remote {
+		// Called by the name half of their address: their server has told
+		// this one nothing more about them.
+		name, _, _ := strings.Cut(member.Address, "@")
+		response = append(response, projectMemberResponse{
+			Username: member.Address, DisplayName: name, Address: member.Address,
+			Role: member.Role, JoinedAt: member.JoinedAt, Remote: true,
+		})
+	}
 	return c.JSON(http.StatusOK, response)
+}
+
+/*
+remoteMemberRefusal refuses naming somebody on another server while this server
+does not federate, or does not federate with theirs. Nil for somebody here.
+
+Checked here rather than in the projects package, which knows nothing of this
+server's settings: a membership the server would never act on is refused
+before it is recorded.
+*/
+func (s *Server) remoteMemberRefusal(c *echo.Context, who string) error {
+	_, host, found := strings.Cut(who, "@")
+	if !found || strings.EqualFold(host, s.rooms.ServerName()) {
+		return nil
+	}
+	if !s.federationEnabled(c) {
+		return echo.NewHTTPError(http.StatusConflict, "this server does not federate, so it cannot hold people from other servers")
+	}
+	if allowed, _ := s.federationTrust(c.Request().Context()).Allows(strings.ToLower(host)); !allowed {
+		return echo.NewHTTPError(http.StatusForbidden, "this server does not federate with "+host)
+	}
+	return nil
 }
 
 func (s *Server) handleSetProjectMember(c *echo.Context) error {
@@ -465,6 +511,9 @@ func (s *Server) handleSetProjectMember(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
+	if err := s.remoteMemberRefusal(c, c.Param("username")); err != nil {
+		return err
+	}
 	if err := s.projects.SetMember(ctx, actorOf(c), access, c.Param("username"), request.Role); err != nil {
 		return projectError(err)
 	}
@@ -480,6 +529,52 @@ func (s *Server) handleSetProjectMember(c *echo.Context) error {
 		return err
 	}
 	return c.NoContent(http.StatusNoContent)
+}
+
+/*
+handleSetProjectFederation opens a project to other servers, or closes it.
+
+The project's administrators decide, not the operator: the operator decided
+when they turned federation on whether anything here may be shared at all, so
+opening one project is only possible on a server that federates. Closing always
+is, so a project can be withdrawn after federation has been turned off.
+*/
+func (s *Server) handleSetProjectFederation(c *echo.Context) error {
+	ctx := c.Request().Context()
+	access, err := s.projectFrom(c)
+	if err != nil {
+		return err
+	}
+	var request struct {
+		Federated bool `json:"federated"`
+	}
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
+	}
+	if request.Federated && !s.federationEnabled(c) {
+		return echo.NewHTTPError(http.StatusConflict, "this server does not federate, so it cannot share a project")
+	}
+	if err := s.projects.SetFederated(ctx, actorOf(c), access, request.Federated); err != nil {
+		return projectError(err)
+	}
+
+	user, _ := currentUser(c)
+	if err := s.audit.Record(ctx, audit.Entry{
+		ActorID: &user.ID, ActorLabel: user.Username,
+		Action:     audit.ActionProjectFederationChanged,
+		TargetKind: "project", TargetID: access.Project.ID.String(),
+		Detail:   map[string]any{"federated": request.Federated},
+		SourceIP: requestIP(c), UserAgent: c.Request().UserAgent(),
+	}); err != nil {
+		return err
+	}
+
+	access.Project.Federated = request.Federated
+	response, err := s.fullProject(ctx, access)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, response)
 }
 
 func (s *Server) handleRemoveProjectMember(c *echo.Context) error {
