@@ -115,6 +115,25 @@ func TestAServerSigningForAnotherServersUserIsRefused(t *testing.T) {
 }
 
 /*
+A server may speak as itself, with no person in the sender — a baseline, the
+end of a cycle — and only as itself: a bare server name is held to the same
+rule as an address.
+*/
+func TestAServerSpeaksOnlyAsItself(t *testing.T) {
+	signing, verifying := homeServerKeyring(t)
+
+	own := signedEvent(t, signing, messageFrom("a.example.org", "a.example.org", "general@a.example.org"))
+	if err := federation.Accept(own, verifying, "general@a.example.org", "a.example.org"); err != nil {
+		t.Errorf("a server's event in its own name was refused: %v", err)
+	}
+
+	other := signedEvent(t, signing, messageFrom("b.example.org", "a.example.org", "general@a.example.org"))
+	if err := federation.Accept(other, verifying, "general@a.example.org", "a.example.org"); !errors.Is(err, federation.ErrImpersonation) {
+		t.Errorf("a server's event in another server's name was answered %v, want ErrImpersonation", err)
+	}
+}
+
+/*
 An event about a different room is refused.
 
 Otherwise a peer participating in one room could use that delivery to inject

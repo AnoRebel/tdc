@@ -91,9 +91,17 @@ func Accept(event events.Event, keyring *events.Keyring, roomAddress, homeServer
 		fields that are both inside the signature, so neither can be altered
 		after signing.
 	*/
-	senderServer, err := ServerOf(event.Sender)
-	if err != nil {
-		return err
+	/*
+		A sender with no person in it is a server speaking for itself — a
+		baseline, the end of a cycle, a change it made at somebody's signed
+		request — and is held to the same rule: only that server may sign it.
+	*/
+	senderServer := strings.ToLower(strings.TrimSpace(event.Sender))
+	if strings.Contains(event.Sender, "@") || senderServer == "" {
+		var err error
+		if senderServer, err = ServerOf(event.Sender); err != nil {
+			return err
+		}
 	}
 	if !strings.EqualFold(senderServer, strings.ToLower(event.Origin)) {
 		return fmt.Errorf("%w: %s signed for %s", ErrImpersonation, event.Origin, event.Sender)
