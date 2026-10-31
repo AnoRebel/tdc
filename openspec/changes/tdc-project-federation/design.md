@@ -83,6 +83,14 @@ The switch is `projects.federated`, not the project room's `rooms.federated`: th
 - **Reaching a server.** An address names a host. The home reaches it at the address a room peer records, else an allowlist entry written as a full address, else `https://host`.
 - **Not yet:** whether the home is reachable is not shown on a replica; public projects reach only member servers until following arrives in Phase 4.5; a replica rebuilds from the whole stream (since the latest baseline) per delivery.
 
+### As built (Phase 4)
+
+- **One endpoint, named changes.** `POST /api/federation/projects/change` carries a `Change` — file, edit, delete, move, (un)assign, (un)label, priority, (un)relate, cycle, milestone — naming issues by number. The home checks the signing server speaks for the actor, holds an accepted replica, and then calls `Service.Apply`, which dispatches to the same methods a local request uses with the access `RemoteAccess` gives, so every rule is the same rule.
+- **Credit without impersonation.** The home cannot sign an event in a remote person's name (receivers refuse an event whose sender's server did not sign it). It records the change as itself — bare server name as sender — with `"by"` in the content. Receivers accept a bare sender only from that server. The projector reads an issue's author from `by`; other attribution columns (`*_by`) record only the home's own people, on the home as on replicas, which keeps projection and tables equal. History shows `by`.
+- **Synchronous for the person.** The replica's route forwards the change, then catches the replica up from the home before answering, so the response is the issue as it now is — the request in flight is the pending state — and a refusal comes back in the home's words with its status. Abilities on a replica are what the person's role would allow at home (`Access.AsAtHome`), with project administration left to the home.
+- **Comments.** Rooms gained `DelegateRemoteMembership`: an issue's discussion admits, on the home, anybody `RemoteAccess` admits to its project, so a comment posted from a replica through the remote-message path is accepted from exactly the people whose changes are. Replica discussion rooms inherit the project room's peer, so they know where their home is.
+- **Notifications through the person's own server.** Arriving messages are indexed and notified as local ones; an arriving `issue.assigned` naming somebody of the receiving server notifies them there. The home notifies only its own people.
+
 ### Issue discussions
 
 Each issue's discussion room is federated together with its project, to the same servers, with the room rules unchanged. Comments from replicas use the existing remote-message path. Creating an issue on the home server creates its discussion room federated the same way.

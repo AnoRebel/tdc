@@ -628,8 +628,8 @@ a person on another server sees them in the call's state but cannot do them.
 ## A project's stream
 
 > **Status.** A project's home server shares it with the servers hosting its
-> members, which hold read-only replicas. Changes made on a replica are not yet
-> sent back to the home server.
+> members. Their replicas are written only from the project's stream; their
+> people's changes are asked of the home server, which makes them.
 
 A project is shared only once its administrators open it to federation, and
 until then a federated request about it is answered as though it did not
@@ -750,6 +750,45 @@ either way. A server entitled again is offered the project afresh.
 
 A replica never offers a project to anybody, and never delivers its events: only
 a room's home server sends its events on.
+
+**Changes from a replica.** A replica never writes its own tables. A change
+somebody makes there is asked of the home server, signed by the replica's
+server: `POST /api/federation/projects/change`,
+
+```json
+{
+  "project": "<uuid>",
+  "actor": "dalila@b.example",
+  "change": { "kind": "move", "issue": 12, "state": "<uuid>", "expected": "<uuid>" }
+}
+```
+
+The kinds are `file` (`title`, `description`, `state`), `edit` (`title`,
+`description`), `delete`, `move` (`state`, `expected`), `assign` and `unassign`
+(`person`, an address), `label` and `unlabel` (`label`), `priority`
+(`priority`, or none to clear it), `relate` and `unrelate` (`relation`,
+`other`, the other issue's number), `cycle` and `milestone` (an identifier, or
+none). Issues are named by number, since the key differs between servers. The
+home server refuses with `403` a request for somebody the signing server does
+not host, with `404` one from a server holding no accepted replica, and
+otherwise checks the person's project role exactly as for its own people,
+answering a refusal with the status and message a local request would get, and
+a change made with `200` and `{"issue": <number>}`. The change then reaches
+every replica as an event; the asking server catches up at once, so its person
+sees the result before the request returns.
+
+**Who a change is credited to.** The home server cannot sign an event in the
+name of somebody it does not host, since a receiving server refuses an event
+whose sender's server did not sign it. So it records the change as itself —
+the sender is its bare name, with no `@` — and names the person in the content
+as `"by": "dalila@b.example"`. A receiving server accepts a sender with no `@`
+only from the server of that name. A projection credits an issue's author from
+`by` when the sender is a server; the other attribution columns name only the
+receiving server's own people.
+
+Comments go through the ordinary remote-message path: a member of a project
+opened to federation takes part in its issues' discussions as a remote member
+does in a room.
 
 Not in the stream, and so never part of a projection: when each row was
 written on the home server, saved views, who follows a discussion, and the

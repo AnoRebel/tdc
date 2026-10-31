@@ -509,9 +509,15 @@ appears there under a key naming this server, `WEB@your.server`, and its issues
 as `WEB@your.server-12`, so it can never be mistaken for a project of their own.
 Its header says where it lives.
 
-There it can be read but not changed: filing, moving and assigning are done on
-the project's home, and for now that means here. Changes made on their server,
-and comments from there, are still being built.
+There they work in it as you do here, as far as their role allows: filing,
+editing, moving, assigning, labelling, prioritising, relating and planning
+issues, and commenting in their discussions. Each change is made here, on the
+project's home, in their name — their server asks, this server checks their
+role and makes it — and comes back to their server before they see the result,
+so both servers always show the same thing. If this server refuses, they are
+told why, in its words. Running the project itself — members, states, labels,
+cycles and milestones — is done here only. Assigning somebody on another server
+tells them through their own server.
 
 When the last of a server's members leaves the project, or the project is closed
 to other servers, that server is told to discard its copy, and nothing more is

@@ -162,8 +162,6 @@ check "the new issue's discussion is on B from its first message" \
   eventually 30 said "$PORT_B" "$DALILA" "$WEB2" "From its first message."
 check "WEB-1 moved to Done on A is Done on B" \
   eventually 30 bash -c "curl -sf -H 'Authorization: Bearer ${DALILA}' 'http://localhost:${PORT_B}/api/issues/WEB@a.localhost-1' | grep -q '\"isCompletion\":true'"
-check "B cannot change the replica: filing there is refused" \
-  bash -c "[[ \"\$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Authorization: Bearer ${DALILA}' -H 'Content-Type: application/json' -d '{\"title\":\"x\"}' 'http://localhost:${PORT_B}/api/projects/WEB@a.localhost/issues')\" != 201 ]]"
 
 say "Removing B's last member ends B's replica"
 api "$PORT_A" "$A" DELETE /api/projects/WEB/members/dalila@b.localhost >/dev/null

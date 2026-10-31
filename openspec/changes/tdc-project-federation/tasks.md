@@ -40,12 +40,12 @@ Goal: a project and its issues' discussions arrive on the servers entitled to th
 
 Goal: members on replicas work in the project as if it were local.
 
-- [ ] 4.1 Send changes made on a replica to the home server as signed federated requests in the author's name, for every issue change (file, edit, move, assign, label, prioritise, relate, plan); verify the home server authorises each against its own records and the change returns to the replica as an event, and that a replica never allocates a sequence in a project stream
-- [ ] 4.2 Refuse a request whose author does not belong to the requesting server, and one for a project the requester holds no replica of; verify both are refused and recorded
-- [ ] 4.3 Comments from replicas through the existing remote-message path; verify mention and assignment notifications reach a person through their own server
-- [ ] 4.4 Pending state in the interface between making a change and its event arriving, and a clear refusal when the home server says no; verify a refused move puts the card back with the reason
+- [x] 4.1 Send changes made on a replica to the home server as signed federated requests in the author's name, for every issue change (file, edit, move, assign, label, prioritise, relate, plan); verify the home server authorises each against its own records and the change returns to the replica as an event, and that a replica never allocates a sequence in a project stream
+- [x] 4.2 Refuse a request whose author does not belong to the requesting server, and one for a project the requester holds no replica of; verify both are refused and recorded
+- [x] 4.3 Comments from replicas through the existing remote-message path; verify mention and assignment notifications reach a person through their own server
+- [ ] 4.4 Pending state in the interface between making a change and its event arriving, and a clear refusal when the home server says no; verify a refused move puts the card back with the reason — *the replica answers only once the change has come back, so the request in flight is the pending state, and a refusal or conflict is answered as a local one is; not yet checked in a browser*
 - [ ] 4.5 Public projects: following from a peer (read-only), and requesting membership; verify a follower reads and cannot change anything
-- [ ] **MILESTONE 4** — Demonstrate: a member on B files an issue in A's project, a member on A moves it, a member on B comments and is assigned, and the board on both servers shows the same issue in the same column with the same history. Tag `v1.44.0-dev`.
+- [x] **MILESTONE 4** — Demonstrate: a member on B files an issue in A's project, a member on A moves it, a member on B comments and is assigned, and the board on both servers shows the same issue in the same column with the same history. Tag `v1.44.0-dev`.
 
 ## 5. Phase 5 — Ready to run
 

@@ -1501,7 +1501,7 @@
       "server": "Seva"
     },
     "replica": {
-      "from": "Umeshirikiwa kutoka {home}. Unaweza kuusoma hapa; mabadiliko hufanywa kwenye {home}.",
+      "from": "Umeshirikiwa kutoka {home}. Unaishi huko: unachobadilisha hapa hufanywa huko, kwa kadiri nafasi yako ndani yake inavyoruhusu.",
       "stopped": "Nakala hii imeacha kufuata {home}, iliyorekodi kitu ambacho seva hii bado haikielewi. Inaonyesha mradi kama ulivyokuwa hadi seva hii isasishwe."
     },
     "federation": {

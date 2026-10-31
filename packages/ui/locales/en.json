@@ -1501,7 +1501,7 @@
       "server": "The server"
     },
     "replica": {
-      "from": "Shared from {home}. You can read it here; changes are made on {home}.",
+      "from": "Shared from {home}. It lives there: what you change here is made there, as your role in it allows.",
       "stopped": "This copy has stopped following {home}, which recorded something this server does not understand yet. It shows the project as it was until this server is updated."
     },
     "federation": {
