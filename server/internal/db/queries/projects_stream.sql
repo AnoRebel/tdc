@@ -29,7 +29,8 @@ WHERE project_remote_members.project_id = $1;
 SELECT issues.id, issues.number, issues.title, issues.description, issues.state_id,
        issues.priority_id, (issues.deleted_at IS NOT NULL)::bool AS deleted,
        COALESCE(author.username, '')::text AS author_username,
-       COALESCE(deleter.username, '')::text AS deleted_by_username
+       COALESCE(deleter.username, '')::text AS deleted_by_username,
+       COALESCE(issues.author_address, '')::text AS author_address
 FROM issues
 LEFT JOIN users author ON author.id = issues.author_id
 LEFT JOIN users deleter ON deleter.id = issues.deleted_by
@@ -99,3 +100,9 @@ WHERE room_id = @project_id
   AND (@before_sequence::bigint = 0 OR sequence < @before_sequence::bigint)
 ORDER BY sequence DESC
 LIMIT @page_size;
+
+-- name: ListIssueRemoteAssigneesForStream :many
+SELECT issue_remote_assignees.issue_id, issue_remote_assignees.address
+FROM issue_remote_assignees
+JOIN issues ON issues.id = issue_remote_assignees.issue_id
+WHERE issues.project_id = $1;

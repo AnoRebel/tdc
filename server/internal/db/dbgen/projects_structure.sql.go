@@ -338,7 +338,7 @@ func (q *Queries) ListLabelsForIssues(ctx context.Context, issueIds []uuid.UUID)
 }
 
 const listMyIssues = `-- name: ListMyIssues :many
-SELECT issues.id, issues.project_id, issues.number, issues.title, issues.description, issues.state_id, issues.author_id, issues.created_at, issues.updated_at, issues.deleted_at, issues.deleted_by, issues.priority_id, projects.key AS project_key, projects.name AS project_name
+SELECT issues.id, issues.project_id, issues.number, issues.title, issues.description, issues.state_id, issues.author_id, issues.created_at, issues.updated_at, issues.deleted_at, issues.deleted_by, issues.priority_id, issues.author_address, projects.key AS project_key, projects.name AS project_name
 FROM issue_assignees a
 JOIN issues ON issues.id = a.issue_id
 JOIN projects ON projects.id = issues.project_id
@@ -356,20 +356,21 @@ type ListMyIssuesParams struct {
 }
 
 type ListMyIssuesRow struct {
-	ID          uuid.UUID
-	ProjectID   uuid.UUID
-	Number      int64
-	Title       string
-	Description string
-	StateID     uuid.UUID
-	AuthorID    *uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	DeletedAt   *time.Time
-	DeletedBy   *uuid.UUID
-	PriorityID  *uuid.UUID
-	ProjectKey  string
-	ProjectName string
+	ID            uuid.UUID
+	ProjectID     uuid.UUID
+	Number        int64
+	Title         string
+	Description   string
+	StateID       uuid.UUID
+	AuthorID      *uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	DeletedAt     *time.Time
+	DeletedBy     *uuid.UUID
+	PriorityID    *uuid.UUID
+	AuthorAddress *string
+	ProjectKey    string
+	ProjectName   string
 }
 
 // Everything assigned to somebody, in every project they may still see.
@@ -398,6 +399,7 @@ func (q *Queries) ListMyIssues(ctx context.Context, arg ListMyIssuesParams) ([]L
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PriorityID,
+			&i.AuthorAddress,
 			&i.ProjectKey,
 			&i.ProjectName,
 		); err != nil {
@@ -620,7 +622,7 @@ func (q *Queries) RelateIssues(ctx context.Context, arg RelateIssuesParams) (int
 }
 
 const setIssuePriority = `-- name: SetIssuePriority :one
-UPDATE issues SET priority_id = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
+UPDATE issues SET priority_id = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address
 `
 
 type SetIssuePriorityParams struct {
@@ -644,6 +646,7 @@ func (q *Queries) SetIssuePriority(ctx context.Context, arg SetIssuePriorityPara
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }

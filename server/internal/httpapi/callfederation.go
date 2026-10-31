@@ -155,14 +155,22 @@ func (s *Server) isLocalAddress(address string) bool {
 	return err == nil && strings.EqualFold(server, s.rooms.ServerName())
 }
 
-// peerAddressFor is where to reach the server an address names: the address a
-// room's peers record for it, or its host over HTTPS.
+/*
+peerAddressFor is where to reach the server an address names: the address a
+room's peers record for it; else an allowlist entry for it written as a full
+address, scheme and port and all; else its host over HTTPS.
+*/
 func (s *Server) peerAddressFor(ctx context.Context, host string) string {
 	if peers, err := s.rooms.KnownPeers(ctx); err == nil {
 		for _, peer := range peers {
 			if strings.EqualFold(peer.Server, host) && peer.Address != "" {
 				return peer.Address
 			}
+		}
+	}
+	for _, entry := range s.federationTrust(ctx).Allowed {
+		if listed, err := federation.Host(entry); err == nil && strings.EqualFold(listed, host) && strings.Contains(entry, "://") {
+			return strings.TrimRight(entry, "/")
 		}
 	}
 	return "https://" + host

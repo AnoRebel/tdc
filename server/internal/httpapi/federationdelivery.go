@@ -50,6 +50,7 @@ func (s *Server) deliverDue(ctx context.Context) {
 	}
 	sender := federation.NewSender(s.config.CanonicalAddress, s.rooms.Keyring(), s.federationTrust(ctx),
 		s.settings.Get(ctx, settings.FederationAllowPrivateAddresses) == "true")
+	s.offerAndWithdraw(ctx, sender)
 
 	for ctx.Err() == nil {
 		peers, err := s.rooms.ClaimPeersDue(ctx, federationDeliveryBatch)

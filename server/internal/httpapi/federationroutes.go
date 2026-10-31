@@ -494,13 +494,20 @@ func (s *Server) handleFederatedDelivery(c *echo.Context) error {
 
 /*
 arrived shows the people here what another server has just told this one: each
-newly stored event goes out live, as one written here would.
+newly stored event goes out live, as one written here would, and a project
+held here for that server is brought up to what its stream now says.
 
 Only what is new — a redelivery shows nobody anything twice.
 */
 func (s *Server) arrived(ctx context.Context, room dbgen.Room, stored []dbgen.Event) {
 	for _, event := range stored {
 		s.publishEvent(ctx, event)
+	}
+	// A project held for another server is rebuilt from what arrived.
+	if len(stored) > 0 && room.Kind == "project" && s.projects != nil {
+		if err := s.projects.Replicate(ctx, room); err != nil {
+			s.log.Warn("a project replica could not follow its stream", "project", room.ID, "error", err.Error())
+		}
 	}
 }
 

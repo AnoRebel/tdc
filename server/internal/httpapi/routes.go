@@ -99,6 +99,14 @@ func (s *Server) routes() {
 	authenticated.POST("/rooms/:slug/leave", s.handleFederatedLeave)
 	authenticated.POST("/rooms/:slug/post", s.handleFederatedPost)
 
+	/*
+		A project's home server offering this server a replica of it, and
+		telling it to discard one. The home is the verified origin, so a
+		server can only offer or withdraw projects it is home to.
+	*/
+	authenticated.POST("/projects/offer", s.handleProjectOffer)
+	authenticated.POST("/projects/discard", s.handleProjectDiscard)
+
 	// The bytes of a file a message in a room carries, for a peer whose
 	// member opened it.
 	authenticated.GET("/rooms/:slug/files/:digest", s.handleFederatedFile)

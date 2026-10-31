@@ -54,6 +54,16 @@ var notWrites = map[string]string{
 	"Reindex":              "rewrites the search index, which is worked out from the rows",
 	"OnAppended":           "wiring, done once while the server is built",
 	"MaintainPeriodically": "runs CloseEndedCycles and CompleteStreams on a timer",
+
+	"Replicate":         "writes a replica, from its stream, never a project of this server's",
+	"DiscardReplica":    "removes a replica",
+	"AcceptOffer":       "starts a replica",
+	"SyncReplicas":      "bookkeeping of which servers hold a replica",
+	"ClaimReplicaWork":  "bookkeeping of which servers hold a replica",
+	"OfferFor":          "reads",
+	"ReplicaOffered":    "bookkeeping of which servers hold a replica",
+	"ReplicaWorkFailed": "bookkeeping of which servers hold a replica",
+	"ForgetReplica":     "bookkeeping of which servers hold a replica",
 }
 
 // step is one change the scenario makes, named by the method it goes through.
@@ -619,8 +629,15 @@ type replica struct {
 
 func newReplica(t *testing.T) replica {
 	t.Helper()
+	return newReplicaOn(t, "projectsreplica", testServerName)
+}
+
+// newReplicaOn is a second database, under its own suite name, for a server
+// called server.
+func newReplicaOn(t *testing.T, suite, server string) replica {
+	t.Helper()
 	ctx := context.Background()
-	pool, err := db.Open(ctx, db.Config{URL: dbtest.URL(t, "projectsreplica")}, dbtest.Logger())
+	pool, err := db.Open(ctx, db.Config{URL: dbtest.URL(t, suite)}, dbtest.Logger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -641,7 +658,7 @@ func newReplica(t *testing.T) replica {
 		t.Fatal(err)
 	}
 	queries := dbgen.New(pool)
-	roomsService := rooms.NewService(queries, events.NewKeyring(key), testServerName, dbtest.Logger())
+	roomsService := rooms.NewService(queries, events.NewKeyring(key), server, dbtest.Logger())
 	return replica{pool: pool, queries: queries, projects: projects.NewService(pool, roomsService, dbtest.Logger())}
 }
 

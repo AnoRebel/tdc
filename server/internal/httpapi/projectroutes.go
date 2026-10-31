@@ -237,20 +237,26 @@ type projectResponse struct {
 	CyclePolicy string `json:"cyclePolicy"`
 	// Federated is whether it may be shared with other servers.
 	Federated bool `json:"federated"`
+	// Home is the server a replica lives on, absent for a project of this
+	// server's own; ReplicaError is why a replica stopped following it.
+	Home         string `json:"home,omitempty"`
+	ReplicaError string `json:"replicaError,omitempty"`
 }
 
 func projectResponseOf(project dbgen.Project, role string) projectResponse {
 	return projectResponse{
-		ID:          project.ID.String(),
-		Key:         project.Key,
-		Name:        project.Name,
-		Description: project.Description,
-		Visibility:  project.Visibility,
-		CreatedAt:   project.CreatedAt,
-		Role:        role,
-		TimeZone:    project.TimeZone,
-		CyclePolicy: project.CyclePolicy,
-		Federated:   project.Federated,
+		ID:           project.ID.String(),
+		Key:          project.Key,
+		Name:         project.Name,
+		Description:  project.Description,
+		Visibility:   project.Visibility,
+		CreatedAt:    project.CreatedAt,
+		Role:         role,
+		TimeZone:     project.TimeZone,
+		CyclePolicy:  project.CyclePolicy,
+		Federated:    project.Federated,
+		Home:         projects.HomeOf(project),
+		ReplicaError: project.ReplicaError,
 	}
 }
 

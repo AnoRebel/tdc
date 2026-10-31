@@ -90,7 +90,7 @@ func (q *Queries) CountProjectAdmins(ctx context.Context, projectID uuid.UUID) (
 const createIssue = `-- name: CreateIssue :one
 INSERT INTO issues (id, project_id, number, title, description, state_id, author_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
+RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address
 `
 
 type CreateIssueParams struct {
@@ -127,6 +127,7 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }
@@ -172,7 +173,7 @@ const createProject = `-- name: CreateProject :one
 
 INSERT INTO projects (id, key, key_folded, name, description, visibility, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error
 `
 
 type CreateProjectParams struct {
@@ -212,6 +213,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.CyclePolicy,
 		&i.StreamComplete,
 		&i.Federated,
+		&i.ReplicaError,
 	)
 	return i, err
 }
@@ -226,7 +228,7 @@ func (q *Queries) DeleteIssueState(ctx context.Context, id uuid.UUID) error {
 }
 
 const getIssueByID = `-- name: GetIssueByID :one
-SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id FROM issues WHERE id = $1
+SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address FROM issues WHERE id = $1
 `
 
 func (q *Queries) GetIssueByID(ctx context.Context, id uuid.UUID) (Issue, error) {
@@ -245,12 +247,13 @@ func (q *Queries) GetIssueByID(ctx context.Context, id uuid.UUID) (Issue, error)
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }
 
 const getIssueByNumber = `-- name: GetIssueByNumber :one
-SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id FROM issues WHERE project_id = $1 AND number = $2
+SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address FROM issues WHERE project_id = $1 AND number = $2
 `
 
 type GetIssueByNumberParams struct {
@@ -274,6 +277,7 @@ func (q *Queries) GetIssueByNumber(ctx context.Context, arg GetIssueByNumberPara
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }
@@ -298,7 +302,7 @@ func (q *Queries) GetIssueState(ctx context.Context, id uuid.UUID) (IssueState, 
 }
 
 const getProjectByID = `-- name: GetProjectByID :one
-SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated FROM projects WHERE id = $1
+SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error FROM projects WHERE id = $1
 `
 
 func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, error) {
@@ -319,12 +323,13 @@ func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, er
 		&i.CyclePolicy,
 		&i.StreamComplete,
 		&i.Federated,
+		&i.ReplicaError,
 	)
 	return i, err
 }
 
 const getProjectByKey = `-- name: GetProjectByKey :one
-SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated FROM projects WHERE key_folded = $1
+SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error FROM projects WHERE key_folded = $1
 `
 
 func (q *Queries) GetProjectByKey(ctx context.Context, keyFolded string) (Project, error) {
@@ -345,6 +350,7 @@ func (q *Queries) GetProjectByKey(ctx context.Context, keyFolded string) (Projec
 		&i.CyclePolicy,
 		&i.StreamComplete,
 		&i.Federated,
+		&i.ReplicaError,
 	)
 	return i, err
 }
@@ -493,7 +499,7 @@ func (q *Queries) ListIssueStates(ctx context.Context, projectID uuid.UUID) ([]I
 }
 
 const listProjectIssues = `-- name: ListProjectIssues :many
-SELECT issues.id, issues.project_id, issues.number, issues.title, issues.description, issues.state_id, issues.author_id, issues.created_at, issues.updated_at, issues.deleted_at, issues.deleted_by, issues.priority_id
+SELECT issues.id, issues.project_id, issues.number, issues.title, issues.description, issues.state_id, issues.author_id, issues.created_at, issues.updated_at, issues.deleted_at, issues.deleted_by, issues.priority_id, issues.author_address
 FROM issues
 LEFT JOIN project_priorities p ON p.id = issues.priority_id
 WHERE issues.project_id = $1
@@ -564,6 +570,7 @@ func (q *Queries) ListProjectIssues(ctx context.Context, arg ListProjectIssuesPa
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PriorityID,
+			&i.AuthorAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -702,7 +709,7 @@ func (q *Queries) ListProjectStream(ctx context.Context, arg ListProjectStreamPa
 }
 
 const listProjectsForUser = `-- name: ListProjectsForUser :many
-SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, COALESCE(project_members.role, '')::text AS my_role
+SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, projects.replica_error, COALESCE(project_members.role, '')::text AS my_role
 FROM projects
 LEFT JOIN project_members
        ON project_members.project_id = projects.id
@@ -727,6 +734,7 @@ type ListProjectsForUserRow struct {
 	CyclePolicy     string
 	StreamComplete  bool
 	Federated       bool
+	ReplicaError    string
 	MyRole          string
 }
 
@@ -757,6 +765,7 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, userID uuid.UUID) ([]
 			&i.CyclePolicy,
 			&i.StreamComplete,
 			&i.Federated,
+			&i.ReplicaError,
 			&i.MyRole,
 		); err != nil {
 			return nil, err
@@ -770,7 +779,7 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, userID uuid.UUID) ([]
 }
 
 const lockIssue = `-- name: LockIssue :one
-SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id FROM issues WHERE id = $1 FOR UPDATE
+SELECT id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address FROM issues WHERE id = $1 FOR UPDATE
 `
 
 // Reads an issue and holds it until the transaction ends, so a change and the
@@ -791,6 +800,7 @@ func (q *Queries) LockIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }
@@ -798,7 +808,7 @@ func (q *Queries) LockIssue(ctx context.Context, id uuid.UUID) (Issue, error) {
 const markIssueDeleted = `-- name: MarkIssueDeleted :one
 UPDATE issues SET deleted_at = NOW(), deleted_by = $2, updated_at = NOW()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
+RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address
 `
 
 type MarkIssueDeletedParams struct {
@@ -822,6 +832,7 @@ func (q *Queries) MarkIssueDeleted(ctx context.Context, arg MarkIssueDeletedPara
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }
@@ -866,7 +877,7 @@ func (q *Queries) RemoveProjectRemoteMember(ctx context.Context, arg RemoveProje
 }
 
 const setIssueDescription = `-- name: SetIssueDescription :one
-UPDATE issues SET description = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
+UPDATE issues SET description = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address
 `
 
 type SetIssueDescriptionParams struct {
@@ -890,6 +901,7 @@ func (q *Queries) SetIssueDescription(ctx context.Context, arg SetIssueDescripti
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }
@@ -909,7 +921,7 @@ func (q *Queries) SetIssueStatePosition(ctx context.Context, arg SetIssueStatePo
 }
 
 const setIssueTitle = `-- name: SetIssueTitle :one
-UPDATE issues SET title = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
+UPDATE issues SET title = $2, updated_at = NOW() WHERE id = $1 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address
 `
 
 type SetIssueTitleParams struct {
@@ -933,6 +945,7 @@ func (q *Queries) SetIssueTitle(ctx context.Context, arg SetIssueTitleParams) (I
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }
@@ -959,7 +972,7 @@ const transitionIssue = `-- name: TransitionIssue :one
 UPDATE issues
 SET state_id = $1, updated_at = NOW()
 WHERE id = $2 AND state_id = $3
-RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id
+RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address
 `
 
 type TransitionIssueParams struct {
@@ -988,6 +1001,7 @@ func (q *Queries) TransitionIssue(ctx context.Context, arg TransitionIssueParams
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.PriorityID,
+		&i.AuthorAddress,
 	)
 	return i, err
 }
@@ -1030,7 +1044,7 @@ const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET name = $2, description = $3, visibility = $4, updated_at = NOW()
 WHERE id = $1
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error
 `
 
 type UpdateProjectParams struct {
@@ -1063,6 +1077,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.CyclePolicy,
 		&i.StreamComplete,
 		&i.Federated,
+		&i.ReplicaError,
 	)
 	return i, err
 }

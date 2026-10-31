@@ -8,6 +8,7 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/projects"
 	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/google/uuid"
 	"reflect"
 )
 
@@ -1703,6 +1704,20 @@ var routeBodies = map[string]routeBodySet{
 		},
 	},
 	"POST /api/federation/ping": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/federation/projects/discard": {
+		Request: reflect.TypeFor[struct {
+			Project uuid.UUID "json:\"project\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/federation/projects/offer": {
+		Request: reflect.TypeFor[projects.Offer](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},

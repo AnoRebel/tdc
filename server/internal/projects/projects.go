@@ -184,7 +184,8 @@ outside the shape is refused, because the key is embedded in identifiers people
 say aloud and paste into commit messages, and WEB-12 has to survive both.
 */
 func NormaliseKey(key string) (string, error) {
-	upper := strings.ToUpper(strings.TrimSpace(key))
+	key, home, elsewhere := strings.Cut(strings.TrimSpace(key), "@")
+	upper := strings.ToUpper(key)
 	if len(upper) < minKeyLength || len(upper) > maxKeyLength {
 		return "", ErrInvalidKey
 	}
@@ -196,6 +197,13 @@ func NormaliseKey(key string) (string, error) {
 			return "", ErrInvalidKey
 		}
 	}
+	if elsewhere {
+		// A replica's key, which names the server it lives on.
+		if home == "" || strings.ContainsAny(home, " /@") {
+			return "", ErrInvalidKey
+		}
+		return upper + "@" + strings.ToLower(home), nil
+	}
 	return upper, nil
 }
 
@@ -205,6 +213,11 @@ func (s *Service) Create(ctx context.Context, actor Actor, input NewProject) (db
 		return dbgen.Project{}, RefusalError{decision}
 	}
 
+	// A key naming another server belongs to a replica, never to a project
+	// started here.
+	if strings.Contains(input.Key, "@") {
+		return dbgen.Project{}, ErrInvalidKey
+	}
 	key, err := NormaliseKey(input.Key)
 	if err != nil {
 		return dbgen.Project{}, err
@@ -365,6 +378,10 @@ the same way a denial beats server administration. Then a grant, at either
 scope. Then membership.
 */
 func (a Access) Allows(permission authz.Permission) authz.Decision {
+	// A replica is changed only by its stream: changes are made on its home.
+	if IsReplica(a.Project) {
+		return authz.Decision{Allowed: false, Permission: permission, Reason: "this project lives on " + HomeOf(a.Project) + ", and is changed there"}
+	}
 	if a.permissions.DeniedInProject(permission, a.Project.ID) {
 		return authz.Decision{Allowed: false, Permission: permission, Reason: "denied for this project"}
 	}
@@ -398,7 +415,7 @@ and nobody else's.
 */
 func (a Access) AllowsOn(permission authz.Permission, issue dbgen.Issue) authz.Decision {
 	decision := a.Allows(permission)
-	if decision.Allowed || a.permissions.DeniedInProject(permission, a.Project.ID) {
+	if decision.Allowed || IsReplica(a.Project) || a.permissions.DeniedInProject(permission, a.Project.ID) {
 		return decision
 	}
 	if authorGrants[permission] && issue.AuthorID != nil && *issue.AuthorID == a.userID {
@@ -411,7 +428,7 @@ func (a Access) AllowsOn(permission authz.Permission, issue dbgen.Issue) authz.D
 // description: whoever wrote it, and whoever may file issues in the project.
 func (a Access) MayEdit(issue dbgen.Issue) authz.Decision {
 	decision := a.Allows(authz.PermIssueCreate)
-	if decision.Allowed || a.permissions.DeniedInProject(authz.PermIssueCreate, a.Project.ID) {
+	if decision.Allowed || IsReplica(a.Project) || a.permissions.DeniedInProject(authz.PermIssueCreate, a.Project.ID) {
 		return decision
 	}
 	if issue.AuthorID != nil && *issue.AuthorID == a.userID {

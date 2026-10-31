@@ -576,18 +576,19 @@ type InvitationUse struct {
 }
 
 type Issue struct {
-	ID          uuid.UUID
-	ProjectID   uuid.UUID
-	Number      int64
-	Title       string
-	Description string
-	StateID     uuid.UUID
-	AuthorID    *uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	DeletedAt   *time.Time
-	DeletedBy   *uuid.UUID
-	PriorityID  *uuid.UUID
+	ID            uuid.UUID
+	ProjectID     uuid.UUID
+	Number        int64
+	Title         string
+	Description   string
+	StateID       uuid.UUID
+	AuthorID      *uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	DeletedAt     *time.Time
+	DeletedBy     *uuid.UUID
+	PriorityID    *uuid.UUID
+	AuthorAddress *string
 }
 
 type IssueAssignee struct {
@@ -620,6 +621,13 @@ type IssueRelation struct {
 	Kind      string
 	CreatedAt time.Time
 	CreatedBy *uuid.UUID
+}
+
+type IssueRemoteAssignee struct {
+	IssueID    uuid.UUID
+	Address    string
+	HomeServer string
+	AssignedAt time.Time
 }
 
 type IssueSearch struct {
@@ -874,6 +882,7 @@ type Project struct {
 	CyclePolicy     string
 	StreamComplete  bool
 	Federated       bool
+	ReplicaError    string
 }
 
 type ProjectLabel struct {
@@ -909,6 +918,17 @@ type ProjectRemoteMember struct {
 	Role       string
 	JoinedAt   time.Time
 	AddedBy    *uuid.UUID
+}
+
+type ProjectReplica struct {
+	ProjectID     uuid.UUID
+	Server        string
+	Address       string
+	OfferedAt     *time.Time
+	Discarding    bool
+	Failures      int32
+	NextAttemptAt *time.Time
+	LastError     string
 }
 
 type ProjectView struct {

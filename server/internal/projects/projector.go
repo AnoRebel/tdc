@@ -1,6 +1,7 @@
 package projects
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -1002,7 +1003,7 @@ func (s *Service) rowsOf(ctx context.Context, q *dbgen.Queries, projectID uuid.U
 	for _, issue := range issues {
 		rows.Issues[issue.ID] = IssueRow{
 			Number: issue.Number, Title: issue.Title, Description: issue.Description, State: issue.StateID,
-			Author: address(issue.AuthorUsername), Priority: issue.PriorityID,
+			Author: cmp.Or(address(issue.AuthorUsername), issue.AuthorAddress), Priority: issue.PriorityID,
 			Deleted: issue.Deleted, DeletedBy: address(issue.DeletedByUsername),
 			Labels: map[uuid.UUID]bool{}, Assignees: map[string]string{},
 		}
@@ -1013,6 +1014,13 @@ func (s *Service) rowsOf(ctx context.Context, q *dbgen.Queries, projectID uuid.U
 	}
 	for _, assignee := range assignees {
 		rows.Issues[assignee.IssueID].Assignees[address(assignee.Username)] = address(assignee.AssignedByUsername)
+	}
+	remoteAssignees, err := q.ListIssueRemoteAssigneesForStream(ctx, projectID)
+	if err != nil {
+		return Rows{}, fmt.Errorf("read remote assignees: %w", err)
+	}
+	for _, assignee := range remoteAssignees {
+		rows.Issues[assignee.IssueID].Assignees[assignee.Address] = ""
 	}
 	labelled, err := q.ListIssueLabelsForStream(ctx, projectID)
 	if err != nil {

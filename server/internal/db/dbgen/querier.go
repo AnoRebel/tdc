@@ -23,6 +23,11 @@ type Querier interface {
 	// Whoever creates a company is its first administrator, accepted from the
 	// start: they are consenting by creating it.
 	AddCompanyFounder(ctx context.Context, arg AddCompanyFounderParams) error
+	// Every server hosting a member of an opened project this server is home to is
+	// to hold a replica — never of a replica held here, whose members and switch
+	// are its home's to act on. One told to discard its copy that is entitled
+	// again is offered it afresh.
+	AddEntitledReplicas(ctx context.Context) error
 	// Records one more piece, only if it is the next one and still fits.
 	//
 	// The count of keys is the piece number the caller sent, so a retried or
@@ -47,6 +52,11 @@ type Querier interface {
 	AddRoomPeer(ctx context.Context, arg AddRoomPeerParams) error
 	AddSkillAlias(ctx context.Context, arg AddSkillAliasParams) error
 	AdoptForeignRoom(ctx context.Context, arg AdoptForeignRoomParams) (Room, error)
+	// The room a replica's project, or one of its issues' discussions, lives in:
+	// the home server's identifier, so its events name the same room everywhere.
+	// Only ever a replica of that same home: an offer naming the identifier of a
+	// room this server owns, or another server's, changes nothing.
+	AdoptReplicaRoom(ctx context.Context, arg AdoptReplicaRoomParams) error
 	// Every later update, which succeeds only against the version it names.
 	AdvanceMessageInteraction(ctx context.Context, arg AdvanceMessageInteractionParams) (MessageInteraction, error)
 	// Records how far a peer has been told.
@@ -67,6 +77,7 @@ type Querier interface {
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
 	// Assignees, labels, priorities and relationships.
 	AssignIssue(ctx context.Context, arg AssignIssueParams) (int64, error)
+	AssignRemoteToIssue(ctx context.Context, arg AssignRemoteToIssueParams) error
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	// Binds an attachment to the message that carries it.
 	//
@@ -128,6 +139,9 @@ type Querier interface {
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
 	ClaimOperation(ctx context.Context, id uuid.UUID) (int64, error)
 	ClaimPeersDue(ctx context.Context, arg ClaimPeersDueParams) ([]RoomPeer, error)
+	// Offers to make and discards to announce, claimed for one pass the way peers
+	// owed events are.
+	ClaimReplicaWork(ctx context.Context, max int32) ([]ProjectReplica, error)
 	// One message, claimed to be sent now at its author's request. The same claim
 	// a delivery pass takes, so the pass cannot send it a second time.
 	ClaimScheduledMessage(ctx context.Context, arg ClaimScheduledMessageParams) (ScheduledMessage, error)
@@ -146,6 +160,10 @@ type Querier interface {
 	ClearExpiredTyping(ctx context.Context) error
 	ClearIssueCycle(ctx context.Context, issueID uuid.UUID) error
 	ClearIssueMilestone(ctx context.Context, issueID uuid.UUID) error
+	// Everything that hangs from a replica's issues, written again after.
+	ClearReplicaIssueLinks(ctx context.Context, projectID uuid.UUID) error
+	ClearReplicaMembers(ctx context.Context, projectID uuid.UUID) error
+	ClearReplicaRemoteMembers(ctx context.Context, projectID uuid.UUID) error
 	ClearStage(ctx context.Context, id uuid.UUID) error
 	ClearVerification(ctx context.Context, id uuid.UUID) (int64, error)
 	CloseCycle(ctx context.Context, arg CloseCycleParams) error
@@ -383,9 +401,17 @@ type Querier interface {
 	DeleteTranslationRoomRule(ctx context.Context, arg DeleteTranslationRoomRuleParams) error
 	// Scoped to its owner, so a subscription cannot be removed by guessing.
 	DeleteWebhookSubscription(ctx context.Context, arg DeleteWebhookSubscriptionParams) (WebhookSubscription, error)
+	// A server that accepted a project is a peer of its room and of every issue's
+	// discussion, the new ones included.
+	DeliverToOfferedReplicas(ctx context.Context) error
 	// Only an active one, so the owner is told once rather than at every failure
 	// that follows.
 	DisableWebhookSubscription(ctx context.Context, arg DisableWebhookSubscriptionParams) (WebhookSubscription, error)
+	// A replica, its issues' discussions and everything in them, gone.
+	DiscardReplica(ctx context.Context, arg DiscardReplicaParams) (int64, error)
+	// A server no longer hosting any member, or holding a project closed to
+	// federation, is to discard its copy.
+	DiscardUnentitledReplicas(ctx context.Context) error
 	// Turning it back on starts the count again; what failed before is history.
 	EnableWebhookSubscription(ctx context.Context, arg EnableWebhookSubscriptionParams) (WebhookSubscription, error)
 	// Ends calls nobody has been in for a while: their last person left without
@@ -447,6 +473,9 @@ type Querier interface {
 	// Jobs whose node stopped saying it was working on them. Whoever notices
 	// first marks them, so a node that died does not hold the lock for ever.
 	FailStaleOperations(ctx context.Context, afterSeconds int32) ([]Operation, error)
+	// A project's room and its issues' discussions are federated exactly while the
+	// project is.
+	FederateProjectRooms(ctx context.Context, home string) error
 	// Finds a federated room by the address an event names, which is how an
 	// incoming event says which room it belongs to.
 	FederatedRoomByAddress(ctx context.Context, slugFolded *string) (Room, error)
@@ -465,6 +494,7 @@ type Querier interface {
 	// Following because of taking part, unless the person has already decided.
 	FollowThreadByTakingPart(ctx context.Context, arg FollowThreadByTakingPartParams) error
 	ForgetNodes(ctx context.Context, arg ForgetNodesParams) error
+	ForgetReplica(ctx context.Context, arg ForgetReplicaParams) error
 	// Moves a mesh call to the forwarding unit on one node. Once only: a call
 	// already forwarded keeps the node it has.
 	ForwardCall(ctx context.Context, arg ForwardCallParams) (int64, error)
@@ -815,6 +845,7 @@ type Querier interface {
 	ListIssueLabelsForStream(ctx context.Context, projectID uuid.UUID) ([]IssueLabel, error)
 	ListIssueMilestonesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueMilestonesForStreamRow, error)
 	ListIssueRelationsForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueRelationsForStreamRow, error)
+	ListIssueRemoteAssigneesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueRemoteAssigneesForStreamRow, error)
 	ListIssueStates(ctx context.Context, projectID uuid.UUID) ([]IssueState, error)
 	// Deleted issues included: a deleted issue is still a row, still numbered.
 	ListIssuesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssuesForStreamRow, error)
@@ -1214,6 +1245,8 @@ type Querier interface {
 	RemoteCallOf(ctx context.Context, arg RemoteCallOfParams) (RemoteCall, error)
 	RemoteMember(ctx context.Context, arg RemoteMemberParams) (RemoteMember, error)
 	RemoteMembers(ctx context.Context, roomID uuid.UUID) ([]RemoteMember, error)
+	// A project's members on one server, which an offer names.
+	RemoteMembersOn(ctx context.Context, arg RemoteMembersOnParams) ([]string, error)
 	RemoveApplication(ctx context.Context, arg RemoveApplicationParams) (Application, error)
 	// Leaving, declining, or being removed. The row goes, so neither side displays
 	// it from this moment.
@@ -1230,6 +1263,11 @@ type Querier interface {
 	RemoveProjectRemoteMember(ctx context.Context, arg RemoveProjectRemoteMemberParams) error
 	RemoveReaction(ctx context.Context, arg RemoveReactionParams) error
 	RemoveRemoteMember(ctx context.Context, arg RemoveRemoteMemberParams) error
+	RemoveReplicaCyclesExcept(ctx context.Context, arg RemoveReplicaCyclesExceptParams) error
+	RemoveReplicaLabelsExcept(ctx context.Context, arg RemoveReplicaLabelsExceptParams) error
+	RemoveReplicaMilestonesExcept(ctx context.Context, arg RemoveReplicaMilestonesExceptParams) error
+	RemoveReplicaPrioritiesExcept(ctx context.Context, arg RemoveReplicaPrioritiesExceptParams) error
+	RemoveReplicaStatesExcept(ctx context.Context, arg RemoveReplicaStatesExceptParams) error
 	RemoveRoleFromUser(ctx context.Context, arg RemoveRoleFromUserParams) error
 	RemoveRolePermission(ctx context.Context, arg RemoveRolePermissionParams) error
 	RemoveRoomMember(ctx context.Context, arg RemoveRoomMemberParams) error
@@ -1238,6 +1276,8 @@ type Querier interface {
 	RenameRoom(ctx context.Context, arg RenameRoomParams) (Room, error)
 	RenameUser(ctx context.Context, arg RenameUserParams) (User, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
+	ReplicaOffered(ctx context.Context, arg ReplicaOfferedParams) error
+	ReplicaWorkFailed(ctx context.Context, arg ReplicaWorkFailedParams) error
 	// The heartbeat and the cancellation check in one round trip.
 	ReportOperationProgress(ctx context.Context, arg ReportOperationProgressParams) (bool, error)
 	RequestCompletion(ctx context.Context, arg RequestCompletionParams) (int64, error)
@@ -1427,6 +1467,7 @@ type Querier interface {
 	SetProjectPlanning(ctx context.Context, arg SetProjectPlanningParams) (Project, error)
 	SetProjectPriorityRank(ctx context.Context, arg SetProjectPriorityRankParams) error
 	SetReadPosition(ctx context.Context, arg SetReadPositionParams) error
+	SetReplicaError(ctx context.Context, arg SetReplicaErrorParams) error
 	// The conflict target matches the unique index, which COALESCEs a NULL scope
 	// so that two server-scope grants of one permission collide as intended.
 	SetRolePermission(ctx context.Context, arg SetRolePermissionParams) error
@@ -1479,6 +1520,9 @@ type Querier interface {
 	// Stops somebody's recording, returning when it began. The joined copy of the
 	// row is read before the update, which is how the old value comes back.
 	StopCallRecording(ctx context.Context, arg StopCallRecordingParams) (time.Time, error)
+	// Nothing more is sent to a server told to discard its copy: its peer rows on
+	// the project and on every issue's discussion go.
+	StopDeliveringToDiscarding(ctx context.Context) error
 	StopTyping(ctx context.Context, arg StopTypingParams) error
 	StoreForeignEvent(ctx context.Context, arg StoreForeignEventParams) ([]Event, error)
 	// Older translations of the same message, of a body it no longer has, go:
@@ -1557,6 +1601,13 @@ type Querier interface {
 	UpdateRemoteShadow(ctx context.Context, arg UpdateRemoteShadowParams) error
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpsertReplicaCycle(ctx context.Context, arg UpsertReplicaCycleParams) error
+	UpsertReplicaIssue(ctx context.Context, arg UpsertReplicaIssueParams) error
+	UpsertReplicaLabel(ctx context.Context, arg UpsertReplicaLabelParams) error
+	UpsertReplicaMilestone(ctx context.Context, arg UpsertReplicaMilestoneParams) error
+	UpsertReplicaPriority(ctx context.Context, arg UpsertReplicaPriorityParams) error
+	UpsertReplicaProject(ctx context.Context, arg UpsertReplicaProjectParams) error
+	UpsertReplicaState(ctx context.Context, arg UpsertReplicaStateParams) error
 	UpsertSchemaVersion(ctx context.Context, arg UpsertSchemaVersionParams) error
 	UseCalendarFeed(ctx context.Context, tokenHash []byte) (uuid.UUID, error)
 	// Counts a use, refusing one past the limit in the same statement so two

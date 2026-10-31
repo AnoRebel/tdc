@@ -483,7 +483,7 @@ func (q *Queries) ListCyclesToClose(ctx context.Context, arg ListCyclesToClosePa
 }
 
 const listIssuesInCycle = `-- name: ListIssuesInCycle :many
-SELECT i.id, i.project_id, i.number, i.title, i.description, i.state_id, i.author_id, i.created_at, i.updated_at, i.deleted_at, i.deleted_by, i.priority_id
+SELECT i.id, i.project_id, i.number, i.title, i.description, i.state_id, i.author_id, i.created_at, i.updated_at, i.deleted_at, i.deleted_by, i.priority_id, i.author_address
 FROM issue_cycle ic JOIN issues i ON i.id = ic.issue_id
 WHERE ic.cycle_id = $1 AND i.deleted_at IS NULL
 ORDER BY i.number DESC
@@ -511,6 +511,7 @@ func (q *Queries) ListIssuesInCycle(ctx context.Context, cycleID uuid.UUID) ([]I
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PriorityID,
+			&i.AuthorAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -523,7 +524,7 @@ func (q *Queries) ListIssuesInCycle(ctx context.Context, cycleID uuid.UUID) ([]I
 }
 
 const listIssuesInMilestone = `-- name: ListIssuesInMilestone :many
-SELECT i.id, i.project_id, i.number, i.title, i.description, i.state_id, i.author_id, i.created_at, i.updated_at, i.deleted_at, i.deleted_by, i.priority_id
+SELECT i.id, i.project_id, i.number, i.title, i.description, i.state_id, i.author_id, i.created_at, i.updated_at, i.deleted_at, i.deleted_by, i.priority_id, i.author_address
 FROM issue_milestone im JOIN issues i ON i.id = im.issue_id
 WHERE im.milestone_id = $1 AND i.deleted_at IS NULL
 ORDER BY i.number DESC
@@ -551,6 +552,7 @@ func (q *Queries) ListIssuesInMilestone(ctx context.Context, milestoneID uuid.UU
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PriorityID,
+			&i.AuthorAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -678,7 +680,7 @@ func (q *Queries) ListMilestonesOfProject(ctx context.Context, projectID uuid.UU
 }
 
 const listUnfinishedIssuesInCycle = `-- name: ListUnfinishedIssuesInCycle :many
-SELECT i.id, i.project_id, i.number, i.title, i.description, i.state_id, i.author_id, i.created_at, i.updated_at, i.deleted_at, i.deleted_by, i.priority_id
+SELECT i.id, i.project_id, i.number, i.title, i.description, i.state_id, i.author_id, i.created_at, i.updated_at, i.deleted_at, i.deleted_by, i.priority_id, i.author_address
 FROM issue_cycle ic
 JOIN issues i ON i.id = ic.issue_id
 JOIN issue_states s ON s.id = i.state_id
@@ -709,6 +711,7 @@ func (q *Queries) ListUnfinishedIssuesInCycle(ctx context.Context, cycleID uuid.
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.PriorityID,
+			&i.AuthorAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -846,7 +849,7 @@ const setProjectPlanning = `-- name: SetProjectPlanning :one
 
 UPDATE projects SET time_zone = $1, cycle_policy = $2
 WHERE id = $3
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error
 `
 
 type SetProjectPlanningParams struct {
@@ -874,6 +877,7 @@ func (q *Queries) SetProjectPlanning(ctx context.Context, arg SetProjectPlanning
 		&i.CyclePolicy,
 		&i.StreamComplete,
 		&i.Federated,
+		&i.ReplicaError,
 	)
 	return i, err
 }

@@ -15,7 +15,7 @@ import (
 
 const getProjectForStream = `-- name: GetProjectForStream :one
 
-SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, COALESCE(creator.username, '')::text AS created_by_username
+SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, projects.replica_error, COALESCE(creator.username, '')::text AS created_by_username
 FROM projects
 LEFT JOIN users creator ON creator.id = projects.created_by
 WHERE projects.id = $1
@@ -36,6 +36,7 @@ type GetProjectForStreamRow struct {
 	CyclePolicy       string
 	StreamComplete    bool
 	Federated         bool
+	ReplicaError      string
 	CreatedByUsername string
 }
 
@@ -63,6 +64,7 @@ func (q *Queries) GetProjectForStream(ctx context.Context, id uuid.UUID) (GetPro
 		&i.CyclePolicy,
 		&i.StreamComplete,
 		&i.Federated,
+		&i.ReplicaError,
 		&i.CreatedByUsername,
 	)
 	return i, err
@@ -291,11 +293,44 @@ func (q *Queries) ListIssueRelationsForStream(ctx context.Context, projectID uui
 	return items, nil
 }
 
+const listIssueRemoteAssigneesForStream = `-- name: ListIssueRemoteAssigneesForStream :many
+SELECT issue_remote_assignees.issue_id, issue_remote_assignees.address
+FROM issue_remote_assignees
+JOIN issues ON issues.id = issue_remote_assignees.issue_id
+WHERE issues.project_id = $1
+`
+
+type ListIssueRemoteAssigneesForStreamRow struct {
+	IssueID uuid.UUID
+	Address string
+}
+
+func (q *Queries) ListIssueRemoteAssigneesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueRemoteAssigneesForStreamRow, error) {
+	rows, err := q.db.Query(ctx, listIssueRemoteAssigneesForStream, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListIssueRemoteAssigneesForStreamRow{}
+	for rows.Next() {
+		var i ListIssueRemoteAssigneesForStreamRow
+		if err := rows.Scan(&i.IssueID, &i.Address); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listIssuesForStream = `-- name: ListIssuesForStream :many
 SELECT issues.id, issues.number, issues.title, issues.description, issues.state_id,
        issues.priority_id, (issues.deleted_at IS NOT NULL)::bool AS deleted,
        COALESCE(author.username, '')::text AS author_username,
-       COALESCE(deleter.username, '')::text AS deleted_by_username
+       COALESCE(deleter.username, '')::text AS deleted_by_username,
+       COALESCE(issues.author_address, '')::text AS author_address
 FROM issues
 LEFT JOIN users author ON author.id = issues.author_id
 LEFT JOIN users deleter ON deleter.id = issues.deleted_by
@@ -312,6 +347,7 @@ type ListIssuesForStreamRow struct {
 	Deleted           bool
 	AuthorUsername    string
 	DeletedByUsername string
+	AuthorAddress     string
 }
 
 // Deleted issues included: a deleted issue is still a row, still numbered.
@@ -334,6 +370,7 @@ func (q *Queries) ListIssuesForStream(ctx context.Context, projectID uuid.UUID) 
 			&i.Deleted,
 			&i.AuthorUsername,
 			&i.DeletedByUsername,
+			&i.AuthorAddress,
 		); err != nil {
 			return nil, err
 		}

@@ -29,12 +29,12 @@ Goal: the home server can hold people from other servers in a project, before an
 
 Goal: a project and its issues' discussions arrive on the servers entitled to them, and nowhere else.
 
-- [ ] 3.1 Replicate an opened project's room to the servers entitled to it (any trusted peer holding a follower for a public project; servers hosting a member for a private one) through the existing room delivery, cursors and catch-up; verify a private project reaches a server hosting a member and no other server, with a test whose project has several peers so a vacuous pass is impossible
-- [ ] 3.2 Run the projector on replicas, writing replica rows only from events, in order; refuse an unknown event type by stopping that project's stream with a visible reason rather than skipping; verify a replica that followed live and one rebuilt from the start hold identical rows
-- [ ] 3.3 Replicate each issue's discussion room with its project, to the same servers; verify a comment on the home server appears on the replica in order, and a new issue's discussion is federated from its first message
-- [ ] 3.4 Stop and discard a replica when its server loses entitlement (last member removed, project made private or closed to federation); verify the server stops receiving events and its local rows are removed
-- [ ] 3.5 Show a shared project on a replica: read-only marking, the home server's name, and its state when the home is unreachable; verify a replica's board, lists, progress and saved views work for local readers
-- [ ] **MILESTONE 3** — Demonstrate: a private project on A with a member on B appears on B with its board and an issue's discussion, does not appear on C, and disappears from B when that member is removed. Tag `v1.43.0-dev`.
+- [x] 3.1 Replicate an opened project's room to the servers entitled to it (any trusted peer holding a follower for a public project; servers hosting a member for a private one) through the existing room delivery, cursors and catch-up; verify a private project reaches a server hosting a member and no other server, with a test whose project has several peers so a vacuous pass is impossible
+- [x] 3.2 Run the projector on replicas, writing replica rows only from events, in order; refuse an unknown event type by stopping that project's stream with a visible reason rather than skipping; verify a replica that followed live and one rebuilt from the start hold identical rows
+- [x] 3.3 Replicate each issue's discussion room with its project, to the same servers; verify a comment on the home server appears on the replica in order, and a new issue's discussion is federated from its first message
+- [x] 3.4 Stop and discard a replica when its server loses entitlement (last member removed, project made private or closed to federation); verify the server stops receiving events and its local rows are removed
+- [ ] 3.5 Show a shared project on a replica: read-only marking, the home server's name, and its state when the home is unreachable; verify a replica's board, lists, progress and saved views work for local readers — *read-only marking, the home's name, a stopped replica's notice, the board and lists are done; the home's reachability is not shown and saved views on a replica are not yet checked*
+- [x] **MILESTONE 3** — Demonstrate: a private project on A with a member on B appears on B with its board and an issue's discussion, does not appear on C, and disappears from B when that member is removed. Tag `v1.43.0-dev`.
 
 ## 4. Phase 4 — Changes from anywhere
 

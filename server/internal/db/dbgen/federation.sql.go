@@ -169,7 +169,9 @@ WHERE (room_id, peer) IN (
           SELECT 1 FROM events e
           WHERE e.room_id = rp.room_id AND e.sequence > rp.cursor
       )
-    ORDER BY rp.room_id, rp.peer
+    -- A project before anything else: its replica, built from it, makes
+    -- the rooms its issues' discussions are delivered into.
+    ORDER BY (r.kind = 'project') DESC, rp.room_id, rp.peer
     LIMIT $2
     FOR UPDATE OF rp SKIP LOCKED
 )
