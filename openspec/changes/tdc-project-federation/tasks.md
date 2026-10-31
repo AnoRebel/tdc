@@ -33,7 +33,7 @@ Goal: a project and its issues' discussions arrive on the servers entitled to th
 - [x] 3.2 Run the projector on replicas, writing replica rows only from events, in order; refuse an unknown event type by stopping that project's stream with a visible reason rather than skipping; verify a replica that followed live and one rebuilt from the start hold identical rows
 - [x] 3.3 Replicate each issue's discussion room with its project, to the same servers; verify a comment on the home server appears on the replica in order, and a new issue's discussion is federated from its first message
 - [x] 3.4 Stop and discard a replica when its server loses entitlement (last member removed, project made private or closed to federation); verify the server stops receiving events and its local rows are removed
-- [ ] 3.5 Show a shared project on a replica: read-only marking, the home server's name, and its state when the home is unreachable; verify a replica's board, lists, progress and saved views work for local readers — *read-only marking, the home's name, a stopped replica's notice, the board and lists are done; the home's reachability is not shown and saved views on a replica are not yet checked*
+- [x] 3.5 Show a shared project on a replica: read-only marking, the home server's name, and its state when the home is unreachable; verify a replica's board, lists, progress and saved views work for local readers — *the home's silence is recorded by a check each minute (and by any change asked of it) and shown in the header; saved views are personal rows, kept through every replay*
 - [x] **MILESTONE 3** — Demonstrate: a private project on A with a member on B appears on B with its board and an issue's discussion, does not appear on C, and disappears from B when that member is removed. Tag `v1.43.0-dev`.
 
 ## 4. Phase 4 — Changes from anywhere
@@ -43,14 +43,14 @@ Goal: members on replicas work in the project as if it were local.
 - [x] 4.1 Send changes made on a replica to the home server as signed federated requests in the author's name, for every issue change (file, edit, move, assign, label, prioritise, relate, plan); verify the home server authorises each against its own records and the change returns to the replica as an event, and that a replica never allocates a sequence in a project stream
 - [x] 4.2 Refuse a request whose author does not belong to the requesting server, and one for a project the requester holds no replica of; verify both are refused and recorded
 - [x] 4.3 Comments from replicas through the existing remote-message path; verify mention and assignment notifications reach a person through their own server
-- [ ] 4.4 Pending state in the interface between making a change and its event arriving, and a clear refusal when the home server says no; verify a refused move puts the card back with the reason — *the replica answers only once the change has come back, so the request in flight is the pending state, and a refusal or conflict is answered as a local one is; not yet checked in a browser*
-- [ ] 4.5 Public projects: following from a peer (read-only), and requesting membership; verify a follower reads and cannot change anything
+- [x] 4.4 Pending state in the interface between making a change and its event arriving, and a clear refusal when the home server says no; verify a refused move puts the card back with the reason — *the moving card is dimmed and marked busy until the home answers; checked in Chromium and Firefox across two servers, including a stale move put back with the reason*
+- [x] 4.5 Public projects: following from a peer (read-only), and requesting membership; verify a follower reads and cannot change anything — *a home lists its public, opened projects to peers; a server adds (follows) one, its people read it and ask to join, and the home's administrators let them in from settings*
 - [x] **MILESTONE 4** — Demonstrate: a member on B files an issue in A's project, a member on A moves it, a member on B comments and is assigned, and the board on both servers shows the same issue in the same column with the same history. Tag `v1.44.0-dev`.
 
 ## 5. Phase 5 — Ready to run
 
-- [ ] 5.1 Federation protocol document: the project event family, the projector rules, the change-request endpoints, entitlement and discard; verify an independent implementer could build a replica from the document alone
-- [ ] 5.2 Hosting guide and projects guide sections for sharing projects; verify an operator can open a project to federation from the guide alone
-- [ ] 5.3 End-to-end checks across two servers in the browser suite (Chromium and Firefox locally, WebKit in CI)
-- [ ] 5.4 An operator command that rebuilds a replica from its stream
-- [ ] **MILESTONE 5** — Demonstrate the full two-server journey from a stranger's reading of the guides. Tag `v1.45.0-dev`.
+- [x] 5.1 Federation protocol document: the project event family, the projector rules, the change-request endpoints, entitlement and discard; verify an independent implementer could build a replica from the document alone
+- [x] 5.2 Hosting guide and projects guide sections for sharing projects; verify an operator can open a project to federation from the guide alone
+- [x] 5.3 End-to-end checks across two servers in the browser suite (Chromium and Firefox locally, WebKit in CI) — *scripts/demo-milestone-project-federation-5.sh, run by CI in all three engines*
+- [x] 5.4 An operator command that rebuilds a replica from its stream — *`tdc-server -rebuild-replica KEY`; a stopped replica also resumes by itself once it can*
+- [x] **MILESTONE 5** — Demonstrate the full two-server journey from a stranger's reading of the guides. Tag `v1.45.0-dev`.

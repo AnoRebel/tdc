@@ -81,7 +81,7 @@ The switch is `projects.federated`, not the project room's `rooms.federated`: th
 - **Rows from the stream alone.** On each arrival the replica replays its stream from the latest baseline and syncs its tables to the result: definitions and issues upserted, what hangs from issues cleared and rewritten, definitions nothing uses removed last, so foreign keys hold throughout. People of the replica's server are members, authors and assignees by account; everybody else by address (`project_remote_members`, `issues.author_address`, `issue_remote_assignees`). Attribution columns (who added, created, assigned) name only local people. An unknown event stops the replica with `projects.replica_error`, rows untouched.
 - **Read-only by construction.** `Access.Allows` refuses every permission on a replica, naming the home, and the author exceptions do not apply there; the project response carries `home` and `replicaError`. Posting into a replica's discussion goes to the home's remote-post path, which refuses until Phase 4.3 admits replica members to discussions.
 - **Reaching a server.** An address names a host. The home reaches it at the address a room peer records, else an allowlist entry written as a full address, else `https://host`.
-- **Not yet:** whether the home is reachable is not shown on a replica; public projects reach only member servers until following arrives in Phase 4.5; a replica rebuilds from the whole stream (since the latest baseline) per delivery.
+- **Not yet** (as of Phase 3; see Phases 4.5 and 5 below for what followed): a replica rebuilds from the whole stream (since the latest baseline) per delivery.
 
 ### As built (Phase 4)
 
@@ -90,6 +90,14 @@ The switch is `projects.federated`, not the project room's `rooms.federated`: th
 - **Synchronous for the person.** The replica's route forwards the change, then catches the replica up from the home before answering, so the response is the issue as it now is — the request in flight is the pending state — and a refusal comes back in the home's words with its status. Abilities on a replica are what the person's role would allow at home (`Access.AsAtHome`), with project administration left to the home.
 - **Comments.** Rooms gained `DelegateRemoteMembership`: an issue's discussion admits, on the home, anybody `RemoteAccess` admits to its project, so a comment posted from a replica through the remote-message path is accepted from exactly the people whose changes are. Replica discussion rooms inherit the project room's peer, so they know where their home is.
 - **Notifications through the person's own server.** Arriving messages are indexed and notified as local ones; an arriving `issue.assigned` naming somebody of the receiving server notifies them there. The home notifies only its own people.
+
+### As built (Phases 4.5 and 5)
+
+- **Following is "adding" to people.** The protocol says follow; the interface says **Add from another server** and **Remove from this server**, since what happens is that this server keeps a read-only copy for everybody on it. `project_replicas.followed` keeps a follower's copy while the project is public and opened; members entitle it otherwise. The follower adopts the project room when the home agrees, which is what lets it accept an offer naming none of its people.
+- **Asking to join, without a notification.** Notifications point at an event, and a join request is not one: putting it in the stream would stop every replica on an older server. `project_join_requests` holds it on the home; the project response carries the count for administrators, shown in its header, and settings lets them in (an ordinary member added) or declines.
+- **Keeping up.** Each replica catches up from its home once a minute; that is also the reachability check (`projects.home_unreachable_since`, from the first failure, also set by a change that could not reach the home), and the point where a replica stopped by an unknown event is replayed again. `tdc-server -rebuild-replica KEY` does the same by hand.
+- **Path parameters decoded.** The router now unescapes every path parameter: the web client percent-encodes `@`, and `name%40server` had been arriving as a local username, so adding a member from elsewhere through the interface never worked. The event-identifier workaround that did the same for `$` went with it.
+- **Delivery order kept.** `UPDATE … RETURNING` returns claimed peers in no order, so a discussion room could be delivered before the project room its replica builds it from; a pass now sorts project rooms first after claiming.
 
 ### Issue discussions
 

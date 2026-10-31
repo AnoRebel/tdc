@@ -504,7 +504,8 @@ administrators on this server count towards a project's last administrator.
 
 Their server gets the project: its board, its lists, its cycles, milestones and
 progress, and every issue's discussion, kept up to date as the project changes
-here. Only servers hosting one of its members get it, private or public. It
+here. Servers hosting one of its members get it, and for a public project also
+any server that adds it (below). It
 appears there under a key naming this server, `WEB@your.server`, and its issues
 as `WEB@your.server-12`, so it can never be mistaken for a project of their own.
 Its header says where it lives.
@@ -524,10 +525,39 @@ to other servers, that server is told to discard its copy, and nothing more is
 sent to it. Closing a project keeps its members from elsewhere listed, so
 opening it again shares it with them again.
 
-If the project's home records something their server does not understand yet —
-a newer kind of change — their copy stops there and says so, rather than
-skipping it and quietly showing something different from the home. It catches
-up once their server is updated.
+A card being moved on their server is dimmed until the home has made the move.
+If somebody here moved it first, the move is refused and the card goes to where
+it really is, saying so. Their saved views of the project are their own and stay
+on their server.
+
+If this server stops answering, their copy says since when: what they see may be
+behind, and nothing can be changed until it answers again. If the project's home
+records something their server does not understand yet — a newer kind of change
+— their copy stops there and says so, rather than skipping it and quietly
+showing something different from the home. It catches up by itself once their
+server is updated.
+
+### Adding a public project to another server, and asking to join
+
+A public project opened to other servers can be added to any server this one
+federates with, so that people there can read it. On that server, **Projects →
+Add from another server** asks for this server's address — `your.server`, or
+`https://your.server` written out — lists the public projects opened here, and
+**Add** brings one in. Anybody there who may start projects may add one. It
+arrives a moment later, marked as living here, and everybody on that server can
+read it. Nobody there can change it yet.
+
+To work in it, somebody there presses **Ask to join** in its header. Here, the
+project's administrators see **1 person waiting to join** in its header, and
+under **Settings → Waiting to join** they **Let in** — the person becomes a
+member, and can work in the project from their own server as above — or
+**Decline**. Asking again while a request waits changes nothing.
+
+An added project stays on that server while it is public and open to other
+servers, until somebody there who may start projects presses **Remove from this
+server** in its header — a server where people are members keeps it for them.
+Making it private withdraws it from every server that only added it; closing it
+to other servers withdraws it from every server.
 
 ## Discussing an issue
 

@@ -220,6 +220,19 @@ jobs:
           done
         working-directory: apps/web
 
+      # A project shared between two servers, in the same three engines: an
+      # administrator on one opens it and adds somebody from the other, who
+      # works in it there. The script starts both servers afresh for each
+      # engine, on databases of their own beside the suite's.
+      - name: Check a project shared between servers
+        env:
+          ENGINES: chromium firefox webkit
+          SKIP_WEB_BUILD: "1"
+          TDC_DEMO_DATABASE_SERVER: postgres://tdc:tdc@127.0.0.1:5432
+        run: |
+          pkill -f /tmp/tdc-server || true
+          scripts/demo-milestone-project-federation-5.sh
+
       - name: Keep what a failure produced
         if: failure()
         uses: actions/upload-artifact@v7

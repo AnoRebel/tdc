@@ -30,6 +30,25 @@ export default defineConfig({
     {
       name: "desktop",
       use: { ...devices["Desktop Chrome"] },
+      testIgnore: /project-federation\.spec\.ts/,
     },
+    /*
+     * A project shared between two servers, in each engine a release is gated
+     * on. Run by scripts/demo-milestone-project-federation-5.sh, which starts
+     * both servers afresh for each engine: the last check stops one of them.
+     */
+    ...(["chromium", "firefox", "webkit"] as const).map((engine) => ({
+      name: `federation-${engine}`,
+      use: {
+        ...devices[
+          engine === "chromium"
+            ? "Desktop Chrome"
+            : engine === "firefox"
+              ? "Desktop Firefox"
+              : "Desktop Safari"
+        ],
+      },
+      testMatch: /project-federation\.spec\.ts/,
+    })),
   ],
 });

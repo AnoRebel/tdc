@@ -8,8 +8,8 @@ Federation is optional. A server with it switched off is a complete TDC server;
 nothing on this page is needed to run one.
 
 > **Status.** This document covers discovery, identity, request signing, room
-> replication, remote membership and posting, files, calls, and the events a
-> project's stream holds, though projects are not shared yet. Cross-server browsing and
+> replication, remote membership and posting, files, calls, and sharing projects:
+> the events a project's stream holds, replicas, changes, following and joining. Cross-server browsing and
 > moderation are still being built. Version `tdc/1` is not frozen until they
 > land.
 
@@ -628,8 +628,9 @@ a person on another server sees them in the call's state but cannot do them.
 ## A project's stream
 
 > **Status.** A project's home server shares it with the servers hosting its
-> members. Their replicas are written only from the project's stream; their
-> people's changes are asked of the home server, which makes them.
+> members, and a public one with any trusted server that follows it. Replicas
+> are written only from the project's stream; their people's changes are asked
+> of the home server, which makes them.
 
 A project is shared only once its administrators open it to federation, and
 until then a federated request about it is answered as though it did not
@@ -649,7 +650,14 @@ its end, a baseline — has the server's bare name as its `sender`, with no `@`.
 
 Identifiers are UUIDs as strings. Days are `YYYY-MM-DD` in the project's
 calendar. Content may carry more fields than listed — names as they were, for
-a reader of the history — and a receiver ignores what it does not use.
+a reader of the history — and a receiver ignores what it does not use, with one
+exception: each field of a `project.updated` is a change, and one a projection
+does not know stops it as an unknown type would.
+
+A project's room has no slug, so it is addressed by its identifier: its address
+is `<project uuid>@<home>`, every event's `room` is exactly that, and the
+endpoints that take a room's slug take the identifier in its place. An issue's
+discussion room is the same, under the issue's identifier.
 
 | Type                                                                       | Content a projection reads                                                                                                                                                     |
 | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -695,9 +703,7 @@ runs. The rules a second implementation needs:
 - **Removing a cycle or a milestone takes any issue still in it out of it**,
   as a database's cascade would; only a deleted issue can still be in one.
 - **A `project.baseline` replaces everything.** Its content is the project's
-  rows — the project, members by address, states, labels, priorities, cycles,
-  milestones, issues with their labels, assignees, cycle and milestone, and
-  relationships — as they stood when it was appended. Replay starts from the
+  rows as they stood when it was appended, in the shape shown below. Replay starts from the
   latest baseline in the stream; what came before it is already in it. A home
   server appends one, once, to a project made before every change was an
   event, so that its stream alone describes it from there on.
@@ -705,6 +711,63 @@ runs. The rules a second implementation needs:
   skip the event: a projection that skipped what it did not understand would
   disagree with its source without saying so. The project stays as it was at
   the event before, and says why.
+
+A baseline's content, every map optional and empty when absent:
+
+```json
+{
+  "project": {
+    "id": "<uuid>",
+    "key": "WEB",
+    "name": "Website",
+    "description": "",
+    "visibility": "private",
+    "timeZone": "Africa/Dar_es_Salaam",
+    "cyclePolicy": "carry-forward",
+    "nextIssueNumber": 13,
+    "federated": true
+  },
+  "members": { "amina@a.example": { "role": "admin" } },
+  "states": { "<uuid>": { "name": "To do", "position": 1, "isCompletion": false } },
+  "labels": { "<uuid>": { "name": "backend", "colour": "#2563eb" } },
+  "priorities": { "<uuid>": { "name": "Urgent", "rank": 1 } },
+  "cycles": {
+    "<uuid>": {
+      "name": "Week 44",
+      "startsOn": "2026-10-26",
+      "endsOn": "2026-11-01",
+      "closedAt": null,
+      "closedPolicy": ""
+    }
+  },
+  "milestones": { "<uuid>": { "name": "Launch", "description": "", "targetDate": "2026-12-01" } },
+  "issues": {
+    "<uuid>": {
+      "number": 12,
+      "title": "…",
+      "description": "",
+      "state": "<uuid>",
+      "author": "dalila@b.example",
+      "priority": "<uuid>",
+      "cycle": null,
+      "milestone": null,
+      "deleted": false,
+      "labels": { "<uuid>": true },
+      "assignees": { "amina@a.example": "" }
+    }
+  },
+  "relations": {
+    "<from uuid> blocks <to uuid>": { "from": "<uuid>", "to": "<uuid>", "kind": "blocks" }
+  }
+}
+```
+
+Members and assignees are keyed by address. A relation is keyed by
+`"<from> <kind> <to>"`, the edge as stored, so one relationship appears twice,
+once from each side. Fields naming who did something (`createdBy`, `addedBy`,
+`deletedBy`, an assignee's value) may be empty and are only ever the home's own
+people; a cycle's and a milestone's instants (`startsAt`, `endsAt`, `dueAt`),
+when present, are worked out again from the days and the time zone.
 
 ### Sharing a project
 
@@ -718,9 +781,10 @@ the project's events through the same delivery as a room's.
 { "project": "<uuid>", "name": "Website", "visibility": "private", "members": ["dalila@b.example"] }
 ```
 
-The receiving server accepts, with `200`, only if one of the named members is
-somebody it hosts — otherwise `404`, so a peer cannot make another server hold
-whatever it likes. Accepting adopts a room of kind `project` under the home's
+The receiving server accepts, with `200` and `{"accepted": true}`, only if one
+of the named members is somebody it hosts, or it asked to follow this public
+project (below) — otherwise `404`, so a peer cannot make another server hold
+whatever it likes. A `visibility` other than `public` is taken as `private`. Accepting adopts a room of kind `project` under the home's
 own identifier, with the home as its home server and its peer, and creates no
 rows yet. A room by that identifier that is the receiving server's own, or
 another home's, is never touched. Once the offer is accepted, the home server
@@ -737,8 +801,11 @@ before discussion rooms. The replica's key is the home's key followed by `@`
 and the home's name — `WEB@a.example` — so it can never take the key of a
 project of the receiving server's own, and its issues read as
 `WEB@a.example-12` there. People of the receiving server are its members and
-assignees by account, and everybody else by address. A replica refuses every
-change made locally, saying which server the project lives on.
+assignees by account, and everybody else by address. A replica writes none of
+its own rows: a change to an issue made there is asked of the home (below), and
+a change to the project itself — its members, states, labels, priorities,
+cycles and milestones — is refused there, saying which server the project lives
+on.
 
 **Discard.** When a server no longer hosts any member, or the project is closed
 to federation, the home server stops delivering to it at once and sends
@@ -767,13 +834,16 @@ The kinds are `file` (`title`, `description`, `state`), `edit` (`title`,
 `description`), `delete`, `move` (`state`, `expected`), `assign` and `unassign`
 (`person`, an address), `label` and `unlabel` (`label`), `priority`
 (`priority`, or none to clear it), `relate` and `unrelate` (`relation`,
-`other`, the other issue's number), `cycle` and `milestone` (an identifier, or
-none). Issues are named by number, since the key differs between servers. The
+`other`, the other issue's number), `cycle` and `milestone` (fields of those
+names: an identifier, or none). Every kind but `file` names its issue by number
+in `issue`, since the key differs between servers. The
 home server refuses with `403` a request for somebody the signing server does
 not host, with `404` one from a server holding no accepted replica, and
 otherwise checks the person's project role exactly as for its own people,
-answering a refusal with the status and message a local request would get, and
-a change made with `200` and `{"issue": <number>}`. The change then reaches
+answering a refusal with the status and message a local request would get —
+`{"message": "…"}`, which the asking server passes to its person — an unknown
+kind or a missing cycle or milestone with `400`, and a change made with `200`
+and `{"issue": <number>}`. The change then reaches
 every replica as an event; the asking server catches up at once, so its person
 sees the result before the request returns.
 
@@ -793,6 +863,68 @@ does in a room.
 Not in the stream, and so never part of a projection: when each row was
 written on the home server, saved views, who follows a discussion, and the
 search index, which a server works out from the rows itself.
+
+**Following a public project.** A public project opened to federation may be
+held by any server its home deals with, not only one hosting a member. A server
+lists what it lets a peer follow at `GET /api/federation/projects`, signed:
+
+```json
+{ "projects": [{ "id": "<uuid>", "key": "WEB", "name": "Website", "description": "" }] }
+```
+
+A server that is not discoverable by the peer answers with an empty list, as
+for room browsing. To follow one, the peer sends
+`POST /api/federation/projects/follow` with `{"project": "<uuid>"}`; the home
+answers `200` and offers the project as above, or `404` for a project that is
+not public and open, or asked by a server it is not discoverable by — the same
+answer as one that does not exist. Both answer `{"following": true|false}`;
+unfollowing always answers `200`. The follower
+adopts the project's room as soon as the home has said yes, so the offer that
+follows, which names none of its people, is accepted for a public project whose
+room it already holds from that home, and refused otherwise. A follower keeps
+its replica while the project stays public and opened, members or not; when it
+is made private or closed, or the follower sends
+`POST /api/federation/projects/unfollow` with `{"project": "<uuid>"}`, the
+replica is discarded — when unfollowed, unless people of that server are
+members; when the project is closed to federation, in every case, since closing
+withdraws it from every server. Everybody on the follower may read the project; nobody there may change it until they are a
+member.
+
+**Asking to join.** Somebody reading a followed project asks its home to let
+them in through their own server, `POST /api/federation/projects/join`:
+
+```json
+{ "project": "<uuid>", "actor": "dalila@b.example" }
+```
+
+As with a change, the signing server must host the actor (`403`) and hold an
+accepted replica (`404`); somebody already a member is answered `409`. The home
+answers `202` and keeps the request for the project's administrators, who let
+the person in — an ordinary `project.member_added`, which reaches the follower
+like any event — or decline, which sends nothing. Asking again changes nothing.
+
+**Keeping up.** A replica's server asks the home for events after the latest it
+holds, at `GET /api/federation/rooms/<project's identifier>/events?since=N` (see
+[Catch-up is a pull](#catch-up-is-a-pull)) — a page of at most 200, with
+`"more": true` while there are more — once a minute and after every change it
+asks for. A project's missing delivery is made up this way; its issues'
+discussions rely on the home's retries, and on a rebuild. and the asking is
+also how a replica learns its home has stopped answering: it records when, from
+the first failure, and says so to its readers until the home answers again. A
+replica stopped at an event it could not apply is replayed again on the same
+schedule, so one stopped before its server was updated resumes once it is. An
+operator can do both by hand: `tdc-server -rebuild-replica WEB@a.example`
+fetches what the home has, replays the replica from its whole stream, and then
+catches up every issue's discussion.
+
+**Order of delivery.** A home sends a project's room before its issues'
+discussion rooms in any one pass, since a replica creates a discussion room
+when the projection first holds its issue. A receiver refuses events for a room
+it does not hold with `404`, and the home retries.
+
+**Common answers.** Every endpoint here answers a body it cannot read with
+`400`, a request from a server it cannot identify with `401`, and a refusal
+with `{"message": "…"}`.
 
 **After an erasure, a baseline.** When a person's data is erased, the content
 of everything they sent is emptied — project events included — and their

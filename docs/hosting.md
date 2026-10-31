@@ -880,6 +880,28 @@ you resume it. This server reaches another at the address its rooms' peers
 record for it, or at an entry in `federation.allowed_servers` written as a full
 address — `https://their.server:8443` — or else at `https://` and its name.
 
+A **public** project opened to other servers can also be added to any server
+you federate with, by somebody there who may start projects, without anybody
+there being a member; its people read it, and ask to join to work in it. Your
+project's administrators let them in. Which servers may see your public
+projects at all follows the same rules as browsing your public rooms: under
+`allowlist`, only the servers you list. See
+[Adding a public project to another server](projects.md#adding-a-public-project-to-another-server-and-asking-to-join).
+
+**On a server holding copies of other servers' projects**, each copy checks in
+with its home once a minute, picks up anything it missed, and tells its readers
+when the home has stopped answering. A copy that stopped at a change this
+server did not understand carries on by itself once you have upgraded. To bring
+one up to date by hand — after restoring a backup, say — stop the server and
+run:
+
+```sh
+tdc-server -rebuild-replica WEB@their.server
+```
+
+It fetches what the home has, replays the copy from its whole history, says
+how many events it holds, and exits; start the server again afterwards.
+
 ### If a signing key is compromised
 
 Rotate it. That is the only mechanism, and you should know what it does not do.

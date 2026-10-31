@@ -25,6 +25,16 @@ A public project opened to federation MAY be held by any trusted peer. A private
 - **WHEN** a private project has members on one remote server and not another
 - **THEN** the first receives the project and the second receives nothing about it
 
+#### Scenario: A public project is followed and read, not changed
+
+- **WHEN** a trusted server follows a public project opened to federation, with nobody there a member
+- **THEN** it holds a replica its people may read, and their changes are refused until the home server makes them members
+
+#### Scenario: Asking to join is decided by the home server
+
+- **WHEN** somebody reading a followed project asks to join it
+- **THEN** the home server records the request for the project's administrators, and they become a member only when an administrator lets them in
+
 #### Scenario: Losing the last member ends a replica
 
 - **WHEN** the last member on a remote server is removed from a private project
