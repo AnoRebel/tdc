@@ -63,7 +63,7 @@ func (s *Server) handleForward(c *echo.Context) error {
 
 	event, err := s.rooms.Forward(
 		c.Request().Context(), fromRoomID, toRoomID, user.ID,
-		eventIDParam(c), request.Comment, request.ClientToken)
+		c.Param("eventId"), request.Comment, request.ClientToken)
 	if err != nil {
 		return roomError(err)
 	}
@@ -74,7 +74,7 @@ func (s *Server) handleForward(c *echo.Context) error {
 	// went is deliberately not said: the destination may be a room they cannot
 	// see, and naming it would disclose that the room exists.
 	if s.notify != nil {
-		if original, err := s.rooms.EventInRoom(ctx, fromRoomID, eventIDParam(c)); err == nil &&
+		if original, err := s.rooms.EventInRoom(ctx, fromRoomID, c.Param("eventId")); err == nil &&
 			original.SenderID != nil {
 			s.notify.About(ctx, *original.SenderID, user.ID,
 				s.rooms.UserAddress(user.Username), fromRoomID, original.ID,

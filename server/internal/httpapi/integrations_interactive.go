@@ -117,13 +117,7 @@ func (s *Server) pressInteractive(c *echo.Context) error {
 		return refusal
 	}
 
-	/*
-		eventIDParam rather than c.Param: an event identifier begins with "$",
-		which a correct client percent-encodes, and Echo hands back the raw
-		segment. Reading it directly yields "%24abc" and every lookup misses —
-		invisibly, for as long as every client leaves the "$" alone.
-	*/
-	messageID := eventIDParam(c)
+	messageID := c.Param("eventId")
 	message, err := s.rooms.Event(ctx, messageID)
 	if err == nil && message.SenderID != nil {
 		if refusal := s.throttlePress(c, "press:integration:"+message.SenderID.String(),
@@ -225,7 +219,7 @@ func (s *Server) handleUpdateControls(c *echo.Context) error {
 	event, controls, err := s.rooms.UpdateMessage(ctx, rooms.Update{
 		RoomID:   roomID,
 		AuthorID: user.ID,
-		Message:  eventIDParam(c),
+		Message:  c.Param("eventId"),
 		Expected: *request.Version,
 		Body:     filtered.Body,
 		Actions:  request.Actions,
@@ -295,7 +289,7 @@ func (s *Server) handlePrivateReply(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, rooms.ErrMessageTooLong.Error())
 	}
 
-	invocation, err := s.rooms.PrivateReplyTarget(ctx, roomID, user.ID, eventIDParam(c))
+	invocation, err := s.rooms.PrivateReplyTarget(ctx, roomID, user.ID, c.Param("eventId"))
 	if err != nil {
 		return interactiveError(err)
 	}

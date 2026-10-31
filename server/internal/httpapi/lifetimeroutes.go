@@ -42,7 +42,7 @@ func (s *Server) handleSetMessageLifetime(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	event, err := s.rooms.EventInRoom(ctx, roomID, eventIDParam(c))
+	event, err := s.rooms.EventInRoom(ctx, roomID, c.Param("eventId"))
 	if err != nil {
 		return roomError(err)
 	}

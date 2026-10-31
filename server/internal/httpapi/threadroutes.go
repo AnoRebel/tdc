@@ -34,7 +34,7 @@ func (s *Server) handleThread(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 
-	root, replies, err := s.rooms.Thread(ctx, roomID, user.ID, eventIDParam(c))
+	root, replies, err := s.rooms.Thread(ctx, roomID, user.ID, c.Param("eventId"))
 	if err != nil {
 		return roomError(err)
 	}
@@ -78,7 +78,7 @@ func (s *Server) handleReplyInThread(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
 
-	return s.postMessage(c, roomID, user, request, eventIDParam(c))
+	return s.postMessage(c, roomID, user, request, c.Param("eventId"))
 }
 
 // handleMarkThreadRead records how far the reader has read one thread.
@@ -96,7 +96,7 @@ func (s *Server) handleMarkThreadRead(c *echo.Context) error {
 	}
 
 	if err := s.rooms.MarkThreadRead(c.Request().Context(), roomID, user.ID,
-		eventIDParam(c), request.Sequence); err != nil {
+		c.Param("eventId"), request.Sequence); err != nil {
 		return roomError(err)
 	}
 	return c.NoContent(http.StatusNoContent)
@@ -121,7 +121,7 @@ func (s *Server) setFollowing(c *echo.Context, following bool) error {
 	}
 
 	if err := s.rooms.SetThreadFollowing(c.Request().Context(), roomID, user.ID,
-		eventIDParam(c), following); err != nil {
+		c.Param("eventId"), following); err != nil {
 		return roomError(err)
 	}
 	return c.NoContent(http.StatusNoContent)

@@ -41,7 +41,7 @@ func (s *Server) handleReact(c *echo.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	eventID := eventIDParam(c)
+	eventID := c.Param("eventId")
 
 	err = s.rooms.React(ctx, roomID, user.ID, eventID, request.Emoji)
 	if errors.Is(err, rooms.ErrNotAnEmoji) {
@@ -81,7 +81,7 @@ func (s *Server) handleUnreact(c *echo.Context) error {
 	}
 
 	if err := s.rooms.Unreact(
-		c.Request().Context(), roomID, user.ID, eventIDParam(c), emoji,
+		c.Request().Context(), roomID, user.ID, c.Param("eventId"), emoji,
 	); err != nil {
 		return roomError(err)
 	}

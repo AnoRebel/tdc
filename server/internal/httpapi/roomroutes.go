@@ -623,7 +623,7 @@ func (s *Server) handleEditMessage(c *echo.Context) error {
 	// channel; the service enforces authorship when it is absent.
 	moderator := currentPermissions(c).AllowsChannel(authz.PermMessageEditAny, roomID).Allowed
 
-	event, err := s.rooms.EditMessageAs(ctx, roomID, user.ID, eventIDParam(c), filtered.Body, moderator)
+	event, err := s.rooms.EditMessageAs(ctx, roomID, user.ID, c.Param("eventId"), filtered.Body, moderator)
 	if err != nil {
 		return roomError(err)
 	}
@@ -667,7 +667,7 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 	// service enforces authorship when it is absent.
 	moderator := currentPermissions(c).AllowsChannel(authz.PermMessageDeleteAny, roomID).Allowed
 
-	event, err := s.rooms.DeleteMessage(ctx, roomID, user.ID, eventIDParam(c), moderator)
+	event, err := s.rooms.DeleteMessage(ctx, roomID, user.ID, c.Param("eventId"), moderator)
 
 	/*
 		A redaction on a replica removes the content and writes no event,
@@ -680,11 +680,11 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 	*/
 	if errors.Is(err, rooms.ErrRedactedLocally) {
 		if moderator {
-			s.recordModeration(c, user, audit.ActionMessageRemoved, "event", eventIDParam(c), nil)
+			s.recordModeration(c, user, audit.ActionMessageRemoved, "event", c.Param("eventId"), nil)
 		}
-		if err := s.attachments.DeleteForEvent(ctx, eventIDParam(c)); err != nil {
+		if err := s.attachments.DeleteForEvent(ctx, c.Param("eventId")); err != nil {
 			s.log.Error("cannot remove a locally redacted message's attachments",
-				"event", eventIDParam(c), "error", err)
+				"event", c.Param("eventId"), "error", err)
 		}
 		return c.NoContent(http.StatusNoContent)
 	}
@@ -699,18 +699,18 @@ func (s *Server) handleDeleteMessage(c *echo.Context) error {
 	//
 	// Logged rather than returned: the message is already deleted, and failing
 	// the request now would suggest to the caller that it was not.
-	if err := s.attachments.DeleteForEvent(ctx, eventIDParam(c)); err != nil {
+	if err := s.attachments.DeleteForEvent(ctx, c.Param("eventId")); err != nil {
 		s.log.Error("cannot remove a deleted message's attachments",
-			"eventId", eventIDParam(c), "error", err)
+			"eventId", c.Param("eventId"), "error", err)
 	}
 
 	// A deleted message that stayed searchable would be a deletion that did
 	// not delete: the placeholder says the content is gone, and search has to
 	// agree.
 	if s.search != nil {
-		if err := s.search.Unindex(ctx, eventIDParam(c)); err != nil {
+		if err := s.search.Unindex(ctx, c.Param("eventId")); err != nil {
 			s.log.Error("cannot remove a deleted message from the search index",
-				"eventId", eventIDParam(c), "error", err)
+				"eventId", c.Param("eventId"), "error", err)
 		}
 	}
 

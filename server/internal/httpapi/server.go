@@ -272,7 +272,18 @@ type Services struct {
 // keeps the server testable without a database for routes that do not need
 // one.
 func New(cfg Config, pool *db.Pool, services Services, log *slog.Logger) *Server {
-	e := echo.New()
+	/*
+		Path parameters decoded, for every route at once.
+
+		A correct client percent-encodes what it puts in a path — the "$" an
+		event identifier begins with, the "@" in a project key or address of
+		somebody elsewhere — and Echo otherwise hands back the raw segment, so
+		"dalila%40b.example" arrived as a username with no server in it.
+	*/
+	e := echo.NewWithConfig(echo.Config{Router: echo.NewRouter(echo.RouterConfig{
+		AllowOverwritingRoute:   true,
+		UnescapePathParamValues: true,
+	})})
 	e.Logger = log
 	// Echo v5 takes a factory here, and the parameter order of the handler it
 	// returns is (context, error) — reversed from v4.
