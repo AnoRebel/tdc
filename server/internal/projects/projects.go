@@ -359,6 +359,22 @@ type Access struct {
 	Role        string
 	userID      uuid.UUID
 	permissions authz.Permissions
+	// atHome is a replica's access as its home would see it.
+	atHome bool
+}
+
+/*
+AsAtHome is what somebody may ask a replica's home to do: their project role
+alone, as RemoteAccess resolves it there, with nothing granted on this server.
+
+For showing what a person can do with a replica, never for changing it here —
+the replica's own access still refuses every change.
+*/
+func (a Access) AsAtHome() Access {
+	if !IsReplica(a.Project) {
+		return a
+	}
+	return Access{Project: a.Project, Role: a.Role, atHome: true}
 }
 
 // memberGrants is what being in a project confers, beyond seeing it.
@@ -396,7 +412,7 @@ scope. Then membership.
 */
 func (a Access) Allows(permission authz.Permission) authz.Decision {
 	// A replica is changed only by its stream: changes are made on its home.
-	if IsReplica(a.Project) {
+	if IsReplica(a.Project) && !a.atHome {
 		return authz.Decision{Allowed: false, Permission: permission, Reason: "this project lives on " + HomeOf(a.Project) + ", and is changed there"}
 	}
 	if a.permissions.DeniedInProject(permission, a.Project.ID) {

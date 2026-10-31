@@ -3,6 +3,7 @@ package projects_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -154,5 +155,57 @@ func TestARemoteMemberIsHeldToTheirProjectRole(t *testing.T) {
 	must(f.projects.SetFederated(ctx, amina, access, false))
 	if _, err := f.projects.RemoteAccess(ctx, access.Project.ID, "dalila@elsewhere.example"); !errors.Is(err, projects.ErrProjectNotFound) {
 		t.Errorf("a project closed to federation still answered for its remote member: %v", err)
+	}
+}
+
+/*
+A change asked for through a replica is made through the same methods as a
+local one, so a remote member's role decides it: they may file and move, they
+are refused a deletion their role does not allow, naming the permission, and a
+change this server does not make for another is refused for what it is.
+*/
+func TestAChangeFromElsewhereIsHeldToTheSameRules(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	amina := f.person(t, "amina")
+	access := f.project(t, amina, "APL")
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(f.projects.SetFederated(ctx, amina, access, true))
+	access, err := f.projects.ProjectByID(ctx, amina, access.Project.ID)
+	must(err)
+	must(f.projects.SetMember(ctx, amina, access, "dalila@elsewhere.example", "member"))
+	dalila := projects.Actor{Address: "dalila@elsewhere.example"}
+	theirs, err := f.projects.RemoteAccess(ctx, access.Project.ID, dalila.Address)
+	must(err)
+
+	title := "Asked for from elsewhere"
+	filed, err := f.projects.Apply(ctx, dalila, theirs, projects.Change{Kind: projects.ChangeFile, Title: &title})
+	must(err)
+	if filed.AuthorID != nil || filed.AuthorAddress == nil || *filed.AuthorAddress != dalila.Address {
+		t.Errorf("the issue's author is %v / %v, want dalila by address", filed.AuthorID, filed.AuthorAddress)
+	}
+
+	var refusal projects.RefusalError
+	_, err = f.projects.Apply(ctx, dalila, theirs, projects.Change{Kind: projects.ChangeDelete, Issue: filed.Number})
+	if !errors.As(err, &refusal) || refusal.Decision.Permission != authz.PermIssueDelete {
+		t.Errorf("a member elsewhere deleting an issue was answered %v", err)
+	}
+	if _, err := f.projects.Apply(ctx, dalila, theirs, projects.Change{Kind: "rename-the-project", Issue: filed.Number}); !errors.Is(err, projects.ErrUnknownChange) {
+		t.Errorf("an unknown change was answered %v", err)
+	}
+	if _, err := f.projects.Apply(ctx, dalila, theirs, projects.Change{Kind: projects.ChangeEdit, Issue: 999, Title: &title}); !errors.Is(err, projects.ErrIssueNotFound) {
+		t.Errorf("a change to an issue that does not exist was answered %v", err)
+	}
+
+	stream, err := f.projects.Stream(ctx, access.Project.ID)
+	must(err)
+	last := stream[len(stream)-1]
+	if last.Type != "issue.created" || strings.Contains(last.SenderAddress, "@") || !strings.Contains(string(last.Content), `"by": "dalila@elsewhere.example"`) {
+		t.Errorf("the filing is recorded as %s by %s: %s", last.Type, last.SenderAddress, last.Content)
 	}
 }

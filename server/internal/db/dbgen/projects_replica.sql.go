@@ -263,6 +263,44 @@ func (q *Queries) ForgetReplica(ctx context.Context, arg ForgetReplicaParams) er
 	return err
 }
 
+const holdsReplica = `-- name: HoldsReplica :one
+SELECT EXISTS (
+    SELECT 1 FROM project_replicas
+    WHERE project_id = $1 AND server = $2 AND offered_at IS NOT NULL AND NOT discarding
+)
+`
+
+type HoldsReplicaParams struct {
+	ProjectID uuid.UUID
+	Server    string
+}
+
+// Whether a server holds an accepted replica of a project, which is what lets
+// it ask for changes to it.
+func (q *Queries) HoldsReplica(ctx context.Context, arg HoldsReplicaParams) (bool, error) {
+	row := q.db.QueryRow(ctx, holdsReplica, arg.ProjectID, arg.Server)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const inheritRoomPeers = `-- name: InheritRoomPeers :exec
+INSERT INTO room_peers (room_id, peer, address)
+SELECT $1::uuid, peer, address FROM room_peers WHERE room_id = $2::uuid
+ON CONFLICT (room_id, peer) DO NOTHING
+`
+
+type InheritRoomPeersParams struct {
+	Room    uuid.UUID
+	Project uuid.UUID
+}
+
+// An issue's discussion on a replica reaches its home where the project does.
+func (q *Queries) InheritRoomPeers(ctx context.Context, arg InheritRoomPeersParams) error {
+	_, err := q.db.Exec(ctx, inheritRoomPeers, arg.Room, arg.Project)
+	return err
+}
+
 const remoteMembersOn = `-- name: RemoteMembersOn :many
 SELECT address FROM project_remote_members WHERE project_id = $1 AND home_server = $2 ORDER BY address
 `

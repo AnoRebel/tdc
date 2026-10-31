@@ -240,6 +240,9 @@ func (s *Service) writeReplica(ctx context.Context, q *dbgen.Queries, room dbgen
 		}); err != nil {
 			return fmt.Errorf("adopt discussion: %w", err)
 		}
+		if err := q.InheritRoomPeers(ctx, dbgen.InheritRoomPeersParams{Room: id, Project: projectID}); err != nil {
+			return fmt.Errorf("give the discussion its home: %w", err)
+		}
 		author, here := people.local(issue.Author)
 		var authorAddress *string
 		if !here && issue.Author != "" {

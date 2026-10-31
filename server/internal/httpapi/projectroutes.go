@@ -46,6 +46,11 @@ func init() {
 			s.rooms.DelegateAccess("issue-discussion", func(ctx context.Context, room dbgen.Room, userID uuid.UUID) (bool, error) {
 				return s.projects.DiscussionVisible(ctx, room.ID, userID)
 			})
+			// And somebody elsewhere takes part in it while they are in the
+			// project, opened to federation: a comment from a replica is theirs.
+			s.rooms.DelegateRemoteMembership("issue-discussion", func(ctx context.Context, room dbgen.Room, address string) (bool, error) {
+				return s.projects.DiscussionMemberElsewhere(ctx, room.ID, address)
+			})
 		}
 
 		group := s.echo.Group("/api/projects", requireAuthentication, s.requireProjects)
@@ -201,16 +206,21 @@ type projectAbilities struct {
 }
 
 func abilitiesOf(access projects.Access) projectAbilities {
+	// On a replica, what its home would allow: changes are asked of it.
+	replica := projects.IsReplica(access.Project)
+	access = access.AsAtHome()
 	return projectAbilities{
-		Administer:      access.Allows(authz.PermProjectAdminister).Allowed,
-		ConfigureStates: access.Allows(authz.PermProjectConfigureStates).Allowed,
+		// Only changes to issues are carried to a replica's home; running
+		// the project itself is done there.
+		Administer:      !replica && access.Allows(authz.PermProjectAdminister).Allowed,
+		ConfigureStates: !replica && access.Allows(authz.PermProjectConfigureStates).Allowed,
 		CreateIssues:    access.Allows(authz.PermIssueCreate).Allowed,
 		Transition:      access.Allows(authz.PermIssueTransition).Allowed,
 		Assign:          access.Allows(authz.PermIssueAssign).Allowed,
 		Label:           access.Allows(authz.PermIssueLabel).Allowed,
 		Relate:          access.Allows(authz.PermIssueRelate).Allowed,
 		Delete:          access.Allows(authz.PermIssueDelete).Allowed,
-		Plan:            access.Allows(authz.PermProjectPlan).Allowed,
+		Plan:            !replica && access.Allows(authz.PermProjectPlan).Allowed,
 		PlanIssues:      access.Allows(authz.PermIssuePlan).Allowed,
 	}
 }
@@ -788,6 +798,9 @@ func (s *Server) issueSummaries(ctx context.Context, project dbgen.Project, issu
 				authors[*issue.AuthorID] = name
 			}
 			summary.Author = name
+		} else if issue.AuthorAddress != nil {
+			// Filed by somebody on another server, named by their address.
+			summary.Author = *issue.AuthorAddress
 		}
 		response = append(response, summary)
 	}
@@ -881,8 +894,22 @@ func (s *Server) handleCreateIssue(c *echo.Context) error {
 		input.Origin = &projects.Origin{RoomID: room, EventID: request.OriginEvent}
 	}
 
-	issue, err := s.projects.CreateIssue(ctx, actorOf(c), access, input)
-	if err != nil {
+	var issue dbgen.Issue
+	if projects.IsReplica(access.Project) {
+		// Filed where the project lives; read back here once it has arrived.
+		if input.Origin != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "an issue of a project on another server cannot be made from a message here")
+		}
+		number, err := s.atHome(c, access, projects.Change{
+			Kind: projects.ChangeFile, Title: &input.Title, Description: &input.Description, State: input.StateID,
+		})
+		if err != nil {
+			return err
+		}
+		if issue, err = s.queries.GetIssueByNumber(ctx, dbgen.GetIssueByNumberParams{ProjectID: access.Project.ID, Number: number}); err != nil {
+			return echo.NewHTTPError(http.StatusAccepted, "filed on "+projects.HomeOf(access.Project)+"; it will appear here shortly")
+		}
+	} else if issue, err = s.projects.CreateIssue(ctx, actorOf(c), access, input); err != nil {
 		return projectError(err)
 	}
 
@@ -919,6 +946,7 @@ func (s *Server) fullIssue(ctx context.Context, c *echo.Context, access projects
 		return issueResponse{}, err
 	}
 	response.Project = &project
+	access = access.AsAtHome()
 	response.Can = &issueAbilities{
 		Edit:       access.MayEdit(issue).Allowed,
 		Transition: access.AllowsOn(authz.PermIssueTransition, issue).Allowed,
@@ -966,6 +994,14 @@ func (s *Server) handleEditIssue(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
+	if projects.IsReplica(access.Project) {
+		if _, err := s.atHome(c, access, projects.Change{
+			Kind: projects.ChangeEdit, Issue: issue.Number, Title: request.Title, Description: request.Description,
+		}); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
+	}
 	edited, err := s.projects.Edit(ctx, actorOf(c), access, issue, projects.IssueChanges{
 		Title: request.Title, Description: request.Description,
 	})
@@ -983,6 +1019,12 @@ func (s *Server) handleDeleteIssue(c *echo.Context) error {
 	access, issue, err := s.issueFrom(c)
 	if err != nil {
 		return err
+	}
+	if projects.IsReplica(access.Project) {
+		if _, err := s.atHome(c, access, projects.Change{Kind: projects.ChangeDelete, Issue: issue.Number}); err != nil {
+			return err
+		}
+		return c.NoContent(http.StatusNoContent)
 	}
 	if err := s.projects.Delete(c.Request().Context(), actorOf(c), access, issue); err != nil {
 		return projectError(err)
@@ -1022,7 +1064,22 @@ func (s *Server) handleTransitionIssue(c *echo.Context) error {
 		expected = &id
 	}
 
-	moved, err := s.projects.Transition(ctx, actorOf(c), access, issue, to, expected)
+	var moved dbgen.Issue
+	if projects.IsReplica(access.Project) {
+		_, err = s.atHome(c, access, projects.Change{Kind: projects.ChangeMove, Issue: issue.Number, State: &to, Expected: expected})
+		var refused *echo.HTTPError
+		if errors.As(err, &refused) && refused.Code == http.StatusConflict {
+			// Moved by somebody else first: the card goes where it really is.
+			if current, readErr := s.queries.GetIssueByID(ctx, issue.ID); readErr == nil {
+				err = projects.ConflictError{Issue: current}
+			}
+		}
+		if err == nil {
+			moved, err = s.queries.GetIssueByID(ctx, issue.ID)
+		}
+	} else {
+		moved, err = s.projects.Transition(ctx, actorOf(c), access, issue, to, expected)
+	}
 	var conflict projects.ConflictError
 	if errors.As(err, &conflict) {
 		/*
@@ -1062,6 +1119,23 @@ type historyEntry struct {
 	Content json.RawMessage `json:"content"`
 }
 
+/*
+historyActor is who a recorded change is credited to: its sender, or for a
+change a project's home made at the signed request of somebody on another
+server, that person, whom the event names as "by".
+*/
+func historyActor(event dbgen.Event) string {
+	if !strings.Contains(event.SenderAddress, "@") {
+		var content struct {
+			By string `json:"by"`
+		}
+		if json.Unmarshal(event.Content, &content) == nil && strings.Contains(content.By, "@") {
+			return content.By
+		}
+	}
+	return event.SenderAddress
+}
+
 func (s *Server) handleIssueHistory(c *echo.Context) error {
 	access, issue, err := s.issueFrom(c)
 	if err != nil {
@@ -1076,7 +1150,7 @@ func (s *Server) handleIssueHistory(c *echo.Context) error {
 		response = append(response, historyEntry{
 			ID:       event.ID,
 			Type:     event.Type,
-			Actor:    event.SenderAddress,
+			Actor:    historyActor(event),
 			At:       time.UnixMilli(event.CreatedAt).UTC(),
 			Sequence: event.Sequence,
 			Content:  json.RawMessage(event.Content),
@@ -1113,7 +1187,7 @@ func (s *Server) handleProjectHistory(c *echo.Context) error {
 		response = append(response, historyEntry{
 			ID:       event.ID,
 			Type:     event.Type,
-			Actor:    event.SenderAddress,
+			Actor:    historyActor(event),
 			At:       time.UnixMilli(event.CreatedAt).UTC(),
 			Sequence: event.Sequence,
 			Content:  content,

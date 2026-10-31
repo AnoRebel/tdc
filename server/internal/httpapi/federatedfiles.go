@@ -185,10 +185,7 @@ func (s *Server) ensureCopied(ctx context.Context, room dbgen.Room, attachment *
 	if err != nil {
 		return err
 	}
-	slug := ""
-	if room.Slug != nil {
-		slug = *room.Slug
-	}
+	slug := rooms.LocalPart(room)
 	allowPrivate := s.settings != nil &&
 		s.settings.Get(ctx, settings.FederationAllowPrivateAddresses) == "true"
 	sender := federation.NewSender(s.config.CanonicalAddress, s.rooms.Keyring(), s.federationTrust(ctx), allowPrivate)

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/AnoRebel/tdc/server/internal/federation"
 	"github.com/AnoRebel/tdc/server/internal/projects"
+	"github.com/AnoRebel/tdc/server/internal/settings"
 )
 
 /*
@@ -118,4 +120,126 @@ func (s *Server) replicaWork(ctx context.Context, sender *federation.Sender, wor
 		return s.projects.ForgetReplica(ctx, work)
 	}
 	return s.projects.ReplicaOffered(ctx, work, address)
+}
+
+/*
+handleProjectChange makes a change somebody on another server asked for, in a
+project this server is home to.
+
+Three things are checked before anything is done: that the signing server
+speaks for the person named, which a server may only do for its own people;
+that it holds an accepted replica of the project, so a server with no part in
+it cannot act in it; and that the person's project role allows the change,
+which RemoteAccess and the ordinary methods decide exactly as they would for
+somebody here. A refusal of the first two is logged, naming the peer.
+*/
+func (s *Server) handleProjectChange(c *echo.Context) error {
+	ctx := c.Request().Context()
+	origin, _ := c.Get(peerOrigin).(string)
+	server, err := federation.Host(origin)
+	if err != nil || s.projects == nil {
+		return echo.NewHTTPError(http.StatusUnauthorized, "unidentified peer")
+	}
+	var request struct {
+		Project uuid.UUID       `json:"project"`
+		Actor   string          `json:"actor"`
+		Change  projects.Change `json:"change"`
+	}
+	if err := c.Bind(&request); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "could not read the change")
+	}
+	if err := s.peerSpeaksFor(origin, request.Actor); err != nil {
+		s.log.Warn("refused a project change for somebody the peer does not host",
+			"peer", server, "actor", request.Actor, "project", request.Project)
+		return echo.NewHTTPError(http.StatusForbidden, err.Error())
+	}
+	holds, err := s.projects.HoldsReplica(ctx, request.Project, server)
+	if err != nil {
+		return err
+	}
+	if !holds {
+		s.log.Warn("refused a project change from a server holding no replica of it",
+			"peer", server, "actor", request.Actor, "project", request.Project)
+		return echo.NewHTTPError(http.StatusNotFound, "no such project")
+	}
+	access, err := s.projects.RemoteAccess(ctx, request.Project, request.Actor)
+	if err != nil {
+		return projectError(err)
+	}
+	issue, err := s.projects.Apply(ctx, projects.Actor{Address: strings.ToLower(request.Actor)}, access, request.Change)
+	if err != nil {
+		return changeError(err)
+	}
+	return c.JSON(http.StatusOK, map[string]any{"issue": issue.Number})
+}
+
+// changeError is the answer to a change that could not be made, as a local
+// request making it would have been answered.
+func changeError(err error) error {
+	switch {
+	case errors.Is(err, projects.ErrUnknownChange),
+		errors.Is(err, projects.ErrCycleNotFound),
+		errors.Is(err, projects.ErrMilestoneNotFound):
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	return structureError(err)
+}
+
+/*
+atHome makes a change to a replica on the server it lives on, in the name of
+the person asking here, and returns the number of the issue changed.
+
+Whatever the home answers, this server then catches the replica up before
+replying, so the person sees the result — or, refused, the issue as it now is
+— as they would after a change made here, rather than after the next delivery.
+A refusal is passed on in the home's own words.
+*/
+func (s *Server) atHome(c *echo.Context, access projects.Access, change projects.Change) (int64, error) {
+	ctx := c.Request().Context()
+	user, ok := currentUser(c)
+	if !ok {
+		return 0, echo.NewHTTPError(http.StatusUnauthorized, "sign in first")
+	}
+	home := projects.HomeOf(access.Project)
+	if !s.federationEnabled(c) {
+		return 0, echo.NewHTTPError(http.StatusConflict,
+			"this project lives on "+home+", and this server no longer federates, so it cannot be changed from here")
+	}
+	sender := federation.NewSender(s.config.CanonicalAddress, s.rooms.Keyring(), s.federationTrust(ctx),
+		s.settings.Get(ctx, settings.FederationAllowPrivateAddresses) == "true")
+	response, err := sender.Send(ctx, s.peerAddressFor(ctx, home), "/api/federation/projects/change", map[string]any{
+		"project": access.Project.ID, "actor": s.rooms.UserAddress(user.Username), "change": change,
+	})
+	if err != nil {
+		return 0, echo.NewHTTPError(http.StatusBadGateway, home+" could not be reached, so nothing was changed: "+err.Error())
+	}
+	defer response.Body.Close()
+	var answer struct {
+		Issue   int64  `json:"issue"`
+		Message string `json:"message"`
+	}
+	_ = json.NewDecoder(io.LimitReader(response.Body, 64<<10)).Decode(&answer)
+
+	if room, err := s.rooms.ByID(ctx, access.Project.ID); err == nil {
+		if _, _, err := s.catchUp(ctx, room); err != nil {
+			s.log.Warn("could not catch a replica up after a change", "project", access.Project.ID, "error", err.Error())
+		}
+	}
+	if response.StatusCode != http.StatusOK {
+		message := answer.Message
+		if message == "" {
+			message = home + " refused the change: " + response.Status
+		}
+		return 0, echo.NewHTTPError(response.StatusCode, message)
+	}
+	return answer.Issue, nil
+}
+
+// replicaPerson is somebody named in a request about a replica, as the home
+// knows them: an address, with somebody here given this server's name.
+func (s *Server) replicaPerson(name string) string {
+	if strings.Contains(name, "@") {
+		return strings.ToLower(name)
+	}
+	return s.rooms.UserAddress(strings.ToLower(name))
 }

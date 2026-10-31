@@ -38,6 +38,35 @@ func (s *Service) DelegateAccess(kind string, decide AccessDecider) {
 }
 
 /*
+RemoteMemberDecider answers, for a room of one kind, whether somebody on
+another server takes part in it — for a room whose membership belongs to
+something else, as an issue's discussion's belongs to its project.
+*/
+type RemoteMemberDecider func(ctx context.Context, room dbgen.Room, address string) (bool, error)
+
+// DelegateRemoteMembership hands the question of who elsewhere takes part in
+// rooms of a kind to decide. Called once while the server is being built.
+func (s *Service) DelegateRemoteMembership(kind string, decide RemoteMemberDecider) {
+	if s.remoteDeciders == nil {
+		s.remoteDeciders = make(map[string]RemoteMemberDecider)
+	}
+	s.remoteDeciders[kind] = decide
+}
+
+// remotelyMember reports whether somebody elsewhere takes part in a room: by
+// the room's own list, or by whatever its kind delegates to.
+func (s *Service) remotelyMember(ctx context.Context, room dbgen.Room, address string) (bool, error) {
+	member, err := s.store.IsRemoteMember(ctx, dbgen.IsRemoteMemberParams{RoomID: room.ID, Address: address})
+	if err != nil || member {
+		return member, err
+	}
+	if decide, ok := s.remoteDeciders[room.Kind]; ok {
+		return decide(ctx, room, address)
+	}
+	return false, nil
+}
+
+/*
 ServerName is this server's own name, as it signs events and names rooms.
 
 For a package that creates rooms of its own inside a transaction of its own —

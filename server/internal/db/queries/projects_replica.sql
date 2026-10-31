@@ -203,3 +203,17 @@ DELETE FROM project_replicas WHERE project_id = $1 AND server = $2 AND discardin
 -- name: RemoteMembersOn :many
 -- A project's members on one server, which an offer names.
 SELECT address FROM project_remote_members WHERE project_id = $1 AND home_server = $2 ORDER BY address;
+
+-- name: HoldsReplica :one
+-- Whether a server holds an accepted replica of a project, which is what lets
+-- it ask for changes to it.
+SELECT EXISTS (
+    SELECT 1 FROM project_replicas
+    WHERE project_id = $1 AND server = $2 AND offered_at IS NOT NULL AND NOT discarding
+);
+
+-- name: InheritRoomPeers :exec
+-- An issue's discussion on a replica reaches its home where the project does.
+INSERT INTO room_peers (room_id, peer, address)
+SELECT sqlc.arg(room)::uuid, peer, address FROM room_peers WHERE room_id = sqlc.arg(project)::uuid
+ON CONFLICT (room_id, peer) DO NOTHING;

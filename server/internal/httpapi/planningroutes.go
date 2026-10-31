@@ -455,6 +455,12 @@ func (s *Server) handleSetIssueCycle(c *echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
+	if projects.IsReplica(access.Project) {
+		if _, err := s.atHome(c, access, projects.Change{Kind: projects.ChangeCycle, Issue: issue.Number, Cycle: id}); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
+	}
 	if _, err := s.projects.SetIssueCycle(ctx, actorOf(c), access, issue, id); err != nil {
 		if errors.Is(err, projects.ErrCycleNotFound) {
 			// The issue exists; the cycle it names does not.
@@ -484,6 +490,12 @@ func (s *Server) handleSetIssueMilestone(c *echo.Context) error {
 	id, err := optionalID(request.MilestoneID, projects.ErrMilestoneNotFound)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if projects.IsReplica(access.Project) {
+		if _, err := s.atHome(c, access, projects.Change{Kind: projects.ChangeMilestone, Issue: issue.Number, Milestone: id}); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
 	}
 	if _, err := s.projects.SetIssueMilestone(ctx, actorOf(c), access, issue, id); err != nil {
 		if errors.Is(err, projects.ErrMilestoneNotFound) {

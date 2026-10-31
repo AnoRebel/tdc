@@ -259,6 +259,14 @@ func (s *Server) handleAssign(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
+	if projects.IsReplica(access.Project) {
+		if _, err := s.atHome(c, access, projects.Change{
+			Kind: projects.ChangeAssign, Issue: issue.Number, Person: s.replicaPerson(c.Param("username")),
+		}); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
+	}
 	event, person, err := s.projects.Assign(ctx, actorOf(c), access, issue, c.Param("username"))
 	if err != nil {
 		return structureError(err)
@@ -268,7 +276,7 @@ func (s *Server) handleAssign(c *echo.Context) error {
 	if event != nil && person.ID != uuid.Nil() {
 		user, _ := currentUser(c)
 		s.inBackground(ctx, "assignment notification", func(ctx context.Context) {
-			s.notifyAssignee(ctx, user, person, issue, access.Project, *event)
+			s.notifyAssignee(ctx, user.ID, s.rooms.UserAddress(user.Username), person, issue, access.Project, *event)
 		})
 	}
 	return s.respondWithIssue(c, access, issue)
@@ -279,7 +287,7 @@ notifyAssignee tells somebody an issue is now theirs — according to their own
 settings for its discussion, which they have just joined: somebody who has
 asked to hear nothing, there or everywhere, hears nothing about this either.
 */
-func (s *Server) notifyAssignee(ctx context.Context, actor, assignee dbgen.User, issue dbgen.Issue, project dbgen.Project, event dbgen.Event) {
+func (s *Server) notifyAssignee(ctx context.Context, actorID uuid.UUID, actorAddress string, assignee dbgen.User, issue dbgen.Issue, project dbgen.Project, event dbgen.Event) {
 	if s.notify == nil {
 		return
 	}
@@ -292,7 +300,7 @@ func (s *Server) notifyAssignee(ctx context.Context, actor, assignee dbgen.User,
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		s.log.Warn("cannot read a notification preference", "error", err)
 	}
-	s.notify.About(ctx, assignee.ID, actor.ID, s.rooms.UserAddress(actor.Username),
+	s.notify.About(ctx, assignee.ID, actorID, actorAddress,
 		issue.ID, event.ID, notify.Reason("assigned"),
 		projects.Identifier(project, issue)+" "+issue.Title)
 }
@@ -301,6 +309,14 @@ func (s *Server) handleUnassign(c *echo.Context) error {
 	access, issue, err := s.issueFrom(c)
 	if err != nil {
 		return err
+	}
+	if projects.IsReplica(access.Project) {
+		if _, err := s.atHome(c, access, projects.Change{
+			Kind: projects.ChangeUnassign, Issue: issue.Number, Person: s.replicaPerson(c.Param("username")),
+		}); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
 	}
 	if err := s.projects.Unassign(c.Request().Context(), actorOf(c), access, issue, c.Param("username")); err != nil {
 		return structureError(err)
@@ -320,6 +336,17 @@ func (s *Server) respondWithIssue(c *echo.Context, access projects.Access, issue
 		return err
 	}
 	return c.JSON(http.StatusOK, response)
+}
+
+// relateAtHome relates, or unrelates, a replica's issue to another of its
+// issues, named by its identifier here and by number at home.
+func (s *Server) relateAtHome(c *echo.Context, access projects.Access, issue dbgen.Issue, kind, relation, other string) error {
+	_, number, ok := projects.ParseIdentifier(other)
+	if !ok {
+		return structureError(projects.ErrIssueNotFound)
+	}
+	_, err := s.atHome(c, access, projects.Change{Kind: kind, Issue: issue.Number, Relation: relation, Other: number})
+	return err
 }
 
 func uuidParam(c *echo.Context, name string, missing error) (uuid.UUID, error) {
@@ -347,6 +374,16 @@ func (s *Server) setIssueLabel(c *echo.Context, present bool) error {
 	if err != nil {
 		return err
 	}
+	if projects.IsReplica(access.Project) {
+		kind := projects.ChangeUnlabel
+		if present {
+			kind = projects.ChangeLabel
+		}
+		if _, err := s.atHome(c, access, projects.Change{Kind: kind, Issue: issue.Number, Label: &labelID}); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
+	}
 	if _, err := s.projects.SetLabel(c.Request().Context(), actorOf(c), access, issue, labelID, present); err != nil {
 		return structureError(err)
 	}
@@ -373,6 +410,12 @@ func (s *Server) handleSetPriority(c *echo.Context) error {
 		}
 		priorityID = &id
 	}
+	if projects.IsReplica(access.Project) {
+		if _, err := s.atHome(c, access, projects.Change{Kind: projects.ChangePriority, Issue: issue.Number, Priority: priorityID}); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
+	}
 	if _, err := s.projects.SetPriority(c.Request().Context(), actorOf(c), access, issue, priorityID); err != nil {
 		return structureError(err)
 	}
@@ -393,6 +436,12 @@ func (s *Server) handleRelate(c *echo.Context) error {
 	if err := c.Bind(&request); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "the request body could not be read")
 	}
+	if projects.IsReplica(access.Project) {
+		if err := s.relateAtHome(c, access, issue, projects.ChangeRelate, request.Kind, request.Issue); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
+	}
 	if err := s.projects.Relate(c.Request().Context(), actorOf(c), access, issue, request.Kind, request.Issue); err != nil {
 		return structureError(err)
 	}
@@ -403,6 +452,12 @@ func (s *Server) handleUnrelate(c *echo.Context) error {
 	access, issue, err := s.issueFrom(c)
 	if err != nil {
 		return err
+	}
+	if projects.IsReplica(access.Project) {
+		if err := s.relateAtHome(c, access, issue, projects.ChangeUnrelate, c.Param("kind"), c.Param("other")); err != nil {
+			return err
+		}
+		return s.respondWithIssue(c, access, issue)
 	}
 	if err := s.projects.Unrelate(c.Request().Context(), actorOf(c), access, issue, c.Param("kind"), c.Param("other")); err != nil {
 		return structureError(err)

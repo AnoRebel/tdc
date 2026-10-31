@@ -61,6 +61,8 @@ type Service struct {
 	// deciders answer who may see rooms that belong to something else, by
 	// kind. See DelegateAccess.
 	deciders map[string]AccessDecider
+	// remoteDeciders answer who elsewhere takes part in such rooms.
+	remoteDeciders map[string]RemoteMemberDecider
 
 	// appended is told about every event this server stores, once it is
 	// stored. See OnAppended.

@@ -1708,6 +1708,16 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
+	"POST /api/federation/projects/change": {
+		Request: reflect.TypeFor[struct {
+			Project uuid.UUID       "json:\"project\""
+			Actor   string          "json:\"actor\""
+			Change  projects.Change "json:\"change\""
+		}](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
 	"POST /api/federation/projects/discard": {
 		Request: reflect.TypeFor[struct {
 			Project uuid.UUID "json:\"project\""

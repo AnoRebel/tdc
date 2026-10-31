@@ -502,13 +502,76 @@ Only what is new — a redelivery shows nobody anything twice.
 func (s *Server) arrived(ctx context.Context, room dbgen.Room, stored []dbgen.Event) {
 	for _, event := range stored {
 		s.publishEvent(ctx, event)
+		/*
+			A message is found and heard of here as one written here is:
+			indexed, and its readers here told according to their own
+			settings. Its author is told nothing, being elsewhere.
+		*/
+		if events.Type(event.Type) == events.TypeMessageSent {
+			var content struct {
+				Body string `json:"body"`
+			}
+			if json.Unmarshal(event.Content, &content) == nil {
+				s.inBackground(ctx, "index", func(ctx context.Context) { s.indexForSearch(ctx, event, content.Body) })
+				s.inBackground(ctx, "notify", func(ctx context.Context) { s.notifyRecipients(ctx, event, content.Body, event.RoomID) })
+			}
+		}
 	}
-	// A project held for another server is rebuilt from what arrived.
+	// A project held for another server is rebuilt from what arrived, and
+	// whoever here it was assigned to is told.
 	if len(stored) > 0 && room.Kind == "project" && s.projects != nil {
 		if err := s.projects.Replicate(ctx, room); err != nil {
 			s.log.Warn("a project replica could not follow its stream", "project", room.ID, "error", err.Error())
+			return
+		}
+		for _, event := range stored {
+			if events.Type(event.Type) == events.TypeIssueAssigned {
+				s.notifyArrivedAssignment(ctx, event)
+			}
 		}
 	}
+}
+
+// notifyArrivedAssignment tells somebody here that an issue of a replica is
+// now theirs, as an assignment made here would.
+func (s *Server) notifyArrivedAssignment(ctx context.Context, event dbgen.Event) {
+	var content struct {
+		Issue    string `json:"issue"`
+		Assignee string `json:"assignee"`
+		By       string `json:"by"`
+	}
+	if json.Unmarshal(event.Content, &content) != nil {
+		return
+	}
+	name, server, _ := strings.Cut(content.Assignee, "@")
+	if !strings.EqualFold(server, s.rooms.ServerName()) {
+		return
+	}
+	assignee, err := s.queries.GetUserByUsername(ctx, strings.ToLower(name))
+	if err != nil {
+		return
+	}
+	issueID, err := uuid.Parse(content.Issue)
+	if err != nil {
+		return
+	}
+	issue, err := s.queries.GetIssueByID(ctx, issueID)
+	if err != nil {
+		return
+	}
+	project, err := s.queries.GetProjectByID(ctx, issue.ProjectID)
+	if err != nil {
+		return
+	}
+	// Whoever assigned them, as the event names them: by address, since they
+	// are not of this server — or the server, for a change it made itself.
+	by := content.By
+	if by == "" {
+		by = event.SenderAddress
+	}
+	s.inBackground(ctx, "assignment notification", func(ctx context.Context) {
+		s.notifyAssignee(ctx, uuid.Nil(), by, assignee, issue, project, event)
+	})
 }
 
 /*
@@ -835,9 +898,43 @@ func (s *Server) handleCatchUp(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusConflict, "this server owns that room; there is nothing to catch up on")
 	}
 
-	peers, err := s.rooms.Peers(ctx, roomID)
-	if err != nil || len(peers) == 0 {
+	fetched, stored, err := s.catchUp(ctx, room)
+	if errors.Is(err, errNoHomeToAsk) {
 		return echo.NewHTTPError(http.StatusConflict, "that room has no peer to ask")
+	}
+	var refused *catchUpRefusedError
+	if errors.As(err, &refused) {
+		return echo.NewHTTPError(refused.status, refused.message)
+	}
+	if err != nil {
+		return c.JSON(http.StatusOK, map[string]any{"fetched": 0, "error": err.Error()})
+	}
+	if fetched == 0 {
+		return c.JSON(http.StatusOK, map[string]any{"fetched": 0, "upToDate": true})
+	}
+	return c.JSON(http.StatusOK, map[string]any{"fetched": fetched, "stored": stored})
+}
+
+var errNoHomeToAsk = errors.New("that room has no home server to ask")
+
+// catchUpRefusedError is a catch-up that failed in a way the caller answers with a
+// status of its own.
+type catchUpRefusedError struct {
+	status  int
+	message string
+}
+
+func (r *catchUpRefusedError) Error() string { return r.message }
+
+/*
+catchUp asks a replica's home server for what this server has not stored, and
+stores and shows what it is given. Returns how many events were fetched and
+how many of them were new.
+*/
+func (s *Server) catchUp(ctx context.Context, room dbgen.Room) (int, int, error) {
+	peers, err := s.rooms.Peers(ctx, room.ID)
+	if err != nil || len(peers) == 0 {
+		return 0, 0, errNoHomeToAsk
 	}
 
 	allowPrivate := s.settings != nil &&
@@ -846,11 +943,9 @@ func (s *Server) handleCatchUp(c *echo.Context) error {
 		s.federationTrust(ctx), allowPrivate)
 
 	home := peers[0]
-	slug := rooms.LocalPart(room)
-
-	held, err := s.rooms.HighestSequence(ctx, roomID)
+	held, err := s.rooms.HighestSequence(ctx, room.ID)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "could not read the room")
+		return 0, 0, &catchUpRefusedError{http.StatusInternalServerError, "could not read the room"}
 	}
 
 	address := home.Address
@@ -858,33 +953,32 @@ func (s *Server) handleCatchUp(c *echo.Context) error {
 		address = "https://" + home.Peer
 	}
 
-	batch, err := sender.FetchEvents(ctx, address, slug, held)
+	batch, err := sender.FetchEvents(ctx, address, rooms.LocalPart(room), held)
 	if err != nil {
-		return c.JSON(http.StatusOK, map[string]any{"fetched": 0, "error": err.Error()})
+		return 0, 0, err
 	}
 	if len(batch) == 0 {
-		return c.JSON(http.StatusOK, map[string]any{"fetched": 0, "upToDate": true})
+		return 0, 0, nil
 	}
 
-	peers2, _ := s.federationState()
-	document, err := peers2.Discover(ctx, address)
+	discovery, _ := s.federationState()
+	document, err := discovery.Discover(ctx, address)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, "could not fetch the home server's keys")
+		return 0, 0, &catchUpRefusedError{http.StatusBadGateway, "could not fetch the home server's keys"}
 	}
 	keyring, err := document.Keyring()
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadGateway, "the home server publishes no usable keys")
+		return 0, 0, &catchUpRefusedError{http.StatusBadGateway, "the home server publishes no usable keys"}
 	}
 
-	stored, err := s.rooms.AcceptForeignEvents(ctx, room, home.Peer, keyring, peers2, batch)
+	stored, err := s.rooms.AcceptForeignEvents(ctx, room, home.Peer, keyring, discovery, batch)
 	if err != nil {
 		s.log.Warn("refused events fetched during catch-up",
-			"room", roomID, "peer", home.Peer, "error", err)
-		return echo.NewHTTPError(http.StatusUnprocessableEntity, err.Error())
+			"room", room.ID, "peer", home.Peer, "error", err)
+		return 0, 0, &catchUpRefusedError{http.StatusUnprocessableEntity, err.Error()}
 	}
 	s.arrived(ctx, room, stored)
-
-	return c.JSON(http.StatusOK, map[string]any{"fetched": len(batch), "stored": len(stored)})
+	return len(batch), len(stored), nil
 }
 
 /*
@@ -1098,10 +1192,7 @@ func (s *Server) handleJoinRemoteRoom(c *echo.Context) error {
 	}
 
 	member := s.rooms.UserAddress(user.Username)
-	slug := ""
-	if room.Slug != nil {
-		slug = *room.Slug
-	}
+	slug := rooms.LocalPart(room)
 
 	if err := sender.JoinRoom(ctx, home, slug, member); err != nil {
 		s.log.Warn("a remote join was refused", "room", roomID, "member", member, "error", err)
@@ -1176,10 +1267,7 @@ func (s *Server) handleSendToRemoteRoom(c *echo.Context) error {
 		}
 	}
 
-	slug := ""
-	if room.Slug != nil {
-		slug = *room.Slug
-	}
+	slug := rooms.LocalPart(room)
 
 	payload := map[string]any{"body": strings.TrimSpace(request.Body)}
 	if len(files) > 0 {

@@ -59,3 +59,44 @@ func TestAProjectOfferIsAcceptedOnlyForSomebodyHere(t *testing.T) {
 		t.Errorf("the home could not have its replica discarded: %s", gone.Body)
 	}
 }
+
+/*
+A change asked for through a replica is refused from a server speaking for
+somebody it does not host, and from one holding no replica of the project —
+before anything about the person's role is asked. From the server that does,
+for its own member, it is made.
+*/
+func TestAChangeFromElsewhereNeedsTheRightServer(t *testing.T) {
+	handler := newTestAPIWithAddress(t, thisServer)
+	owner := enableFederation(t, handler)
+	setSetting(t, handler, owner, "federation.allow_private_addresses", "true")
+	peer := newFakePeer(t, "peer-key")
+	project := startProject(t, handler, owner, "CHG", "private")
+	mustCall(t, handler, http.MethodPut, "/api/projects/CHG/federation", map[string]any{"federated": true}, owner, http.StatusOK)
+	member := "dalila@" + peer.host(t)
+	mustCall(t, handler, http.MethodPut, "/api/projects/CHG/members/"+member, map[string]any{"role": "member"}, owner, http.StatusNoContent)
+
+	title := map[string]any{"kind": "file", "title": "From elsewhere"}
+	ask := func(actor string) int {
+		return peer.signed(t, handler, http.MethodPost, "/api/federation/projects/change",
+			map[string]any{"project": project["id"], "actor": actor, "change": title}).Code
+	}
+	if code := ask(member); code != http.StatusNotFound {
+		t.Errorf("a server holding no replica was answered %d", code)
+	}
+	if _, err := poolForTest.Exec(t.Context(),
+		"INSERT INTO project_replicas (project_id, server, address, offered_at) VALUES ($1, $2, $3, NOW())",
+		project["id"], peer.host(t), peer.address); err != nil {
+		t.Fatal(err)
+	}
+	if code := ask("esi@somewhere.else"); code != http.StatusForbidden {
+		t.Errorf("a server speaking for somebody it does not host was answered %d", code)
+	}
+	if code := ask(member); code != http.StatusOK {
+		t.Fatalf("its own member's filing was answered %d", code)
+	}
+	issue := decode(t, mustCall(t, handler, http.MethodGet, "/api/issues/CHG-1", nil, owner, http.StatusOK))
+	if issue["title"] != "From elsewhere" {
+		t.Errorf("the issue filed is %v", issue["title"])
+	}
+}

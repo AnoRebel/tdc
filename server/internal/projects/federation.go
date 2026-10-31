@@ -183,3 +183,25 @@ func (s *Service) RemoteAccess(ctx context.Context, projectID uuid.UUID, address
 	}
 	return Access{Project: project, Role: role}, nil
 }
+
+/*
+DiscussionMemberElsewhere reports whether somebody on another server takes
+part in an issue's discussion: whether they are in its project, opened to
+federation. The same answer RemoteAccess gives, so a comment is accepted from
+exactly the people whose changes are.
+*/
+func (s *Service) DiscussionMemberElsewhere(ctx context.Context, issueID uuid.UUID, address string) (bool, error) {
+	issue, err := s.queries.GetIssueByID(ctx, issueID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("read issue: %w", err)
+	}
+	if _, err := s.RemoteAccess(ctx, issue.ProjectID, address); errors.Is(err, ErrProjectNotFound) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return issue.DeletedAt == nil, nil
+}

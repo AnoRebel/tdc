@@ -174,9 +174,7 @@ func (s *Service) PostRemote(
 		return dbgen.Event{}, err
 	}
 
-	member, err := s.store.IsRemoteMember(ctx, dbgen.IsRemoteMemberParams{
-		RoomID: room.ID, Address: event.Sender,
-	})
+	member, err := s.remotelyMember(ctx, room, event.Sender)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("check remote membership: %w", err)
 	}

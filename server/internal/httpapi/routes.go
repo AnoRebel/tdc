@@ -106,6 +106,8 @@ func (s *Server) routes() {
 	*/
 	authenticated.POST("/projects/offer", s.handleProjectOffer)
 	authenticated.POST("/projects/discard", s.handleProjectDiscard)
+	// A change somebody on a replica asked for, made here in their name.
+	authenticated.POST("/projects/change", s.handleProjectChange)
 
 	// The bytes of a file a message in a room carries, for a peer whose
 	// member opened it.

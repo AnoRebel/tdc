@@ -647,12 +647,17 @@ type Querier interface {
 	// The furthest this server has stored for a room, which is what a catch-up
 	// request asks from.
 	HighestSequenceInRoom(ctx context.Context, roomID uuid.UUID) (int64, error)
+	// Whether a server holds an accepted replica of a project, which is what lets
+	// it ask for changes to it.
+	HoldsReplica(ctx context.Context, arg HoldsReplicaParams) (bool, error)
 	InFederatedRoom(ctx context.Context, arg InFederatedRoomParams) (bool, error)
 	// Finding issues, and what was said about them.
 	// Writes an issue's searchable text. The issue's own row is read, never
 	// written: rebuilding the index is never a change to the record.
 	IndexIssue(ctx context.Context, arg IndexIssueParams) error
 	IndexMessage(ctx context.Context, arg IndexMessageParams) error
+	// An issue's discussion on a replica reaches its home where the project does.
+	InheritRoomPeers(ctx context.Context, arg InheritRoomPeersParams) error
 	InsertAgreement(ctx context.Context, arg InsertAgreementParams) (EngagementAgreement, error)
 	InsertEngagement(ctx context.Context, arg InsertEngagementParams) (Engagement, error)
 	InsertEnquiry(ctx context.Context, arg InsertEnquiryParams) (Enquiry, error)

@@ -55,15 +55,18 @@ var notWrites = map[string]string{
 	"OnAppended":           "wiring, done once while the server is built",
 	"MaintainPeriodically": "runs CloseEndedCycles and CompleteStreams on a timer",
 
-	"Replicate":         "writes a replica, from its stream, never a project of this server's",
-	"DiscardReplica":    "removes a replica",
-	"AcceptOffer":       "starts a replica",
-	"SyncReplicas":      "bookkeeping of which servers hold a replica",
-	"ClaimReplicaWork":  "bookkeeping of which servers hold a replica",
-	"OfferFor":          "reads",
-	"ReplicaOffered":    "bookkeeping of which servers hold a replica",
-	"ReplicaWorkFailed": "bookkeeping of which servers hold a replica",
-	"ForgetReplica":     "bookkeeping of which servers hold a replica",
+	"Replicate":                 "writes a replica, from its stream, never a project of this server's",
+	"DiscardReplica":            "removes a replica",
+	"AcceptOffer":               "starts a replica",
+	"SyncReplicas":              "bookkeeping of which servers hold a replica",
+	"ClaimReplicaWork":          "bookkeeping of which servers hold a replica",
+	"OfferFor":                  "reads",
+	"ReplicaOffered":            "bookkeeping of which servers hold a replica",
+	"ReplicaWorkFailed":         "bookkeeping of which servers hold a replica",
+	"ForgetReplica":             "bookkeeping of which servers hold a replica",
+	"Apply":                     "makes the writes this test makes, for somebody elsewhere",
+	"HoldsReplica":              "reads",
+	"DiscussionMemberElsewhere": "reads",
 }
 
 // step is one change the scenario makes, named by the method it goes through.

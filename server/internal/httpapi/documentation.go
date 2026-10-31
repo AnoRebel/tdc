@@ -26,6 +26,7 @@ var documentation = map[string]entry{
 	"POST /api/federation/rooms/:slug/post":                 {Summary: "A peer's user posts a message", Authentication: "federation signature"},
 	"POST /api/federation/projects/offer":                   {Summary: "A project's home server offers a replica of it", Authentication: "federation signature"},
 	"POST /api/federation/projects/discard":                 {Summary: "A project's home server has its replica discarded", Authentication: "federation signature"},
+	"POST /api/federation/projects/change":                  {Summary: "A change to a project asked for on a replica", Authentication: "federation signature"},
 	"GET /api/federation/rooms":                             {Summary: "Rooms this server publishes to a peer", Authentication: "federation signature"},
 	"GET /api/federation/servers":                           {Summary: "Servers this one is connected to", Authentication: "session or token"},
 	"GET /api/federation/servers/:domain":                   {Summary: "A connected server", Authentication: "session or token"},
