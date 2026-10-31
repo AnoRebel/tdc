@@ -459,6 +459,15 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	/*
+		Federated rooms' events, sent to the peers owed them. Always started:
+		it does nothing while federation is off, and starts working the moment
+		an operator turns it on, without a restart.
+	*/
+	if s.rooms != nil {
+		go s.deliverFederationPeriodically(ctx)
+	}
+
+	/*
 		Events from the other nodes, where there are any.
 
 		Started before listening for requests, so a node is hearing about other

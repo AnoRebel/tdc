@@ -218,8 +218,8 @@ func TestAHomeServersEventFitsIntoAReplicaAfterALocalJoin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the home server's sequence 1 was refused: %v", err)
 	}
-	if stored != 1 {
-		t.Fatalf("stored %d events, want 1", stored)
+	if len(stored) != 1 || stored[0].ID != incoming.ID {
+		t.Fatalf("stored %d events, want the one delivered", len(stored))
 	}
 }
 

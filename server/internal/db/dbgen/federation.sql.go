@@ -143,6 +143,76 @@ func (q *Queries) AdvanceRoomPeerCursor(ctx context.Context, arg AdvanceRoomPeer
 	return err
 }
 
+const claimPeersDue = `-- name: ClaimPeersDue :many
+/*
+Peers owed events, claimed for one delivery pass.
+
+Only for federated rooms this server is home to: a replica holds a peer row for
+the home server it receives from, and must never push that server's own events
+back to it. Abandoned peers are excluded here rather than checked by the
+caller: a peer past the ceiling must cost nothing.
+
+Claiming moves the next attempt a minute on, under row locks other passes
+skip, so two nodes sharing the database never deliver the same batch at once.
+A success clears it; a failure replaces it with the backoff.
+*/
+UPDATE room_peers
+SET next_attempt_at = NOW() + interval '1 minute'
+WHERE (room_id, peer) IN (
+    SELECT rp.room_id, rp.peer FROM room_peers rp
+    JOIN rooms r ON r.id = rp.room_id
+    WHERE rp.abandoned = FALSE
+      AND r.federated
+      AND r.home_server = $1
+      AND (rp.next_attempt_at IS NULL OR rp.next_attempt_at <= NOW())
+      AND EXISTS (
+          SELECT 1 FROM events e
+          WHERE e.room_id = rp.room_id AND e.sequence > rp.cursor
+      )
+    ORDER BY rp.room_id, rp.peer
+    LIMIT $2
+    FOR UPDATE OF rp SKIP LOCKED
+)
+RETURNING room_id, peer, cursor, delivered_at, attempted_at, last_error, added_at, address, failures, next_attempt_at, abandoned
+`
+
+type ClaimPeersDueParams struct {
+	Home string
+	Max  int32
+}
+
+func (q *Queries) ClaimPeersDue(ctx context.Context, arg ClaimPeersDueParams) ([]RoomPeer, error) {
+	rows, err := q.db.Query(ctx, claimPeersDue, arg.Home, arg.Max)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RoomPeer{}
+	for rows.Next() {
+		var i RoomPeer
+		if err := rows.Scan(
+			&i.RoomID,
+			&i.Peer,
+			&i.Cursor,
+			&i.DeliveredAt,
+			&i.AttemptedAt,
+			&i.LastError,
+			&i.AddedAt,
+			&i.Address,
+			&i.Failures,
+			&i.NextAttemptAt,
+			&i.Abandoned,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearDeliveryFailures = `-- name: ClearDeliveryFailures :exec
 UPDATE room_peers
 SET failures = 0, next_attempt_at = NULL, abandoned = FALSE, last_error = ''
@@ -263,6 +333,36 @@ func (q *Queries) FederatedRoomByAddress(ctx context.Context, slugFolded *string
 	return i, err
 }
 
+const federatedRoomByID = `-- name: FederatedRoomByID :one
+SELECT id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key, federated FROM rooms WHERE id = $1 AND slug IS NULL AND federated = TRUE
+`
+
+// A federated room with no slug — a project, an issue's discussion — whose
+// address names its identifier instead.
+func (q *Queries) FederatedRoomByID(ctx context.Context, id uuid.UUID) (Room, error) {
+	row := q.db.QueryRow(ctx, federatedRoomByID, id)
+	var i Room
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.SlugFolded,
+		&i.Name,
+		&i.Topic,
+		&i.Kind,
+		&i.Visibility,
+		&i.HomeServer,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ArchivedAt,
+		&i.ArchivedBy,
+		&i.MessageTtlSeconds,
+		&i.ParticipantKey,
+		&i.Federated,
+	)
+	return i, err
+}
+
 const highestSequenceInRoom = `-- name: HighestSequenceInRoom :one
 SELECT COALESCE(MAX(sequence), 0)::bigint FROM events WHERE room_id = $1
 `
@@ -333,57 +433,6 @@ func (q *Queries) KnownPeers(ctx context.Context) ([]KnownPeersRow, error) {
 			&i.Address,
 			&i.Rooms,
 			&i.AnyAbandoned,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const peersDueForDelivery = `-- name: PeersDueForDelivery :many
-/*
-Peers with something owed and nothing stopping delivery.
-
-Abandoned peers are excluded here rather than checked by the caller: a peer
-past the ceiling must cost nothing, and leaving it to a caller's if-statement
-is how it ends up being retried by whichever path forgot.
-*/
-SELECT rp.room_id, rp.peer, rp.cursor, rp.delivered_at, rp.attempted_at, rp.last_error, rp.added_at, rp.address, rp.failures, rp.next_attempt_at, rp.abandoned FROM room_peers rp
-WHERE rp.abandoned = FALSE
-  AND (rp.next_attempt_at IS NULL OR rp.next_attempt_at <= NOW())
-  AND EXISTS (
-      SELECT 1 FROM events e
-      WHERE e.room_id = rp.room_id AND e.sequence > rp.cursor
-  )
-ORDER BY rp.room_id, rp.peer
-LIMIT $1
-`
-
-func (q *Queries) PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomPeer, error) {
-	rows, err := q.db.Query(ctx, peersDueForDelivery, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []RoomPeer{}
-	for rows.Next() {
-		var i RoomPeer
-		if err := rows.Scan(
-			&i.RoomID,
-			&i.Peer,
-			&i.Cursor,
-			&i.DeliveredAt,
-			&i.AttemptedAt,
-			&i.LastError,
-			&i.AddedAt,
-			&i.Address,
-			&i.Failures,
-			&i.NextAttemptAt,
-			&i.Abandoned,
 		); err != nil {
 			return nil, err
 		}
@@ -685,7 +734,7 @@ func (q *Queries) SetRoomFederated(ctx context.Context, arg SetRoomFederatedPara
 	return err
 }
 
-const storeForeignEvent = `-- name: StoreForeignEvent :execrows
+const storeForeignEvent = `-- name: StoreForeignEvent :many
 /*
 Stores an event that arrived from another server, keeping its sequence.
 
@@ -695,8 +744,9 @@ the failure the protocol exists to prevent.
 
 Idempotent on the event's own content-derived identifier. A redelivery — a
 retry, an overlapping catch-up, a peer sending a batch twice — writes nothing
-and reports zero rows, so "do not produce duplicates" is a database rule rather
-than a check the caller has to remember.
+and returns no row, so "do not produce duplicates" is a database rule rather
+than a check the caller has to remember. The row returned is what is new, for
+showing to the people here who are watching.
 */
 INSERT INTO events (
     id, room_id, sequence, sender_id, sender_address, room_address,
@@ -704,6 +754,7 @@ INSERT INTO events (
 )
 VALUES ($1, $2, $3, NULL, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 ON CONFLICT (id) DO NOTHING
+RETURNING id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id, redacted_at, redacted_by, nonce, thread_root_id, content_hash
 `
 
 type StoreForeignEventParams struct {
@@ -722,8 +773,8 @@ type StoreForeignEventParams struct {
 	KeyID         string
 }
 
-func (q *Queries) StoreForeignEvent(ctx context.Context, arg StoreForeignEventParams) (int64, error) {
-	result, err := q.db.Exec(ctx, storeForeignEvent,
+func (q *Queries) StoreForeignEvent(ctx context.Context, arg StoreForeignEventParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, storeForeignEvent,
 		arg.ID,
 		arg.RoomID,
 		arg.Sequence,
@@ -739,7 +790,37 @@ func (q *Queries) StoreForeignEvent(ctx context.Context, arg StoreForeignEventPa
 		arg.KeyID,
 	)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []Event{}
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.RoomID,
+			&i.Sequence,
+			&i.SenderID,
+			&i.SenderAddress,
+			&i.RoomAddress,
+			&i.OriginServer,
+			&i.Type,
+			&i.Content,
+			&i.CreatedAt,
+			&i.Signature,
+			&i.KeyID,
+			&i.RedactedAt,
+			&i.RedactedBy,
+			&i.Nonce,
+			&i.ThreadRootID,
+			&i.ContentHash,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

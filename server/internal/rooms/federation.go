@@ -138,10 +138,11 @@ func (s *Service) EventsForPeer(
 /*
 AcceptForeignEvents verifies and stores events delivered by another server.
 
-Returns how many were newly stored, which is not the number delivered: a
-redelivery writes nothing. The caller reports that number rather than the
-length of the batch, so a peer retrying a batch it already sent sees an honest
-answer instead of one implying it did something.
+Returns the events newly stored, which are not all that were delivered: a
+redelivery writes nothing. The caller reports how many rather than the length
+of the batch, so a peer retrying a batch it already sent sees an honest answer
+instead of one implying it did something — and shows only the new ones to the
+people here who are watching.
 
 Every event is verified before any is stored, and a single failure refuses the
 whole batch. Storing the valid prefix of a batch containing a forgery would
@@ -164,11 +165,11 @@ func (s *Service) AcceptForeignEvents(
 	keyring *events.Keyring,
 	authors AuthorKeys,
 	batch []events.Event,
-) (int, error) {
+) ([]dbgen.Event, error) {
 	roomAddress := s.RoomAddress(room)
 
 	if !room.Federated {
-		return 0, ErrNotFederated
+		return nil, ErrNotFederated
 	}
 
 	/*
@@ -179,7 +180,7 @@ func (s *Service) AcceptForeignEvents(
 		for — which is the point at which two servers begin to disagree.
 	*/
 	if strings.EqualFold(room.HomeServer, s.serverName) {
-		return 0, ErrNotHome
+		return nil, ErrNotHome
 	}
 
 	/*
@@ -190,23 +191,23 @@ func (s *Service) AcceptForeignEvents(
 	for _, event := range batch {
 		verifier, err := s.keysFor(ctx, event.Origin, origin, keyring, authors)
 		if err != nil {
-			return 0, fmt.Errorf("event %s: %w", event.ID, err)
+			return nil, fmt.Errorf("event %s: %w", event.ID, err)
 		}
 
 		if err := federation.AcceptDelivered(
 			event, verifier, roomAddress, room.HomeServer, origin,
 		); err != nil {
-			return 0, fmt.Errorf("event %s: %w", event.ID, err)
+			return nil, fmt.Errorf("event %s: %w", event.ID, err)
 		}
 	}
 
-	stored := 0
+	var stored []dbgen.Event
 	for _, event := range batch {
 		rows, err := s.storeForeign(ctx, room, event)
 		if err != nil {
 			return stored, err
 		}
-		stored += int(rows)
+		stored = append(stored, rows...)
 	}
 	return stored, nil
 }
@@ -214,7 +215,7 @@ func (s *Service) AcceptForeignEvents(
 // storeForeign writes one verified event, keeping the sequence its home server
 // assigned. Writing nothing when the event is already held is what makes
 // redelivery a no-op rather than an error the caller has to interpret.
-func (s *Service) storeForeign(ctx context.Context, room dbgen.Room, event events.Event) (int64, error) {
+func (s *Service) storeForeign(ctx context.Context, room dbgen.Room, event events.Event) ([]dbgen.Event, error) {
 	/*
 		The digest of the content as it was signed, recorded alongside it.
 
@@ -241,16 +242,25 @@ func (s *Service) storeForeign(ctx context.Context, room dbgen.Room, event event
 		KeyID:         event.KeyID,
 	})
 	if err != nil {
-		return 0, fmt.Errorf("store event %s: %w", event.ID, err)
+		return nil, fmt.Errorf("store event %s: %w", event.ID, err)
 	}
 	return rows, nil
 }
 
-// FederatedRoom finds a room by its slug, refusing one that is not federated
-// so that a peer cannot learn which rooms exist by asking about each in turn.
+/*
+FederatedRoom finds a room by the first half of its address, refusing one that
+is not federated so that a peer cannot learn which rooms exist by asking about
+each in turn.
+
+The first half is a slug, or for a room without one — a project, an issue's
+discussion — its identifier.
+*/
 func (s *Service) FederatedRoom(ctx context.Context, slug string) (dbgen.Room, error) {
 	folded := strings.ToLower(slug)
 	room, err := s.store.FederatedRoomByAddress(ctx, &folded)
+	if id, parsed := uuid.Parse(slug); errors.Is(err, pgx.ErrNoRows) && parsed == nil {
+		room, err = s.store.FederatedRoomByID(ctx, id)
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return dbgen.Room{}, ErrNotFederated
 	}
@@ -366,9 +376,21 @@ func (s *Service) ResumePeer(ctx context.Context, roomID uuid.UUID, peer string)
 	return s.store.ResumePeer(ctx, dbgen.ResumePeerParams{RoomID: roomID, Peer: peer})
 }
 
-// PeersDue lists peers with events owed and nothing stopping delivery.
-func (s *Service) PeersDue(ctx context.Context, limit int32) ([]dbgen.RoomPeer, error) {
-	return s.store.PeersDueForDelivery(ctx, limit)
+// ClaimPeersDue claims peers owed events in rooms this server is home to, for
+// one delivery pass. See the query for why claiming rather than listing.
+func (s *Service) ClaimPeersDue(ctx context.Context, limit int32) ([]dbgen.RoomPeer, error) {
+	return s.store.ClaimPeersDue(ctx, dbgen.ClaimPeersDueParams{Home: s.serverName, Max: limit})
+}
+
+/*
+LocalPart is the half of a room's address before the server: its slug, or its
+identifier for a room without one. What a peer names the room by.
+*/
+func LocalPart(room dbgen.Room) string {
+	if room.Slug != nil && *room.Slug != "" {
+		return *room.Slug
+	}
+	return room.ID.String()
 }
 
 // pgInterval turns a duration into the interval the query expects.

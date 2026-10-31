@@ -57,7 +57,7 @@ WHERE e.room_id = $1
 ORDER BY e.sequence
 LIMIT $4;
 
--- name: StoreForeignEvent :execrows
+-- name: StoreForeignEvent :many
 /*
 Stores an event that arrived from another server, keeping its sequence.
 
@@ -67,20 +67,27 @@ the failure the protocol exists to prevent.
 
 Idempotent on the event's own content-derived identifier. A redelivery — a
 retry, an overlapping catch-up, a peer sending a batch twice — writes nothing
-and reports zero rows, so "do not produce duplicates" is a database rule rather
-than a check the caller has to remember.
+and returns no row, so "do not produce duplicates" is a database rule rather
+than a check the caller has to remember. The row returned is what is new, for
+showing to the people here who are watching.
 */
 INSERT INTO events (
     id, room_id, sequence, sender_id, sender_address, room_address,
     origin_server, type, content, content_hash, created_at, nonce, signature, key_id
 )
 VALUES ($1, $2, $3, NULL, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO NOTHING
+RETURNING *;
 
 -- name: FederatedRoomByAddress :one
 -- Finds a federated room by the address an event names, which is how an
 -- incoming event says which room it belongs to.
 SELECT * FROM rooms WHERE slug_folded = $1 AND federated = TRUE;
+
+-- name: FederatedRoomByID :one
+-- A federated room with no slug — a project, an issue's discussion — whose
+-- address names its identifier instead.
+SELECT * FROM rooms WHERE id = $1 AND slug IS NULL AND federated = TRUE;
 
 -- name: HighestSequenceInRoom :one
 -- The furthest this server has stored for a room, which is what a catch-up
@@ -159,23 +166,37 @@ UPDATE room_peers
 SET abandoned = FALSE, failures = 0, next_attempt_at = NULL, last_error = ''
 WHERE room_id = $1 AND peer = $2;
 
--- name: PeersDueForDelivery :many
+-- name: ClaimPeersDue :many
 /*
-Peers with something owed and nothing stopping delivery.
+Peers owed events, claimed for one delivery pass.
 
-Abandoned peers are excluded here rather than checked by the caller: a peer
-past the ceiling must cost nothing, and leaving it to a caller's if-statement
-is how it ends up being retried by whichever path forgot.
+Only for federated rooms this server is home to: a replica holds a peer row for
+the home server it receives from, and must never push that server's own events
+back to it. Abandoned peers are excluded here rather than checked by the
+caller: a peer past the ceiling must cost nothing.
+
+Claiming moves the next attempt a minute on, under row locks other passes
+skip, so two nodes sharing the database never deliver the same batch at once.
+A success clears it; a failure replaces it with the backoff.
 */
-SELECT rp.* FROM room_peers rp
-WHERE rp.abandoned = FALSE
-  AND (rp.next_attempt_at IS NULL OR rp.next_attempt_at <= NOW())
-  AND EXISTS (
-      SELECT 1 FROM events e
-      WHERE e.room_id = rp.room_id AND e.sequence > rp.cursor
-  )
-ORDER BY rp.room_id, rp.peer
-LIMIT $1;
+UPDATE room_peers
+SET next_attempt_at = NOW() + interval '1 minute'
+WHERE (room_id, peer) IN (
+    SELECT rp.room_id, rp.peer FROM room_peers rp
+    JOIN rooms r ON r.id = rp.room_id
+    WHERE rp.abandoned = FALSE
+      AND r.federated
+      AND r.home_server = sqlc.arg(home)
+      AND (rp.next_attempt_at IS NULL OR rp.next_attempt_at <= NOW())
+      AND EXISTS (
+          SELECT 1 FROM events e
+          WHERE e.room_id = rp.room_id AND e.sequence > rp.cursor
+      )
+    ORDER BY rp.room_id, rp.peer
+    LIMIT sqlc.arg(max)
+    FOR UPDATE OF rp SKIP LOCKED
+)
+RETURNING *;
 
 -- name: PublishedRooms :many
 /*

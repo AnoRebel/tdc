@@ -127,6 +127,7 @@ type Querier interface {
 	// to receive the redirect. Consumed as it is read, exactly as the handle is.
 	ClaimOAuthOutcomeByState(ctx context.Context, stateHash []byte) (OauthOutcome, error)
 	ClaimOperation(ctx context.Context, id uuid.UUID) (int64, error)
+	ClaimPeersDue(ctx context.Context, arg ClaimPeersDueParams) ([]RoomPeer, error)
 	// One message, claimed to be sent now at its author's request. The same claim
 	// a delivery pass takes, so the pass cannot send it a second time.
 	ClaimScheduledMessage(ctx context.Context, arg ClaimScheduledMessageParams) (ScheduledMessage, error)
@@ -449,6 +450,9 @@ type Querier interface {
 	// Finds a federated room by the address an event names, which is how an
 	// incoming event says which room it belongs to.
 	FederatedRoomByAddress(ctx context.Context, slugFolded *string) (Room, error)
+	// A federated room with no slug — a project, an issue's discussion — whose
+	// address names its identifier instead.
+	FederatedRoomByID(ctx context.Context, id uuid.UUID) (Room, error)
 	FindDirectRoom(ctx context.Context, participantKey *string) (Room, error)
 	FindIdempotentSubmission(ctx context.Context, arg FindIdempotentSubmissionParams) (string, error)
 	FindInvitationByCodeHash(ctx context.Context, codeHash []byte) (Invitation, error)
@@ -1126,7 +1130,6 @@ type Querier interface {
 	NotificationDigestChosen(ctx context.Context, userID uuid.UUID) (bool, error)
 	OpenCallInRoom(ctx context.Context, roomID uuid.UUID) (Call, error)
 	ParkOAuthOutcome(ctx context.Context, arg ParkOAuthOutcomeParams) (OauthOutcome, error)
-	PeersDueForDelivery(ctx context.Context, limit int32) ([]RoomPeer, error)
 	// Reloads and restarts another node asked of this one.
 	PendingOperationsFor(ctx context.Context, node string) ([]Operation, error)
 	// What uploads in progress have reserved, server-wide.
@@ -1477,7 +1480,7 @@ type Querier interface {
 	// row is read before the update, which is how the old value comes back.
 	StopCallRecording(ctx context.Context, arg StopCallRecordingParams) (time.Time, error)
 	StopTyping(ctx context.Context, arg StopTypingParams) error
-	StoreForeignEvent(ctx context.Context, arg StoreForeignEventParams) (int64, error)
+	StoreForeignEvent(ctx context.Context, arg StoreForeignEventParams) ([]Event, error)
 	// Older translations of the same message, of a body it no longer has, go:
 	// an edited message's earlier words should not stay behind in the cache.
 	StoreMessageTranslation(ctx context.Context, arg StoreMessageTranslationParams) error

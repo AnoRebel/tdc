@@ -485,10 +485,23 @@ func (s *Server) handleFederatedDelivery(c *echo.Context) error {
 	for _, event := range delivery.Events {
 		s.recordFederatedFiles(c.Request().Context(), room, event)
 	}
+	s.arrived(c.Request().Context(), room, stored)
 
 	// How many were new, not how many arrived: a redelivery stores nothing,
 	// and saying otherwise would imply it did something.
-	return c.JSON(http.StatusOK, map[string]any{"stored": stored})
+	return c.JSON(http.StatusOK, map[string]any{"stored": len(stored)})
+}
+
+/*
+arrived shows the people here what another server has just told this one: each
+newly stored event goes out live, as one written here would.
+
+Only what is new — a redelivery shows nobody anything twice.
+*/
+func (s *Server) arrived(ctx context.Context, room dbgen.Room, stored []dbgen.Event) {
+	for _, event := range stored {
+		s.publishEvent(ctx, event)
+	}
 }
 
 /*
@@ -590,12 +603,11 @@ func (s *Server) describeRoomPeers(c *echo.Context, roomID uuid.UUID) error {
 }
 
 /*
-handleDeliverRoom pushes a room's outstanding events to its peers.
+handleDeliverRoom pushes a room's outstanding events to its peers, now.
 
-Triggered rather than automatic, in this phase. Delivery on every accepted
-event, with retry and backoff, is what Phase 5 builds; doing it now would mean
-a background scheduler nobody can yet observe failing. An operator — and the
-demonstration — can push explicitly and see exactly what happened.
+The server delivers by itself (see deliverFederationPeriodically); this is for
+an operator who wants to see exactly what happens with each peer, and it
+reports that peer by peer.
 */
 func (s *Server) handleDeliverRoom(c *echo.Context) error {
 	roomID, err := uuid.Parse(c.Param("id"))
@@ -626,96 +638,102 @@ func (s *Server) handleDeliverRoom(c *echo.Context) error {
 	sender := federation.NewSender(s.config.CanonicalAddress, s.rooms.Keyring(),
 		s.federationTrust(ctx), allowPrivate)
 
-	slug := ""
-	if room.Slug != nil {
-		slug = *room.Slug
-	}
-
 	results := make([]map[string]any, 0, len(peers))
 	for _, peer := range peers {
-		result := map[string]any{"peer": peer.Peer}
-
 		if peer.Abandoned {
 			// Given up on. An operator resumes it deliberately; until then it
 			// costs nothing, which is the point of abandoning it.
-			result["abandoned"] = true
-			result["lastError"] = peer.LastError
-			results = append(results, result)
+			results = append(results, map[string]any{
+				"peer": peer.Peer, "abandoned": true, "lastError": peer.LastError,
+			})
 			continue
 		}
-
-		batch, err := s.rooms.EventsForPeer(ctx, roomID, peer.Peer, peer.Cursor, maxEventsPerBatch)
-		if err != nil {
-			result["error"] = err.Error()
-			results = append(results, result)
-			continue
-		}
-		if len(batch) == 0 {
-			result["upToDate"] = true
-			results = append(results, result)
-			continue
-		}
-
-		/*
-			Reached at the address the peer publishes, not at its bare host.
-
-			A peer is stored as a host because that is its identity — a server
-			on :8443 is the same server as on :443 — but an identity is not an
-			address, and assuming https on the default port makes every
-			deployment behind another port unreachable. The discovery document
-			already says where the peer actually is.
-		*/
-		reachable := peer.Address
-		if reachable == "" {
-			reachable = "https://" + peer.Peer
-		}
-
-		stored, err := sender.DeliverEvents(ctx, reachable, slug, batch)
-		if err != nil {
-			/*
-				The cursor stays where it was, so the same events are tried
-				again rather than skipped, and the failure is counted so the
-				next attempt waits longer than this one did.
-			*/
-			state, recordErr := s.rooms.DeliveryFailed(ctx, roomID, peer.Peer, err.Error(), int(peer.Failures))
-			if recordErr != nil {
-				s.log.Error("cannot record a delivery failure", "peer", peer.Peer, "error", recordErr)
-			}
-
-			result["error"] = err.Error()
-			result["failures"] = state.Failures
-			if state.Abandoned {
-				// Past the ceiling: nothing further is attempted until an
-				// operator says so, and they are told rather than left to
-				// notice a room quietly stopped replicating.
-				result["abandoned"] = true
-				s.log.Warn("abandoned a federation peer after repeated failures",
-					"peer", peer.Peer, "room", roomID,
-					"failures", state.Failures, "error", err)
-			} else if state.NextAttemptAt != nil {
-				result["nextAttemptAt"] = state.NextAttemptAt.UTC()
-			}
-
-			results = append(results, result)
-			continue
-		}
-
-		furthest := batch[len(batch)-1].Sequence
-		if err := s.rooms.AdvancePeer(ctx, roomID, peer.Peer, furthest); err != nil {
-			s.log.Error("cannot advance a peer's cursor", "peer", peer.Peer, "error", err)
-		}
-
-		if err := s.rooms.DeliverySucceeded(ctx, roomID, peer.Peer); err != nil {
-			s.log.Error("cannot clear a peer's failures", "peer", peer.Peer, "error", err)
-		}
-
-		result["sent"] = len(batch)
-		result["stored"] = stored
-		result["cursor"] = furthest
-		results = append(results, result)
+		results = append(results, s.deliverToPeer(ctx, sender, room, peer))
 	}
 
 	return c.JSON(http.StatusOK, map[string]any{"peers": results})
+}
+
+/*
+deliverToPeer sends a peer the next batch of a room's events it has not had, and
+records what happened: the cursor advanced on success, the failure counted and
+the next attempt pushed back on failure, the peer abandoned past the ceiling.
+Returns what happened, for an operator who asked.
+*/
+func (s *Server) deliverToPeer(
+	ctx context.Context,
+	sender *federation.Sender,
+	room dbgen.Room,
+	peer dbgen.RoomPeer,
+) map[string]any {
+	result := map[string]any{"peer": peer.Peer}
+
+	batch, err := s.rooms.EventsForPeer(ctx, room.ID, peer.Peer, peer.Cursor, maxEventsPerBatch)
+	if err != nil {
+		result["error"] = err.Error()
+		return result
+	}
+	if len(batch) == 0 {
+		result["upToDate"] = true
+		return result
+	}
+
+	/*
+		Reached at the address the peer publishes, not at its bare host.
+
+		A peer is stored as a host because that is its identity — a server
+		on :8443 is the same server as on :443 — but an identity is not an
+		address, and assuming https on the default port makes every
+		deployment behind another port unreachable. The discovery document
+		already says where the peer actually is.
+	*/
+	reachable := peer.Address
+	if reachable == "" {
+		reachable = "https://" + peer.Peer
+	}
+
+	stored, err := sender.DeliverEvents(ctx, reachable, rooms.LocalPart(room), batch)
+	if err != nil {
+		/*
+			The cursor stays where it was, so the same events are tried
+			again rather than skipped, and the failure is counted so the
+			next attempt waits longer than this one did.
+		*/
+		state, recordErr := s.rooms.DeliveryFailed(ctx, room.ID, peer.Peer, err.Error(), int(peer.Failures))
+		if recordErr != nil {
+			s.log.Error("cannot record a delivery failure", "peer", peer.Peer, "error", recordErr)
+		}
+
+		result["error"] = err.Error()
+		result["failures"] = state.Failures
+		if state.Abandoned {
+			// Past the ceiling: nothing further is attempted until an
+			// operator says so, and they are told rather than left to
+			// notice a room quietly stopped replicating.
+			result["abandoned"] = true
+			s.log.Warn("abandoned a federation peer after repeated failures",
+				"peer", peer.Peer, "room", room.ID,
+				"failures", state.Failures, "error", err)
+		} else if state.NextAttemptAt != nil {
+			result["nextAttemptAt"] = state.NextAttemptAt.UTC()
+		}
+
+		return result
+	}
+
+	furthest := batch[len(batch)-1].Sequence
+	if err := s.rooms.AdvancePeer(ctx, room.ID, peer.Peer, furthest); err != nil {
+		s.log.Error("cannot advance a peer's cursor", "peer", peer.Peer, "error", err)
+	}
+
+	if err := s.rooms.DeliverySucceeded(ctx, room.ID, peer.Peer); err != nil {
+		s.log.Error("cannot clear a peer's failures", "peer", peer.Peer, "error", err)
+	}
+
+	result["sent"] = len(batch)
+	result["stored"] = stored
+	result["cursor"] = furthest
+	return result
 }
 
 /*
@@ -821,10 +839,7 @@ func (s *Server) handleCatchUp(c *echo.Context) error {
 		s.federationTrust(ctx), allowPrivate)
 
 	home := peers[0]
-	slug := ""
-	if room.Slug != nil {
-		slug = *room.Slug
-	}
+	slug := rooms.LocalPart(room)
 
 	held, err := s.rooms.HighestSequence(ctx, roomID)
 	if err != nil {
@@ -860,8 +875,9 @@ func (s *Server) handleCatchUp(c *echo.Context) error {
 			"room", roomID, "peer", home.Peer, "error", err)
 		return echo.NewHTTPError(http.StatusUnprocessableEntity, err.Error())
 	}
+	s.arrived(ctx, room, stored)
 
-	return c.JSON(http.StatusOK, map[string]any{"fetched": len(batch), "stored": stored})
+	return c.JSON(http.StatusOK, map[string]any{"fetched": len(batch), "stored": len(stored)})
 }
 
 /*
