@@ -112,6 +112,24 @@ export interface Project {
   home?: string;
   /** Why a replica stopped following its home, when it has. */
   replicaError?: string;
+  /** When a replica's home stopped answering, while it has not answered since. */
+  homeUnreachableSince?: string;
+  /** How many people elsewhere are waiting to be let in, for whoever may let them. */
+  joinRequests?: number;
+}
+
+/** A public project another server lets this one follow. */
+export interface PublishedProject {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+}
+
+/** Somebody on another server waiting to be let into a project. */
+export interface JoinRequest {
+  address: string;
+  requestedAt: string;
 }
 
 export interface ProjectMember {

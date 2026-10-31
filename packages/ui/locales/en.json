@@ -1502,7 +1502,8 @@
     },
     "replica": {
       "from": "Shared from {home}. It lives there: what you change here is made there, as your role in it allows.",
-      "stopped": "This copy has stopped following {home}, which recorded something this server does not understand yet. It shows the project as it was until this server is updated."
+      "stopped": "This copy has stopped following {home}, which recorded something this server does not understand yet. It shows the project as it was until this server is updated.",
+      "unreachable": "{home} has not answered since {since}. What you see may be behind, and changes cannot be made until it answers again."
     },
     "federation": {
       "title": "Other servers",
@@ -1812,6 +1813,34 @@
       "table": "Issues done at the end of each day",
       "day": "Day",
       "wholeProject": "The whole project, the last two weeks"
+    },
+    "elsewhere": {
+      "title": "Add from another server",
+      "hint": "Public projects on another server, kept here for everybody to read. To work in one, ask to join it.",
+      "server": "Server",
+      "look": "Look",
+      "none": "{server} has no projects this server may add, or could not be reached.",
+      "follow": "Add",
+      "followProject": "Add {project} to this server",
+      "following": "Added. It appears among the projects in a moment.",
+      "couldNotLook": "Could not ask that server.",
+      "couldNotFollow": "Could not add that project.",
+      "remove": "Remove from this server",
+      "removed": "Removed. It leaves this server in a moment.",
+      "couldNotRemove": "Could not remove that project."
+    },
+    "join": {
+      "ask": "Ask to join",
+      "asked": "Asked. {home} decides, and you become a member here when it says yes.",
+      "couldNotAsk": "Could not ask to join.",
+      "waitingOne": "{count} person waiting to join",
+      "waitingMany": "{count} people waiting to join",
+      "title": "Waiting to join",
+      "hint": "People on other servers who asked to be let in. Letting somebody in makes them a member.",
+      "askedWhen": "Asked {when}",
+      "letIn": "Let in",
+      "letInDone": "{who} is a member now.",
+      "decline": "Decline"
     }
   },
   "desktop": {

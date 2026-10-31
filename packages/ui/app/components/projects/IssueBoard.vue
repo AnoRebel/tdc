@@ -107,7 +107,9 @@ function columnOf(key: string): BoardColumn | undefined {
   return board.value?.columns.find((column) => column.cards.some((card) => card.key === key));
 }
 
-const moving = ref(false);
+// The card on its way, until the server answers — which on a replica means
+// until the change has been made on the project's home and come back.
+const moving = ref<string | null>(null);
 
 /*
  * The one way a card moves. Applied at once, so the board answers the hand
@@ -122,7 +124,7 @@ async function moveCard(card: BoardCard, to: BoardColumn) {
   from.total--;
   to.cards.unshift(card);
   to.total++;
-  moving.value = true;
+  moving.value = card.key;
   failed.value = null;
   try {
     await projectsApi.move(card.key, to.stateId, from.stateId);
@@ -140,7 +142,7 @@ async function moveCard(card: BoardCard, to: BoardColumn) {
       announcement.value = failed.value;
     }
   } finally {
-    moving.value = false;
+    moving.value = null;
   }
 }
 
@@ -317,9 +319,10 @@ function isTarget(index: number) {
             :key="card.key"
             class="group rounded-lg border bg-card p-2.5 shadow-xs transition-shadow duration-(--motion-duration-fast) hover:shadow-sm"
             :class="[
-              dragged?.key === card.key && 'opacity-50',
+              (dragged?.key === card.key || moving === card.key) && 'opacity-50',
               held?.card.key === card.key && 'ring-2 ring-primary',
             ]"
+            :aria-busy="moving === card.key || undefined"
             :draggable="props.canMove"
             :data-card="card.key"
             @dragstart="onDragStart($event, card)"

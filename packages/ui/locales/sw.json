@@ -1502,7 +1502,8 @@
     },
     "replica": {
       "from": "Umeshirikiwa kutoka {home}. Unaishi huko: unachobadilisha hapa hufanywa huko, kwa kadiri nafasi yako ndani yake inavyoruhusu.",
-      "stopped": "Nakala hii imeacha kufuata {home}, iliyorekodi kitu ambacho seva hii bado haikielewi. Inaonyesha mradi kama ulivyokuwa hadi seva hii isasishwe."
+      "stopped": "Nakala hii imeacha kufuata {home}, iliyorekodi kitu ambacho seva hii bado haikielewi. Inaonyesha mradi kama ulivyokuwa hadi seva hii isasishwe.",
+      "unreachable": "{home} haijajibu tangu {since}. Unachokiona kinaweza kuwa nyuma, na mabadiliko hayawezi kufanywa hadi ijibu tena."
     },
     "federation": {
       "title": "Seva nyingine",
@@ -1812,6 +1813,34 @@
       "table": "Masuala yaliyokamilika mwisho wa kila siku",
       "day": "Siku",
       "wholeProject": "Mradi mzima, wiki mbili zilizopita"
+    },
+    "elsewhere": {
+      "title": "Ongeza kutoka seva nyingine",
+      "hint": "Miradi ya umma kwenye seva nyingine, inayohifadhiwa hapa ili kila mtu aisome. Ili kufanya kazi ndani ya mmoja, omba kujiunga.",
+      "server": "Seva",
+      "look": "Tafuta",
+      "none": "{server} haina miradi ambayo seva hii inaweza kuongeza, au haikuweza kufikiwa.",
+      "follow": "Ongeza",
+      "followProject": "Ongeza {project} kwenye seva hii",
+      "following": "Umeongezwa. Utaonekana kati ya miradi baada ya muda mfupi.",
+      "couldNotLook": "Haikuweza kuuliza seva hiyo.",
+      "couldNotFollow": "Haikuweza kuongeza mradi huo.",
+      "remove": "Ondoa kwenye seva hii",
+      "removed": "Umeondolewa. Utaondoka kwenye seva hii baada ya muda mfupi.",
+      "couldNotRemove": "Haikuweza kuondoa mradi huo."
+    },
+    "join": {
+      "ask": "Omba kujiunga",
+      "asked": "Umeomba. {home} inaamua, na unakuwa mwanachama hapa itakaposema ndiyo.",
+      "couldNotAsk": "Haikuweza kuomba kujiunga.",
+      "waitingOne": "Mtu {count} anasubiri kujiunga",
+      "waitingMany": "Watu {count} wanasubiri kujiunga",
+      "title": "Wanaosubiri kujiunga",
+      "hint": "Watu kwenye seva nyingine walioomba kuruhusiwa kuingia. Kumruhusu mtu humfanya kuwa mwanachama.",
+      "askedWhen": "Aliomba {when}",
+      "letIn": "Ruhusu",
+      "letInDone": "{who} sasa ni mwanachama.",
+      "decline": "Kataa"
     }
   },
   "desktop": {

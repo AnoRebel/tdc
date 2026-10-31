@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { whenBriefly } from "#layers/ui/app/lib/dates";
 import { nameOf } from "#layers/ui/app/lib/names";
 import { useForm } from "@tanstack/vue-form";
 import * as v from "valibot";
@@ -7,6 +8,7 @@ import {
   isApiError,
   type CyclePolicy,
   type IssueState,
+  type JoinRequest,
   type Project,
   type ProjectMember,
 } from "@tdc/types";
@@ -37,6 +39,8 @@ const { offers } = useServerInfo();
 
 const project = ref<Project | null>(null);
 const members = ref<ProjectMember[]>([]);
+// People on other servers waiting to be let in, for whoever may let them.
+const joinRequests = ref<JoinRequest[]>([]);
 const missing = ref(false);
 const error = ref<string | null>(null);
 const notice = ref<string | null>(null);
@@ -49,6 +53,9 @@ async function load() {
   try {
     project.value = await projectsApi.get(key.value);
     members.value = await projectsApi.members(key.value);
+    joinRequests.value = project.value.joinRequests
+      ? await projectsApi.joinRequests(key.value)
+      : [];
   } catch (cause) {
     if (isApiError(cause) && cause.status === 404) missing.value = true;
     else error.value = isApiError(cause) ? cause.message : $ts("projects.couldNotLoad");
@@ -580,6 +587,46 @@ async function setPolicy(cyclePolicy: CyclePolicy | undefined) {
               </memberForm.Field>
               <Button type="submit" class="self-end">{{ $t("projects.addMember") }}</Button>
             </form>
+          </section>
+
+          <section v-if="joinRequests.length" :aria-labelledby="'join-requests-heading'">
+            <h2 id="join-requests-heading" class="text-sm font-semibold">
+              {{ $t("projects.join.title") }}
+            </h2>
+            <p class="mt-0.5 text-xs text-muted-foreground">{{ $t("projects.join.hint") }}</p>
+            <ul class="mt-3 space-y-1">
+              <li
+                v-for="request in joinRequests"
+                :key="request.address"
+                class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-accent"
+              >
+                <UiAvatar :name="request.address" size="sm" />
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm">{{ request.address }}</span>
+                  <span class="block text-xs text-muted-foreground">{{
+                    $t("projects.join.askedWhen", { when: whenBriefly(request.requestedAt) })
+                  }}</span>
+                </span>
+                <Button
+                  size="small"
+                  @click="
+                    attempt(
+                      () => projectsApi.letIn(key, request.address),
+                      $ts('projects.join.letInDone', { who: request.address }),
+                    )
+                  "
+                >
+                  {{ $t("projects.join.letIn") }}
+                </Button>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  @click="attempt(() => projectsApi.decline(key, request.address))"
+                >
+                  {{ $t("projects.join.decline") }}
+                </Button>
+              </li>
+            </ul>
           </section>
 
           <section v-if="sharable" :aria-labelledby="'federation-heading'">

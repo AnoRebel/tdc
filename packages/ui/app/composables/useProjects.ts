@@ -19,6 +19,8 @@ import type {
   IssueLabel,
   IssuePriority,
   IssueState,
+  JoinRequest,
+  PublishedProject,
   MyIssue,
   Project,
   ProjectMember,
@@ -60,6 +62,25 @@ export function useProjects() {
       api.delete<void>(`${at(key)}/members/${encodeURIComponent(username)}`),
     setFederated: (key: string, federated: boolean) =>
       api.put<Project>(`${at(key)}/federation`, { federated }),
+
+    /** The public projects another server lets this one follow. */
+    elsewhere: (server: string) =>
+      api.get<PublishedProject[]>(`/api/projects-elsewhere?${new URLSearchParams({ server })}`),
+    follow: (server: string, project: PublishedProject) =>
+      api.post<void>("/api/projects-elsewhere/follow", {
+        server,
+        project: project.id,
+        name: project.name,
+      }),
+    unfollow: (server: string, project: string) =>
+      api.post<void>("/api/projects-elsewhere/unfollow", { server, project }),
+    /** Asks a shared project's home to let the caller in. */
+    askToJoin: (key: string) => api.post<void>(`${at(key)}/join`, {}),
+    joinRequests: (key: string) => api.get<JoinRequest[]>(`${at(key)}/join-requests`),
+    letIn: (key: string, address: string) =>
+      api.post<void>(`${at(key)}/join-requests/${encodeURIComponent(address)}`, {}),
+    decline: (key: string, address: string) =>
+      api.delete<void>(`${at(key)}/join-requests/${encodeURIComponent(address)}`),
 
     addState: (key: string, state: { name: string; isCompletion: boolean }) =>
       api.post<IssueState>(`${at(key)}/states`, state),

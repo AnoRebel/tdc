@@ -23,12 +23,14 @@ useHead({ title: $ts("projects.title") });
 
 const projectsApi = useProjects();
 const { can } = useAuth();
+const { offers } = useServerInfo();
 const router = useRouter();
 
 const projects = ref<Project[]>([]);
 const loading = ref(true);
 const failed = ref<string | null>(null);
 const starting = ref(false);
+const followingElsewhere = ref(false);
 
 async function load() {
   loading.value = true;
@@ -42,6 +44,11 @@ async function load() {
   }
 }
 onMounted(load);
+
+// A project followed arrives a moment after its home agrees to it.
+function followed() {
+  setTimeout(() => void load(), 3000);
+}
 
 /*
  * The rules a project must meet, stated once.
@@ -118,8 +125,17 @@ const visibilities = computed(() => [
     <header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
       <h1 class="text-sm font-semibold">{{ $t("projects.title") }}</h1>
       <Button
-        v-if="can('project.create') && !starting"
+        v-if="can('project.create') && offers('projects.federated') && !followingElsewhere"
+        variant="outline"
         class="ml-auto"
+        @click="followingElsewhere = true"
+      >
+        <Icon name="lucide:globe" class="size-3.5" />
+        {{ $t("projects.elsewhere.title") }}
+      </Button>
+      <Button
+        v-if="can('project.create') && !starting"
+        :class="followingElsewhere || !offers('projects.federated') ? 'ml-auto' : ''"
         @click="((starting = true), form.reset())"
       >
         <Icon name="lucide:plus" class="size-3.5" />
@@ -128,6 +144,11 @@ const visibilities = computed(() => [
     </header>
 
     <div class="max-w-3xl space-y-6 px-4 py-6">
+      <ProjectsFollowElsewhere
+        v-if="followingElsewhere"
+        @close="followingElsewhere = false"
+        @followed="followed"
+      />
       <section
         v-if="starting"
         class="rounded-xl border bg-card p-4"
