@@ -26,7 +26,14 @@
  * TDC_DOCS_POSTGRES names the Postgres server (the compose file's by default),
  * TDC_DOCS_DATABASE the scratch database it creates and drops,
  * TDC_DOCS_PORT the port the server listens on (8131); the port after it takes
- * the seeded outgoing webhook's deliveries.
+ * the seeded outgoing webhook's deliveries, and the one after that is a second
+ * server, on a database of its own, for the screens of a project shared
+ * between two.
+ *
+ * Both servers are named under .localhost, which resolves to this machine, so
+ * that each can reach the other by the name it signs as. The pictures show
+ * them as community.example and arusha.example: every page photographed has
+ * those names put in place of the real ones as it draws.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -36,7 +43,7 @@ import { dirname, join } from "node:path";
 import { SQL } from "bun";
 import { chromium, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-import { seed, type Seeded } from "./docs-seed";
+import { seed, seedElsewhere, type Seeded, type SeededElsewhere } from "./docs-seed";
 import { shots, type Shot } from "./docs-shots";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
@@ -46,6 +53,56 @@ const DATABASE = process.env.TDC_DOCS_DATABASE ?? "tdc_docs_screenshots";
 const PORT = Number(process.env.TDC_DOCS_PORT ?? 8131);
 const BASE = `http://127.0.0.1:${PORT}`;
 const BINARY = join(tmpdir(), "tdc-docs-screenshots-server");
+const ELSEWHERE_PORT = PORT + 2;
+const ELSEWHERE_BASE = `http://127.0.0.1:${ELSEWHERE_PORT}`;
+const ELSEWHERE_DATABASE = `${DATABASE}_elsewhere`;
+
+/*
+ * The names the servers sign as, and the names the pictures give them. Longest
+ * first, so a whole address is replaced before the host inside it.
+ */
+const CANONICAL = `http://community.localhost:${PORT}`;
+const ELSEWHERE_CANONICAL = `http://arusha.localhost:${ELSEWHERE_PORT}`;
+const DISGUISES: [string, string][] = [
+  [CANONICAL, "https://community.example"],
+  [ELSEWHERE_CANONICAL, "https://arusha.example"],
+  [`community.localhost:${PORT}`, "community.example"],
+  [`arusha.localhost:${ELSEWHERE_PORT}`, "arusha.example"],
+  ["community.localhost", "community.example"],
+  ["arusha.localhost", "arusha.example"],
+];
+
+/*
+ * Runs in every page photographed: puts the pictures' names in place of the
+ * servers' real ones, in text as it is drawn and in fields when asked
+ * (window.__disguise, which settling calls). Only what is shown changes; what
+ * a field sends is what was typed into it.
+ */
+function disguise(names: [string, string][]) {
+  const swap = (text: string) =>
+    names.reduce((done, [real, shown]) => done.split(real).join(shown), text);
+  const sweep = (root: Node) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const shown = swap(node.nodeValue ?? "");
+      if (shown !== node.nodeValue) node.nodeValue = shown;
+    }
+  };
+  const everything = () => {
+    sweep(document.body);
+    for (const field of document.querySelectorAll<HTMLInputElement>("input, textarea")) {
+      const shown = swap(field.value);
+      if (shown !== field.value) field.value = shown;
+    }
+  };
+  (window as unknown as { __disguise: () => void }).__disguise = everything;
+  new MutationObserver((changes) => {
+    for (const change of changes) {
+      if (change.type === "characterData") sweep(change.target);
+      else for (const added of change.addedNodes) sweep(added);
+    }
+  }).observe(document, { childList: true, subtree: true, characterData: true });
+}
 
 const flags = new Set(process.argv.slice(2));
 const only = [...flags].find((flag) => flag.startsWith("--only="))?.slice("--only=".length);
@@ -76,15 +133,21 @@ async function withPostgres<T>(work: (sql: SQL) => Promise<T>): Promise<T> {
   }
 }
 
-async function freshDatabase() {
+async function freshDatabases() {
   await withPostgres(async (sql) => {
-    await sql.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`);
-    await sql.unsafe(`CREATE DATABASE ${DATABASE}`);
+    for (const database of [DATABASE, ELSEWHERE_DATABASE]) {
+      await sql.unsafe(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
+      await sql.unsafe(`CREATE DATABASE ${database}`);
+    }
   });
 }
 
-async function dropDatabase() {
-  await withPostgres((sql) => sql.unsafe(`DROP DATABASE IF EXISTS ${DATABASE} WITH (FORCE)`));
+async function dropDatabases() {
+  await withPostgres(async (sql) => {
+    for (const database of [DATABASE, ELSEWHERE_DATABASE]) {
+      await sql.unsafe(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
+    }
+  });
 }
 
 function build() {
@@ -93,24 +156,29 @@ function build() {
   run("bun", ["run", "generate"], join(ROOT, "apps", "web"), { NUXT_PUBLIC_API_BASE: "" });
 }
 
-async function startServer(): Promise<ChildProcess> {
+async function startServer(
+  database: string,
+  port: number,
+  canonical: string,
+): Promise<ChildProcess> {
   const server = spawn(BINARY, [], {
     stdio: ["ignore", "ignore", "inherit"],
     env: {
       ...process.env,
-      TDC_DATABASE_URL: `${POSTGRES}/${DATABASE}?sslmode=disable`,
+      TDC_DATABASE_URL: `${POSTGRES}/${database}?sslmode=disable`,
       TDC_SERVER_WEB_ROOT: join(ROOT, "apps", "web", ".output", "public"),
-      TDC_SERVER_ADDRESS: `127.0.0.1:${PORT}`,
+      TDC_SERVER_ADDRESS: `127.0.0.1:${port}`,
       TDC_SERVER_SECURE_COOKIES: "false",
-      // So people read as neema@community.example rather than neema@localhost.
-      TDC_SERVER_CANONICAL_ADDRESS: "https://community.example",
+      // So people read as neema@community.localhost, which the pictures show
+      // as neema@community.example, rather than neema@localhost.
+      TDC_SERVER_CANONICAL_ADDRESS: canonical,
       TDC_LOG_LEVEL: "error",
       TDC_TRANSLATION_LIBRETRANSLATE_URL: `http://127.0.0.1:${PORT + 1}`,
     },
   });
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
-      if ((await fetch(`${BASE}/api/health`)).ok) return server;
+      if ((await fetch(`http://127.0.0.1:${port}/api/health`)).ok) return server;
     } catch {
       // Not listening yet.
     }
@@ -167,15 +235,33 @@ async function toWebp(encoder: Page, png: Buffer) {
 export interface Studio {
   base: string;
   seeded: Seeded;
+  /** The second server, and the name it signs as. */
+  elsewhere: { base: string; host: string; seeded: SeededElsewhere };
+  /** The name the first server signs as, as the second knows it. */
+  host: string;
   browser: Browser;
-  /** A browser context signed in as one of the seeded people, light theme, no tour. */
+  /**
+   * A browser context signed in as one of the seeded people, light theme, no
+   * tour; on the second server when asked.
+   */
   as(
     username: string | null,
-    options?: { phone?: boolean; dark?: boolean; permissions?: string[] },
+    options?: { phone?: boolean; dark?: boolean; permissions?: string[]; elsewhere?: boolean },
   ): Promise<BrowserContext>;
+  /**
+   * Stops the first server answering, until the work given is done: for the
+   * screen another server shows when a project's home goes quiet.
+   */
+  silence<T>(work: () => Promise<T>): Promise<T>;
 }
 
-async function photograph(seeded: Seeded) {
+/** What a run seeded on both servers, as --serve leaves it for --attach. */
+interface Sessions {
+  seeded: Seeded;
+  elsewhere: SeededElsewhere;
+}
+
+async function photograph({ seeded, elsewhere }: Sessions, home?: ChildProcess) {
   const browser = await chromium.launch({
     args: [
       // A camera and microphone that exist, for the calls.
@@ -189,10 +275,14 @@ async function photograph(seeded: Seeded) {
   const studio: Studio = {
     base: BASE,
     seeded,
+    elsewhere: { base: ELSEWHERE_BASE, host: new URL(ELSEWHERE_CANONICAL).host, seeded: elsewhere },
+    host: new URL(CANONICAL).host,
     browser,
     async as(username, options = {}) {
+      const base = options.elsewhere ? ELSEWHERE_BASE : BASE;
+      const people = options.elsewhere ? elsewhere.people : seeded.people;
       const context = await browser.newContext({
-        baseURL: BASE,
+        baseURL: base,
         viewport: options.phone ? { width: 390, height: 844 } : { width: 1280, height: 800 },
         deviceScaleFactor: 1,
         isMobile: options.phone ?? false,
@@ -205,11 +295,22 @@ async function photograph(seeded: Seeded) {
       });
       if (username) {
         await context.addCookies([
-          { name: "tdc_session", value: seeded.people[username]!.token, url: BASE },
+          { name: "tdc_session", value: people[username]!.token, url: base },
         ]);
       }
+      await context.addInitScript(disguise, DISGUISES);
       contexts.push(context);
       return context;
+    },
+    async silence(work) {
+      if (!home?.pid) throw new Error("only a run that started the servers can silence one");
+      // Stopped rather than ended, so it answers again for the shots after.
+      process.kill(home.pid, "SIGSTOP");
+      try {
+        return await work();
+      } finally {
+        process.kill(home.pid, "SIGCONT");
+      }
     },
   };
 
@@ -264,12 +365,13 @@ function report(failed: string[]) {
 async function main() {
   // Another run's --serve is still up: photograph what it seeded.
   if (flags.has("--attach")) {
-    report(await photograph(JSON.parse(readFileSync(SESSIONS, "utf8")) as Seeded));
+    report(await photograph(JSON.parse(readFileSync(SESSIONS, "utf8")) as Sessions));
     return;
   }
   if (!flags.has("--skip-build")) build();
-  await freshDatabase();
+  await freshDatabases();
   let server: ChildProcess | undefined;
+  let other: ChildProcess | undefined;
   // Where the seeded outgoing webhook delivers, which only has to say yes;
   // and a stand-in LibreTranslate for the translation screenshots.
   const receiver = Bun.serve({
@@ -281,21 +383,29 @@ async function main() {
         : new Response(null, { status: 204 }),
   });
   try {
-    server = await startServer();
+    server = await startServer(DATABASE, PORT, CANONICAL);
+    other = await startServer(ELSEWHERE_DATABASE, ELSEWHERE_PORT, ELSEWHERE_CANONICAL);
     console.log("Seeding…");
-    const seeded = await seed(BASE, `http://127.0.0.1:${PORT + 1}/hooks/golang`);
+    const sessions: Sessions = {
+      seeded: await seed(BASE, `http://127.0.0.1:${PORT + 1}/hooks/golang`),
+      elsewhere: await seedElsewhere(ELSEWHERE_BASE),
+    };
     if (flags.has("--serve")) {
-      writeFileSync(SESSIONS, JSON.stringify(seeded, null, 2));
-      console.log(`Serving ${BASE}; sessions in ${SESSIONS}. Ctrl-C stops and cleans up.`);
+      writeFileSync(SESSIONS, JSON.stringify(sessions, null, 2));
+      console.log(
+        `Serving ${BASE} and ${ELSEWHERE_BASE}; sessions in ${SESSIONS}. Ctrl-C stops and cleans up.`,
+      );
       await new Promise((resolve) => process.once("SIGINT", resolve));
       return;
     }
     console.log("Photographing…");
-    report(await photograph(seeded));
+    report(await photograph(sessions, server));
   } finally {
     void receiver.stop(true);
+    server?.kill("SIGCONT");
     server?.kill();
-    await dropDatabase();
+    other?.kill();
+    await dropDatabases();
   }
 }
 

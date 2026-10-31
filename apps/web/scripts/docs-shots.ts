@@ -23,6 +23,8 @@ interface OpenOptions {
   phone?: boolean;
   dark?: boolean;
   permissions?: string[];
+  /** On the second server, as somebody seeded there. */
+  elsewhere?: boolean;
 }
 
 /** A page signed in as somebody (or nobody), opened at a path and settled. */
@@ -53,6 +55,8 @@ async function settle(page: Page) {
     )
     .catch(() => {});
   await page.waitForTimeout(300);
+  // The servers' real names, swapped for the ones the guides use.
+  await page.evaluate(() => (window as unknown as { __disguise?: () => void }).__disguise?.());
 }
 
 const room = (studio: Studio, slug: string) => `/rooms/${studio.seeded.rooms[slug]}`;
@@ -87,11 +91,28 @@ async function region(page: Page, target: Locator, margin = 16): Promise<Buffer>
 const window = (page: Page) => page.screenshot();
 
 /** An API request as one of the seeded people, for what a shot sets up off screen. */
-async function as(studio: Studio, who: string, method: string, path: string, body?: unknown) {
-  const response = await fetch(new URL(path, studio.base), {
+function as(studio: Studio, who: string, method: string, path: string, body?: unknown) {
+  return request(studio.base, studio.seeded.people[who]!.token, who, method, path, body);
+}
+
+/** The same, on the second server. */
+function elsewhere(studio: Studio, who: string, method: string, path: string, body?: unknown) {
+  const { base, seeded } = studio.elsewhere;
+  return request(base, seeded.people[who]!.token, who, method, path, body);
+}
+
+async function request(
+  base: string,
+  token: string,
+  who: string,
+  method: string,
+  path: string,
+  body?: unknown,
+) {
+  const response = await fetch(new URL(path, base), {
     method,
     headers: {
-      Authorization: `Bearer ${studio.seeded.people[who]!.token}`,
+      Authorization: `Bearer ${token}`,
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -102,6 +123,63 @@ async function as(studio: Studio, who: string, method: string, path: string, bod
 }
 
 const media = { permissions: ["microphone", "camera"] };
+
+/*
+ * The community website, shared with the Arusha group's server: what the
+ * projects guide's last screens show. Each step makes sure of the ones before
+ * it, so any of those screens can be taken alone.
+ */
+
+/** The community website as the second server knows it. */
+const copy = (studio: Studio) => `WEB@${studio.host.split(":")[0]}`;
+
+/** Asks again until it holds, for what arrives from the other server a moment later. */
+async function eventually(what: string, check: () => Promise<boolean>) {
+  for (let tries = 0; tries < 90; tries++) {
+    if (await check().catch(() => false)) return;
+    await Bun.sleep(1000);
+  }
+  throw new Error(`${what} never happened`);
+}
+
+/** Both servers federating, and the website open to other servers. */
+async function shared(studio: Studio) {
+  for (const key of ["federation.enabled", "federation.allow_private_addresses"]) {
+    await as(studio, "neema", "PUT", `/api/admin/settings/${key}`, { value: "true" });
+    await elsewhere(studio, "imani", "PUT", `/api/admin/settings/${key}`, { value: "true" });
+  }
+  await as(studio, "neema", "PUT", "/api/projects/WEB/federation", { federated: true });
+}
+
+/** The website added to the second server, and arrived there. */
+async function added(studio: Studio) {
+  await shared(studio);
+  const key = encodeURIComponent(copy(studio));
+  const there = () => elsewhere(studio, "imani", "GET", `/api/projects/${key}`).then(() => true);
+  if (await there().catch(() => false)) return;
+  const project = await as(studio, "neema", "GET", "/api/projects/WEB");
+  await elsewhere(studio, "imani", "POST", "/api/projects-elsewhere/follow", {
+    server: `http://${studio.host}`,
+    project: project.id,
+    name: project.name,
+  });
+  await eventually("the website arriving on the second server", there);
+}
+
+/** Imani a member of the website, let in after asking from her own server. */
+async function joined(studio: Studio) {
+  await added(studio);
+  const key = encodeURIComponent(copy(studio));
+  // Asked already, or already a member: either is where this wants to be.
+  await elsewhere(studio, "imani", "POST", `/api/projects/${key}/join`).catch(() => {});
+  const address = encodeURIComponent(`imani@${studio.elsewhere.host.split(":")[0]}`);
+  await eventually("Imani's request reaching the website's home", () =>
+    as(studio, "neema", "GET", "/api/projects/WEB/join-requests").then((asked) =>
+      JSON.stringify(asked).includes("imani@"),
+    ),
+  ).catch(() => {});
+  await as(studio, "neema", "POST", `/api/projects/WEB/join-requests/${address}`).catch(() => {});
+}
 
 /*
  * A call in #general: Neema starts it, Juma and Zawadi join by voice, and the
@@ -680,6 +758,10 @@ export const shots: Shot[] = [
     },
   },
 
+  /* ------------------------------------------------------------ projects */
+  // The screens of a project shared between two servers are last of all: the
+  // last of them stops the first server answering for a moment.
+
   /* ----------------------------------------------------------- directory */
   {
     guide: "directory",
@@ -872,6 +954,89 @@ export const shots: Shot[] = [
     name: "applications",
     async take(studio) {
       return window(await open(studio, "neema", "/applications"));
+    },
+  },
+  /* ------------------------------------------- projects, on another server */
+  {
+    guide: "projects",
+    name: "add-from-another-server",
+    async take(studio) {
+      await shared(studio);
+      const page = await open(studio, "imani", "/projects", { elsewhere: true });
+      await page.getByRole("button", { name: "Add from another server" }).click();
+      await page.getByLabel("Server", { exact: true }).fill(`http://${studio.host}`);
+      await page.getByRole("button", { name: "Look" }).click();
+      await page
+        .getByRole("button", { name: "Add Community website to this server" })
+        .waitFor({ timeout: 30_000 });
+      await settle(page);
+      return region(page, page.getByRole("region", { name: "Add from another server" }));
+    },
+  },
+  {
+    guide: "projects",
+    name: "added-project",
+    async take(studio) {
+      await added(studio);
+      const page = await open(studio, "imani", `/projects/${copy(studio)}/board`, {
+        elsewhere: true,
+      });
+      await page.getByRole("button", { name: "Ask to join" }).waitFor();
+      await settle(page);
+      return window(page);
+    },
+  },
+  {
+    guide: "projects",
+    name: "waiting-to-join",
+    async take(studio) {
+      await added(studio);
+      await elsewhere(
+        studio,
+        "imani",
+        "POST",
+        `/api/projects/${encodeURIComponent(copy(studio))}/join`,
+      ).catch(() => {});
+      await eventually("Imani's request reaching the website's home", () =>
+        as(studio, "neema", "GET", "/api/projects/WEB/join-requests").then((asked) =>
+          JSON.stringify(asked).includes("imani@"),
+        ),
+      );
+      const page = await open(studio, "neema", "/projects/WEB/settings");
+      return region(page, page.getByRole("region", { name: "Waiting to join" }));
+    },
+  },
+  {
+    guide: "projects",
+    name: "home-silent",
+    async take(studio) {
+      await joined(studio);
+      const key = copy(studio);
+      const card = new RegExp(`^Move ${key.replace(/[.@]/g, "\\$&")}-\\d+, now in To do$`);
+      const page = await open(studio, "imani", `/projects/${key}/board`, { elsewhere: true });
+      // Her membership arrives from the home a moment after she is let in.
+      await eventually("Imani being able to work in the website", async () => {
+        await page.reload();
+        return page
+          .getByRole("button", { name: card })
+          .first()
+          .waitFor({ timeout: 3000 })
+          .then(() => true);
+      });
+      return studio.silence(async () => {
+        await page.getByRole("button", { name: card }).first().focus();
+        await page.keyboard.press("Enter");
+        await page.keyboard.press("ArrowRight");
+        await page.keyboard.press("Enter");
+        await page.getByRole("alert").first().waitFor({ timeout: 60_000 });
+        await page.reload();
+        await page
+          .getByRole("status")
+          .filter({ hasText: "has not answered since" })
+          .waitFor({ timeout: 30_000 });
+        await settle(page);
+        return window(page);
+      });
     },
   },
 ];

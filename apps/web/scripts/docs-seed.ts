@@ -1241,3 +1241,40 @@ async function seedDirectory(api: Api): Promise<string> {
   });
   return engagement;
 }
+
+/** The second server, for the screenshots of a project shared between two. */
+export interface SeededElsewhere {
+  people: Record<string, Person>;
+}
+
+/*
+ * A smaller community in Arusha, on a server of its own: its founder, Imani,
+ * is who adds the Dar group's public project there and asks to join it.
+ */
+export async function seedElsewhere(base: string): Promise<SeededElsewhere> {
+  const username = "imani";
+  const displayName = "Imani Mollel";
+  // Its own loopback address, clear of the first server's people.
+  const index = PEOPLE.length + 1;
+  const made = await fromAddress(base, index, "/api/setup", {
+    username,
+    password: PASSWORD,
+    displayName,
+    email: `${username}@example.org`,
+  });
+  if (made.status >= 300) throw new Error(`registering ${username}: ${JSON.stringify(made)}`);
+  const signedIn = await fromAddress(base, index, "/api/auth/signin", {
+    username,
+    password: PASSWORD,
+  });
+  const session = signedIn.body as { token: string; user: { id: string } };
+  if (!session?.token) throw new Error(`signing in ${username}: ${JSON.stringify(signedIn)}`);
+  await fetch(new URL("/api/me/preferences/tours", base), {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ seen: ["chat"], reached: {} }),
+  });
+  return {
+    people: { imani: { username, displayName, token: session.token, id: session.user.id } },
+  };
+}

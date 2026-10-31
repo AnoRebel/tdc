@@ -440,7 +440,13 @@ It builds the server and the application, starts the server on an empty
 database of its own (`tdc_docs_screenshots`), fills it with a made-up developer
 community — people, channels and conversations, a project with issues, directory
 profiles, a webhook and a bot — and photographs each screen a guide describes,
-in a light theme at 1280 × 800 (390 × 844 for the phone). The images are written
+in a light theme at 1280 × 800 (390 × 844 for the phone). A second server, on a
+database of its own, is the small community in Arusha that the projects guide's
+screens of a project shared between two servers are taken on. The servers are
+named `community.localhost` and `arusha.localhost`, so each can reach the other,
+and every picture shows them as `community.example` and `arusha.example`. The
+last of those pictures stops the first server for a moment, so they are taken
+after every other. The images are written
 to `docs/images/<guide>/<name>.webp`, with their sizes in
 `docs/images/sizes.json`, and the database is dropped afterwards. `git diff
 --stat docs/images` then shows which pictures changed; look at them before
@@ -452,7 +458,8 @@ committing.
   Ctrl-C; `--attach`, from a second terminal, photographs that server without
   seeding again — the quick loop while working on one picture.
 - `TDC_DOCS_POSTGRES` names another Postgres server, `TDC_DOCS_PORT` another
-  port (8131 and the one after it).
+  port (8131, the one after it for webhooks and translation, and the one after
+  that for the second server).
 
 Each picture is an entry in `apps/web/scripts/docs-shots.ts` — what to open and
 what to press — and the community it shows is `apps/web/scripts/docs-seed.ts`.

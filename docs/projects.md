@@ -537,6 +537,8 @@ records something their server does not understand yet — a newer kind of chang
 showing something different from the home. It catches up by itself once their
 server is updated.
 
+![A project on another server, its header saying community.example has not answered since 01:01, that what is shown may be behind and that changes cannot be made until it answers again](images/projects/home-silent.webp)
+
 ### Adding a public project to another server, and asking to join
 
 A public project opened to other servers can be added to any server this one
@@ -547,11 +549,17 @@ Add from another server** asks for this server's address — `your.server`, or
 arrives a moment later, marked as living here, and everybody on that server can
 read it. Nobody there can change it yet.
 
+![Add from another server: the server's address typed in, and below it the public project Community website with an Add button](images/projects/add-from-another-server.webp)
+
+![The added project's board on the other server, marked as shared from community.example, with Ask to join and Remove from this server in its header](images/projects/added-project.webp)
+
 To work in it, somebody there presses **Ask to join** in its header. Here, the
 project's administrators see **1 person waiting to join** in its header, and
 under **Settings → Waiting to join** they **Let in** — the person becomes a
 member, and can work in the project from their own server as above — or
 **Decline**. Asking again while a request waits changes nothing.
+
+![Waiting to join: imani@arusha.example, who asked at 01:00, with Let in and Decline](images/projects/waiting-to-join.webp)
 
 An added project stays on that server while it is public and open to other
 servers, until somebody there who may start projects presses **Remove from this
