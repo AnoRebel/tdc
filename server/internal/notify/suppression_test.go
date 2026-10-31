@@ -3,8 +3,7 @@ package notify_test
 import (
 	"context"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/notify"
 )

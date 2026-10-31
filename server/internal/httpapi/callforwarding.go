@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -209,7 +209,7 @@ func (s *Server) sendFromForwarding(callID, to uuid.UUID, signal json.RawMessage
 	if s.hub == nil {
 		return
 	}
-	payload, err := json.Marshal(map[string]any{"call": callID.String(), "from": uuid.Nil.String(), "signal": signal})
+	payload, err := json.Marshal(map[string]any{"call": callID.String(), "from": uuid.Nil().String(), "signal": signal})
 	if err != nil {
 		return
 	}

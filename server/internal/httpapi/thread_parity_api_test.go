@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 /*
@@ -84,7 +83,7 @@ func TestAReplyCarriesFiles(t *testing.T) {
 
 	// A file that is not there is refused before anything is posted.
 	missing := call(t, handler, http.MethodPost, "/api/rooms/"+roomID+"/threads/"+rootID+"/replies",
-		map[string]any{"body": "and this", "attachmentIds": []string{uuid.NewString()}}, owner)
+		map[string]any{"body": "and this", "attachmentIds": []string{uuid.New().String()}}, owner)
 	if missing.Code == http.StatusCreated {
 		t.Fatal("a reply naming a file that does not exist was posted")
 	}

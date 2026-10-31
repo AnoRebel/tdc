@@ -3,8 +3,7 @@ package httpapi_test
 import (
 	"net/http"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 /*

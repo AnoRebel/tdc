@@ -10,7 +10,7 @@ import (
 	"net/netip"
 	"time"
 
-	uuid "github.com/google/uuid"
+	uuid "uuid"
 )
 
 const createRecoveryToken = `-- name: CreateRecoveryToken :one

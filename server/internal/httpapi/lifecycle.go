@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
@@ -203,7 +203,7 @@ func (s *Server) completeRestart(ctx context.Context) {
 	queries := s.backups.Queries()
 
 	var waiting []dbgen.Operation
-	if s.lifecycle.ResumedOperation != uuid.Nil {
+	if s.lifecycle.ResumedOperation != uuid.Nil() {
 		if op, err := queries.GetOperation(ctx, s.lifecycle.ResumedOperation); err == nil && op.Status == backup.StatusRunning {
 			waiting = append(waiting, op)
 		}

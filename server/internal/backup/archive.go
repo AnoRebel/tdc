@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
 	"filippo.io/age"
-	"github.com/google/uuid"
 )
 
 /*

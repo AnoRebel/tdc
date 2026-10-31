@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"uuid"
 
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/google/uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 )

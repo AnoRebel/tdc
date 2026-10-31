@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	uuid "github.com/google/uuid"
+	uuid "uuid"
 )
 
 const listPinnedEventIDs = `-- name: ListPinnedEventIDs :many

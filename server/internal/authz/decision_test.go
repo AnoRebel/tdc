@@ -2,8 +2,7 @@ package authz_test
 
 import (
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 )

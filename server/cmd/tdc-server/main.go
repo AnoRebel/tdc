@@ -13,10 +13,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5"
-
-	"github.com/google/uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/apitokens"
 	"github.com/AnoRebel/tdc/server/internal/attachments"
@@ -62,7 +61,7 @@ func main() {
 		os.Exit(1)
 	}
 	// Shut down cleanly to come back: everything run held is closed by now.
-	if restart.operation != uuid.Nil {
+	if restart.operation != uuid.Nil() {
 		if err := comeBack(restart.method, restart.operation); err != nil {
 			fmt.Fprintf(os.Stderr, "tdc-server: %v\n", err)
 			os.Exit(1)
@@ -506,7 +505,7 @@ func run() (restartRequest, error) {
 	if err := server.Run(ctx); err != nil {
 		return restartRequest{}, err
 	}
-	if operation := control.restarting(); operation != uuid.Nil {
+	if operation := control.restarting(); operation != uuid.Nil() {
 		return restartRequest{operation: operation, method: control.describe().Method}, nil
 	}
 	return restartRequest{}, nil

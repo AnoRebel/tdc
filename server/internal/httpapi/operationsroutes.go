@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
 
@@ -130,7 +130,7 @@ func operationError(err error) error {
 func pathUUID(c *echo.Context, name string) (uuid.UUID, error) {
 	id, err := uuid.Parse(c.Param(name))
 	if err != nil {
-		return uuid.Nil, echo.NewHTTPError(http.StatusNotFound, "there is no such backup or operation")
+		return uuid.Nil(), echo.NewHTTPError(http.StatusNotFound, "there is no such backup or operation")
 	}
 	return id, nil
 }

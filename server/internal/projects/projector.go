@@ -8,8 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/events"
@@ -220,7 +219,7 @@ func decode(event dbgen.Event, into any) error {
 func parseID(text string) (uuid.UUID, error) {
 	id, err := uuid.Parse(text)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("names no identifier: %q", text)
+		return uuid.Nil(), fmt.Errorf("names no identifier: %q", text)
 	}
 	return id, nil
 }
@@ -280,15 +279,15 @@ func issueOf(rows *Rows, event dbgen.Event) (uuid.UUID, IssueRow, error) {
 		Issue string `json:"issue"`
 	}
 	if err := decode(event, &content); err != nil {
-		return uuid.Nil, IssueRow{}, err
+		return uuid.Nil(), IssueRow{}, err
 	}
 	id, err := parseID(content.Issue)
 	if err != nil {
-		return uuid.Nil, IssueRow{}, err
+		return uuid.Nil(), IssueRow{}, err
 	}
 	issue, ok := rows.Issues[id]
 	if !ok {
-		return uuid.Nil, IssueRow{}, fmt.Errorf("issue %s was never created", id)
+		return uuid.Nil(), IssueRow{}, fmt.Errorf("issue %s was never created", id)
 	}
 	return id, issue, nil
 }

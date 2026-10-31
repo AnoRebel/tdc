@@ -9,8 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/backup"
 	"github.com/AnoRebel/tdc/server/internal/httpapi"
@@ -58,7 +57,7 @@ func TestOperationsNeedTheirPermissions(t *testing.T) {
 	handler := newTestAPI(t)
 	admin := completeSetup(t, handler)
 	member := registerAndSignIn(t, handler, "member")
-	someID := uuid.NewString()
+	someID := uuid.New().String()
 
 	for _, attempt := range []struct{ method, path string }{
 		{http.MethodGet, "/api/admin/backups"},

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
@@ -161,7 +161,7 @@ func (s *Service) CreateCompany(ctx context.Context, creator uuid.UUID, role str
 /*
 ViewCompany returns a company as a viewer may see it.
 
-viewer is the signed-in person, or uuid.Nil for somebody who is not. Only
+viewer is the signed-in person, or uuid.Nil() for somebody who is not. Only
 accepted members are ever listed; the pending ones are shown to the company's
 own administrators, who sent the invitations and so learn nothing new.
 */

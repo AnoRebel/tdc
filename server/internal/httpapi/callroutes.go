@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -336,7 +336,7 @@ func (s *Server) announceCall(ctx context.Context, roomID uuid.UUID, call rooms.
 	if record, err := s.rooms.CallRecord(ctx, call.ID); err == nil {
 		call.Call = record
 	}
-	if call.RoomID == uuid.Nil {
+	if call.RoomID == uuid.Nil() {
 		call.RoomID = roomID
 	}
 	view := s.callViewOf(call.Call, participants)
@@ -399,7 +399,7 @@ func (s *Server) Signal(ctx context.Context, from, callID, to uuid.UUID, signal 
 		}
 	}
 	// Addressed to nobody: to the forwarding unit, in a forwarded call.
-	if to == uuid.Nil {
+	if to == uuid.Nil() {
 		return s.signalForwarding(ctx, from, callID, signal)
 	}
 	roomID, fromIn := s.rooms.CallRoomOf(ctx, callID, from)

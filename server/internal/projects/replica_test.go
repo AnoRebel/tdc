@@ -4,8 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -134,7 +133,7 @@ func TestAReplicaHoldsWhatItsStreamSays(t *testing.T) {
 	}
 
 	// Then the home changes things the replica already holds.
-	inProgress := uuid.Nil
+	inProgress := uuid.Nil()
 	for _, state := range f.states(t, access) {
 		if state.Name == "In progress" {
 			inProgress = state.ID

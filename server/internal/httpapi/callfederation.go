@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
 
@@ -185,7 +185,7 @@ refused if it is already somebody else's.
 */
 func (s *Server) remoteParticipant(ctx context.Context, request federatedCallRequest, origin string, callID uuid.UUID) (dbgen.User, error) {
 	id, err := uuid.Parse(request.ID)
-	if err != nil || id == uuid.Nil {
+	if err != nil || id == uuid.Nil() {
 		return dbgen.User{}, echo.NewHTTPError(http.StatusBadRequest, "a member needs the identifier their server knows them by")
 	}
 	name := strings.TrimSpace(request.DisplayName)
@@ -287,7 +287,7 @@ func (s *Server) handleFederatedCallJoin(c *echo.Context) error {
 		current, err := s.rooms.OpenCallIn(ctx, room.ID)
 		callID := current.ID
 		if errors.Is(err, rooms.ErrNoCall) {
-			callID = uuid.Nil
+			callID = uuid.Nil()
 		} else if err != nil {
 			return callError(err)
 		}
@@ -299,7 +299,7 @@ func (s *Server) handleFederatedCallJoin(c *echo.Context) error {
 		if err != nil {
 			return joinError(err, full)
 		}
-		if callID == uuid.Nil {
+		if callID == uuid.Nil() {
 			// Started just now: the row standing for them names the call.
 			_ = s.queries.UpdateRemoteShadow(ctx, dbgen.UpdateRemoteShadowParams{
 				ID: shadow.ID, DisplayName: shadow.DisplayName, GuestCall: &call.ID, RemoteServer: &origin,

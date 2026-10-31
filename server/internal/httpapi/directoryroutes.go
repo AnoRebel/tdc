@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"sort"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
 
@@ -167,9 +167,9 @@ func (api *directoryAPI) viewerRank(c *echo.Context) (directory.Rank, uuid.UUID,
 		return viewerRankOf(user), user.ID, true
 	}
 	if api.visibility(c.Request().Context()) != VisibilityPublic {
-		return directory.Anonymous, uuid.Nil, false
+		return directory.Anonymous, uuid.Nil(), false
 	}
-	return directory.Anonymous, uuid.Nil, true
+	return directory.Anonymous, uuid.Nil(), true
 }
 
 // noProfile is the one refusal for everything a viewer may not learn about a

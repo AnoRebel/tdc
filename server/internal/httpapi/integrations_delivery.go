@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/cache"
@@ -130,7 +130,7 @@ func (s *Server) handleTestDelivery(c *echo.Context) error {
 		return destinationError(err)
 	}
 
-	id := uuid.NewString()
+	id := uuid.New().String()
 	body, err := json.Marshal(map[string]any{
 		"version":     1,
 		"id":          id,

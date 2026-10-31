@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
@@ -94,7 +94,7 @@ func eventError(err error) error {
 func eventIDOf(c *echo.Context) (uuid.UUID, error) {
 	id, err := uuid.Parse(c.Param("eventId"))
 	if err != nil {
-		return uuid.Nil, echo.NewHTTPError(http.StatusNotFound, "no such event")
+		return uuid.Nil(), echo.NewHTTPError(http.StatusNotFound, "no such event")
 	}
 	return id, nil
 }

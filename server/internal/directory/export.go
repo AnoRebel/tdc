@@ -3,8 +3,7 @@ package directory
 import (
 	"context"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ProfileExportFormat names the shape of an exported profile, so a reader can

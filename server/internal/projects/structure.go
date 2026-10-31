@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -665,7 +665,7 @@ func edgeOf(kind string, subject, other uuid.UUID) (from, to uuid.UUID, stored, 
 	case "blocked_by":
 		return other, subject, "blocks", "blocked_by", "blocks", nil
 	}
-	return uuid.Nil, uuid.Nil, "", "", "", ErrRelationKind
+	return uuid.Nil(), uuid.Nil(), "", "", "", ErrRelationKind
 }
 
 /*

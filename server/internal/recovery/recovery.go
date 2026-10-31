@@ -28,8 +28,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -266,11 +266,11 @@ func (s *Service) Redeem(ctx context.Context, token, newPassword string, people 
 	/*
 		The new password, and every session ended.
 
-		uuid.Nil keeps nothing: there is no session doing this, and any that
+		uuid.Nil() keeps nothing: there is no session doing this, and any that
 		exist belong either to the person who is about to sign in properly or to
 		whoever they are recovering the account from.
 	*/
-	if err := people.ChangePassword(ctx, user.ID, newPassword, uuid.Nil); err != nil {
+	if err := people.ChangePassword(ctx, user.ID, newPassword, uuid.Nil()); err != nil {
 		return dbgen.User{}, err
 	}
 

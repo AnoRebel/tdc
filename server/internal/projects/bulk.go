@@ -4,8 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 )
@@ -133,7 +132,7 @@ func (s *Service) bulkChange(ctx context.Context, actor Actor, access Access, ch
 	parseID := func(missing error) (uuid.UUID, error) {
 		id, err := uuid.Parse(value)
 		if err != nil {
-			return uuid.Nil, missing
+			return uuid.Nil(), missing
 		}
 		return id, nil
 	}

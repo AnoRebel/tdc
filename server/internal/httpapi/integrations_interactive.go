@@ -7,8 +7,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/actions"
@@ -308,7 +308,7 @@ func (s *Server) handlePrivateReply(c *echo.Context) error {
 	}
 
 	payload, err := json.Marshal(privateReply{
-		ID:        uuid.NewString(),
+		ID:        uuid.New().String(),
 		Press:     invocation.Press.ID,
 		Message:   invocation.Message,
 		Sender:    s.rooms.UserAddress(user.Username),
@@ -344,11 +344,11 @@ type contextResponse struct {
 func contextParams(c *echo.Context) (uuid.UUID, uuid.UUID, error) {
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, echo.NewHTTPError(http.StatusNotFound, "no such room")
+		return uuid.Nil(), uuid.Nil(), echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 	userID, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, echo.NewHTTPError(http.StatusNotFound, "nothing remembered")
+		return uuid.Nil(), uuid.Nil(), echo.NewHTTPError(http.StatusNotFound, "nothing remembered")
 	}
 	return roomID, userID, nil
 }

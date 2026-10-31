@@ -21,9 +21,9 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+	"uuid"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
-	"github.com/google/uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"

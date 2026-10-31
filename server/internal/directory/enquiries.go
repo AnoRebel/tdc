@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -129,7 +129,7 @@ people in it so the sender can post the enquiry. CloseEnquiry takes the sender
 out again once it is recorded.
 */
 func (s *Service) OpenEnquiryRoom(ctx context.Context, sender, recipient uuid.UUID, subject, homeServer string) (dbgen.Room, error) {
-	key := "enquiry:" + uuid.NewString()
+	key := "enquiry:" + uuid.New().String()
 	room, err := s.queries.CreateEnquiryRoom(ctx, dbgen.CreateEnquiryRoomParams{
 		ID: uuid.New(), Name: subject, HomeServer: homeServer,
 		CreatedBy: &sender, ParticipantKey: &key,
@@ -213,7 +213,7 @@ func (s *Service) Received(ctx context.Context, userID uuid.UUID) ([]Enquiry, er
 			Body: row.Body, RoomID: row.RoomID, Status: row.Status, CreatedAt: row.CreatedAt,
 			RespondedAt: row.RespondedAt,
 		}, row.OtherUsername, row.OtherDisplayName))
-		if row.EngagementID != uuid.Nil {
+		if row.EngagementID != uuid.Nil() {
 			id := row.EngagementID
 			enquiries[len(enquiries)-1].EngagementID = &id
 		}
@@ -234,7 +234,7 @@ func (s *Service) Sent(ctx context.Context, userID uuid.UUID) ([]Enquiry, error)
 			Body: row.Body, RoomID: row.RoomID, Status: row.Status, CreatedAt: row.CreatedAt,
 			RespondedAt: row.RespondedAt,
 		}, row.OtherUsername, row.OtherDisplayName))
-		if row.EngagementID != uuid.Nil {
+		if row.EngagementID != uuid.Nil() {
 			id := row.EngagementID
 			enquiries[len(enquiries)-1].EngagementID = &id
 		}

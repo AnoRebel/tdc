@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"uuid"
+
 	// The zone database, inside the binary. A project's calendar is an IANA
 	// zone, and a server image with no /usr/share/zoneinfo — a scratch
 	// container — must still know where Dar es Salaam's day ends.
 	_ "time/tzdata"
 	"unicode/utf8"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -313,7 +314,7 @@ func (s *Service) CreateCycle(ctx context.Context, actor Actor, access Access, i
 		if err := q.LockProjectStream(ctx, access.Project.ID); err != nil {
 			return fmt.Errorf("lock project: %w", err)
 		}
-		if err := noOverlap(ctx, q, access.Project.ID, uuid.Nil, starts.StartIn(zone), ends.EndIn(zone)); err != nil {
+		if err := noOverlap(ctx, q, access.Project.ID, uuid.Nil(), starts.StartIn(zone), ends.EndIn(zone)); err != nil {
 			return err
 		}
 		var err error

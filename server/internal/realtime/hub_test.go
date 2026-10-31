@@ -7,8 +7,7 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // stubMembership lets a test change who is in a room between deliveries.

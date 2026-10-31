@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/AnoRebel/tdc/server/internal/db"
@@ -391,7 +391,7 @@ func TestStopTypingWithdrawsEarly(t *testing.T) {
 func makeRoom(t *testing.T, queries *dbgen.Queries, creator uuid.UUID) uuid.UUID {
 	t.Helper()
 
-	slug := "room-" + uuid.NewString()[:8]
+	slug := "room-" + uuid.New().String()[:8]
 	room, err := queries.CreateRoom(context.Background(), dbgen.CreateRoomParams{
 		ID:         uuid.New(),
 		Slug:       &slug,

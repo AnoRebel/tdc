@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/identity"
@@ -46,7 +46,7 @@ func (s *Server) boardFilter(c *echo.Context) projects.BoardFilter {
 		if err != nil {
 			// Nobody by that name: an identifier nobody holds, so every
 			// column is empty, as it should be.
-			nobody := uuid.Nil
+			nobody := uuid.Nil()
 			filter.Assignee = &nobody
 			return filter
 		}

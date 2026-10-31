@@ -7,8 +7,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/federation"
@@ -30,7 +30,7 @@ func (s *Server) handleProjectOffer(c *echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "unidentified peer")
 	}
 	var offer projects.Offer
-	if err := c.Bind(&offer); err != nil || offer.Project == uuid.Nil {
+	if err := c.Bind(&offer); err != nil || offer.Project == uuid.Nil() {
 		return echo.NewHTTPError(http.StatusBadRequest, "could not read the offer")
 	}
 	if err := s.projects.AcceptOffer(c.Request().Context(), offer, home, origin); err != nil {

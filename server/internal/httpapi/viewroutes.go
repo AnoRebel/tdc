@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/identity"
@@ -258,7 +258,7 @@ func (s *Server) handleViewResults(c *echo.Context) error {
 		filter := projects.BoardFilter{Label: view.Filter.Label, Priority: view.Filter.Priority}
 		id, ok := assignee()
 		if !ok {
-			nobody := uuid.Nil
+			nobody := uuid.Nil()
 			id = &nobody
 		}
 		filter.Assignee = id

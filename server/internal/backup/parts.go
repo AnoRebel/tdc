@@ -21,8 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Part is a named set of tables an administrator can choose to back up.

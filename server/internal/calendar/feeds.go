@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -69,11 +69,11 @@ func (s *Service) Feed(ctx context.Context, userID uuid.UUID) (dbgen.CalendarFee
 // FeedOwner is whose address a secret is, noting that it was used.
 func (s *Service) FeedOwner(ctx context.Context, secret string) (uuid.UUID, error) {
 	if !strings.HasPrefix(secret, FeedSecretPrefix) {
-		return uuid.Nil, ErrNotFound
+		return uuid.Nil(), ErrNotFound
 	}
 	owner, err := s.queries.UseCalendarFeed(ctx, feedHash(secret))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, ErrNotFound
+		return uuid.Nil(), ErrNotFound
 	}
 	return owner, err
 }

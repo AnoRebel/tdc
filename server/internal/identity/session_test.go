@@ -6,8 +6,7 @@ import (
 	"net/netip"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/identity"
 )

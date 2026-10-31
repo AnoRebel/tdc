@@ -11,8 +11,7 @@ import (
 	"log/slog"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Frame is one message sent to a client.

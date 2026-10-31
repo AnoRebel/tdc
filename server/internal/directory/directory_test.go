@@ -4,8 +4,7 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -102,7 +101,7 @@ func TestAWithheldFieldIsNotReadFromTheDatabase(t *testing.T) {
 		t.Fatalf("save: %v", err)
 	}
 
-	stranger, err := service.View(ctx, "juma", directory.Anonymous, uuid.Nil)
+	stranger, err := service.View(ctx, "juma", directory.Anonymous, uuid.Nil())
 	if err != nil {
 		t.Fatalf("view: %v", err)
 	}

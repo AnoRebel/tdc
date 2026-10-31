@@ -2,8 +2,7 @@ package realtime
 
 import (
 	"log/slog"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 /*

@@ -13,8 +13,7 @@ import (
 	"log/slog"
 	"net/netip"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 )

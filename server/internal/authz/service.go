@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -437,7 +437,7 @@ func (s *Service) EnsureRole(
 		// Granting, not withdrawing, and during setup where there is no actor
 		// — neither lockout check can apply.
 		if err := s.SetRolePermission(
-			ctx, role.ID, permission, nil, true, uuid.Nil, false,
+			ctx, role.ID, permission, nil, true, uuid.Nil(), false,
 		); err != nil {
 			return dbgen.Role{}, err
 		}

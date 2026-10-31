@@ -6,8 +6,7 @@ import (
 	"log/slog"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -93,7 +92,7 @@ func createEvent(t *testing.T, queries *dbgen.Queries, room, sender uuid.UUID) d
 	t.Helper()
 
 	event, err := queries.AppendEvent(context.Background(), dbgen.AppendEventParams{
-		ID:            uuid.NewString(),
+		ID:            uuid.New().String(),
 		RoomID:        room,
 		Sequence:      1,
 		SenderID:      &sender,

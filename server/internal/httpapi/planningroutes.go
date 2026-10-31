@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -226,7 +226,7 @@ func (s *Server) handleCreateCycle(c *echo.Context) error {
 func pathID(c *echo.Context, name string, missing error) (uuid.UUID, error) {
 	id, err := uuid.Parse(c.Param(name))
 	if err != nil {
-		return uuid.Nil, planningError(missing)
+		return uuid.Nil(), planningError(missing)
 	}
 	return id, nil
 }

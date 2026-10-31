@@ -10,8 +10,7 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/dbtest"
@@ -108,8 +107,8 @@ func TestAnEventReachesAnotherNode(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	announcement := realtime.Announcement{
-		EventID: "evt-" + uuid.NewString(),
-		RoomID:  uuid.NewString(),
+		EventID: "evt-" + uuid.New().String(),
+		RoomID:  uuid.New().String(),
 	}
 	if err := nodeOne.Announce(ctx, announcement); err != nil {
 		t.Fatalf("announcing: %v", err)
@@ -148,8 +147,8 @@ func TestANodeIgnoresItsOwnAnnouncement(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	if err := node.Announce(ctx, realtime.Announcement{
-		EventID: "evt-" + uuid.NewString(),
-		RoomID:  uuid.NewString(),
+		EventID: "evt-" + uuid.New().String(),
+		RoomID:  uuid.New().String(),
 	}); err != nil {
 		t.Fatalf("announcing: %v", err)
 	}
@@ -224,7 +223,7 @@ func TestAnOversizedAnnouncementIsRefusedHere(t *testing.T) {
 
 	oversized := realtime.Announcement{
 		EventID: string(make([]byte, 9000)),
-		RoomID:  uuid.NewString(),
+		RoomID:  uuid.New().String(),
 	}
 
 	if err := node.Announce(context.Background(), oversized); err == nil {
@@ -293,7 +292,7 @@ func TestAPrivateFrameReachesAnotherNodeWhole(t *testing.T) {
 
 	body := bytes.Repeat([]byte("ñ"), 4000) // 8000 bytes, the longest answer
 	payload, _ := json.Marshal(map[string]string{"body": string(body)})
-	frame := realtime.Frame{Type: realtime.FramePrivate, RoomID: uuid.NewString(), Payload: payload}
+	frame := realtime.Frame{Type: realtime.FramePrivate, RoomID: uuid.New().String(), Payload: payload}
 	person := uuid.New()
 
 	started := time.Now()
@@ -417,7 +416,7 @@ func TestAnImpossiblePieceIsIgnored(t *testing.T) {
 
 	whole, _ := json.Marshal(map[string]any{"u": uuid.New(), "f": map[string]string{"type": "private"}})
 	forged, _ := json.Marshal(map[string]any{
-		"i": uuid.NewString(), "o": "elsewhere", "n": 0, "of": 1 << 30,
+		"i": uuid.New().String(), "o": "elsewhere", "n": 0, "of": 1 << 30,
 		"d": base64.StdEncoding.EncodeToString(whole),
 	})
 	if _, err := pool.Exec(ctx, "SELECT pg_notify('tdc_private', $1)", string(forged)); err != nil {

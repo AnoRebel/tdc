@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	uuid "github.com/google/uuid"
+	uuid "uuid"
 )
 
 type Querier interface {

@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+	"uuid"
 
 	"github.com/coder/websocket"
-	"github.com/google/uuid"
 )
 
 // clientMessage is what a client sends.

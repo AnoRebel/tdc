@@ -7,8 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 )

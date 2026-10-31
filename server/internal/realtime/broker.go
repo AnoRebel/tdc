@@ -3,8 +3,7 @@ package realtime
 import (
 	"context"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 /*
@@ -132,4 +131,4 @@ func (Alone) Close() error { return nil }
 // Fresh each start, because what it is for is telling this node's own
 // announcements apart from everybody else's — and a node that restarted is, for
 // that purpose, a different node.
-func NodeID() string { return uuid.NewString() }
+func NodeID() string { return uuid.New().String() }

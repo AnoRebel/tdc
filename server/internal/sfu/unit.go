@@ -30,8 +30,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 )

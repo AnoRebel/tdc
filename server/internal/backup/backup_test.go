@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/AnoRebel/tdc/server/internal/dbtest"
@@ -84,8 +84,8 @@ func seed(t *testing.T, pool *pgxpool.Pool, store storage.Store) fixture {
 	f := fixture{
 		alice: uuid.New(), bob: uuid.New(), admin: uuid.New(),
 		general: uuid.New(), random: uuid.New(), project: uuid.New(), issue: uuid.New(),
-		rootEvent: "$root-" + uuid.NewString(), reply: "$reply-" + uuid.NewString(),
-		attachmentKey:      "attachments/" + uuid.NewString(),
+		rootEvent: "$root-" + uuid.New().String(), reply: "$reply-" + uuid.New().String(),
+		attachmentKey:      "attachments/" + uuid.New().String(),
 		attachmentBytes:    []byte("the bytes of a file somebody shared"),
 		deletedEventMarker: "a message somebody will delete",
 	}
@@ -119,7 +119,7 @@ func seed(t *testing.T, pool *pgxpool.Pool, store storage.Store) fixture {
 			[]any{f.reply, f.general, f.bob, fmt.Sprintf(`{"body":%q}`, f.deletedEventMarker), f.rootEvent}},
 		{`INSERT INTO events (id, room_id, sequence, sender_id, sender_address, room_address, origin_server, type, content, created_at, signature, key_id)
 			VALUES ($1, $2, 1, $3, 'bob@localhost', 'random@localhost', 'localhost', 'message', '{"body":"elsewhere"}', 3, 'sig', 'key-1')`,
-			[]any{"$random-" + uuid.NewString(), f.random, f.bob}},
+			[]any{"$random-" + uuid.New().String(), f.random, f.bob}},
 		{`INSERT INTO reactions (id, event_id, room_id, user_id, user_address, emoji) VALUES ($1, $2, $3, $4, 'bob@localhost', '👍')`,
 			[]any{uuid.New(), f.rootEvent, f.general, f.bob}},
 		{`INSERT INTO message_views (event_id, viewer_id) VALUES ($1, $2)`, []any{f.rootEvent, f.bob}},

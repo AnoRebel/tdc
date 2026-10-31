@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -160,7 +160,7 @@ func (s *Service) RestrictPosting(
 ) (uuid.UUID, error) {
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
-		return uuid.Nil, ErrReasonRequired
+		return uuid.Nil(), ErrReasonRequired
 	}
 
 	row, err := s.queries.RestrictPosting(ctx, dbgen.RestrictPostingParams{
@@ -173,7 +173,7 @@ func (s *Service) RestrictPosting(
 		ExpiresAt:           until,
 	})
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("moderation: restricting: %w", err)
+		return uuid.Nil(), fmt.Errorf("moderation: restricting: %w", err)
 	}
 
 	return row.ID, nil

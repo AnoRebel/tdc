@@ -5,8 +5,7 @@ import (
 	"slices"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/applications"
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -133,7 +132,7 @@ func (s *Server) queueWebhooks(ctx context.Context, event dbgen.Event) {
 	}
 	s.inBackground(ctx, "queue webhooks", func(ctx context.Context) {
 		service.Enqueue(ctx, event)
-		if channel, ok := s.webhookRoomForEvent(ctx, event); ok && channel != uuid.Nil {
+		if channel, ok := s.webhookRoomForEvent(ctx, event); ok && channel != uuid.Nil() {
 			service.EnqueueFor(ctx, channel, event)
 		}
 	})
@@ -220,11 +219,11 @@ func projectOfRoom(ctx context.Context, queries *dbgen.Queries, room dbgen.Room)
 	case "issue-discussion":
 		issue, err := queries.GetIssueByID(ctx, room.ID)
 		if err != nil {
-			return uuid.Nil, false
+			return uuid.Nil(), false
 		}
 		return issue.ProjectID, true
 	}
-	return uuid.Nil, false
+	return uuid.Nil(), false
 }
 
 /*
@@ -326,7 +325,7 @@ func (s *Server) tellOwnerWebhookDisabled(ctx context.Context, subscription dbge
 		}
 		roomID = &event.RoomID
 	}
-	s.notify.About(ctx, subscription.OwnerID, uuid.Nil, s.rooms.UserAddress("webhooks"),
+	s.notify.About(ctx, subscription.OwnerID, uuid.Nil(), s.rooms.UserAddress("webhooks"),
 		*roomID, *eventID, notify.ReasonWebhookDisabled, subscription.Label)
 }
 

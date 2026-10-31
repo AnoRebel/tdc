@@ -6,8 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/notify"
@@ -143,7 +142,7 @@ func TestAComposedDigestCountsWithoutQuoting(t *testing.T) {
 func eventIn(t *testing.T, queries *dbgen.Queries, room, sender uuid.UUID, sequence int64) dbgen.Event {
 	t.Helper()
 	event, err := queries.AppendEvent(context.Background(), dbgen.AppendEventParams{
-		ID:            uuid.NewString(),
+		ID:            uuid.New().String(),
 		RoomID:        room,
 		Sequence:      sequence,
 		SenderID:      &sender,
@@ -153,7 +152,7 @@ func eventIn(t *testing.T, queries *dbgen.Queries, room, sender uuid.UUID, seque
 		Type:          "m.message",
 		Content:       []byte(`{"body":"@juma habari"}`),
 		CreatedAt:     time.Now().UnixMilli(),
-		Nonce:         uuid.NewString(),
+		Nonce:         uuid.New().String(),
 		Signature:     "signature",
 		KeyID:         "test-key",
 	})

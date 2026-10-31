@@ -2,8 +2,7 @@ package authz
 
 import (
 	"fmt"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Grant is one permission a role confers or withholds at a scope.

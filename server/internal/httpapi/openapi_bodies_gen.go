@@ -8,8 +8,8 @@ import (
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/projects"
 	"github.com/go-webauthn/webauthn/protocol"
-	"github.com/google/uuid"
 	"reflect"
+	"uuid"
 )
 
 // routeBodies records what each route's handler binds and writes.

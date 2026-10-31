@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -397,7 +397,7 @@ func (s *Service) EnqueueServer(ctx context.Context, kind, sender string, conten
 	}
 
 	event := dbgen.Event{
-		ID:            "$" + strings.ReplaceAll(uuid.NewString(), "-", ""),
+		ID:            "$" + strings.ReplaceAll(uuid.New().String(), "-", ""),
 		Type:          kind,
 		SenderAddress: sender,
 		Content:       encoded,

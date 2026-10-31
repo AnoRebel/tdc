@@ -7,8 +7,7 @@ import (
 	"log/slog"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db"
@@ -86,7 +85,7 @@ func TestPermissionsResolveFromRoles(t *testing.T) {
 	userID := makeUser(t, queries, "member")
 	roleID := makeRole(t, queries, "poster")
 
-	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, true, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, true, uuid.Nil(), false); err != nil {
 		t.Fatalf("SetRolePermission: %v", err)
 	}
 	if err := service.AssignRole(ctx, userID, roleID, nil); err != nil {
@@ -114,13 +113,13 @@ func TestRevokedPermissionStopsApplying(t *testing.T) {
 	userID := makeUser(t, queries, "member")
 	roleID := makeRole(t, queries, "poster")
 
-	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, true, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, true, uuid.Nil(), false); err != nil {
 		t.Fatalf("grant: %v", err)
 	}
 	if err := service.AssignRole(ctx, userID, roleID, nil); err != nil {
 		t.Fatalf("AssignRole: %v", err)
 	}
-	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, false, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, false, uuid.Nil(), false); err != nil {
 		t.Fatalf("deny: %v", err)
 	}
 
@@ -142,10 +141,10 @@ func TestChannelDenialOverridesServerGrantThroughStore(t *testing.T) {
 	roleID := makeRole(t, queries, "mixed")
 	restricted := uuid.New()
 
-	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, true, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, true, uuid.Nil(), false); err != nil {
 		t.Fatalf("server grant: %v", err)
 	}
-	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, &restricted, false, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, &restricted, false, uuid.Nil(), false); err != nil {
 		t.Fatalf("channel denial: %v", err)
 	}
 	if err := service.AssignRole(ctx, userID, roleID, nil); err != nil {
@@ -173,10 +172,10 @@ func TestGrantsFromSeveralRolesCombine(t *testing.T) {
 	first := makeRole(t, queries, "posters")
 	second := makeRole(t, queries, "creators")
 
-	if err := service.SetRolePermission(ctx, first, authz.PermChannelPost, nil, true, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, first, authz.PermChannelPost, nil, true, uuid.Nil(), false); err != nil {
 		t.Fatalf("first grant: %v", err)
 	}
-	if err := service.SetRolePermission(ctx, second, authz.PermChannelCreate, nil, true, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, second, authz.PermChannelCreate, nil, true, uuid.Nil(), false); err != nil {
 		t.Fatalf("second grant: %v", err)
 	}
 	for _, roleID := range []uuid.UUID{first, second} {
@@ -200,7 +199,7 @@ func TestUnknownPermissionIsRefused(t *testing.T) {
 	service, queries := newTestService(t)
 	roleID := makeRole(t, queries, "typo")
 
-	err := service.SetRolePermission(context.Background(), roleID, "channel.psot", nil, true, uuid.Nil, false)
+	err := service.SetRolePermission(context.Background(), roleID, "channel.psot", nil, true, uuid.Nil(), false)
 	if !errors.Is(err, authz.ErrUnknownPermission) {
 		t.Errorf("error = %v, want ErrUnknownPermission", err)
 	}
@@ -213,7 +212,7 @@ func TestServerOnlyPermissionRefusedAtChannelScope(t *testing.T) {
 	roleID := makeRole(t, queries, "channel-role")
 	channelID := uuid.New()
 
-	err := service.SetRolePermission(context.Background(), roleID, authz.PermServerAdminister, &channelID, true, uuid.Nil, false)
+	err := service.SetRolePermission(context.Background(), roleID, authz.PermServerAdminister, &channelID, true, uuid.Nil(), false)
 	if !errors.Is(err, authz.ErrScopeNotAllowed) {
 		t.Errorf("error = %v, want ErrScopeNotAllowed", err)
 	}
@@ -228,7 +227,7 @@ func TestLastAdministratorCannotBeRemoved(t *testing.T) {
 	adminID := makeUser(t, queries, "founder")
 	roleID := makeRole(t, queries, "administrator")
 
-	if err := service.SetRolePermission(ctx, roleID, authz.PermServerAdminister, nil, true, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermServerAdminister, nil, true, uuid.Nil(), false); err != nil {
 		t.Fatalf("grant administration: %v", err)
 	}
 	if err := service.AssignRole(ctx, adminID, roleID, nil); err != nil {
@@ -238,7 +237,7 @@ func TestLastAdministratorCannotBeRemoved(t *testing.T) {
 	if err := service.RemoveRole(ctx, adminID, roleID, adminID, true); !errors.Is(err, authz.ErrLastAdministrator) {
 		t.Errorf("RemoveRole error = %v, want ErrLastAdministrator", err)
 	}
-	if err := service.SetRolePermission(ctx, roleID, authz.PermServerAdminister, nil, false, uuid.Nil, false); !errors.Is(err, authz.ErrLastAdministrator) {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermServerAdminister, nil, false, uuid.Nil(), false); !errors.Is(err, authz.ErrLastAdministrator) {
 		t.Errorf("withdrawing administration error = %v, want ErrLastAdministrator", err)
 	}
 	if err := service.DeleteRole(ctx, roleID); !errors.Is(err, authz.ErrLastAdministrator) {
@@ -255,7 +254,7 @@ func TestAdministratorCanBeRemovedWhenAnotherRemains(t *testing.T) {
 	second := makeUser(t, queries, "successor")
 	roleID := makeRole(t, queries, "administrator")
 
-	if err := service.SetRolePermission(ctx, roleID, authz.PermServerAdminister, nil, true, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermServerAdminister, nil, true, uuid.Nil(), false); err != nil {
 		t.Fatalf("grant administration: %v", err)
 	}
 	for _, userID := range []uuid.UUID{first, second} {
@@ -296,7 +295,7 @@ func TestDeletingRolePreservesUsers(t *testing.T) {
 	userID := makeUser(t, queries, "member")
 	roleID := makeRole(t, queries, "temporary")
 
-	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, true, uuid.Nil, false); err != nil {
+	if err := service.SetRolePermission(ctx, roleID, authz.PermChannelPost, nil, true, uuid.Nil(), false); err != nil {
 		t.Fatalf("grant: %v", err)
 	}
 	if err := service.AssignRole(ctx, userID, roleID, nil); err != nil {
@@ -334,7 +333,7 @@ func TestRemovingSomebodyElsesAdministrationIsNotSelfLockout(t *testing.T) {
 
 	roleID := makeRole(t, queries, "administrator")
 	if err := service.SetRolePermission(
-		ctx, roleID, authz.PermServerAdminister, nil, true, uuid.Nil, false,
+		ctx, roleID, authz.PermServerAdminister, nil, true, uuid.Nil(), false,
 	); err != nil {
 		t.Fatalf("SetRolePermission: %v", err)
 	}
@@ -367,7 +366,7 @@ func TestWithdrawingAdministrationFromYourOwnRoleIsRefused(t *testing.T) {
 
 	roleID := makeRole(t, queries, "administrator")
 	if err := service.SetRolePermission(
-		ctx, roleID, authz.PermServerAdminister, nil, true, uuid.Nil, false,
+		ctx, roleID, authz.PermServerAdminister, nil, true, uuid.Nil(), false,
 	); err != nil {
 		t.Fatalf("SetRolePermission: %v", err)
 	}
@@ -377,7 +376,7 @@ func TestWithdrawingAdministrationFromYourOwnRoleIsRefused(t *testing.T) {
 	// and the test would pass without exercising what it names.
 	otherRole := makeRole(t, queries, "second-administrator")
 	if err := service.SetRolePermission(
-		ctx, otherRole, authz.PermServerAdminister, nil, true, uuid.Nil, false,
+		ctx, otherRole, authz.PermServerAdminister, nil, true, uuid.Nil(), false,
 	); err != nil {
 		t.Fatalf("SetRolePermission: %v", err)
 	}

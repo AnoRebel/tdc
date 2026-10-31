@@ -6,8 +6,8 @@ import (
 	"html"
 	"net/http"
 	"strings"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 )
 

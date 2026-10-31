@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
 
@@ -284,14 +284,14 @@ func (s *Server) mayManageIncoming(c *echo.Context) (uuid.UUID, error) {
 	user, _ := currentUser(c)
 	roomID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		return uuid.Nil, echo.NewHTTPError(http.StatusNotFound, "no such room")
+		return uuid.Nil(), echo.NewHTTPError(http.StatusNotFound, "no such room")
 	}
 	if _, err := s.rooms.Visible(c.Request().Context(), roomID, user.ID); err != nil {
-		return uuid.Nil, roomError(err)
+		return uuid.Nil(), roomError(err)
 	}
 	decision := currentPermissions(c).AllowsChannel(authz.PermChannelWebhooks, roomID)
 	if !decision.Allowed {
-		return uuid.Nil, echo.NewHTTPError(http.StatusForbidden, decision.Error())
+		return uuid.Nil(), echo.NewHTTPError(http.StatusForbidden, decision.Error())
 	}
 	return roomID, nil
 }

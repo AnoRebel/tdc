@@ -6,8 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 )
@@ -23,7 +22,7 @@ func sampleExport() Export {
 	event := func(title string, start, end time.Time, zone, rule string) Listed {
 		return Listed{CalendarEvent: dbgen.CalendarEvent{
 			ID: uuid.New(), Kind: KindMeetup, Title: title, StartsAt: start.UTC(), EndsAt: end.UTC(),
-			TimeZone: zone, Recurrence: rule, Uid: uuid.NewString() + "@tdc.test",
+			TimeZone: zone, Recurrence: rule, Uid: uuid.New().String() + "@tdc.test",
 			CreatedAt: stamp, UpdatedAt: stamp,
 		}}
 	}

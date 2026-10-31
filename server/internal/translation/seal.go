@@ -7,8 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ErrCannotStoreKeys is returned when the operator has not configured

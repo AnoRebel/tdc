@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
@@ -118,7 +118,7 @@ func TestAProjectsStreamReproducesItsRows(t *testing.T) {
 			}
 		}
 		t.Fatalf("no state %q", name)
-		return uuid.Nil
+		return uuid.Nil()
 	}
 	issueNamed := map[string]dbgen.Issue{}
 	issue := func(t *testing.T, title string) dbgen.Issue {

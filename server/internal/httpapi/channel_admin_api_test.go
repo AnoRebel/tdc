@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/coder/websocket"
-	"github.com/google/uuid"
 )
 
 /*
@@ -22,7 +22,7 @@ func grantInChannel(t *testing.T, handler http.Handler, admin, holder, roomID st
 	t.Helper()
 
 	created := decode(t, mustCall(t, handler, http.MethodPost, "/api/admin/roles",
-		map[string]string{"name": "keeper-" + uuid.NewString()[:8]}, admin, http.StatusCreated))
+		map[string]string{"name": "keeper-" + uuid.New().String()[:8]}, admin, http.StatusCreated))
 	roleID, _ := created["id"].(string)
 	for _, permission := range permissions {
 		mustCall(t, handler, http.MethodPut, "/api/admin/roles/"+roleID+"/permissions",

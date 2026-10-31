@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db"
@@ -396,7 +396,7 @@ func (s *Service) View(ctx context.Context, username string, rank Rank, viewer u
 		Available:    row.Available,
 		// Somebody not signed in cannot send an enquiry, so is not told a
 		// profile takes them.
-		AcceptsEnquiries: row.AcceptsEnquiries && viewer != uuid.Nil,
+		AcceptsEnquiries: row.AcceptsEnquiries && viewer != uuid.Nil(),
 		UpdatedAt:        row.UpdatedAt,
 	}
 	if row.Available {
@@ -533,10 +533,10 @@ func (s *Service) Moderate(ctx context.Context, userID uuid.UUID, change Moderat
 func (s *Service) OwnerOf(ctx context.Context, username string) (uuid.UUID, error) {
 	row, err := s.queries.GetDirectoryProfileOwnerByUsername(ctx, username)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, ErrNoProfile
+		return uuid.Nil(), ErrNoProfile
 	}
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("find a profile: %w", err)
+		return uuid.Nil(), fmt.Errorf("find a profile: %w", err)
 	}
 	return row.ID, nil
 }

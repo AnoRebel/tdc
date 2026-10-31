@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // offer offers a file directly and returns the transfer's identifier.

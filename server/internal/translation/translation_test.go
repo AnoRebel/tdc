@@ -11,8 +11,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // plainDial reaches the stand-in providers, which listen on loopback.

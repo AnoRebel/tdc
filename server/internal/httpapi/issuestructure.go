@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
 
@@ -323,7 +323,7 @@ func (s *Server) respondWithIssue(c *echo.Context, access projects.Access, issue
 func uuidParam(c *echo.Context, name string, missing error) (uuid.UUID, error) {
 	id, err := uuid.Parse(c.Param(name))
 	if err != nil {
-		return uuid.Nil, structureError(missing)
+		return uuid.Nil(), structureError(missing)
 	}
 	return id, nil
 }

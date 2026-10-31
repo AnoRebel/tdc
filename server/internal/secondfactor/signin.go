@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"net/netip"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/pquerna/otp/totp"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -188,10 +188,10 @@ account is.
 func (s *Service) PendingFor(ctx context.Context, ticket string) (uuid.UUID, error) {
 	pending, err := s.store.GetPendingSignIn(ctx, hashTicket(ticket))
 	if notFound(err) {
-		return uuid.Nil, ErrRejected
+		return uuid.Nil(), ErrRejected
 	}
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("find the pending sign-in: %w", err)
+		return uuid.Nil(), fmt.Errorf("find the pending sign-in: %w", err)
 	}
 	return pending.UserID, nil
 }

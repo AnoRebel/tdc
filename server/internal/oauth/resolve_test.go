@@ -6,8 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -133,7 +133,7 @@ func TestAnUnverifiedEmailNeverLinks(t *testing.T) {
 		t.Errorf("an unverified email matching %s resolved to %q; it must resolve to a new account",
 			*victim.Email, resolution.Outcome)
 	}
-	if resolution.User.ID != uuid.Nil || resolution.LinkTo.ID != uuid.Nil {
+	if resolution.User.ID != uuid.Nil() || resolution.LinkTo.ID != uuid.Nil() {
 		t.Error("an unverified email produced an account to sign in to or link")
 	}
 	if len(accounts.created) != 0 {
@@ -171,7 +171,7 @@ func TestAVerifiedEmailIsOfferedNotTaken(t *testing.T) {
 	if len(accounts.created) != 0 {
 		t.Error("the link offer attached a credential; it must wait to be accepted")
 	}
-	if resolution.User.ID != uuid.Nil {
+	if resolution.User.ID != uuid.Nil() {
 		t.Error("a link offer signed somebody in before they accepted it")
 	}
 }

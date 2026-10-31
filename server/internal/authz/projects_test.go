@@ -4,8 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 )
@@ -67,7 +66,7 @@ func TestAProjectGrantAtTheWrongScopeIsRefused(t *testing.T) {
 	}
 
 	err := service.SetRolePermission(context.Background(), uuid.New(), authz.PermIssueTransition,
-		&project, true, uuid.Nil, false)
+		&project, true, uuid.Nil(), false)
 	if !errors.Is(err, authz.ErrScopeNotAllowed) {
 		t.Errorf("granting issue.transition at a channel: %v, want ErrScopeNotAllowed", err)
 	}

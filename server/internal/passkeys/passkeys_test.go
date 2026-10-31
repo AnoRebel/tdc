@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/descope/virtualwebauthn"
-	"github.com/google/uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/db"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -384,7 +384,7 @@ func TestARevokedPasskeyStopsWorking(t *testing.T) {
 			phoneRow = row
 		}
 	}
-	if phoneRow.ID == uuid.Nil {
+	if phoneRow.ID == uuid.Nil() {
 		t.Fatal("the phone's passkey is not in the list")
 	}
 

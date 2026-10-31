@@ -7,8 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 /*
@@ -78,7 +77,7 @@ func grantRole(t *testing.T, handler http.Handler, admin, holder string, permiss
 	t.Helper()
 
 	created := call(t, handler, http.MethodPost, "/api/admin/roles", map[string]string{
-		"name": "role-" + uuid.NewString()[:8],
+		"name": "role-" + uuid.New().String()[:8],
 	}, admin)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("creating a role: %d %s", created.Code, created.Body.String())

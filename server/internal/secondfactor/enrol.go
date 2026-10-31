@@ -5,8 +5,8 @@ import (
 	"crypto/rand"
 	"fmt"
 	"strings"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/pquerna/otp/totp"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"

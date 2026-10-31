@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/directory"
@@ -190,7 +190,7 @@ func (api *directoryAPI) announce(ctx context.Context, engagement directory.Enga
 func engagementIDParam(c *echo.Context) (uuid.UUID, error) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		return uuid.Nil, echo.NewHTTPError(http.StatusNotFound, directory.ErrNoEngagement.Error())
+		return uuid.Nil(), echo.NewHTTPError(http.StatusNotFound, directory.ErrNoEngagement.Error())
 	}
 	return id, nil
 }

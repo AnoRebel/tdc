@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
 	ics "github.com/arran4/golang-ical"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"

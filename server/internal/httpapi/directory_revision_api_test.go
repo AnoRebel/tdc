@@ -6,8 +6,7 @@ import (
 	"net/http"
 	"reflect"
 	"testing"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 /*

@@ -8,7 +8,7 @@ package dbgen
 import (
 	"context"
 
-	uuid "github.com/google/uuid"
+	uuid "uuid"
 )
 
 const countActionPresses = `-- name: CountActionPresses :one

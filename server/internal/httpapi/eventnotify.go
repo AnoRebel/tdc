@@ -2,13 +2,13 @@ package httpapi
 
 import (
 	"net/http"
+	"uuid"
 
 	"context"
-	"github.com/labstack/echo/v5"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/calendar"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -31,7 +31,7 @@ type eventNotice struct {
 	reason notify.Reason
 	// entry is the log entry the notification points at.
 	entry string
-	// actor did it; uuid.Nil and an empty address for the server itself.
+	// actor did it; uuid.Nil() and an empty address for the server itself.
 	actorID      uuid.UUID
 	actorAddress string
 	// push also reaches devices with the application closed, with this
@@ -154,21 +154,21 @@ sent. Every other entry is heard in its own room.
 */
 func (s *Server) webhookRoomForEvent(ctx context.Context, entry dbgen.Event) (uuid.UUID, bool) {
 	if s.calendar == nil || !strings.HasPrefix(entry.Type, "event.") {
-		return uuid.Nil, false
+		return uuid.Nil(), false
 	}
 	if channel, ok := s.eventChannelFor(ctx, entry); ok {
 		return channel, true
 	}
-	return uuid.Nil, true
+	return uuid.Nil(), true
 }
 
 func (s *Server) eventChannelFor(ctx context.Context, entry dbgen.Event) (uuid.UUID, bool) {
 	if s.calendar == nil || !strings.HasPrefix(entry.Type, "event.") {
-		return uuid.Nil, false
+		return uuid.Nil(), false
 	}
 	event, err := s.calendar.Queries().GetCalendarEvent(ctx, entry.RoomID)
 	if err != nil || event.ChannelID == nil || event.Visibility == calendar.VisibilityInvite {
-		return uuid.Nil, false
+		return uuid.Nil(), false
 	}
 	return *event.ChannelID, true
 }

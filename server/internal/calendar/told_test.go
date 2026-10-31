@@ -4,8 +4,7 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/authz"
 	"github.com/AnoRebel/tdc/server/internal/db"
@@ -45,7 +44,7 @@ func TestAnEventIsToldOfOnlyOnceItIsCommitted(t *testing.T) {
 		}
 	})
 
-	username := "told" + uuid.NewString()[:8]
+	username := "told" + uuid.New().String()[:8]
 	actor, err := queries.CreateUser(ctx, dbgen.CreateUserParams{
 		ID: uuid.New(), Username: username, UsernameFolded: username, DisplayName: username,
 	})

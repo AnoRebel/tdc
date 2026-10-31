@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -163,7 +163,7 @@ func (b *PostgresBroker) Whisper(
 		return 0, fmt.Errorf("the private frame is %d bytes, more than is shared between nodes", len(encoded))
 	}
 
-	id := uuid.NewString()
+	id := uuid.New().String()
 	acknowledged := make(chan int, 64)
 	b.mu.Lock()
 	b.waiting[id] = acknowledged

@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
@@ -121,7 +121,7 @@ func (s *Service) CreateUser(ctx context.Context, input NewUser) (dbgen.User, er
 	// A name somebody else gave up recently is still theirs. Reported as
 	// taken, which is true, rather than as somebody's old name, which would
 	// say more than the person registering needs to know.
-	held, err := s.UsernameHeld(ctx, NormaliseUsername(username), uuid.Nil)
+	held, err := s.UsernameHeld(ctx, NormaliseUsername(username), uuid.Nil())
 	if err != nil {
 		return dbgen.User{}, err
 	}

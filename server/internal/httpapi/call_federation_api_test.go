@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/coder/websocket"
-	"github.com/google/uuid"
 
 	"github.com/AnoRebel/tdc/server/internal/events"
 	"github.com/AnoRebel/tdc/server/internal/federation"
@@ -136,9 +136,9 @@ func TestARingFromAnotherServerReachesOnlyWhomItMay(t *testing.T) {
 	live := liveConnection(t, ctx, server, baraka)
 
 	ring := func(from string) (string, int) {
-		callID := uuid.NewString()
+		callID := uuid.New().String()
 		answer := home.signed(t, handler, http.MethodPost, "/api/federation/calls/ring", map[string]any{
-			"call": callID, "roomId": uuid.NewString(), "to": "baraka@tdc.test",
+			"call": callID, "roomId": uuid.New().String(), "to": "baraka@tdc.test",
 			"from": map[string]string{"address": from, "displayName": "Amina"},
 		})
 		return callID, answer.Code
@@ -198,9 +198,9 @@ func TestOnlyACallsHomeDeliversToThePeopleInIt(t *testing.T) {
 	defer cancel()
 	live := liveConnection(t, ctx, server, baraka)
 
-	callID := uuid.NewString()
+	callID := uuid.New().String()
 	if code := home.signed(t, handler, http.MethodPost, "/api/federation/calls/ring", map[string]any{
-		"call": callID, "roomId": uuid.NewString(), "to": "baraka@tdc.test",
+		"call": callID, "roomId": uuid.New().String(), "to": "baraka@tdc.test",
 		"from": map[string]string{"address": "amina@" + home.host(t)},
 	}).Code; code != http.StatusAccepted {
 		t.Fatalf("ring: %d", code)
@@ -208,7 +208,7 @@ func TestOnlyACallsHomeDeliversToThePeopleInIt(t *testing.T) {
 	deliver := func(peer *callPeer, body string) int {
 		return peer.signed(t, handler, http.MethodPost, "/api/federation/calls/deliver", map[string]any{
 			"call": callID, "to": "baraka@tdc.test", "type": "call.signal",
-			"payload": map[string]any{"call": callID, "from": uuid.NewString(), "signal": map[string]string{"sdp": body}},
+			"payload": map[string]any{"call": callID, "from": uuid.New().String(), "signal": map[string]string{"sdp": body}},
 		}).Code
 	}
 	if code := deliver(stranger, "from a stranger"); code != http.StatusNotFound {
@@ -245,7 +245,7 @@ func TestSomebodyFromAnotherServerTakesPartInACallHere(t *testing.T) {
 	started := decode(t, mustCall(t, handler, http.MethodPost, "/api/rooms/"+room+"/call", map[string]any{"audio": true}, founder, http.StatusOK))
 	callID := started["id"].(string)
 	baraka := "baraka@" + peer.host(t)
-	barakaID := uuid.NewString()
+	barakaID := uuid.New().String()
 	join := func(member, id string) *httptest.ResponseRecorder {
 		return peer.signed(t, handler, http.MethodPost, "/api/federation/calls/join", map[string]any{
 			"call": callID, "member": member, "id": id, "displayName": "Baraka", "audio": true,
@@ -266,7 +266,7 @@ func TestSomebodyFromAnotherServerTakesPartInACallHere(t *testing.T) {
 		t.Errorf("the ring sent: %v", ring)
 	}
 
-	if code := join("chausiku@elsewhere.example", uuid.NewString()).Code; code != http.StatusForbidden {
+	if code := join("chausiku@elsewhere.example", uuid.New().String()).Code; code != http.StatusForbidden {
 		t.Errorf("a server joining somebody not its own: %d, want 403", code)
 	}
 	if code := join(baraka, accountID(t, handler, founder)).Code; code != http.StatusConflict {
@@ -342,7 +342,7 @@ func TestSomebodyHereJoinsACallAnotherServerHolds(t *testing.T) {
 	defer cancel()
 	live := liveConnection(t, ctx, server, baraka)
 
-	callID, roomID, aminaID := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	callID, roomID, aminaID := uuid.New().String(), uuid.New().String(), uuid.New().String()
 	mustCall(t, handler, http.MethodPost, "/api/calls/"+callID, map[string]any{"audio": true}, baraka, http.StatusNotFound)
 
 	if code := home.signed(t, handler, http.MethodPost, "/api/federation/calls/ring", map[string]any{
@@ -409,7 +409,7 @@ func TestACallInASharedRoomIsHeldByItsHome(t *testing.T) {
 	handler, founder := federatedCalls(t, peer)
 	join := func(member string) *httptest.ResponseRecorder {
 		return peer.signed(t, handler, http.MethodPost, "/api/federation/calls/join", map[string]any{
-			"room": "shared", "member": member, "id": uuid.NewString(), "audio": true,
+			"room": "shared", "member": member, "id": uuid.New().String(), "audio": true,
 		})
 	}
 	if code := join("zuri@" + peer.host(t)).Code; code != http.StatusNotFound {

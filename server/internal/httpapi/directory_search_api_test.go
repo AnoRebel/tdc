@@ -10,8 +10,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 /*
@@ -84,7 +83,7 @@ func TestAnUnknownSkillEntersReview(t *testing.T) {
 	juma := registerAndSignIn(t, handler, "juma")
 	amina := registerAndSignIn(t, handler, "amina")
 
-	name := "Elixir " + uuid.NewString()[:6]
+	name := "Elixir " + uuid.New().String()[:6]
 	id, status, code := proposeSkill(t, handler, juma, name)
 	if status != "proposed" || code != http.StatusCreated {
 		t.Fatalf("an unknown skill was %s (%d), want a new proposal", status, code)
@@ -156,7 +155,7 @@ func TestTheSkillReviewQueue(t *testing.T) {
 	amina := registerAndSignIn(t, handler, "amina")
 	reviewer := registerAndSignIn(t, handler, "kheri")
 
-	suffix := uuid.NewString()[:6]
+	suffix := uuid.New().String()[:6]
 	approved, _, _ := proposeSkill(t, handler, juma, "Svelte "+suffix)
 	rejected, _, _ := proposeSkill(t, handler, juma, "Nonsense "+suffix)
 	merged, _, _ := proposeSkill(t, handler, juma, "Postgre "+suffix)
@@ -228,7 +227,7 @@ func TestTheSkillReviewQueue(t *testing.T) {
 // Somebody who manages the vocabulary adds to it without a queue.
 func TestAVocabularyManagerAddsASkillDirectly(t *testing.T) {
 	handler, founder := withDirectory(t)
-	name := "Haskell " + uuid.NewString()[:6]
+	name := "Haskell " + uuid.New().String()[:6]
 	_, status, code := proposeSkill(t, handler, founder, name)
 	if status != "active" || code != http.StatusCreated {
 		t.Errorf("a manager's new skill is %s (%d), want active", status, code)

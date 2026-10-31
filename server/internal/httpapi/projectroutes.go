@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 
 	"github.com/AnoRebel/tdc/server/internal/audit"
@@ -639,7 +639,7 @@ func (s *Server) handleAddState(c *echo.Context) error {
 func stateParam(c *echo.Context) (uuid.UUID, error) {
 	id, err := uuid.Parse(c.Param("state"))
 	if err != nil {
-		return uuid.Nil, projectError(projects.ErrStateNotFound)
+		return uuid.Nil(), projectError(projects.ErrStateNotFound)
 	}
 	return id, nil
 }
