@@ -48,7 +48,7 @@ func (s *Service) SetFederated(ctx context.Context, actor Actor, access Access, 
 		if changed == 0 {
 			return nil
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectFederationChanged,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectFederationChanged,
 			map[string]any{"federated": federated})
 	})
 }
@@ -117,7 +117,7 @@ func (s *Service) setRemoteMember(ctx context.Context, actor Actor, access Acces
 		}); err != nil {
 			return fmt.Errorf("add remote member: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMemberAdded,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectMemberAdded,
 			map[string]any{"member": address, "role": role, "previous": previous})
 	})
 }
@@ -147,7 +147,7 @@ func (s *Service) removeRemoteMember(ctx context.Context, actor Actor, access Ac
 		}); err != nil {
 			return fmt.Errorf("remove remote member: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMemberRemoved,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectMemberRemoved,
 			map[string]any{"member": address, "previous": previous})
 	})
 }

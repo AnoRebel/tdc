@@ -320,6 +320,35 @@ func TestAProjectsStreamReproducesItsRows(t *testing.T) {
 			_, _, err := f.projects.Assign(ctx, amina, access, issue(t, "Write the projector"), "amina")
 			must(t, err)
 		}},
+		/*
+			Somebody on another server, acting through a request their
+			server signed: the home records the change as itself, naming
+			them, and the projection still agrees with the tables.
+		*/
+		{method: "CreateIssue", run: func(t *testing.T) {
+			theirs, err := f.projects.RemoteAccess(ctx, access.Project.ID, "dalila@elsewhere.example")
+			must(t, err)
+			created, err := f.projects.CreateIssue(ctx, projects.Actor{Address: "dalila@elsewhere.example"}, theirs,
+				projects.NewIssue{Title: "Filed from elsewhere"})
+			must(t, err)
+			issueNamed["Filed from elsewhere"] = created
+		}},
+		{method: "Transition", run: func(t *testing.T) {
+			theirs, err := f.projects.RemoteAccess(ctx, access.Project.ID, "dalila@elsewhere.example")
+			must(t, err)
+			_, err = f.projects.Transition(ctx, projects.Actor{Address: "dalila@elsewhere.example"}, theirs,
+				issue(t, "Filed from elsewhere"), stateNamed(t, "In progress"), nil)
+			must(t, err)
+		}},
+		{method: "Assign", run: func(t *testing.T) {
+			for _, title := range []string{"Filed from elsewhere", "Run it in CI"} {
+				_, _, err := f.projects.Assign(ctx, amina, access, issue(t, title), "dalila@elsewhere.example")
+				must(t, err)
+			}
+		}},
+		{method: "Unassign", run: func(t *testing.T) {
+			must(t, f.projects.Unassign(ctx, amina, access, issue(t, "Run it in CI"), "dalila@elsewhere.example"))
+		}},
 		{method: "Unassign", run: func(t *testing.T) {
 			must(t, f.projects.Unassign(ctx, amina, access, issue(t, "Run it in CI"), "bola"))
 		}},
@@ -795,10 +824,16 @@ func (r replica) write(t *testing.T, home fixture, rows projects.Rows, stream []
 			ID: id, Name: key, Topic: issue.Title, Kind: "issue-discussion", Visibility: "private", HomeServer: testServerName,
 		})
 		must(err)
-		_, err = r.queries.CreateIssue(ctx, dbgen.CreateIssueParams{
+		params := dbgen.CreateIssueParams{
 			ID: id, ProjectID: project.ID, Number: issue.Number, Title: issue.Title,
-			Description: issue.Description, StateID: issue.State, AuthorID: who(issue.Author),
-		})
+			Description: issue.Description, StateID: issue.State,
+		}
+		if _, server, _ := strings.Cut(issue.Author, "@"); server != testServerName {
+			params.AuthorAddress = &issue.Author
+		} else {
+			params.AuthorID = who(issue.Author)
+		}
+		_, err = r.queries.CreateIssue(ctx, params)
 		must(err)
 		if issue.Priority != nil {
 			_, err := r.queries.SetIssuePriority(ctx, dbgen.SetIssuePriorityParams{ID: id, PriorityID: issue.Priority})
@@ -817,6 +852,13 @@ func (r replica) write(t *testing.T, home fixture, rows projects.Rows, stream []
 			must(err)
 		}
 		for assignee, by := range issue.Assignees {
+			if _, server, _ := strings.Cut(assignee, "@"); server != testServerName {
+				_, err := r.queries.AssignRemoteToIssue(ctx, dbgen.AssignRemoteToIssueParams{
+					IssueID: id, Address: assignee, HomeServer: server, AssignedBy: who(by),
+				})
+				must(err)
+				continue
+			}
 			_, err := r.queries.AssignIssue(ctx, dbgen.AssignIssueParams{IssueID: id, UserID: *who(assignee), AssignedBy: who(by)})
 			must(err)
 		}

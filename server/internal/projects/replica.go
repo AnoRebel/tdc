@@ -269,7 +269,7 @@ func (s *Service) writeReplica(ctx context.Context, q *dbgen.Queries, room dbgen
 					return fmt.Errorf("write assignee: %w", err)
 				}
 			} else if server, ok := people.elsewhere(assignee); ok {
-				if err := q.AssignRemoteToIssue(ctx, dbgen.AssignRemoteToIssueParams{IssueID: id, Address: assignee, HomeServer: server}); err != nil {
+				if _, err := q.AssignRemoteToIssue(ctx, dbgen.AssignRemoteToIssueParams{IssueID: id, Address: assignee, HomeServer: server, AssignedBy: people.who(by)}); err != nil {
 					return fmt.Errorf("write remote assignee: %w", err)
 				}
 			}

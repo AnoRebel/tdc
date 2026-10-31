@@ -89,10 +89,13 @@ WITH project_issues AS (SELECT issues.id FROM issues WHERE issues.project_id = $
      search AS (DELETE FROM issue_search WHERE issue_search.project_id = $1)
 DELETE FROM issue_relations WHERE from_issue IN (SELECT id FROM project_issues);
 
--- name: AssignRemoteToIssue :exec
-INSERT INTO issue_remote_assignees (issue_id, address, home_server)
-VALUES ($1, $2, $3)
+-- name: AssignRemoteToIssue :execrows
+INSERT INTO issue_remote_assignees (issue_id, address, home_server, assigned_by)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING;
+
+-- name: UnassignRemoteFromIssue :execrows
+DELETE FROM issue_remote_assignees WHERE issue_id = $1 AND address = $2;
 
 -- name: RemoveReplicaStatesExcept :exec
 DELETE FROM issue_states WHERE project_id = $1 AND NOT (id = ANY(sqlc.arg(keep)::uuid[]));

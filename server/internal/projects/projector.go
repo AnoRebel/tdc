@@ -209,6 +209,28 @@ func person(event dbgen.Event) string {
 	return event.SenderAddress
 }
 
+/*
+author is who wrote an issue: its sender, or for one filed by somebody on
+another server, the person its home server names as "by" — the only thing it
+can truthfully say of somebody it does not host.
+
+Only an issue's author is read from "by". Who added, assigned or created
+something is recorded in the home's columns for its own people alone, and the
+projection agrees with that.
+*/
+func author(event dbgen.Event) string {
+	if who := person(event); who != "" {
+		return who
+	}
+	var content struct {
+		By string `json:"by"`
+	}
+	if json.Unmarshal(event.Content, &content) == nil && strings.Contains(content.By, "@") {
+		return content.By
+	}
+	return ""
+}
+
 func decode(event dbgen.Event, into any) error {
 	if err := json.Unmarshal(event.Content, into); err != nil {
 		return fmt.Errorf("content: %w", err)
@@ -671,7 +693,7 @@ var projections = map[events.Type]func(*Rows, dbgen.Event) error{
 		}
 		rows.Issues[id] = IssueRow{
 			Number: number, Title: content.Title, Description: content.Description,
-			State: state, Author: person(event),
+			State: state, Author: author(event),
 			Labels: map[uuid.UUID]bool{}, Assignees: map[string]string{},
 		}
 		if number >= rows.Project.NextIssueNumber {
@@ -1019,7 +1041,7 @@ func (s *Service) rowsOf(ctx context.Context, q *dbgen.Queries, projectID uuid.U
 		return Rows{}, fmt.Errorf("read remote assignees: %w", err)
 	}
 	for _, assignee := range remoteAssignees {
-		rows.Issues[assignee.IssueID].Assignees[assignee.Address] = ""
+		rows.Issues[assignee.IssueID].Assignees[assignee.Address] = address(assignee.AssignedByUsername)
 	}
 	labelled, err := q.ListIssueLabelsForStream(ctx, projectID)
 	if err != nil {

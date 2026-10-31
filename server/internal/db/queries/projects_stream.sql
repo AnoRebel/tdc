@@ -102,7 +102,9 @@ ORDER BY sequence DESC
 LIMIT @page_size;
 
 -- name: ListIssueRemoteAssigneesForStream :many
-SELECT issue_remote_assignees.issue_id, issue_remote_assignees.address
+SELECT issue_remote_assignees.issue_id, issue_remote_assignees.address,
+       COALESCE(adder.username, '')::text AS assigned_by_username
 FROM issue_remote_assignees
 JOIN issues ON issues.id = issue_remote_assignees.issue_id
+LEFT JOIN users adder ON adder.id = issue_remote_assignees.assigned_by
 WHERE issues.project_id = $1;

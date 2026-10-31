@@ -147,6 +147,23 @@ else on the server; this package consults them rather than resolving its own.
 type Actor struct {
 	ID          uuid.UUID
 	Permissions authz.Permissions
+	// Address is somebody on another server acting through a request their
+	// server signed: no account here, so ID is nil and what they may do comes
+	// from RemoteAccess alone.
+	Address string
+}
+
+// Remote reports whether the actor is somebody on another server.
+func (a Actor) Remote() bool { return a.Address != "" }
+
+// Ref is the actor's account, for the columns that record who did
+// something, or nothing for somebody on another server — who is named in the
+// event instead.
+func (a Actor) Ref() *uuid.UUID {
+	if a.Remote() {
+		return nil
+	}
+	return &a.ID
 }
 
 // NewProject describes a project to start.
@@ -611,7 +628,7 @@ func (s *Service) Update(ctx context.Context, actor Actor, access Access, change
 			}
 		}
 
-		return s.appendProjectEvent(ctx, q, project.ID, actor.ID, events.TypeProjectUpdated, changed)
+		return s.appendProjectEvent(ctx, q, project.ID, actor, events.TypeProjectUpdated, changed)
 	})
 	return updated, err
 }

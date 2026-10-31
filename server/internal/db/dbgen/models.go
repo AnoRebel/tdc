@@ -628,6 +628,7 @@ type IssueRemoteAssignee struct {
 	Address    string
 	HomeServer string
 	AssignedAt time.Time
+	AssignedBy *uuid.UUID
 }
 
 type IssueSearch struct {

@@ -77,7 +77,7 @@ type Querier interface {
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
 	// Assignees, labels, priorities and relationships.
 	AssignIssue(ctx context.Context, arg AssignIssueParams) (int64, error)
-	AssignRemoteToIssue(ctx context.Context, arg AssignRemoteToIssueParams) error
+	AssignRemoteToIssue(ctx context.Context, arg AssignRemoteToIssueParams) (int64, error)
 	AssignRole(ctx context.Context, arg AssignRoleParams) error
 	// Binds an attachment to the message that carries it.
 	//
@@ -1562,6 +1562,7 @@ type Querier interface {
 	// state became rather than silently overwriting it.
 	TransitionIssue(ctx context.Context, arg TransitionIssueParams) (Issue, error)
 	UnassignIssue(ctx context.Context, arg UnassignIssueParams) (int64, error)
+	UnassignRemoteFromIssue(ctx context.Context, arg UnassignRemoteFromIssueParams) (int64, error)
 	UnblockUser(ctx context.Context, arg UnblockUserParams) error
 	// Takes back a recording that could not be recorded in the log, so nobody is
 	// shown as recording what was never announced.

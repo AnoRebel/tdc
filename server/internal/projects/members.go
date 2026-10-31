@@ -87,7 +87,7 @@ func (s *Service) SetMember(ctx context.Context, actor Actor, access Access, use
 			return fmt.Errorf("add member: %w", err)
 		}
 
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMemberAdded,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectMemberAdded,
 			map[string]any{
 				"member":   s.rooms.UserAddress(person.Username),
 				"role":     role,
@@ -164,7 +164,7 @@ func (s *Service) RemoveMember(ctx context.Context, actor Actor, access Access, 
 			}
 		}
 
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMemberRemoved,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectMemberRemoved,
 			map[string]any{"member": s.rooms.UserAddress(person.Username), "previous": previous})
 	})
 }

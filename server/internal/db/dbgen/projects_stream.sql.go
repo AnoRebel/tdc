@@ -294,15 +294,18 @@ func (q *Queries) ListIssueRelationsForStream(ctx context.Context, projectID uui
 }
 
 const listIssueRemoteAssigneesForStream = `-- name: ListIssueRemoteAssigneesForStream :many
-SELECT issue_remote_assignees.issue_id, issue_remote_assignees.address
+SELECT issue_remote_assignees.issue_id, issue_remote_assignees.address,
+       COALESCE(adder.username, '')::text AS assigned_by_username
 FROM issue_remote_assignees
 JOIN issues ON issues.id = issue_remote_assignees.issue_id
+LEFT JOIN users adder ON adder.id = issue_remote_assignees.assigned_by
 WHERE issues.project_id = $1
 `
 
 type ListIssueRemoteAssigneesForStreamRow struct {
-	IssueID uuid.UUID
-	Address string
+	IssueID            uuid.UUID
+	Address            string
+	AssignedByUsername string
 }
 
 func (q *Queries) ListIssueRemoteAssigneesForStream(ctx context.Context, projectID uuid.UUID) ([]ListIssueRemoteAssigneesForStreamRow, error) {
@@ -314,7 +317,7 @@ func (q *Queries) ListIssueRemoteAssigneesForStream(ctx context.Context, project
 	items := []ListIssueRemoteAssigneesForStreamRow{}
 	for rows.Next() {
 		var i ListIssueRemoteAssigneesForStreamRow
-		if err := rows.Scan(&i.IssueID, &i.Address); err != nil {
+		if err := rows.Scan(&i.IssueID, &i.Address, &i.AssignedByUsername); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

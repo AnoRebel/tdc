@@ -2,6 +2,7 @@ package projects
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"uuid"
@@ -133,18 +134,20 @@ func (s *Service) appendSigned(
 func (s *Service) appendProjectEvent(
 	ctx context.Context,
 	q *dbgen.Queries,
-	projectID, actorID uuid.UUID,
+	projectID uuid.UUID,
+	actor Actor,
 	eventType events.Type,
 	content any,
 ) error {
-	_, err := s.appendProjectEventReturning(ctx, q, projectID, actorID, eventType, content)
+	_, err := s.appendProjectEventReturning(ctx, q, projectID, actor, eventType, content)
 	return err
 }
 
 func (s *Service) appendProjectEventReturning(
 	ctx context.Context,
 	q *dbgen.Queries,
-	projectID, actorID uuid.UUID,
+	projectID uuid.UUID,
+	actor Actor,
 	eventType events.Type,
 	content any,
 ) (dbgen.Event, error) {
@@ -152,11 +155,53 @@ func (s *Service) appendProjectEventReturning(
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("read project stream: %w", err)
 	}
-	actor, err := q.GetUserByID(ctx, actorID)
+	return s.appendBy(ctx, q, stream, actor, eventType, content)
+}
+
+/*
+appendBy appends as the person acting: in their own name for somebody here,
+and for somebody on another server in this server's, naming them as "by".
+
+This server cannot sign in the name of somebody it does not host — a receiving
+server refuses an event whose sender's server is not the one that signed it —
+and it should not: what it can truthfully say is that it made this change at
+their request, which their server signed. So the event is the server's, and
+the person is in its content.
+*/
+func (s *Service) appendBy(
+	ctx context.Context,
+	q *dbgen.Queries,
+	room dbgen.Room,
+	actor Actor,
+	eventType events.Type,
+	content any,
+) (dbgen.Event, error) {
+	if actor.Remote() {
+		attributed, err := withBy(content, actor.Address)
+		if err != nil {
+			return dbgen.Event{}, err
+		}
+		return s.appendAsServer(ctx, q, room, eventType, attributed)
+	}
+	person, err := q.GetUserByID(ctx, actor.ID)
 	if err != nil {
 		return dbgen.Event{}, fmt.Errorf("read actor: %w", err)
 	}
-	return s.appendTo(ctx, q, stream, actor, eventType, content)
+	return s.appendTo(ctx, q, room, person, eventType, content)
+}
+
+// withBy is content with the person a change was made for added as "by".
+func withBy(content any, address string) (map[string]any, error) {
+	encoded, err := json.Marshal(content)
+	if err != nil {
+		return nil, fmt.Errorf("encode content: %w", err)
+	}
+	fields := map[string]any{}
+	if err := json.Unmarshal(encoded, &fields); err != nil {
+		return nil, fmt.Errorf("content is not an object: %w", err)
+	}
+	fields["by"] = address
+	return fields, nil
 }
 
 /*

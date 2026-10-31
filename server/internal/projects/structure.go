@@ -106,6 +106,12 @@ func (s *Service) Assign(ctx context.Context, actor Actor, access Access, issue 
 	if decision := access.AllowsOn(authz.PermIssueAssign, issue); !decision.Allowed {
 		return nil, dbgen.User{}, RefusalError{decision}
 	}
+	if address, server, remote, err := s.remoteAddress(username); err != nil {
+		return nil, dbgen.User{}, err
+	} else if remote {
+		event, err := s.assignRemote(ctx, actor, access, issue, address, server)
+		return event, dbgen.User{}, err
+	}
 	person, err := s.personNamed(ctx, username)
 	if err != nil {
 		return nil, dbgen.User{}, err
@@ -121,7 +127,7 @@ func (s *Service) Assign(ctx context.Context, actor Actor, access Access, issue 
 	var recorded *dbgen.Event
 	err = s.inTransaction(ctx, func(q *dbgen.Queries) error {
 		rows, err := q.AssignIssue(ctx, dbgen.AssignIssueParams{
-			IssueID: issue.ID, UserID: person.ID, AssignedBy: &actor.ID,
+			IssueID: issue.ID, UserID: person.ID, AssignedBy: actor.Ref(),
 		})
 		if err != nil {
 			return fmt.Errorf("assign: %w", err)
@@ -134,7 +140,7 @@ func (s *Service) Assign(ctx context.Context, actor Actor, access Access, issue 
 			return err
 		}
 
-		event, err := s.appendProjectEventReturning(ctx, q, access.Project.ID, actor.ID, events.TypeIssueAssigned,
+		event, err := s.appendProjectEventReturning(ctx, q, access.Project.ID, actor, events.TypeIssueAssigned,
 			issueContent(issue, access.Project.Key, map[string]any{
 				"assignee": s.rooms.UserAddress(person.Username),
 			}))
@@ -145,6 +151,40 @@ func (s *Service) Assign(ctx context.Context, actor Actor, access Access, issue 
 		return nil
 	})
 	return recorded, person, err
+}
+
+/*
+assignRemote makes somebody on another server responsible for an issue: only
+a member of the project, held by address. They hear of it through their own
+server, which holds the project's replica and tells them when the event
+arrives.
+*/
+func (s *Service) assignRemote(ctx context.Context, actor Actor, access Access, issue dbgen.Issue, address, server string) (*dbgen.Event, error) {
+	if _, err := s.queries.GetProjectRemoteMemberRole(ctx, dbgen.GetProjectRemoteMemberRoleParams{
+		ProjectID: access.Project.ID, Address: address,
+	}); errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrCannotSeeIssue
+	} else if err != nil {
+		return nil, fmt.Errorf("read membership: %w", err)
+	}
+	var recorded *dbgen.Event
+	err := s.inTransaction(ctx, func(q *dbgen.Queries) error {
+		rows, err := q.AssignRemoteToIssue(ctx, dbgen.AssignRemoteToIssueParams{IssueID: issue.ID, Address: address, HomeServer: server, AssignedBy: actor.Ref()})
+		if err != nil {
+			return fmt.Errorf("assign: %w", err)
+		}
+		if rows == 0 {
+			return nil
+		}
+		event, err := s.appendProjectEventReturning(ctx, q, access.Project.ID, actor, events.TypeIssueAssigned,
+			issueContent(issue, access.Project.Key, map[string]any{"assignee": address}))
+		if err != nil {
+			return err
+		}
+		recorded = &event
+		return nil
+	})
+	return recorded, err
 }
 
 /*
@@ -181,6 +221,18 @@ func (s *Service) Unassign(ctx context.Context, actor Actor, access Access, issu
 	if decision := access.AllowsOn(authz.PermIssueAssign, issue); !decision.Allowed {
 		return RefusalError{decision}
 	}
+	if address, _, remote, err := s.remoteAddress(username); err != nil {
+		return err
+	} else if remote {
+		return s.inTransaction(ctx, func(q *dbgen.Queries) error {
+			rows, err := q.UnassignRemoteFromIssue(ctx, dbgen.UnassignRemoteFromIssueParams{IssueID: issue.ID, Address: address})
+			if err != nil || rows == 0 {
+				return err
+			}
+			return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueUnassigned,
+				issueContent(issue, access.Project.Key, map[string]any{"assignee": address}))
+		})
+	}
 	person, err := s.personNamed(ctx, username)
 	if err != nil {
 		return err
@@ -193,7 +245,7 @@ func (s *Service) Unassign(ctx context.Context, actor Actor, access Access, issu
 		if rows == 0 {
 			return nil
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueUnassigned,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueUnassigned,
 			issueContent(issue, access.Project.Key, map[string]any{
 				"assignee": s.rooms.UserAddress(person.Username),
 			}))
@@ -257,7 +309,7 @@ func (s *Service) AddLabel(ctx context.Context, actor Actor, access Access, name
 		if err != nil {
 			return fmt.Errorf("create label: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectLabelAdded, labelContent(label))
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectLabelAdded, labelContent(label))
 	})
 	return label, err
 }
@@ -316,7 +368,7 @@ func (s *Service) UpdateLabel(
 		}
 		content := labelContent(updated)
 		content["previousName"], content["previousColour"] = label.Name, label.Colour
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectLabelChanged, content)
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectLabelChanged, content)
 	})
 	return updated, err
 }
@@ -347,7 +399,7 @@ func (s *Service) RemoveLabel(ctx context.Context, actor Actor, access Access, l
 			if _, err := q.UnlabelIssue(ctx, dbgen.UnlabelIssueParams{IssueID: issueID, LabelID: label.ID}); err != nil {
 				return fmt.Errorf("unlabel: %w", err)
 			}
-			if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueUnlabeled,
+			if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueUnlabeled,
 				issueContent(issue, access.Project.Key, map[string]any{
 					"label": label.ID.String(), "labelName": label.Name,
 				})); err != nil {
@@ -357,7 +409,7 @@ func (s *Service) RemoveLabel(ctx context.Context, actor Actor, access Access, l
 		if err := q.DeleteProjectLabel(ctx, label.ID); err != nil {
 			return fmt.Errorf("delete label: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectLabelRemoved,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectLabelRemoved,
 			map[string]any{"label": label.ID.String(), "name": label.Name})
 	})
 }
@@ -393,7 +445,7 @@ func (s *Service) SetLabel(ctx context.Context, actor Actor, access Access, issu
 			return nil
 		}
 		changed = true
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, eventType,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, eventType,
 			issueContent(issue, access.Project.Key, map[string]any{
 				"label": label.ID.String(), "labelName": label.Name,
 			}))
@@ -454,7 +506,7 @@ func (s *Service) AddPriority(ctx context.Context, actor Actor, access Access, n
 		if err != nil {
 			return fmt.Errorf("create priority: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectPriorityAdded, priorityContent(added))
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectPriorityAdded, priorityContent(added))
 	})
 	return added, err
 }
@@ -494,7 +546,7 @@ func (s *Service) RenamePriority(
 		}
 		content := priorityContent(renamed)
 		content["previousName"] = current.Name
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectPriorityChanged, content)
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectPriorityChanged, content)
 	})
 	return renamed, err
 }
@@ -533,7 +585,7 @@ func (s *Service) ReorderPriorities(ctx context.Context, actor Actor, access Acc
 		for _, id := range order {
 			names = append(names, id.String())
 		}
-		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID,
+		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor,
 			events.TypeProjectPriorityChanged, map[string]any{"order": names}); err != nil {
 			return err
 		}
@@ -573,7 +625,7 @@ func (s *Service) RemovePriority(ctx context.Context, actor Actor, access Access
 		if err := q.DeleteProjectPriority(ctx, priority.ID); err != nil {
 			return fmt.Errorf("delete priority: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectPriorityRemoved,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectPriorityRemoved,
 			map[string]any{"priority": priority.ID.String(), "name": priority.Name})
 	})
 }
@@ -632,7 +684,7 @@ func (s *Service) setPriorityLocked(
 	if err != nil {
 		return fmt.Errorf("set priority: %w", err)
 	}
-	return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssuePriorityChanged,
+	return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssuePriorityChanged,
 		issueContent(updated, access.Project.Key, map[string]any{
 			"field": "priority", "previous": previous, "new": next,
 			"previousName": previousName, "newName": nextName,
@@ -718,7 +770,7 @@ func (s *Service) Relate(ctx context.Context, actor Actor, access Access, issue 
 		}
 
 		rows, err := q.RelateIssues(ctx, dbgen.RelateIssuesParams{
-			FromIssue: from, ToIssue: to, Kind: stored, CreatedBy: &actor.ID,
+			FromIssue: from, ToIssue: to, Kind: stored, CreatedBy: actor.Ref(),
 		})
 		if err != nil {
 			if isUniqueViolation(err) {
@@ -732,13 +784,13 @@ func (s *Service) Relate(ctx context.Context, actor Actor, access Access, issue 
 
 		// One event on each issue, each from its own side, so both histories
 		// say what happened in their own terms.
-		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueRelated,
+		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueRelated,
 			issueContent(issue, access.Project.Key, map[string]any{
 				"kind": subjectIs, "other": other.ID.String(), "otherKey": Identifier(access.Project, other),
 			})); err != nil {
 			return err
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueRelated,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueRelated,
 			issueContent(other, access.Project.Key, map[string]any{
 				"kind": otherIs, "other": issue.ID.String(), "otherKey": Identifier(access.Project, issue),
 			}))
@@ -766,13 +818,13 @@ func (s *Service) Unrelate(ctx context.Context, actor Actor, access Access, issu
 		if rows == 0 {
 			return ErrNotRelated
 		}
-		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueUnrelated,
+		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueUnrelated,
 			issueContent(issue, access.Project.Key, map[string]any{
 				"kind": subjectIs, "other": other.ID.String(), "otherKey": Identifier(access.Project, other),
 			})); err != nil {
 			return err
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueUnrelated,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueUnrelated,
 			issueContent(other, access.Project.Key, map[string]any{
 				"kind": otherIs, "other": issue.ID.String(), "otherKey": Identifier(access.Project, issue),
 			}))

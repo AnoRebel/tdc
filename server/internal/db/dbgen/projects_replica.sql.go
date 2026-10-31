@@ -77,9 +77,9 @@ func (q *Queries) AdoptReplicaRoom(ctx context.Context, arg AdoptReplicaRoomPara
 	return err
 }
 
-const assignRemoteToIssue = `-- name: AssignRemoteToIssue :exec
-INSERT INTO issue_remote_assignees (issue_id, address, home_server)
-VALUES ($1, $2, $3)
+const assignRemoteToIssue = `-- name: AssignRemoteToIssue :execrows
+INSERT INTO issue_remote_assignees (issue_id, address, home_server, assigned_by)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT DO NOTHING
 `
 
@@ -87,11 +87,20 @@ type AssignRemoteToIssueParams struct {
 	IssueID    uuid.UUID
 	Address    string
 	HomeServer string
+	AssignedBy *uuid.UUID
 }
 
-func (q *Queries) AssignRemoteToIssue(ctx context.Context, arg AssignRemoteToIssueParams) error {
-	_, err := q.db.Exec(ctx, assignRemoteToIssue, arg.IssueID, arg.Address, arg.HomeServer)
-	return err
+func (q *Queries) AssignRemoteToIssue(ctx context.Context, arg AssignRemoteToIssueParams) (int64, error) {
+	result, err := q.db.Exec(ctx, assignRemoteToIssue,
+		arg.IssueID,
+		arg.Address,
+		arg.HomeServer,
+		arg.AssignedBy,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const claimReplicaWork = `-- name: ClaimReplicaWork :many
@@ -419,6 +428,23 @@ WHERE pr.discarding AND rp.peer = pr.server
 func (q *Queries) StopDeliveringToDiscarding(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, stopDeliveringToDiscarding)
 	return err
+}
+
+const unassignRemoteFromIssue = `-- name: UnassignRemoteFromIssue :execrows
+DELETE FROM issue_remote_assignees WHERE issue_id = $1 AND address = $2
+`
+
+type UnassignRemoteFromIssueParams struct {
+	IssueID uuid.UUID
+	Address string
+}
+
+func (q *Queries) UnassignRemoteFromIssue(ctx context.Context, arg UnassignRemoteFromIssueParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unassignRemoteFromIssue, arg.IssueID, arg.Address)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const upsertReplicaCycle = `-- name: UpsertReplicaCycle :exec

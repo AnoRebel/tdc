@@ -263,7 +263,9 @@ func (s *Server) handleAssign(c *echo.Context) error {
 	if err != nil {
 		return structureError(err)
 	}
-	if event != nil {
+	// Somebody on another server is told by their own server, when the
+	// event reaches its replica; only somebody here is told from here.
+	if event != nil && person.ID != uuid.Nil() {
 		user, _ := currentUser(c)
 		s.inBackground(ctx, "assignment notification", func(ctx context.Context) {
 			s.notifyAssignee(ctx, user, person, issue, access.Project, *event)

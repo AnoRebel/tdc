@@ -134,11 +134,6 @@ func (s *Service) CreateIssue(ctx context.Context, actor Actor, access Access, i
 			state = states[0]
 		}
 
-		author, err := q.GetUserByID(ctx, actor.ID)
-		if err != nil {
-			return fmt.Errorf("read author: %w", err)
-		}
-
 		number, err := q.AllocateIssueNumber(ctx, project.ID)
 		if err != nil {
 			return fmt.Errorf("allocate number: %w", err)
@@ -159,24 +154,27 @@ func (s *Service) CreateIssue(ctx context.Context, actor Actor, access Access, i
 			Kind:       "issue-discussion",
 			Visibility: "private",
 			HomeServer: s.rooms.ServerName(),
-			CreatedBy:  &actor.ID,
+			CreatedBy:  actor.Ref(),
 		})
 		if err != nil {
 			return fmt.Errorf("create discussion: %w", err)
 		}
 		// The author takes part from the start, as a room's creator does, and
-		// hears what is said about what they filed.
-		if err := q.AddRoomMember(ctx, dbgen.AddRoomMemberParams{
-			RoomID: discussion.ID, UserID: actor.ID,
-		}); err != nil {
-			return fmt.Errorf("add author to discussion: %w", err)
+		// hears what is said about what they filed — somebody here, that is:
+		// somebody elsewhere hears through their own server's replica.
+		if !actor.Remote() {
+			if err := q.AddRoomMember(ctx, dbgen.AddRoomMemberParams{
+				RoomID: discussion.ID, UserID: actor.ID,
+			}); err != nil {
+				return fmt.Errorf("add author to discussion: %w", err)
+			}
+			if err := q.WatchDiscussion(ctx, dbgen.WatchDiscussionParams{
+				UserID: actor.ID, RoomID: &discussion.ID,
+			}); err != nil {
+				return fmt.Errorf("watch discussion: %w", err)
+			}
 		}
-		if err := q.WatchDiscussion(ctx, dbgen.WatchDiscussionParams{
-			UserID: actor.ID, RoomID: &discussion.ID,
-		}); err != nil {
-			return fmt.Errorf("watch discussion: %w", err)
-		}
-		if _, err := s.appendTo(ctx, q, discussion, author, events.TypeRoomCreated, map[string]any{
+		if _, err := s.appendBy(ctx, q, discussion, actor, events.TypeRoomCreated, map[string]any{
 			"name": discussion.Name, "topic": discussion.Topic,
 			"visibility": discussion.Visibility, "kind": discussion.Kind,
 		}); err != nil {
@@ -190,7 +188,13 @@ func (s *Service) CreateIssue(ctx context.Context, actor Actor, access Access, i
 			Title:       title,
 			Description: description,
 			StateID:     state.ID,
-			AuthorID:    &actor.ID,
+			AuthorID:    actor.Ref(),
+			AuthorAddress: func() *string {
+				if actor.Remote() {
+					return &actor.Address
+				}
+				return nil
+			}(),
 		})
 		if err != nil {
 			return fmt.Errorf("create issue: %w", err)
@@ -210,7 +214,7 @@ func (s *Service) CreateIssue(ctx context.Context, actor Actor, access Access, i
 		if err != nil {
 			return fmt.Errorf("read project stream: %w", err)
 		}
-		if _, err = s.appendTo(ctx, q, stream, author, events.TypeIssueCreated, content); err != nil {
+		if _, err = s.appendBy(ctx, q, stream, actor, events.TypeIssueCreated, content); err != nil {
 			return err
 		}
 		return index(ctx, q, issue)
@@ -324,16 +328,12 @@ func (s *Service) Transition(
 		if err != nil {
 			return err
 		}
-		actorRow, err := q.GetUserByID(ctx, actor.ID)
-		if err != nil {
-			return fmt.Errorf("read actor: %w", err)
-		}
 		stream, err := q.GetRoomByID(ctx, access.Project.ID)
 		if err != nil {
 			return fmt.Errorf("read project stream: %w", err)
 		}
 
-		moved, err = s.moveLocked(ctx, q, stream, actorRow, access.Project, locked, origin, destination)
+		moved, err = s.moveLocked(ctx, q, stream, actor, access.Project, locked, origin, destination)
 		return err
 	})
 	return moved, err
@@ -351,7 +351,7 @@ func (s *Service) moveLocked(
 	ctx context.Context,
 	q *dbgen.Queries,
 	stream dbgen.Room,
-	actor dbgen.User,
+	actor Actor,
 	project dbgen.Project,
 	issue dbgen.Issue,
 	from, to dbgen.IssueState,
@@ -372,7 +372,7 @@ func (s *Service) moveLocked(
 		return dbgen.Issue{}, fmt.Errorf("move issue: %w", err)
 	}
 
-	if _, err := s.appendTo(ctx, q, stream, actor, events.TypeIssueStateChanged,
+	if _, err := s.appendBy(ctx, q, stream, actor, events.TypeIssueStateChanged,
 		issueContent(moved, project.Key, map[string]any{
 			"field":        "state",
 			"previous":     from.ID.String(),
@@ -430,7 +430,7 @@ func (s *Service) Edit(ctx context.Context, actor Actor, access Access, issue db
 			if edited, err = q.SetIssueTitle(ctx, dbgen.SetIssueTitleParams{ID: issue.ID, Title: *title}); err != nil {
 				return fmt.Errorf("set title: %w", err)
 			}
-			if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueTitleChanged,
+			if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueTitleChanged,
 				issueContent(edited, access.Project.Key, map[string]any{
 					"field": "title", "previous": locked.Title, "new": *title,
 				})); err != nil {
@@ -444,7 +444,7 @@ func (s *Service) Edit(ctx context.Context, actor Actor, access Access, issue db
 			}); err != nil {
 				return fmt.Errorf("set description: %w", err)
 			}
-			if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueDescriptionChanged,
+			if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueDescriptionChanged,
 				issueContent(edited, access.Project.Key, map[string]any{
 					"field": "description", "previous": locked.Description, "new": *description,
 				})); err != nil {
@@ -472,7 +472,7 @@ func (s *Service) Delete(ctx context.Context, actor Actor, access Access, issue 
 		return RefusalError{decision}
 	}
 	return s.inTransaction(ctx, func(q *dbgen.Queries) error {
-		deleted, err := q.MarkIssueDeleted(ctx, dbgen.MarkIssueDeletedParams{ID: issue.ID, DeletedBy: &actor.ID})
+		deleted, err := q.MarkIssueDeleted(ctx, dbgen.MarkIssueDeletedParams{ID: issue.ID, DeletedBy: actor.Ref()})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrAlreadyDeleted
 		}
@@ -482,7 +482,7 @@ func (s *Service) Delete(ctx context.Context, actor Actor, access Access, issue 
 		if err := q.UnindexIssue(ctx, issue.ID); err != nil {
 			return fmt.Errorf("unindex issue: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueDeleted,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueDeleted,
 			issueContent(deleted, access.Project.Key, nil))
 	})
 }

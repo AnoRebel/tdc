@@ -70,7 +70,7 @@ func (s *Service) AddState(ctx context.Context, actor Actor, access Access, inpu
 			}
 			return fmt.Errorf("create state: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor,
 			events.TypeProjectStateAdded, stateContent(added))
 	})
 	return added, err
@@ -125,7 +125,7 @@ func (s *Service) UpdateState(
 
 		content := stateContent(updated)
 		content["previous"] = stateContent(state)
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectStateChanged, content)
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectStateChanged, content)
 	})
 	return updated, err
 }
@@ -171,7 +171,7 @@ func (s *Service) ReorderStates(ctx context.Context, actor Actor, access Access,
 		for _, id := range order {
 			names = append(names, id.String())
 		}
-		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID,
+		if err := s.appendProjectEvent(ctx, q, access.Project.ID, actor,
 			events.TypeProjectStateChanged, map[string]any{"order": names}); err != nil {
 			return err
 		}
@@ -238,10 +238,6 @@ func (s *Service) RemoveState(
 				return ErrStateInUse
 			}
 
-			actorRow, err := q.GetUserByID(ctx, actor.ID)
-			if err != nil {
-				return fmt.Errorf("read actor: %w", err)
-			}
 			stream, err := q.GetRoomByID(ctx, access.Project.ID)
 			if err != nil {
 				return fmt.Errorf("read project stream: %w", err)
@@ -271,7 +267,7 @@ func (s *Service) RemoveState(
 					// Moved out by somebody else while this waited for it.
 					continue
 				}
-				if _, err := s.moveLocked(ctx, q, stream, actorRow, access.Project, issue, state, destination); err != nil {
+				if _, err := s.moveLocked(ctx, q, stream, actor, access.Project, issue, state, destination); err != nil {
 					return err
 				}
 			}
@@ -287,6 +283,6 @@ func (s *Service) RemoveState(
 			}
 			return fmt.Errorf("delete state: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectStateRemoved, content)
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectStateRemoved, content)
 	})
 }

@@ -167,7 +167,7 @@ func (s *Service) SetPlanning(ctx context.Context, actor Actor, access Access, t
 		if len(changes) == 0 {
 			return nil
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectUpdated, changes)
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectUpdated, changes)
 	})
 	return updated, err
 }
@@ -322,12 +322,12 @@ func (s *Service) CreateCycle(ctx context.Context, actor Actor, access Access, i
 			ID: uuid.New(), ProjectID: access.Project.ID, Name: name,
 			StartsOn: starts.pg(), EndsOn: ends.pg(),
 			StartsAt: starts.StartIn(zone), EndsAt: ends.EndIn(zone),
-			CreatedBy: &actor.ID,
+			CreatedBy: actor.Ref(),
 		})
 		if err != nil {
 			return fmt.Errorf("create cycle: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectCycleAdded,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectCycleAdded,
 			map[string]any{
 				"cycle": created.ID.String(), "name": name,
 				"startsOn": starts.String(), "endsOn": ends.String(),
@@ -393,7 +393,7 @@ func (s *Service) UpdateCycle(ctx context.Context, actor Actor, access Access, i
 		if err != nil {
 			return fmt.Errorf("update cycle: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectCycleChanged,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectCycleChanged,
 			map[string]any{
 				"cycle": id.String(), "name": name,
 				"startsOn": starts.String(), "endsOn": ends.String(),
@@ -434,7 +434,7 @@ func (s *Service) DeleteCycle(ctx context.Context, actor Actor, access Access, i
 		if err := q.DeleteCycle(ctx, id); err != nil {
 			return fmt.Errorf("delete cycle: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectCycleRemoved,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectCycleRemoved,
 			map[string]any{"cycle": id.String(), "name": cycle.Name})
 	})
 }
@@ -521,7 +521,7 @@ func (s *Service) moveToCycle(
 		_, err = s.appendAsServer(ctx, q, stream, events.TypeIssueCycleChanged, content)
 		return err == nil, err
 	}
-	return true, s.appendProjectEvent(ctx, q, project.ID, actor.ID, events.TypeIssueCycleChanged, content)
+	return true, s.appendProjectEvent(ctx, q, project.ID, *actor, events.TypeIssueCycleChanged, content)
 }
 
 /*
@@ -764,12 +764,12 @@ func (s *Service) CreateMilestone(ctx context.Context, actor Actor, access Acces
 		created, err = q.CreateMilestone(ctx, dbgen.CreateMilestoneParams{
 			ID: uuid.New(), ProjectID: access.Project.ID, Name: name,
 			Description: strings.TrimSpace(input.Description), TargetDate: target, DueAt: due,
-			CreatedBy: &actor.ID,
+			CreatedBy: actor.Ref(),
 		})
 		if err != nil {
 			return fmt.Errorf("create milestone: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMilestoneAdded,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectMilestoneAdded,
 			map[string]any{
 				"milestone": created.ID.String(), "name": name, "description": created.Description,
 				"targetDate": dateText(target),
@@ -819,7 +819,7 @@ func (s *Service) UpdateMilestone(ctx context.Context, actor Actor, access Acces
 		if err != nil {
 			return fmt.Errorf("update milestone: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMilestoneChanged,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectMilestoneChanged,
 			map[string]any{
 				"milestone": id.String(), "name": name, "description": updated.Description,
 				"targetDate":   dateText(target),
@@ -850,7 +850,7 @@ func (s *Service) DeleteMilestone(ctx context.Context, actor Actor, access Acces
 		if err := q.DeleteMilestone(ctx, id); err != nil {
 			return fmt.Errorf("delete milestone: %w", err)
 		}
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeProjectMilestoneRemoved,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeProjectMilestoneRemoved,
 			map[string]any{"milestone": id.String(), "name": milestone.Name})
 	})
 }
@@ -903,7 +903,7 @@ func (s *Service) SetIssueMilestone(ctx context.Context, actor Actor, access Acc
 		previousID, previousName := describe(previous)
 		nextID, nextName := describe(next)
 		changed = true
-		return s.appendProjectEvent(ctx, q, access.Project.ID, actor.ID, events.TypeIssueMilestoneChanged,
+		return s.appendProjectEvent(ctx, q, access.Project.ID, actor, events.TypeIssueMilestoneChanged,
 			issueContent(locked, access.Project.Key, map[string]any{
 				"field": "milestone", "previous": previousID, "new": nextID,
 				"previousName": previousName, "newName": nextName,

@@ -91,8 +91,8 @@ DELETE FROM issue_states WHERE id = $1;
 SELECT id FROM issues WHERE state_id = $1 ORDER BY number;
 
 -- name: CreateIssue :one
-INSERT INTO issues (id, project_id, number, title, description, state_id, author_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO issues (id, project_id, number, title, description, state_id, author_id, author_address)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: GetIssueByID :one

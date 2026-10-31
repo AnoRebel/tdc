@@ -88,19 +88,20 @@ func (q *Queries) CountProjectAdmins(ctx context.Context, projectID uuid.UUID) (
 }
 
 const createIssue = `-- name: CreateIssue :one
-INSERT INTO issues (id, project_id, number, title, description, state_id, author_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO issues (id, project_id, number, title, description, state_id, author_id, author_address)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id, project_id, number, title, description, state_id, author_id, created_at, updated_at, deleted_at, deleted_by, priority_id, author_address
 `
 
 type CreateIssueParams struct {
-	ID          uuid.UUID
-	ProjectID   uuid.UUID
-	Number      int64
-	Title       string
-	Description string
-	StateID     uuid.UUID
-	AuthorID    *uuid.UUID
+	ID            uuid.UUID
+	ProjectID     uuid.UUID
+	Number        int64
+	Title         string
+	Description   string
+	StateID       uuid.UUID
+	AuthorID      *uuid.UUID
+	AuthorAddress *string
 }
 
 func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error) {
@@ -112,6 +113,7 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 		arg.Description,
 		arg.StateID,
 		arg.AuthorID,
+		arg.AuthorAddress,
 	)
 	var i Issue
 	err := row.Scan(
