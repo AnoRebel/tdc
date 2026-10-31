@@ -105,6 +105,13 @@ export interface Project {
   cyclePolicy: CyclePolicy;
   /** Whether its administrators have opened it to other servers. */
   federated: boolean;
+  /**
+   * The server it lives on, for a replica held here; absent for a project of
+   * this server's own. A replica is read here and changed on its home.
+   */
+  home?: string;
+  /** Why a replica stopped following its home, when it has. */
+  replicaError?: string;
 }
 
 export interface ProjectMember {

@@ -1500,6 +1500,10 @@
       "carriedOut": "When {from} ended, the server took this out of it, with no next cycle to carry it to",
       "server": "The server"
     },
+    "replica": {
+      "from": "Shared from {home}. You can read it here; changes are made on {home}.",
+      "stopped": "This copy has stopped following {home}, which recorded something this server does not understand yet. It shows the project as it was until this server is updated."
+    },
     "federation": {
       "title": "Other servers",
       "label": "Open to other servers",

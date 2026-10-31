@@ -92,6 +92,20 @@ onMounted(async () => {
       <slot name="actions" />
     </div>
     <p
+      v-if="props.project.home"
+      class="flex items-center gap-1.5 px-4 pb-1.5 text-xs text-muted-foreground"
+    >
+      <Icon name="lucide:globe" class="size-3.5 shrink-0" aria-hidden="true" />
+      {{ $ts("projects.replica.from", { home: props.project.home }) }}
+    </p>
+    <p
+      v-if="props.project.replicaError"
+      role="alert"
+      class="mx-4 mb-1.5 rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive"
+    >
+      {{ $ts("projects.replica.stopped", { home: props.project.home ?? "" }) }}
+    </p>
+    <p
       v-if="linked.length"
       class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pb-1.5 text-xs text-muted-foreground"
     >

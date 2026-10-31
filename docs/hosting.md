@@ -873,6 +873,13 @@ as `project.federation.changed`. People from other servers are then added to a
 project by address, refused if their server is one you do not federate with. See
 [People on other servers](projects.md#people-on-other-servers).
 
+A server hosting a member gets a copy of the project, kept up to date
+automatically, as are federated rooms: events are sent within seconds, retried
+with backoff while a server is away, and abandoned past the retry ceiling until
+you resume it. This server reaches another at the address its rooms' peers
+record for it, or at an entry in `federation.allowed_servers` written as a full
+address — `https://their.server:8443` — or else at `https://` and its name.
+
 ### If a signing key is compromised
 
 Rotate it. That is the only mechanism, and you should know what it does not do.

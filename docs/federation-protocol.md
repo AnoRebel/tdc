@@ -627,10 +627,9 @@ a person on another server sees them in the call's state but cannot do them.
 
 ## A project's stream
 
-> **Status.** Projects are not yet shared between servers: nothing below is
-> sent to a peer today. It is written down now because a server holding a copy
-> of a project will rebuild the project from exactly this, and the event family
-> is part of what `tdc/1` will carry.
+> **Status.** A project's home server shares it with the servers hosting its
+> members, which hold read-only replicas. Changes made on a replica are not yet
+> sent back to the home server.
 
 A project is shared only once its administrators open it to federation, and
 until then a federated request about it is answered as though it did not
@@ -706,6 +705,51 @@ runs. The rules a second implementation needs:
   skip the event: a projection that skipped what it did not understand would
   disagree with its source without saying so. The project stays as it was at
   the event before, and says why.
+
+### Sharing a project
+
+The home server decides which servers hold a replica: every server hosting at
+least one member of a project opened to federation. It tells each, then sends
+the project's events through the same delivery as a room's.
+
+**Offer.** `POST /api/federation/projects/offer`, signed by the home server:
+
+```json
+{ "project": "<uuid>", "name": "Website", "visibility": "private", "members": ["dalila@b.example"] }
+```
+
+The receiving server accepts, with `200`, only if one of the named members is
+somebody it hosts — otherwise `404`, so a peer cannot make another server hold
+whatever it likes. Accepting adopts a room of kind `project` under the home's
+own identifier, with the home as its home server and its peer, and creates no
+rows yet. A room by that identifier that is the receiving server's own, or
+another home's, is never touched. Once the offer is accepted, the home server
+treats the replica as a peer of the project's room and of every issue's
+discussion room, issues filed later included, and delivers their events from
+the start.
+
+**Replica.** The receiving server applies the project's stream as in
+[Rebuilding a project from its stream](#rebuilding-a-project-from-its-stream)
+each time events arrive, and writes its tables from the result alone. An
+issue's discussion room is created there, under the issue's identifier, when the
+projection first holds the issue, so a home server sends the project's room
+before discussion rooms. The replica's key is the home's key followed by `@`
+and the home's name — `WEB@a.example` — so it can never take the key of a
+project of the receiving server's own, and its issues read as
+`WEB@a.example-12` there. People of the receiving server are its members and
+assignees by account, and everybody else by address. A replica refuses every
+change made locally, saying which server the project lives on.
+
+**Discard.** When a server no longer hosts any member, or the project is closed
+to federation, the home server stops delivering to it at once and sends
+`POST /api/federation/projects/discard` with `{"project": "<uuid>"}`, retried
+with backoff until answered. The receiving server removes the replica, its
+issues' discussion rooms and everything in them, but only for a project whose
+home is the signing server, and answers `200` with `{"discarded": true|false}`
+either way. A server entitled again is offered the project afresh.
+
+A replica never offers a project to anybody, and never delivers its events: only
+a room's home server sends its events on.
 
 Not in the stream, and so never part of a projection: when each row was
 written on the home server, saved views, who follows a discussion, and the

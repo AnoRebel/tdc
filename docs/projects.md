@@ -500,10 +500,28 @@ administrators, and a member what it gives members. Roles their own server gives
 them, and grants this server's roles carry, do not apply to them. Only
 administrators on this server count towards a project's last administrator.
 
-Closing a project again keeps its members from elsewhere listed and shares
-nothing with anybody. Nothing about a project reaches another server yet, and
-somebody on another server cannot yet be assigned an issue: both come with
-sharing a project's contents, which is still being built.
+### On their server
+
+Their server gets the project: its board, its lists, its cycles, milestones and
+progress, and every issue's discussion, kept up to date as the project changes
+here. Only servers hosting one of its members get it, private or public. It
+appears there under a key naming this server, `WEB@your.server`, and its issues
+as `WEB@your.server-12`, so it can never be mistaken for a project of their own.
+Its header says where it lives.
+
+There it can be read but not changed: filing, moving and assigning are done on
+the project's home, and for now that means here. Changes made on their server,
+and comments from there, are still being built.
+
+When the last of a server's members leaves the project, or the project is closed
+to other servers, that server is told to discard its copy, and nothing more is
+sent to it. Closing a project keeps its members from elsewhere listed, so
+opening it again shares it with them again.
+
+If the project's home records something their server does not understand yet —
+a newer kind of change — their copy stops there and says so, rather than
+skipping it and quietly showing something different from the home. It catches
+up once their server is updated.
 
 ## Discussing an issue
 
