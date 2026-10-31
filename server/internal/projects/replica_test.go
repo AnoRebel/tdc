@@ -132,6 +132,24 @@ func TestAReplicaHoldsWhatItsStreamSays(t *testing.T) {
 		t.Fatalf("before the home changes anything, the replica holds %d states (%v), want 4", len(held.States), err)
 	}
 
+	// A view somebody here keeps of the replica is theirs, not the project's:
+	// saved while the home is read-only to them, and kept through what follows.
+	dalila, err := live.queries.GetUserByUsername(ctx, "dalila")
+	must(err)
+	reader := projects.Actor{ID: dalila.ID, Permissions: authz.Resolve(nil)}
+	seen, err := live.projects.ProjectByKey(ctx, reader, "FED@"+testServerName)
+	must(err)
+	labelled := projects.BoardFilter{Label: "backend"}
+	view, err := live.projects.SaveView(ctx, reader, &seen, projects.NewView{
+		Name: "Backend", Layout: "board", Filter: projects.ViewFilter{Label: labelled.Label}, Shared: true,
+	})
+	if err != nil {
+		t.Fatalf("a member could not keep a view of the replica: %v", err)
+	}
+	if board, err := live.projects.Board(ctx, seen, labelled, 0); err != nil || cardsOn(board) != 1 {
+		t.Errorf("the view's board shows %d issues (%v), want the one labelled", cardsOn(board), err)
+	}
+
 	// Then the home changes things the replica already holds.
 	inProgress := uuid.Nil()
 	for _, state := range f.states(t, access) {
@@ -177,10 +195,7 @@ func TestAReplicaHoldsWhatItsStreamSays(t *testing.T) {
 		t.Error("the replica still holds a state its home removed")
 	}
 
-	dalila, err := live.queries.GetUserByUsername(ctx, "dalila")
-	must(err)
-	reader := projects.Actor{ID: dalila.ID, Permissions: authz.Resolve(nil)}
-	seen, err := live.projects.ProjectByKey(ctx, reader, "FED@"+testServerName)
+	seen, err = live.projects.ProjectByKey(ctx, reader, "FED@"+testServerName)
 	if err != nil {
 		t.Fatalf("a member on the replica cannot see the project under its home's key: %v", err)
 	}
@@ -194,12 +209,17 @@ func TestAReplicaHoldsWhatItsStreamSays(t *testing.T) {
 	}
 	board, err := live.projects.Board(ctx, seen, projects.BoardFilter{}, 0)
 	must(err)
-	cards := 0
-	for _, column := range board.Columns {
-		cards += len(column.Cards)
-	}
-	if cards != 2 {
+	if cards := cardsOn(board); cards != 2 {
 		t.Errorf("the replica's board shows %d issues, want 2", cards)
+	}
+	if kept, _, err := live.projects.OpenView(ctx, reader, view.ID); err != nil || kept.Name != "Backend" {
+		t.Errorf("the view kept of the replica is gone after it followed its home: %v", err)
+	}
+	if views, err := live.projects.Views(ctx, reader, &seen); err != nil || len(views) != 1 {
+		t.Errorf("the replica lists %d views (%v), want the one kept", len(views), err)
+	}
+	if board, err := live.projects.Board(ctx, seen, labelled, 0); err != nil || cardsOn(board) != 0 {
+		t.Errorf("the view's board shows %d issues (%v); its home took the label off", cardsOn(board), err)
 	}
 	if _, _, err := live.projects.IssueByIdentifier(ctx, reader, "FED@"+testServerName+"-1"); err != nil {
 		t.Errorf("an issue cannot be found by its identifier on the replica: %v", err)
@@ -207,6 +227,14 @@ func TestAReplicaHoldsWhatItsStreamSays(t *testing.T) {
 	if _, _, err := live.projects.IssueByIdentifier(ctx, reader, "FED-1"); err == nil {
 		t.Error("FED-1 names the replica's issue, as though the project were this server's")
 	}
+}
+
+func cardsOn(board projects.Board) int {
+	cards := 0
+	for _, column := range board.Columns {
+		cards += len(column.Cards)
+	}
+	return cards
 }
 
 /*
@@ -253,6 +281,21 @@ func TestAReplicaStopsAtWhatItCannotApplyAndIsDiscardedByItsHome(t *testing.T) {
 		t.Fatal(err)
 	}
 	sameRows(t, "the stopped replica", after, "the replica before", before)
+
+	// Once it can apply its stream — here, the event it could not is gone, as
+	// though this server were updated — it resumes without waiting for more.
+	if err := r.projects.ResumeIfStopped(ctx, room); err == nil {
+		t.Error("a replica still unable to apply its stream resumed")
+	}
+	if _, err := r.pool.Exec(ctx, "DELETE FROM events WHERE id = $1", unknown.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.projects.ResumeIfStopped(ctx, room); err != nil {
+		t.Fatal(err)
+	}
+	if project, err = r.queries.GetProjectByID(ctx, access.Project.ID); err != nil || project.ReplicaError != "" {
+		t.Errorf("the replica is still stopped: %q (%v)", project.ReplicaError, err)
+	}
 
 	if removed, err := r.projects.DiscardReplica(ctx, access.Project.ID, "somebody.else"); err != nil || removed {
 		t.Fatalf("another server had the replica discarded: %v %v", removed, err)

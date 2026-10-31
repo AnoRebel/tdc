@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -33,6 +34,9 @@ type fakePeer struct {
 	mu    sync.Mutex
 	files map[string][]byte // digest → bytes served for it
 	asked int
+	// stream, when set, is a room's events served to a catch-up, a page of
+	// at most 200 from the sequence asked for.
+	stream []events.Event
 }
 
 func newFakePeer(t *testing.T, id string, named ...string) *fakePeer {
@@ -54,6 +58,19 @@ func newFakePeer(t *testing.T, id string, named ...string) *fakePeer {
 	mux.HandleFunc("/api/federation/rooms/", func(w http.ResponseWriter, r *http.Request) {
 		digest := r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
 		peer.mu.Lock()
+		if digest == "events" && peer.stream != nil {
+			since, _ := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
+			page := []events.Event{}
+			for _, event := range peer.stream {
+				if event.Sequence > since && len(page) < 200 {
+					page = append(page, event)
+				}
+			}
+			peer.asked++
+			peer.mu.Unlock()
+			_ = json.NewEncoder(w).Encode(map[string]any{"events": page, "more": len(page) == 200})
+			return
+		}
 		data, ok := peer.files[digest]
 		peer.asked++
 		peer.mu.Unlock()

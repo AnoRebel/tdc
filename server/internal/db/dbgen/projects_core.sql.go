@@ -175,7 +175,7 @@ const createProject = `-- name: CreateProject :one
 
 INSERT INTO projects (id, key, key_folded, name, description, visibility, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error, home_unreachable_since
 `
 
 type CreateProjectParams struct {
@@ -216,6 +216,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.StreamComplete,
 		&i.Federated,
 		&i.ReplicaError,
+		&i.HomeUnreachableSince,
 	)
 	return i, err
 }
@@ -304,7 +305,7 @@ func (q *Queries) GetIssueState(ctx context.Context, id uuid.UUID) (IssueState, 
 }
 
 const getProjectByID = `-- name: GetProjectByID :one
-SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error FROM projects WHERE id = $1
+SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error, home_unreachable_since FROM projects WHERE id = $1
 `
 
 func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, error) {
@@ -326,12 +327,13 @@ func (q *Queries) GetProjectByID(ctx context.Context, id uuid.UUID) (Project, er
 		&i.StreamComplete,
 		&i.Federated,
 		&i.ReplicaError,
+		&i.HomeUnreachableSince,
 	)
 	return i, err
 }
 
 const getProjectByKey = `-- name: GetProjectByKey :one
-SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error FROM projects WHERE key_folded = $1
+SELECT id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error, home_unreachable_since FROM projects WHERE key_folded = $1
 `
 
 func (q *Queries) GetProjectByKey(ctx context.Context, keyFolded string) (Project, error) {
@@ -353,6 +355,7 @@ func (q *Queries) GetProjectByKey(ctx context.Context, keyFolded string) (Projec
 		&i.StreamComplete,
 		&i.Federated,
 		&i.ReplicaError,
+		&i.HomeUnreachableSince,
 	)
 	return i, err
 }
@@ -711,7 +714,7 @@ func (q *Queries) ListProjectStream(ctx context.Context, arg ListProjectStreamPa
 }
 
 const listProjectsForUser = `-- name: ListProjectsForUser :many
-SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, projects.replica_error, COALESCE(project_members.role, '')::text AS my_role
+SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, projects.replica_error, projects.home_unreachable_since, COALESCE(project_members.role, '')::text AS my_role
 FROM projects
 LEFT JOIN project_members
        ON project_members.project_id = projects.id
@@ -722,22 +725,23 @@ ORDER BY projects.name
 `
 
 type ListProjectsForUserRow struct {
-	ID              uuid.UUID
-	Key             string
-	KeyFolded       string
-	Name            string
-	Description     string
-	Visibility      string
-	NextIssueNumber int64
-	CreatedBy       *uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	TimeZone        string
-	CyclePolicy     string
-	StreamComplete  bool
-	Federated       bool
-	ReplicaError    string
-	MyRole          string
+	ID                   uuid.UUID
+	Key                  string
+	KeyFolded            string
+	Name                 string
+	Description          string
+	Visibility           string
+	NextIssueNumber      int64
+	CreatedBy            *uuid.UUID
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	TimeZone             string
+	CyclePolicy          string
+	StreamComplete       bool
+	Federated            bool
+	ReplicaError         string
+	HomeUnreachableSince *time.Time
+	MyRole               string
 }
 
 // The projects somebody may see: every public one, and the private ones they
@@ -768,6 +772,7 @@ func (q *Queries) ListProjectsForUser(ctx context.Context, userID uuid.UUID) ([]
 			&i.StreamComplete,
 			&i.Federated,
 			&i.ReplicaError,
+			&i.HomeUnreachableSince,
 			&i.MyRole,
 		); err != nil {
 			return nil, err
@@ -1046,7 +1051,7 @@ const updateProject = `-- name: UpdateProject :one
 UPDATE projects
 SET name = $2, description = $3, visibility = $4, updated_at = NOW()
 WHERE id = $1
-RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error
+RETURNING id, key, key_folded, name, description, visibility, next_issue_number, created_by, created_at, updated_at, time_zone, cycle_policy, stream_complete, federated, replica_error, home_unreachable_since
 `
 
 type UpdateProjectParams struct {
@@ -1080,6 +1085,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.StreamComplete,
 		&i.Federated,
 		&i.ReplicaError,
+		&i.HomeUnreachableSince,
 	)
 	return i, err
 }

@@ -85,7 +85,10 @@ func (s *Server) offerAndWithdraw(ctx context.Context, sender *federation.Sender
 		return
 	}
 	for _, each := range work {
-		address := s.peerAddressFor(ctx, each.Server)
+		address := each.Address
+		if address == "" {
+			address = s.peerAddressFor(ctx, each.Server)
+		}
 		if err := s.replicaWork(ctx, sender, each, address); err != nil {
 			s.log.Warn("a project offer or withdrawal failed", "server", each.Server, "project", each.ProjectID, "error", err.Error())
 			if recordErr := s.projects.ReplicaWorkFailed(ctx, each, err.Error(), federation.RetryDelay(int(each.Failures)+1)); recordErr != nil {
@@ -210,6 +213,11 @@ func (s *Server) atHome(c *echo.Context, access projects.Access, change projects
 	response, err := sender.Send(ctx, s.peerAddressFor(ctx, home), "/api/federation/projects/change", map[string]any{
 		"project": access.Project.ID, "actor": s.rooms.UserAddress(user.Username), "change": change,
 	})
+	// What the change found out about the home is what the minute's check
+	// would: said at once, rather than up to a minute later.
+	if recordErr := s.projects.SetHomeReachable(ctx, access.Project.ID, err == nil); recordErr != nil {
+		s.log.Warn("could not record whether a replica's home answered", "project", access.Project.ID, "error", recordErr.Error())
+	}
 	if err != nil {
 		return 0, echo.NewHTTPError(http.StatusBadGateway, home+" could not be reached, so nothing was changed: "+err.Error())
 	}

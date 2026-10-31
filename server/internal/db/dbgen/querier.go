@@ -75,6 +75,7 @@ type Querier interface {
 	// Closing an engagement's conversation to new messages, keeping what was said.
 	ArchiveEngagementRoom(ctx context.Context, arg ArchiveEngagementRoomParams) error
 	ArchiveRoom(ctx context.Context, arg ArchiveRoomParams) error
+	AskToJoinProject(ctx context.Context, arg AskToJoinProjectParams) (int64, error)
 	// Assignees, labels, priorities and relationships.
 	AssignIssue(ctx context.Context, arg AssignIssueParams) (int64, error)
 	AssignRemoteToIssue(ctx context.Context, arg AssignRemoteToIssueParams) (int64, error)
@@ -410,7 +411,8 @@ type Querier interface {
 	// A replica, its issues' discussions and everything in them, gone.
 	DiscardReplica(ctx context.Context, arg DiscardReplicaParams) (int64, error)
 	// A server no longer hosting any member, or holding a project closed to
-	// federation, is to discard its copy.
+	// federation, is to discard its copy — unless it follows the project and the
+	// project is still public and open.
 	DiscardUnentitledReplicas(ctx context.Context) error
 	// Turning it back on starts the count again; what failed before is history.
 	EnableWebhookSubscription(ctx context.Context, arg EnableWebhookSubscriptionParams) (WebhookSubscription, error)
@@ -491,8 +493,12 @@ type Querier interface {
 	FinishPendingSignIn(ctx context.Context, ticketHash []byte) (PendingSignIn, error)
 	FinishWebhookAttempt(ctx context.Context, arg FinishWebhookAttemptParams) error
 	FirstWaitlisted(ctx context.Context, eventID uuid.UUID) (uuid.UUID, error)
+	// A server following a project is to hold a replica of it, offered afresh if it
+	// was told to discard one. Nothing for a project that may not be followed.
+	FollowProject(ctx context.Context, arg FollowProjectParams) (int64, error)
 	// Following because of taking part, unless the person has already decided.
 	FollowThreadByTakingPart(ctx context.Context, arg FollowThreadByTakingPartParams) error
+	ForgetJoinRequest(ctx context.Context, arg ForgetJoinRequestParams) (int64, error)
 	ForgetNodes(ctx context.Context, arg ForgetNodesParams) error
 	ForgetReplica(ctx context.Context, arg ForgetReplicaParams) error
 	// Moves a mesh call to the forwarding unit on one node. Once only: a call
@@ -1183,6 +1189,9 @@ type Querier interface {
 	// Everybody here in a call another server holds, for the sweep to vouch for or
 	// take out.
 	PresentInRemoteCalls(ctx context.Context) ([]RemoteCall, error)
+	// Every issue of a project, deleted ones too: each is a discussion room.
+	ProjectIssueIDs(ctx context.Context, projectID uuid.UUID) ([]uuid.UUID, error)
+	ProjectJoinRequests(ctx context.Context, projectID uuid.UUID) ([]ProjectJoinRequest, error)
 	// Removes subscriptions that have failed repeatedly without the service ever
 	// saying they are gone.
 	//
@@ -1193,6 +1202,8 @@ type Querier interface {
 	// History older than the retention period. Only finished deliveries: one still
 	// waiting is not history yet, however old.
 	PruneWebhookDeliveries(ctx context.Context, createdAt time.Time) (int64, error)
+	// The projects a trusted peer may follow: public, opened, and this server's own.
+	PublishedProjects(ctx context.Context, max int32) ([]PublishedProjectsRow, error)
 	PublishedRooms(ctx context.Context, limit int32) ([]PublishedRoomsRow, error)
 	PutIntegrationContext(ctx context.Context, arg PutIntegrationContextParams) (IntegrationContext, error)
 	RecentlyNotifiedInRoom(ctx context.Context, arg RecentlyNotifiedInRoomParams) (bool, error)
@@ -1282,6 +1293,9 @@ type Querier interface {
 	RenameUser(ctx context.Context, arg RenameUserParams) (User, error)
 	ReplacePasswordCredential(ctx context.Context, arg ReplacePasswordCredentialParams) (Credential, error)
 	ReplicaOffered(ctx context.Context, arg ReplicaOfferedParams) error
+	// The room of every replica offered here, its project's identifier too —
+	// including one whose first delivery has yet to arrive.
+	ReplicaProjectRooms(ctx context.Context, home string) ([]uuid.UUID, error)
 	ReplicaWorkFailed(ctx context.Context, arg ReplicaWorkFailedParams) error
 	// The heartbeat and the cancellation check in one round trip.
 	ReportOperationProgress(ctx context.Context, arg ReportOperationProgressParams) (bool, error)
@@ -1444,6 +1458,8 @@ type Querier interface {
 	SetEnquiryStatus(ctx context.Context, arg SetEnquiryStatusParams) (int64, error)
 	SetGlobalNotificationPreference(ctx context.Context, arg SetGlobalNotificationPreferenceParams) error
 	SetHidePushContent(ctx context.Context, arg SetHidePushContentParams) error
+	// The first failure is the one remembered: "since" is when it stopped answering.
+	SetHomeReachable(ctx context.Context, arg SetHomeReachableParams) error
 	SetInvisible(ctx context.Context, arg SetInvisibleParams) error
 	SetIssueCycle(ctx context.Context, arg SetIssueCycleParams) error
 	SetIssueDescription(ctx context.Context, arg SetIssueDescriptionParams) (Issue, error)
@@ -1572,6 +1588,8 @@ type Querier interface {
 	// Takes back a recording that could not be recorded in the log, so nobody is
 	// shown as recording what was never announced.
 	UndoCallRecording(ctx context.Context, arg UndoCallRecordingParams) error
+	// No longer followed: the replica stays only while members entitle it.
+	UnfollowProject(ctx context.Context, arg UnfollowProjectParams) error
 	UnindexIssue(ctx context.Context, issueID uuid.UUID) error
 	UnindexMessage(ctx context.Context, eventID string) error
 	UnlabelIssue(ctx context.Context, arg UnlabelIssueParams) (int64, error)

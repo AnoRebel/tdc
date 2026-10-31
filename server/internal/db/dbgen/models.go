@@ -869,21 +869,29 @@ type ProfileVerification struct {
 }
 
 type Project struct {
-	ID              uuid.UUID
-	Key             string
-	KeyFolded       string
-	Name            string
-	Description     string
-	Visibility      string
-	NextIssueNumber int64
-	CreatedBy       *uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	TimeZone        string
-	CyclePolicy     string
-	StreamComplete  bool
-	Federated       bool
-	ReplicaError    string
+	ID                   uuid.UUID
+	Key                  string
+	KeyFolded            string
+	Name                 string
+	Description          string
+	Visibility           string
+	NextIssueNumber      int64
+	CreatedBy            *uuid.UUID
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	TimeZone             string
+	CyclePolicy          string
+	StreamComplete       bool
+	Federated            bool
+	ReplicaError         string
+	HomeUnreachableSince *time.Time
+}
+
+type ProjectJoinRequest struct {
+	ProjectID   uuid.UUID
+	Address     string
+	HomeServer  string
+	RequestedAt time.Time
 }
 
 type ProjectLabel struct {
@@ -930,6 +938,7 @@ type ProjectReplica struct {
 	Failures      int32
 	NextAttemptAt *time.Time
 	LastError     string
+	Followed      bool
 }
 
 type ProjectView struct {

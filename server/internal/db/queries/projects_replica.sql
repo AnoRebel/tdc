@@ -31,6 +31,19 @@ ON CONFLICT (id) DO UPDATE SET
 -- name: SetReplicaError :exec
 UPDATE projects SET replica_error = $2 WHERE id = $1;
 
+-- name: ReplicaProjectRooms :many
+-- The room of every replica offered here, its project's identifier too —
+-- including one whose first delivery has yet to arrive.
+SELECT id FROM rooms WHERE kind = 'project' AND home_server <> sqlc.arg(home);
+
+-- name: SetHomeReachable :exec
+-- The first failure is the one remembered: "since" is when it stopped answering.
+UPDATE projects SET home_unreachable_since = CASE
+    WHEN sqlc.arg(reachable)::bool THEN NULL
+    ELSE COALESCE(home_unreachable_since, NOW())
+END
+WHERE id = sqlc.arg(id);
+
 -- name: ClearReplicaMembers :exec
 DELETE FROM project_members WHERE project_id = $1;
 
@@ -140,13 +153,17 @@ ON CONFLICT (project_id, server) DO UPDATE SET
 
 -- name: DiscardUnentitledReplicas :exec
 -- A server no longer hosting any member, or holding a project closed to
--- federation, is to discard its copy.
+-- federation, is to discard its copy — unless it follows the project and the
+-- project is still public and open.
 UPDATE project_replicas SET discarding = TRUE, failures = 0, next_attempt_at = NULL, last_error = ''
 WHERE NOT discarding AND NOT EXISTS (
     SELECT 1 FROM project_remote_members prm
     JOIN projects ON projects.id = prm.project_id AND projects.federated AND projects.key_folded NOT LIKE '%@%'
     WHERE prm.project_id = project_replicas.project_id AND prm.home_server = project_replicas.server
-);
+) AND NOT (followed AND EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = project_replicas.project_id AND projects.federated AND projects.visibility = 'public'
+));
 
 -- name: StopDeliveringToDiscarding :exec
 -- Nothing more is sent to a server told to discard its copy: its peer rows on
@@ -217,3 +234,47 @@ SELECT EXISTS (
 INSERT INTO room_peers (room_id, peer, address)
 SELECT sqlc.arg(room)::uuid, peer, address FROM room_peers WHERE room_id = sqlc.arg(project)::uuid
 ON CONFLICT (room_id, peer) DO NOTHING;
+
+/*
+Following a public project from another server, and asking to join one.
+*/
+
+-- name: PublishedProjects :many
+-- The projects a trusted peer may follow: public, opened, and this server's own.
+SELECT id, key, name, description FROM projects
+WHERE visibility = 'public' AND federated AND key_folded NOT LIKE '%@%'
+ORDER BY key_folded
+LIMIT sqlc.arg(max);
+
+-- name: FollowProject :execrows
+-- A server following a project is to hold a replica of it, offered afresh if it
+-- was told to discard one. Nothing for a project that may not be followed.
+INSERT INTO project_replicas (project_id, server, address, followed)
+SELECT id, sqlc.arg(server), sqlc.arg(address), TRUE FROM projects
+WHERE id = sqlc.arg(project) AND visibility = 'public' AND federated AND key_folded NOT LIKE '%@%'
+ON CONFLICT (project_id, server) DO UPDATE SET
+    followed = TRUE,
+    address = EXCLUDED.address,
+    discarding = FALSE,
+    offered_at = CASE WHEN project_replicas.discarding THEN NULL ELSE project_replicas.offered_at END,
+    failures = CASE WHEN project_replicas.discarding THEN 0 ELSE project_replicas.failures END,
+    next_attempt_at = CASE WHEN project_replicas.discarding THEN NULL ELSE project_replicas.next_attempt_at END;
+
+-- name: UnfollowProject :exec
+-- No longer followed: the replica stays only while members entitle it.
+UPDATE project_replicas SET followed = FALSE WHERE project_id = $1 AND server = $2;
+
+-- name: AskToJoinProject :execrows
+INSERT INTO project_join_requests (project_id, address, home_server)
+VALUES ($1, $2, $3)
+ON CONFLICT (project_id, address) DO NOTHING;
+
+-- name: ProjectJoinRequests :many
+SELECT * FROM project_join_requests WHERE project_id = $1 ORDER BY requested_at, address;
+
+-- name: ForgetJoinRequest :execrows
+DELETE FROM project_join_requests WHERE project_id = $1 AND address = $2;
+
+-- name: ProjectIssueIDs :many
+-- Every issue of a project, deleted ones too: each is a discussion room.
+SELECT id FROM issues WHERE project_id = $1;

@@ -85,6 +85,8 @@ func run() (restartRequest, error) {
 			"check the configuration and the database this server would start with, change nothing, and exit")
 		translationKey = flag.Bool("translation-key", false,
 			"generate the key that encrypts members' translation provider keys, and exit")
+		rebuildReplica = flag.String("rebuild-replica", "",
+			"bring the copy held here of another server's project (by its key, WEB@home.example) up to date from its stream, and exit")
 	)
 	flag.Parse()
 
@@ -470,6 +472,16 @@ func run() (restartRequest, error) {
 		SessionLifetime: cfg.Server.SessionLifetime,
 		Keepalive:       cfg.Server.Keepalive,
 	}, pool, services, log)
+
+	// An operator's repair, done before anything is served, then gone.
+	if *rebuildReplica != "" {
+		summary, err := server.RebuildReplica(ctx, *rebuildReplica)
+		if err != nil {
+			return restartRequest{}, fmt.Errorf("rebuild %s: %w", *rebuildReplica, err)
+		}
+		fmt.Printf("tdc-server: %s rebuilt: %s\n", *rebuildReplica, summary)
+		return restartRequest{}, nil
+	}
 
 	control := &controller{
 		configPath: *configPath, level: level, log: log, server: server,

@@ -67,6 +67,18 @@ var notWrites = map[string]string{
 	"Apply":                     "makes the writes this test makes, for somebody elsewhere",
 	"HoldsReplica":              "reads",
 	"DiscussionMemberElsewhere": "reads",
+	"Replicas":                  "reads",
+	"ReplicaByKey":              "reads",
+	"Discussions":               "reads",
+	"Published":                 "reads",
+	"JoinRequests":              "reads",
+	"SetHomeReachable":          "a replica's note of whether its home answers, not part of the project",
+	"ResumeIfStopped":           "replays a replica, as Replicate does",
+	"Follow":                    "bookkeeping of which servers hold a replica",
+	"Unfollow":                  "bookkeeping of which servers hold a replica",
+	"Following":                 "starts a replica",
+	"AskToJoin":                 "a request for the project's administrators, never part of the project",
+	"DecideJoinRequest":         "lets somebody in through SetMember, which this test makes",
 }
 
 // step is one change the scenario makes, named by the method it goes through.

@@ -15,29 +15,30 @@ import (
 
 const getProjectForStream = `-- name: GetProjectForStream :one
 
-SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, projects.replica_error, COALESCE(creator.username, '')::text AS created_by_username
+SELECT projects.id, projects.key, projects.key_folded, projects.name, projects.description, projects.visibility, projects.next_issue_number, projects.created_by, projects.created_at, projects.updated_at, projects.time_zone, projects.cycle_policy, projects.stream_complete, projects.federated, projects.replica_error, projects.home_unreachable_since, COALESCE(creator.username, '')::text AS created_by_username
 FROM projects
 LEFT JOIN users creator ON creator.id = projects.created_by
 WHERE projects.id = $1
 `
 
 type GetProjectForStreamRow struct {
-	ID                uuid.UUID
-	Key               string
-	KeyFolded         string
-	Name              string
-	Description       string
-	Visibility        string
-	NextIssueNumber   int64
-	CreatedBy         *uuid.UUID
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	TimeZone          string
-	CyclePolicy       string
-	StreamComplete    bool
-	Federated         bool
-	ReplicaError      string
-	CreatedByUsername string
+	ID                   uuid.UUID
+	Key                  string
+	KeyFolded            string
+	Name                 string
+	Description          string
+	Visibility           string
+	NextIssueNumber      int64
+	CreatedBy            *uuid.UUID
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+	TimeZone             string
+	CyclePolicy          string
+	StreamComplete       bool
+	Federated            bool
+	ReplicaError         string
+	HomeUnreachableSince *time.Time
+	CreatedByUsername    string
 }
 
 // A project's rows as its stream describes them, and the stream's own pages.
@@ -65,6 +66,7 @@ func (q *Queries) GetProjectForStream(ctx context.Context, id uuid.UUID) (GetPro
 		&i.StreamComplete,
 		&i.Federated,
 		&i.ReplicaError,
+		&i.HomeUnreachableSince,
 		&i.CreatedByUsername,
 	)
 	return i, err

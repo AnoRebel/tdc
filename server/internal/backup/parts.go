@@ -186,6 +186,7 @@ var partTables = map[Part][]tableSpec{
 		{name: "milestones"},
 		{name: "issue_milestone"},
 		{name: "project_replicas"},
+		{name: "project_join_requests"},
 	},
 	PartDirectory: {
 		{name: "skills"},

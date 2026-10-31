@@ -251,6 +251,11 @@ type projectResponse struct {
 	// server's own; ReplicaError is why a replica stopped following it.
 	Home         string `json:"home,omitempty"`
 	ReplicaError string `json:"replicaError,omitempty"`
+	// HomeUnreachableSince is when a replica's home stopped answering.
+	HomeUnreachableSince *time.Time `json:"homeUnreachableSince,omitempty"`
+	// JoinRequests is how many people elsewhere are waiting to be let in, for
+	// whoever may let them.
+	JoinRequests int `json:"joinRequests,omitempty"`
 }
 
 func projectResponseOf(project dbgen.Project, role string) projectResponse {
@@ -267,6 +272,8 @@ func projectResponseOf(project dbgen.Project, role string) projectResponse {
 		Federated:    project.Federated,
 		Home:         projects.HomeOf(project),
 		ReplicaError: project.ReplicaError,
+
+		HomeUnreachableSince: project.HomeUnreachableSince,
 	}
 }
 
@@ -283,6 +290,11 @@ func (s *Server) fullProject(ctx context.Context, access projects.Access) (proje
 	}
 	abilities := abilitiesOf(access)
 	response.Can = &abilities
+	if access.Project.Federated {
+		if waiting, err := s.projects.JoinRequests(ctx, access); err == nil {
+			response.JoinRequests = len(waiting)
+		}
+	}
 
 	labels, err := s.projects.Labels(ctx, access.Project.ID)
 	if err != nil {

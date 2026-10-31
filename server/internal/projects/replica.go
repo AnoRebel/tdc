@@ -35,6 +35,50 @@ func HomeOf(project dbgen.Project) string {
 	return home
 }
 
+// Replicas lists every replica offered here, by identifier — its project room's.
+func (s *Service) Replicas(ctx context.Context) ([]uuid.UUID, error) {
+	return s.queries.ReplicaProjectRooms(ctx, s.rooms.ServerName())
+}
+
+// Discussions lists the rooms of a project's issues' discussions, which share
+// their issues' identifiers.
+func (s *Service) Discussions(ctx context.Context, projectID uuid.UUID) ([]uuid.UUID, error) {
+	return s.queries.ProjectIssueIDs(ctx, projectID)
+}
+
+// ReplicaByKey finds a replica held here by its key, WEB@home.example; a
+// project of this server's own is not one.
+func (s *Service) ReplicaByKey(ctx context.Context, key string) (dbgen.Project, error) {
+	project, err := s.queries.GetProjectByKey(ctx, strings.ToLower(strings.TrimSpace(key)))
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !IsReplica(project)) {
+		return dbgen.Project{}, ErrProjectNotFound
+	}
+	return project, err
+}
+
+/*
+ResumeIfStopped replays a replica that stopped at an event it could not apply.
+
+Nothing else would: a replica is replayed when events arrive, and one stopped
+before this server was updated to understand them waits for the next — which,
+in a quiet project, may be a long wait.
+*/
+func (s *Service) ResumeIfStopped(ctx context.Context, room dbgen.Room) error {
+	project, err := s.queries.GetProjectByID(ctx, room.ID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && project.ReplicaError == "") {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return s.Replicate(ctx, room)
+}
+
+// SetHomeReachable records whether a replica's home answered when last asked.
+func (s *Service) SetHomeReachable(ctx context.Context, projectID uuid.UUID, reachable bool) error {
+	return s.queries.SetHomeReachable(ctx, dbgen.SetHomeReachableParams{ID: projectID, Reachable: reachable})
+}
+
 /*
 Replicate brings a replica up to what its stream says.
 
@@ -404,6 +448,12 @@ func (s *Service) OfferFor(ctx context.Context, work ReplicaWork) (Offer, error)
 	return Offer{Project: project.ID, Name: project.Name, Visibility: project.Visibility, Members: members}, nil
 }
 
+// follows reports whether this server asked to follow the public project offered.
+func (s *Service) follows(ctx context.Context, offer Offer, home string) bool {
+	room, err := s.queries.GetRoomByID(ctx, offer.Project)
+	return err == nil && offer.Visibility == "public" && room.Kind == "project" && strings.EqualFold(room.HomeServer, home)
+}
+
 // ReplicaOffered records that a server accepted a project, at the address it
 // was reached at, so its events are delivered there from the next pass.
 func (s *Service) ReplicaOffered(ctx context.Context, work ReplicaWork, address string) error {
@@ -443,7 +493,9 @@ func (s *Service) AcceptOffer(ctx context.Context, offer Offer, home, homeAddres
 			named = true
 		}
 	}
-	if !named {
+	// Or nobody, for a public project this server asked to follow — whose
+	// room it adopted when its home agreed.
+	if !named && !s.follows(ctx, offer, home) {
 		return ErrNobodyHere
 	}
 	visibility := offer.Visibility

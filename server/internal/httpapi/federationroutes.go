@@ -943,43 +943,55 @@ func (s *Server) catchUp(ctx context.Context, room dbgen.Room) (int, int, error)
 		s.federationTrust(ctx), allowPrivate)
 
 	home := peers[0]
-	held, err := s.rooms.HighestSequence(ctx, room.ID)
-	if err != nil {
-		return 0, 0, &catchUpRefusedError{http.StatusInternalServerError, "could not read the room"}
-	}
-
 	address := home.Address
 	if address == "" {
 		address = "https://" + home.Peer
 	}
 
-	batch, err := sender.FetchEvents(ctx, address, rooms.LocalPart(room), held)
-	if err != nil {
-		return 0, 0, err
+	// A batch at a time until the home has nothing more, within a bound so a
+	// home that never stops sending cannot hold this up for ever.
+	var keyring *events.Keyring
+	fetched, stored := 0, 0
+	for range maxCatchUpBatches {
+		held, err := s.rooms.HighestSequence(ctx, room.ID)
+		if err != nil {
+			return fetched, stored, &catchUpRefusedError{http.StatusInternalServerError, "could not read the room"}
+		}
+		batch, err := sender.FetchEvents(ctx, address, rooms.LocalPart(room), held)
+		if err != nil {
+			return fetched, stored, err
+		}
+		if len(batch) == 0 {
+			break
+		}
+		discovery, _ := s.federationState()
+		if keyring == nil {
+			document, err := discovery.Discover(ctx, address)
+			if err != nil {
+				return fetched, stored, &catchUpRefusedError{http.StatusBadGateway, "could not fetch the home server's keys"}
+			}
+			if keyring, err = document.Keyring(); err != nil {
+				return fetched, stored, &catchUpRefusedError{http.StatusBadGateway, "the home server publishes no usable keys"}
+			}
+		}
+		accepted, err := s.rooms.AcceptForeignEvents(ctx, room, home.Peer, keyring, discovery, batch)
+		if err != nil {
+			s.log.Warn("refused events fetched during catch-up",
+				"room", room.ID, "peer", home.Peer, "error", err)
+			return fetched, stored, &catchUpRefusedError{http.StatusUnprocessableEntity, err.Error()}
+		}
+		s.arrived(ctx, room, accepted)
+		fetched, stored = fetched+len(batch), stored+len(accepted)
+		if len(batch) < maxEventsPerBatch || len(accepted) == 0 {
+			break
+		}
 	}
-	if len(batch) == 0 {
-		return 0, 0, nil
-	}
-
-	discovery, _ := s.federationState()
-	document, err := discovery.Discover(ctx, address)
-	if err != nil {
-		return 0, 0, &catchUpRefusedError{http.StatusBadGateway, "could not fetch the home server's keys"}
-	}
-	keyring, err := document.Keyring()
-	if err != nil {
-		return 0, 0, &catchUpRefusedError{http.StatusBadGateway, "the home server publishes no usable keys"}
-	}
-
-	stored, err := s.rooms.AcceptForeignEvents(ctx, room, home.Peer, keyring, discovery, batch)
-	if err != nil {
-		s.log.Warn("refused events fetched during catch-up",
-			"room", room.ID, "peer", home.Peer, "error", err)
-		return 0, 0, &catchUpRefusedError{http.StatusUnprocessableEntity, err.Error()}
-	}
-	s.arrived(ctx, room, stored)
-	return len(batch), len(stored), nil
+	return fetched, stored, nil
 }
+
+// maxCatchUpBatches bounds one catch-up: ten thousand events at the usual
+// batch size, after which the next asks for the rest.
+const maxCatchUpBatches = 50
 
 /*
 handleFederatedJoin admits somebody from a peer into a room this server owns.

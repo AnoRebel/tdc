@@ -460,3 +460,36 @@ func (s *Sender) BrowseRooms(ctx context.Context, peer string) ([]PublishedRoom,
 	}
 	return answer.Rooms, nil
 }
+
+// Get asks a peer for something, signed over an empty body as every federated
+// GET is, and decodes its answer into into.
+func (s *Sender) Get(ctx context.Context, peer, path string, into any) error {
+	if allowed, why := s.trust.Allows(peer); !allowed {
+		return fmt.Errorf("refusing to reach %s: %w", peer, why)
+	}
+	endpoint, err := peerURL(peer, path)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("build the request: %w", err)
+	}
+	request.Header.Set("TDC-Origin-Server", s.origin)
+	if err := Sign(request, nil, s.keyring, s.now()); err != nil {
+		return fmt.Errorf("sign the request: %w", err)
+	}
+	response, err := s.client.Do(request)
+	if err != nil {
+		return fmt.Errorf("reach %s: %w", peer, err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		reason, _ := io.ReadAll(io.LimitReader(response.Body, 4<<10))
+		return fmt.Errorf("peer %s refused the request: %s: %s", peer, response.Status, strings.TrimSpace(string(reason)))
+	}
+	if err := json.NewDecoder(response.Body).Decode(into); err != nil {
+		return fmt.Errorf("peer %s gave an unreadable answer: %w", peer, err)
+	}
+	return nil
+}

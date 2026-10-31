@@ -77,6 +77,26 @@ func (q *Queries) AdoptReplicaRoom(ctx context.Context, arg AdoptReplicaRoomPara
 	return err
 }
 
+const askToJoinProject = `-- name: AskToJoinProject :execrows
+INSERT INTO project_join_requests (project_id, address, home_server)
+VALUES ($1, $2, $3)
+ON CONFLICT (project_id, address) DO NOTHING
+`
+
+type AskToJoinProjectParams struct {
+	ProjectID  uuid.UUID
+	Address    string
+	HomeServer string
+}
+
+func (q *Queries) AskToJoinProject(ctx context.Context, arg AskToJoinProjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, askToJoinProject, arg.ProjectID, arg.Address, arg.HomeServer)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const assignRemoteToIssue = `-- name: AssignRemoteToIssue :execrows
 INSERT INTO issue_remote_assignees (issue_id, address, home_server, assigned_by)
 VALUES ($1, $2, $3, $4)
@@ -113,7 +133,7 @@ WHERE (project_id, server) IN (
     LIMIT $1
     FOR UPDATE SKIP LOCKED
 )
-RETURNING project_id, server, address, offered_at, discarding, failures, next_attempt_at, last_error
+RETURNING project_id, server, address, offered_at, discarding, failures, next_attempt_at, last_error, followed
 `
 
 // Offers to make and discards to announce, claimed for one pass the way peers
@@ -136,6 +156,7 @@ func (q *Queries) ClaimReplicaWork(ctx context.Context, max int32) ([]ProjectRep
 			&i.Failures,
 			&i.NextAttemptAt,
 			&i.LastError,
+			&i.Followed,
 		); err != nil {
 			return nil, err
 		}
@@ -225,11 +246,15 @@ WHERE NOT discarding AND NOT EXISTS (
     SELECT 1 FROM project_remote_members prm
     JOIN projects ON projects.id = prm.project_id AND projects.federated AND projects.key_folded NOT LIKE '%@%'
     WHERE prm.project_id = project_replicas.project_id AND prm.home_server = project_replicas.server
-)
+) AND NOT (followed AND EXISTS (
+    SELECT 1 FROM projects
+    WHERE projects.id = project_replicas.project_id AND projects.federated AND projects.visibility = 'public'
+))
 `
 
 // A server no longer hosting any member, or holding a project closed to
-// federation, is to discard its copy.
+// federation, is to discard its copy — unless it follows the project and the
+// project is still public and open.
 func (q *Queries) DiscardUnentitledReplicas(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, discardUnentitledReplicas)
 	return err
@@ -247,6 +272,52 @@ WHERE (rooms.id = projects.id OR rooms.id IN (SELECT id FROM issues WHERE issues
 func (q *Queries) FederateProjectRooms(ctx context.Context, home string) error {
 	_, err := q.db.Exec(ctx, federateProjectRooms, home)
 	return err
+}
+
+const followProject = `-- name: FollowProject :execrows
+INSERT INTO project_replicas (project_id, server, address, followed)
+SELECT id, $1, $2, TRUE FROM projects
+WHERE id = $3 AND visibility = 'public' AND federated AND key_folded NOT LIKE '%@%'
+ON CONFLICT (project_id, server) DO UPDATE SET
+    followed = TRUE,
+    address = EXCLUDED.address,
+    discarding = FALSE,
+    offered_at = CASE WHEN project_replicas.discarding THEN NULL ELSE project_replicas.offered_at END,
+    failures = CASE WHEN project_replicas.discarding THEN 0 ELSE project_replicas.failures END,
+    next_attempt_at = CASE WHEN project_replicas.discarding THEN NULL ELSE project_replicas.next_attempt_at END
+`
+
+type FollowProjectParams struct {
+	Server  string
+	Address string
+	Project uuid.UUID
+}
+
+// A server following a project is to hold a replica of it, offered afresh if it
+// was told to discard one. Nothing for a project that may not be followed.
+func (q *Queries) FollowProject(ctx context.Context, arg FollowProjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, followProject, arg.Server, arg.Address, arg.Project)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const forgetJoinRequest = `-- name: ForgetJoinRequest :execrows
+DELETE FROM project_join_requests WHERE project_id = $1 AND address = $2
+`
+
+type ForgetJoinRequestParams struct {
+	ProjectID uuid.UUID
+	Address   string
+}
+
+func (q *Queries) ForgetJoinRequest(ctx context.Context, arg ForgetJoinRequestParams) (int64, error) {
+	result, err := q.db.Exec(ctx, forgetJoinRequest, arg.ProjectID, arg.Address)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const forgetReplica = `-- name: ForgetReplica :exec
@@ -299,6 +370,104 @@ type InheritRoomPeersParams struct {
 func (q *Queries) InheritRoomPeers(ctx context.Context, arg InheritRoomPeersParams) error {
 	_, err := q.db.Exec(ctx, inheritRoomPeers, arg.Room, arg.Project)
 	return err
+}
+
+const projectIssueIDs = `-- name: ProjectIssueIDs :many
+SELECT id FROM issues WHERE project_id = $1
+`
+
+// Every issue of a project, deleted ones too: each is a discussion room.
+func (q *Queries) ProjectIssueIDs(ctx context.Context, projectID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, projectIssueIDs, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const projectJoinRequests = `-- name: ProjectJoinRequests :many
+SELECT project_id, address, home_server, requested_at FROM project_join_requests WHERE project_id = $1 ORDER BY requested_at, address
+`
+
+func (q *Queries) ProjectJoinRequests(ctx context.Context, projectID uuid.UUID) ([]ProjectJoinRequest, error) {
+	rows, err := q.db.Query(ctx, projectJoinRequests, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProjectJoinRequest{}
+	for rows.Next() {
+		var i ProjectJoinRequest
+		if err := rows.Scan(
+			&i.ProjectID,
+			&i.Address,
+			&i.HomeServer,
+			&i.RequestedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const publishedProjects = `-- name: PublishedProjects :many
+/*
+Following a public project from another server, and asking to join one.
+*/
+
+SELECT id, key, name, description FROM projects
+WHERE visibility = 'public' AND federated AND key_folded NOT LIKE '%@%'
+ORDER BY key_folded
+LIMIT $1
+`
+
+type PublishedProjectsRow struct {
+	ID          uuid.UUID
+	Key         string
+	Name        string
+	Description string
+}
+
+// The projects a trusted peer may follow: public, opened, and this server's own.
+func (q *Queries) PublishedProjects(ctx context.Context, max int32) ([]PublishedProjectsRow, error) {
+	rows, err := q.db.Query(ctx, publishedProjects, max)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PublishedProjectsRow{}
+	for rows.Next() {
+		var i PublishedProjectsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Key,
+			&i.Name,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const remoteMembersOn = `-- name: RemoteMembersOn :many
@@ -417,6 +586,32 @@ func (q *Queries) ReplicaOffered(ctx context.Context, arg ReplicaOfferedParams) 
 	return err
 }
 
+const replicaProjectRooms = `-- name: ReplicaProjectRooms :many
+SELECT id FROM rooms WHERE kind = 'project' AND home_server <> $1
+`
+
+// The room of every replica offered here, its project's identifier too —
+// including one whose first delivery has yet to arrive.
+func (q *Queries) ReplicaProjectRooms(ctx context.Context, home string) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, replicaProjectRooms, home)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const replicaWorkFailed = `-- name: ReplicaWorkFailed :exec
 UPDATE project_replicas SET failures = failures + 1, last_error = $3,
     next_attempt_at = NOW() + $4::interval
@@ -437,6 +632,25 @@ func (q *Queries) ReplicaWorkFailed(ctx context.Context, arg ReplicaWorkFailedPa
 		arg.LastError,
 		arg.RetryAfter,
 	)
+	return err
+}
+
+const setHomeReachable = `-- name: SetHomeReachable :exec
+UPDATE projects SET home_unreachable_since = CASE
+    WHEN $1::bool THEN NULL
+    ELSE COALESCE(home_unreachable_since, NOW())
+END
+WHERE id = $2
+`
+
+type SetHomeReachableParams struct {
+	Reachable bool
+	ID        uuid.UUID
+}
+
+// The first failure is the one remembered: "since" is when it stopped answering.
+func (q *Queries) SetHomeReachable(ctx context.Context, arg SetHomeReachableParams) error {
+	_, err := q.db.Exec(ctx, setHomeReachable, arg.Reachable, arg.ID)
 	return err
 }
 
@@ -483,6 +697,21 @@ func (q *Queries) UnassignRemoteFromIssue(ctx context.Context, arg UnassignRemot
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const unfollowProject = `-- name: UnfollowProject :exec
+UPDATE project_replicas SET followed = FALSE WHERE project_id = $1 AND server = $2
+`
+
+type UnfollowProjectParams struct {
+	ProjectID uuid.UUID
+	Server    string
+}
+
+// No longer followed: the replica stays only while members entitle it.
+func (q *Queries) UnfollowProject(ctx context.Context, arg UnfollowProjectParams) error {
+	_, err := q.db.Exec(ctx, unfollowProject, arg.ProjectID, arg.Server)
+	return err
 }
 
 const upsertReplicaCycle = `-- name: UpsertReplicaCycle :exec

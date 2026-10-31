@@ -198,6 +198,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/projects/:key/join-requests/:address": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/projects/:key/labels/:label": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -651,6 +656,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[[]inviteView]()},
 		},
 	},
+	"GET /api/federation/projects": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
 	"GET /api/federation/rooms": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
@@ -879,6 +889,13 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[[]projectResponse]()},
 		},
 	},
+	"GET /api/projects-elsewhere": {
+		Query: []string{"server"},
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[[]any]()},
+			{Status: 200, Type: reflect.TypeFor[[]projects.PublishedProject]()},
+		},
+	},
 	"GET /api/projects/:key": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[projectResponse]()},
@@ -922,6 +939,11 @@ var routeBodies = map[string]routeBodySet{
 		Query: []string{"assignee", "before", "limit", "sort"},
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[[]issueResponse]()},
+		},
+	},
+	"GET /api/projects/:key/join-requests": {
+		Responses: []responseBody{
+			{Status: 200, Type: nil},
 		},
 	},
 	"GET /api/projects/:key/labels": {
@@ -1726,8 +1748,29 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
 	},
+	"POST /api/federation/projects/follow": {
+		Request: reflect.TypeFor[followRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/federation/projects/join": {
+		Request: reflect.TypeFor[struct {
+			Project uuid.UUID "json:\"project\""
+			Actor   string    "json:\"actor\""
+		}](),
+		Responses: []responseBody{
+			{Status: 202, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
 	"POST /api/federation/projects/offer": {
 		Request: reflect.TypeFor[projects.Offer](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/federation/projects/unfollow": {
+		Request: reflect.TypeFor[followRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
@@ -1920,6 +1963,18 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 201, Type: reflect.TypeFor[projectResponse]()},
 		},
 	},
+	"POST /api/projects-elsewhere/follow": {
+		Request: reflect.TypeFor[followElsewhereRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/projects-elsewhere/unfollow": {
+		Request: reflect.TypeFor[followElsewhereRequest](),
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
 	"POST /api/projects/:key/cycles": {
 		Request: reflect.TypeFor[cycleRequest](),
 	},
@@ -1936,6 +1991,16 @@ var routeBodies = map[string]routeBodySet{
 		}](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/projects/:key/join": {
+		Responses: []responseBody{
+			{Status: 202, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"POST /api/projects/:key/join-requests/:address": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
 		},
 	},
 	"POST /api/projects/:key/labels": {
