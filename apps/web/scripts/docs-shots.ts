@@ -233,7 +233,7 @@ export const shots: Shot[] = [
     guide: "using-tdc",
     name: "sessions",
     async take(studio) {
-      const page = await open(studio, "neema", "/settings");
+      const page = await open(studio, "neema", "/settings?tab=security");
       return region(page, section(page, "Signed-in devices"));
     },
   },
@@ -309,7 +309,7 @@ export const shots: Shot[] = [
     guide: "using-tdc",
     name: "status",
     async take(studio) {
-      const page = await open(studio, "neema", "/settings");
+      const page = await open(studio, "neema", "/settings?tab=profile");
       return region(page, section(page, "Status"));
     },
   },
@@ -317,7 +317,7 @@ export const shots: Shot[] = [
     guide: "using-tdc",
     name: "privacy",
     async take(studio) {
-      const page = await open(studio, "neema", "/settings");
+      const page = await open(studio, "neema", "/settings?tab=privacy");
       return region(page, section(page, "Privacy"));
     },
   },
@@ -325,7 +325,7 @@ export const shots: Shot[] = [
     guide: "using-tdc",
     name: "location",
     async take(studio) {
-      const page = await open(studio, "neema", "/settings");
+      const page = await open(studio, "neema", "/settings?tab=profile");
       return region(page, section(page, "Location"));
     },
   },
@@ -474,7 +474,7 @@ export const shots: Shot[] = [
     guide: "using-tdc",
     name: "automatic-replies",
     async take(studio) {
-      const page = await open(studio, "rehema", "/settings");
+      const page = await open(studio, "rehema", "/settings?tab=profile");
       return region(page, page.locator("[data-automatic-replies]"));
     },
   },
@@ -493,7 +493,7 @@ export const shots: Shot[] = [
     guide: "using-tdc",
     name: "translation-settings",
     async take(studio) {
-      const page = await open(studio, "juma", "/settings");
+      const page = await open(studio, "juma", "/settings?tab=more");
       return region(page, page.locator("#translation"));
     },
   },
@@ -516,7 +516,7 @@ export const shots: Shot[] = [
     guide: "using-tdc",
     name: "api-tokens",
     async take(studio) {
-      const page = await open(studio, "neema", "/settings");
+      const page = await open(studio, "neema", "/settings?tab=security");
       return region(page, page.locator("[data-api-tokens]"));
     },
   },
@@ -581,7 +581,7 @@ export const shots: Shot[] = [
     guide: "using-tdc",
     name: "appearance",
     async take(studio) {
-      const page = await open(studio, "neema", "/settings");
+      const page = await open(studio, "neema", "/settings?tab=appearance");
       return region(page, section(page, "Appearance"));
     },
   },
@@ -592,6 +592,45 @@ export const shots: Shot[] = [
       return window(await open(studio, "neema", room(studio, "golang"), { dark: true }));
     },
   },
+  {
+    guide: "using-tdc",
+    name: "appearance-dialog",
+    async take(studio) {
+      const page = await open(studio, "neema", room(studio, "golang"));
+      await page.getByRole("button", { name: "Appearance" }).click();
+      await page.getByRole("menuitem", { name: "More colours and materials…" }).click();
+      await settle(page);
+      return window(page);
+    },
+  },
+  ...(
+    [
+      ["refraction", false],
+      ["tactile", false],
+      ["signal", true],
+    ] as const
+  ).map(([material, dark]): Shot => ({
+    guide: "using-tdc",
+    name: `material-${material}`,
+    async take(studio) {
+      // Chosen on the account, as a person choosing it would: the server's
+      // copy is what the page settles on.
+      await as(studio, "neema", "PUT", "/api/me/preferences/appearance", {
+        palette: material,
+        mode: "",
+        accent: "",
+      });
+      try {
+        return window(await open(studio, "neema", room(studio, "golang"), { dark }));
+      } finally {
+        await as(studio, "neema", "PUT", "/api/me/preferences/appearance", {
+          palette: "",
+          mode: "",
+          accent: "",
+        });
+      }
+    },
+  })),
   {
     guide: "using-tdc",
     name: "shortcuts",

@@ -40,7 +40,7 @@ A profile can say:
 
 - a **headline** — one line on what you do;
 - your **experience**;
-- your **location** — which is your account's, set under Settings → Location
+- your **location** — which is your account's, set under Settings → Profile → Location
   and shown here rather than kept separately (see
   [Where you are](using-tdc.md#where-you-are));
 - an **about** section;

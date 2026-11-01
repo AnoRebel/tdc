@@ -92,6 +92,29 @@ func TestAnAppearanceCanBeCleared(t *testing.T) {
 }
 
 /*
+Every material is a palette somebody may keep.
+
+Checked through the database as well as the handler: the column has its own
+list of names, and a material the handler accepted but the column refused would
+fail only when somebody chose it.
+*/
+func TestEveryMaterialIsAPaletteThatIsKept(t *testing.T) {
+	handler := newTestAPI(t)
+	token := completeSetup(t, handler)
+
+	for _, material := range []string{"refraction", "tactile", "signal", "folio", "bloom", "hybrid"} {
+		recorder := call(t, handler, http.MethodPut, "/api/me/preferences/appearance",
+			map[string]string{"palette": material}, token)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("choosing %s: status %d, body %s", material, recorder.Code, recorder.Body.String())
+		}
+		if after := readAppearance(t, handler, token); after["palette"] != material {
+			t.Errorf("chose %s and it was kept as %v", material, after["palette"])
+		}
+	}
+}
+
+/*
 A palette this server does not have.
 
 Refused rather than stored, because an attribute selecting no rules looks like

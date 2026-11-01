@@ -18,7 +18,7 @@ who makes it: it can only be made for what they can read, every event is
 checked against what they can read when it is queued and again when it is sent,
 and it stops delivering the moment they cannot.
 
-![Outgoing webhooks in Settings → Integrations: an active webhook on the golang channel with its endpoint and events, and the form for a new one with a label, a channel, an endpoint and the events to send](images/webhooks-and-apps/outgoing.webp)
+![Outgoing webhooks in Settings → More → Integrations: an active webhook on the golang channel with its endpoint and events, and the form for a new one with a label, a channel, an endpoint and the events to send](images/webhooks-and-apps/outgoing.webp)
 
 ### Subscribing
 
@@ -122,7 +122,7 @@ the events they go to.
 
 `GET /api/me/webhooks` lists yours, never with secrets. `DELETE
 /api/me/webhooks/{id}` removes one with its history. The interface for all of
-this is **Settings → Integrations** in the web client.
+this is **Settings → More → Integrations** in the web client.
 
 ### What arrives
 
@@ -265,7 +265,7 @@ held server-wide.
 | `account.role_changed`       | S     | Somebody was given a role or had one taken away                                             | `user.read.all`                                    |
 
 Every issue event's `content` carries `issue` and `key` (`WEB-12`), and a change
-carries `field`, `previous` and `new`. **Settings → Integrations** offers them in
+carries `field`, `previous` and `new`. **Settings → More → Integrations** offers them in
 the same groups: messages, members, channels, calls, events, the directory,
 projects, issues, planning and people. A feature that adds events of its own
 adds a group, and nothing about the ones here changes.
@@ -491,12 +491,12 @@ filling up. It needs nothing but the address: no account, no token, no
 signature. That is what makes it easy to connect anything to, and why it is
 built on the assumption that the address will leak.
 
-![Incoming webhooks in Settings → Integrations: a channel to choose and the webhooks already made for it](images/webhooks-and-apps/incoming.webp)
+![Incoming webhooks in Settings → More → Integrations: a channel to choose and the webhooks already made for it](images/webhooks-and-apps/incoming.webp)
 
 ### Making one
 
 Somebody holding `channel.webhooks.manage` in the channel — administrators, by
-default — makes one, from **Settings → Integrations** or:
+default — makes one, from **Settings → More → Integrations** or:
 
 <!-- demo: create-incoming -->
 
@@ -621,9 +621,9 @@ of its own, and holds none of the authority of whoever installed it.
 Installing one takes two steps, and they may be two people, each holding
 `server.applications.manage` — administrators, by default: somebody registers
 it, saying what it needs; somebody approves it, having been shown exactly that.
-Both are in **Settings → Applications**, and both are in the audit log.
+Both are in **Settings → More → Integrations → Applications**, and both are in the audit log.
 
-![Settings → Applications: an approved Deploy bot with its purpose, its one permission, the channel it acts in and what it sends off the server, and below it the form to register another](images/webhooks-and-apps/applications.webp)
+![Settings → More → Integrations → Applications: an approved Deploy bot with its purpose, its one permission, the channel it acts in and what it sends off the server, and below it the form to register another](images/webhooks-and-apps/applications.webp)
 
 ### Registering
 
@@ -890,7 +890,7 @@ administrator:
 - `GET /api/rooms/{id}/applications` lists the applications that can act in a
   channel, to anybody who can see the channel.
 
-Both are under **Installed applications** in **Settings → Integrations**.
+Both are under **Installed applications** in **Settings → More → Integrations**.
 
 ### When it is called too often
 

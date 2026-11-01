@@ -171,7 +171,7 @@ test.describe("themes", () => {
    * to do nothing.
    */
   test("a chosen accent reaches what it should colour", async ({ page }) => {
-    await page.goto("/settings");
+    await page.goto("/settings?tab=appearance");
 
     const chosen = "oklch(0.55 0.2 150)";
     await page.evaluate((colour) => {

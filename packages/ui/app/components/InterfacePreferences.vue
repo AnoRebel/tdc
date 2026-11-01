@@ -2,6 +2,7 @@
 import { usePreferredReducedMotion } from "@vueuse/core";
 import {
   CircleOff,
+  Eye,
   Feather,
   Keyboard,
   Monitor,
@@ -18,7 +19,8 @@ import { Button } from "#layers/ui/app/components/ui/button";
 import { Switch } from "#layers/ui/app/components/ui/switch";
 
 /**
- * How the interface behaves: motion, keyboard shortcuts, formatting and density.
+ * How the interface behaves: motion, keyboard shortcuts, formatting, density,
+ * and which of its parts are shown.
  *
  * A section rather than a page, so it can sit in the web client's settings,
  * in the desktop client's appearance window and in a dialog reachable from
@@ -35,7 +37,8 @@ defineProps<{
 }>();
 
 const { $t, $ts } = useI18n();
-const { motionPreference, motion, shortcuts, density, formatting } = useInterfacePreferences();
+const { motionPreference, motion, shortcuts, density, formatting, parts, shows, setShown } =
+  useInterfacePreferences();
 const system = usePreferredReducedMotion();
 // Ctrl or ⌘, as this platform writes it: a key name, never translated.
 const commandKey = commandKeyLabel();
@@ -43,6 +46,7 @@ const commandKey = commandKeyLabel();
 // Unique per instance: this can be on the settings page and in the dialog at once.
 const motionHeading = useId();
 const densityHeading = useId();
+const partsHeading = useId();
 const titleId = useId();
 
 const motionOptions = computed(() => [
@@ -140,6 +144,24 @@ const systemSays = computed(() =>
           {{ option.label }}
         </Button>
       </div>
+    </div>
+
+    <div>
+      <h3 :id="partsHeading" class="flex items-center gap-1.5 text-xs font-semibold">
+        <Eye class="size-3.5" aria-hidden="true" />
+        {{ $t("interface.parts.title") }}
+      </h3>
+      <p class="mt-1 text-xs text-muted-foreground">{{ $t("interface.parts.hint") }}</p>
+      <ul class="mt-2 space-y-2" :aria-labelledby="partsHeading">
+        <li v-for="part in parts" :key="part" class="flex items-center gap-2.5">
+          <Switch
+            :model-value="shows(part)"
+            :label="$ts(`interface.parts.${part}`)"
+            @update:model-value="setShown(part, $event)"
+          />
+          <span class="text-xs">{{ $t(`interface.parts.${part}`) }}</span>
+        </li>
+      </ul>
     </div>
   </section>
 </template>

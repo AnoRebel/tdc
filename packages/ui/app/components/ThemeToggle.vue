@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Check, Monitor, Moon, Palette, Sun } from "lucide-vue-next";
 import { Button } from "#layers/ui/app/components/ui/button";
+import { isMaterial } from "#layers/ui/app/lib/theme";
 
 /**
  * Changing how the interface looks, without going to settings.
@@ -20,6 +21,13 @@ const open = defineModel<boolean>({ default: false });
 const { $t, $ts } = useI18n();
 
 const theme = useTheme();
+const showingAppearance = useState("appearance.open", () => false);
+
+/** The rest — materials, contrast, glass, accent — in the appearance dialog. */
+function more() {
+  open.value = false;
+  showingAppearance.value = true;
+}
 
 const appearances = computed(() => [
   { value: "auto" as const, label: $t("settings.followMyDevice"), icon: Monitor },
@@ -111,6 +119,18 @@ function onKeydown(event: KeyboardEvent) {
         />
         <span class="flex-1 text-left">{{ option.label }}</span>
         <Check v-if="theme.palette.value === option.value" class="size-3.5 shrink-0" />
+      </button>
+      <!-- Ticked while a material is the colours in use, so the menu never
+           shows neither palette chosen without saying why. -->
+      <button
+        type="button"
+        role="menuitem"
+        class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-muted"
+        @click="more"
+      >
+        <Palette class="size-3.5 shrink-0 opacity-70" />
+        <span class="flex-1 text-left">{{ $t("appearance.more") }}</span>
+        <Check v-if="isMaterial(theme.palette.value)" class="size-3.5 shrink-0" />
       </button>
 
       <!-- Only when there is one to clear. A reset for something nobody set is

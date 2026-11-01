@@ -44,6 +44,7 @@ const props = defineProps<{
 
 const { $t, $ts } = useI18n();
 const context = useMessageContext();
+const { shows } = useInterfacePreferences();
 // Translation offered inline, with whichever provider this person chose.
 const translation = useTranslation();
 const translated = computed(() =>
@@ -322,7 +323,7 @@ function lifetimeExplanation(lifetime: MessageLifetime): string {
       <!-- Only the first link: a message full of them would otherwise produce
            a wall of cards taller than the conversation. -->
       <LinkPreview
-        v-if="!message.removed && firstLinkIn(message.body)"
+        v-if="!message.removed && shows('previews') && firstLinkIn(message.body)"
         :key="firstLinkIn(message.body) ?? ''"
         :url="firstLinkIn(message.body)!"
       />

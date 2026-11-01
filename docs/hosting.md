@@ -285,7 +285,7 @@ Roles beyond them are yours to make, from the screen or under
 
 #### Setting up a moderator from the screen
 
-**Settings → Administration → Roles and permissions** is where this is done.
+**Settings → More → Administration → Roles and permissions** is where this is done.
 It appears for anybody holding `role.manage` (deciding what roles allow) or
 `role.assign` (deciding who holds them). Somebody with only `role.assign` sees
 the roles and what each allows, and can hand them out, but cannot change them.
@@ -1038,7 +1038,7 @@ curl -X PUT https://tdc.example/api/admin/features/directory \
 ```
 
 or the **What this server offers** list on the server settings page of the web
-client (Settings → Administration). It takes effect
+client (Settings → More → Administration). It takes effect
 on the next request, needs no restart and no migration, and turning it off
 again hides everything without deleting any of it — profiles are there as they
 were when it comes back on.
@@ -1801,7 +1801,7 @@ There are two ways to take one: from the administration area, which needs
 nothing but a browser, and with `pg_dump` and `tar` on the host, which needs a
 shell. They suit different things.
 
-**From the application** (Settings → Backups, or `/api/admin/backups`) takes the
+**From the application** (Settings → More → Administration → Backups, or `/api/admin/backups`) takes the
 whole server or chosen parts of it, encrypts the result, and keeps it in the
 server's storage, where it can be downloaded. It is the one to use for
 "keep a copy of this channel", "everything except the files", a backup before a

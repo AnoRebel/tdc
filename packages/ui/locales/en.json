@@ -620,6 +620,12 @@
     "accentRefused": {
       "unmeasurable": "That colour could not be read. Use a hex value like #4f46e5, or an oklch() colour.",
       "unreadable": "No shade of that colour can be read in both light and dark. Try one with more colour in it — a near-grey has nowhere to move to."
+    },
+    "tabs": {
+      "profile": "Profile",
+      "security": "Account and security",
+      "notifications": "Notifications",
+      "more": "More"
     }
   },
   "update": {
@@ -1902,9 +1908,6 @@
       "autoDownloadHint": "It is still only installed when you say so."
     },
     "appearance": {
-      "coloursHint": "The palette, and whether to follow your device's light or dark setting.",
-      "lightOrDark": "Light or dark",
-      "palette": "Palette",
       "window": "Window",
       "windowHint": "How much of what is behind TDC shows through. Only the empty space becomes see-through — messages and menus stay on something solid.",
       "opacity": "Window opacity",
@@ -2154,6 +2157,16 @@
       "title": "Formatting",
       "label": "Show formatting in messages",
       "hint": "Bold, code blocks, lists and the rest, drawn as their author meant. Off shows every message exactly as it was typed."
+    },
+    "parts": {
+      "title": "Show in the interface",
+      "hint": "Put away what you do not use. Only you see the difference, and the pages stay reachable from search.",
+      "directory": "Directory link in the sidebar",
+      "events": "Events link in the sidebar",
+      "projects": "Projects and issues links in the sidebar",
+      "previews": "Link previews under messages",
+      "typing": "Who is typing",
+      "presence": "Online dots on people"
     }
   },
   "calls": {
@@ -3375,5 +3388,48 @@
     "privacyNote": "When detecting, your device's position goes only to this server, which names the nearest town and keeps just that. The position itself is never stored.",
     "fromSettings": "Your location belongs to your account and shows here as you set it.",
     "changeInSettings": "Change it in settings"
+  },
+  "appearance": {
+    "command": "Appearance: colours, materials and contrast",
+    "more": "More colours and materials…",
+    "lightOrDark": "Light or dark",
+    "materials": "Crystal Neuo materials",
+    "materialsHint": "Whole looks from the Crystal Neuo design system, each with its own colours, corners, borders, shadows and type. Each works in light and dark.",
+    "contrast": {
+      "title": "High contrast",
+      "hint": "White on black with a yellow accent, no shadows and no see-through surfaces, over whichever colours you choose.",
+      "standard": "Off",
+      "more": "On"
+    },
+    "glass": {
+      "label": "Frosted glass",
+      "hint": "The sidebar, menus and dialogs show a blur of what is behind them. Off draws them solid."
+    },
+    "material": {
+      "refraction": {
+        "name": "Refraction",
+        "description": "Frosted glass over calm, solid content"
+      },
+      "tactile": {
+        "name": "Tactile",
+        "description": "Ink borders, and controls that press like keys"
+      },
+      "signal": {
+        "name": "Signal",
+        "description": "Soft raised surfaces and a monospaced face"
+      },
+      "folio": {
+        "name": "Folio",
+        "description": "Flat, dense and shadowless, set in IBM Plex"
+      },
+      "bloom": {
+        "name": "Bloom",
+        "description": "Round corners, soft glass and warm colour"
+      },
+      "hybrid": {
+        "name": "Hybrid",
+        "description": "Refraction's glass with Tactile's ink controls"
+      }
+    }
   }
 }

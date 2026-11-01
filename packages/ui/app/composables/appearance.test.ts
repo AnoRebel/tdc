@@ -67,6 +67,25 @@ describe("resolving the colours", () => {
   });
 
   /*
+   * A second choice in one session. The account's copy was read once, at
+   * startup, and outranked everything chosen afterwards: somebody who had
+   * saved Warm and chose Cool saw Warm come back as soon as anything settled
+   * again. Choosing has to update that copy too.
+   */
+  it("keeps a palette chosen after the account's was read", () => {
+    const theme = useTheme();
+    const mine = state.get("appearance-mine")!;
+    mine.value = { palette: "congrator", mode: "", accent: "" };
+    theme.settle({}, mine.value as never);
+    expect(documentState().palette).toBe("congrator");
+
+    theme.setPalette("default");
+    theme.settle({}, mine.value as never);
+
+    expect(documentState().palette).toBeNull();
+  });
+
+  /*
    * The bug, as a test. An operator with no accent set must not clear one this
    * person chose — an empty value from the operator means "I have no opinion",
    * not "use none".

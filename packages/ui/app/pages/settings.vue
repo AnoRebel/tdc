@@ -4,13 +4,15 @@ import type { Session } from "@tdc/types";
 import { isApiError } from "@tdc/types";
 import {
   ArrowLeft,
+  Bell,
+  CircleUser,
   Compass,
+  Ellipsis,
   DatabaseBackup,
   Flag,
   KeyRound,
   LogOut,
   Monitor,
-  Moon,
   ScrollText,
   ShieldCheck,
   SlidersHorizontal,
@@ -20,7 +22,6 @@ import {
 } from "lucide-vue-next";
 import { Avatar } from "#layers/ui/app/components/ui/avatar";
 import { Button } from "#layers/ui/app/components/ui/button";
-import { Input } from "#layers/ui/app/components/ui/input";
 import { fully } from "#layers/ui/app/lib/dates";
 import { presenceDotClass } from "#layers/ui/app/lib/presencedot";
 
@@ -33,7 +34,6 @@ definePageMeta({ middleware: "auth", layout: "app" });
 useHead({ title: $ts("settings.title") });
 
 const personal = usePersonalModeration();
-const theme = useTheme();
 const tour = useTour();
 
 /*
@@ -65,61 +65,6 @@ async function confirmUnblock() {
 async function showTourAgain() {
   tour.forget("chat");
   await navigateTo(localeRoute({ name: "index" }));
-}
-
-/*
- * Three choices rather than a switch.
- *
- * A two-way toggle has no way to say "whichever my device says", which is what
- * most people want and what somebody who has never opened this already has.
- */
-const themeOptions = [
-  { value: "auto" as const, label: $t("settings.followMyDevice"), icon: Monitor },
-  { value: "light" as const, label: $t("settings.light"), icon: Sun },
-  { value: "dark" as const, label: $t("settings.dark"), icon: Moon },
-];
-
-/*
- * The palettes, described by what they look like rather than named after where
- * they came from — "Congrator" means nothing to somebody who has not used it.
- */
-const paletteOptions = [
-  {
-    value: "default" as const,
-    label: $t("settings.paletteCool"),
-    description: $t("settings.paletteCoolDescription"),
-  },
-  {
-    value: "congrator" as const,
-    label: $t("settings.paletteWarm"),
-    description: $t("settings.paletteWarmDescription"),
-  },
-];
-
-/*
- * The accent, typed rather than picked from a list.
- *
- * Whatever is chosen becomes two shades of itself, one per appearance: light
- * mode draws near-white text on the accent and dark mode near-black, so a
- * single value cannot be readable in both. The hue is kept, so what appears is
- * recognisably the colour that was asked for — only its lightness moves.
- */
-const accentDraft = ref("");
-const accentRefusal = ref("");
-
-watchEffect(() => {
-  accentDraft.value = theme.accent.value;
-});
-
-function applyAccent() {
-  const { refused } = theme.setAccent(accentDraft.value);
-  accentRefusal.value = refused ? $ts(`settings.accentRefused.${refused}`) : "";
-}
-
-function clearAccent() {
-  accentDraft.value = "";
-  accentRefusal.value = "";
-  theme.setAccent("");
 }
 
 /*
@@ -205,6 +150,80 @@ onMounted(() => void personal.refresh());
 
 const { user, can, signOut, listSessions, revokeSession } = useAuth();
 const router = useRouter();
+const route = useRoute();
+
+/*
+ * The page's tabs, one subject each.
+ *
+ * Which is open lives in the address (?tab=), so a link or a guide can send
+ * somebody straight to one and the back button undoes a change of tab. Every
+ * panel stays mounted and is only hidden, so moving between them loses
+ * nothing half-typed and loads nothing twice.
+ */
+const tabs = computed(() => [
+  { name: "profile", label: $ts("settings.tabs.profile"), icon: CircleUser },
+  { name: "security", label: $ts("settings.tabs.security"), icon: KeyRound },
+  { name: "appearance", label: $ts("settings.appearance"), icon: Sun },
+  { name: "notifications", label: $ts("settings.tabs.notifications"), icon: Bell },
+  { name: "privacy", label: $ts("settings.privacy"), icon: ShieldCheck },
+  { name: "more", label: $ts("settings.tabs.more"), icon: Ellipsis },
+]);
+
+const tab = computed(() => {
+  const asked = String(route.query.tab ?? "");
+  return tabs.value.some((each) => each.name === asked) ? asked : "profile";
+});
+
+function open(name: string) {
+  if (name !== tab.value) void router.push({ query: { ...route.query, tab: name }, hash: "" });
+}
+
+/** Arrow keys, Home and End move between tabs, as they do in any tab list. */
+function moveBetweenTabs(event: KeyboardEvent) {
+  const names = tabs.value.map((each) => each.name);
+  const at = names.indexOf(tab.value);
+  const next =
+    event.key === "ArrowRight"
+      ? names[(at + 1) % names.length]
+      : event.key === "ArrowLeft"
+        ? names[(at - 1 + names.length) % names.length]
+        : event.key === "Home"
+          ? names[0]
+          : event.key === "End"
+            ? names.at(-1)
+            : undefined;
+  if (!next) return;
+  event.preventDefault();
+  open(next);
+  void nextTick(() => document.getElementById(`settings-tab-${next}`)?.focus());
+}
+
+/*
+ * A link to a part of the page by its anchor (#location, #translation) opens
+ * the tab that part is on, then scrolls to it: an anchor in a hidden tab
+ * would otherwise lead nowhere.
+ */
+watch(
+  () => route.hash,
+  async (hash) => {
+    if (!hash || import.meta.server) return;
+    // Both anchors are on parts loaded on their own, which may not be drawn
+    // yet: given two seconds to arrive.
+    const id = decodeURIComponent(hash.slice(1));
+    let target = document.getElementById(id);
+    for (let tries = 0; !target && tries < 20; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      target = document.getElementById(id);
+    }
+    const panel = target?.closest<HTMLElement>("[data-settings-panel]")?.dataset.settingsPanel;
+    if (panel && panel !== tab.value) {
+      await router.replace({ query: { ...route.query, tab: panel }, hash });
+      await nextTick();
+    }
+    target?.scrollIntoView({ block: "start" });
+  },
+  { immediate: true },
+);
 
 const sessions = ref<Session[]>([]);
 const error = ref<string | null>(null);
@@ -340,476 +359,506 @@ function deviceName(userAgent: string): string {
         {{ error }}
       </p>
 
-      <section>
-        <div class="flex items-center gap-3">
-          <Avatar :name="user ? nameOf(user) : $ts('room.you')" size="lg" online />
-          <div class="min-w-0">
-            <p class="truncate font-medium">{{ user && nameOf(user) }}</p>
-            <p class="truncate text-sm text-muted-foreground">{{ user?.address }}</p>
+      <!-- One subject at a time: the page had grown to a dozen screens of
+           scrolling. Which tab is open is in the address, so a link can open
+           one and the back button returns to the last. -->
+      <div
+        role="tablist"
+        :aria-label="$ts('settings.title')"
+        class="-mx-1 flex gap-1 overflow-x-auto border-b px-1 pb-px"
+      >
+        <button
+          v-for="each in tabs"
+          :id="`settings-tab-${each.name}`"
+          :key="each.name"
+          type="button"
+          role="tab"
+          :aria-selected="tab === each.name"
+          :aria-controls="`settings-panel-${each.name}`"
+          :tabindex="tab === each.name ? 0 : -1"
+          class="-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-2.5 py-2 text-xs font-medium whitespace-nowrap transition-colors"
+          :class="
+            tab === each.name
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          "
+          @click="open(each.name)"
+          @keydown="moveBetweenTabs"
+        >
+          <component :is="each.icon" class="size-3.5" aria-hidden="true" />
+          {{ each.label }}
+        </button>
+      </div>
+
+      <div
+        v-show="tab === 'profile'"
+        id="settings-panel-profile"
+        role="tabpanel"
+        aria-labelledby="settings-tab-profile"
+        data-settings-panel="profile"
+        class="space-y-8"
+      >
+        <section>
+          <div class="flex items-center gap-3">
+            <Avatar :name="user ? nameOf(user) : $ts('room.you')" size="lg" online />
+            <div class="min-w-0">
+              <p class="truncate font-medium">{{ user && nameOf(user) }}</p>
+              <p class="truncate text-sm text-muted-foreground">{{ user?.address }}</p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- What you are called, straight under who you are: the display name
-           and the username that is half of the address above. -->
-      <AccountNames />
+        <!-- What you are called, straight under who you are: the display name
+             and the username that is half of the address above. -->
+        <AccountNames />
 
-      <!-- Where you are, and who may see it. Loaded on its own: the form and
-           detection are needed only by somebody who opens this. -->
-      <LazyLocationSetting />
+        <!-- Where you are, and who may see it. Loaded on its own: the form and
+             detection are needed only by somebody who opens this. -->
+        <LazyLocationSetting />
 
-      <section>
-        <h2 class="text-sm font-semibold">{{ $t("settings.status") }}</h2>
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          {{ $t("settings.statusHint") }}
-        </p>
+        <section>
+          <h2 class="text-sm font-semibold">{{ $t("settings.status") }}</h2>
+          <p class="mt-0.5 text-xs text-muted-foreground">
+            {{ $t("settings.statusHint") }}
+          </p>
 
-        <div class="mt-3 flex flex-wrap items-center gap-3">
-          <span class="flex min-w-0 items-center gap-2 text-sm">
-            <span
-              class="size-2.5 shrink-0 rounded-full"
-              :class="presenceDotClass(ownStatus.own.value.status, ownStatus.own.value.invisible)"
-              aria-hidden="true"
-            />
-            <span class="truncate">
-              {{ ownStatus.labelOf(ownStatus.own.value.status) }}
-              <span v-if="ownStatus.own.value.statusText" class="text-muted-foreground">
-                · {{ ownStatus.own.value.statusText }}
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <span class="flex min-w-0 items-center gap-2 text-sm">
+              <span
+                class="size-2.5 shrink-0 rounded-full"
+                :class="presenceDotClass(ownStatus.own.value.status, ownStatus.own.value.invisible)"
+                aria-hidden="true"
+              />
+              <span class="truncate">
+                {{ ownStatus.labelOf(ownStatus.own.value.status) }}
+                <span v-if="ownStatus.own.value.statusText" class="text-muted-foreground">
+                  · {{ ownStatus.own.value.statusText }}
+                </span>
               </span>
             </span>
-          </span>
-          <Button variant="outline" @click="showingStatus = true">
-            {{ $t("status.change") }}
-          </Button>
-        </div>
-      </section>
-
-      <!-- What the server says for you while you are away, beside the status
-           most replies are tied to. Loaded on its own, so the form and its
-           validation cost nothing to anybody who never opens settings. -->
-      <LazyAutomaticReplies />
-
-      <!-- Both are about who can reach this account, and both come before the
-           list of devices that already do. The second factor first, since it is
-           the one that protects the password everybody already has. -->
-      <!-- Before two-step, because this is the one that decides whether a
-           forgotten password is recoverable at all. -->
-      <EmailAddress />
-
-      <SecondFactorManager />
-
-      <!-- Draws nothing where the server cannot offer passkeys. -->
-      <PasskeyManager />
-
-      <!-- A program's way in without a password, scoped by what it is denied. -->
-      <ApiTokens />
-
-      <section>
-        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
-          <Monitor class="size-3.5 text-muted-foreground" />
-          {{ $t("auth.signedInDevices") }}
-        </h2>
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          {{ $t("auth.endingSessionSignsOut") }}
-        </p>
-
-        <ul class="mt-3 space-y-1.5">
-          <li
-            v-for="session in sessions"
-            :key="session.id"
-            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-surface px-3 py-2.5"
-          >
-            <div class="min-w-0">
-              <p class="truncate text-sm">
-                {{ deviceName(session.userAgent) }}
-                <span
-                  v-if="session.current"
-                  class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success-text"
-                >
-                  {{ $t("auth.thisDevice") }}
-                </span>
-              </p>
-              <p class="text-xs text-muted-foreground">
-                <time>{{ when(session.lastSeenAt) }}</time>
-              </p>
-            </div>
-            <Button
-              variant="danger"
-              v-if="!session.current"
-              :disabled="busy === session.id"
-              @click="ending = session"
-            >
-              {{ busy === session.id ? $t("settings.endingSession") : $t("auth.endSession") }}
+            <Button variant="outline" @click="showingStatus = true">
+              {{ $t("status.change") }}
             </Button>
-          </li>
-        </ul>
-      </section>
+          </div>
+        </section>
 
-      <section>
-        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
-          <Sun class="size-4" />
-          {{ $t("settings.appearance") }}
-        </h2>
-        <p class="mt-1 text-xs text-muted-foreground">
-          {{ $t("settings.appearanceHint") }}
-        </p>
+        <!-- What the server says for you while you are away, beside the status
+             most replies are tied to. Loaded on its own, so the form and its
+             validation cost nothing to anybody who never opens settings. -->
+        <LazyAutomaticReplies />
+      </div>
 
-        <div class="mt-3 flex flex-wrap gap-1.5">
-          <Button
-            v-for="option in themeOptions"
-            :key="option.value"
-            :variant="theme.preference.value === option.value ? 'primary' : 'outline'"
-            @click="theme.set(option.value)"
-          >
-            <component :is="option.icon" class="size-3.5" />
-            {{ option.label }}
-          </Button>
-        </div>
+      <div
+        v-show="tab === 'security'"
+        id="settings-panel-security"
+        role="tabpanel"
+        aria-labelledby="settings-tab-security"
+        data-settings-panel="security"
+        class="space-y-8"
+      >
+        <!-- Both are about who can reach this account, and both come before the
+             list of devices that already do. The second factor first, since it is
+             the one that protects the password everybody already has. -->
+        <!-- Before two-step, because this is the one that decides whether a
+             forgotten password is recoverable at all. -->
+        <EmailAddress />
 
-        <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.colours") }}</h3>
-        <p class="mt-1 text-xs text-muted-foreground">{{ $t("settings.coloursHint") }}</p>
+        <SecondFactorManager />
 
-        <div class="mt-2 flex flex-wrap gap-1.5">
-          <Button
-            v-for="option in paletteOptions"
-            :key="option.value"
-            :variant="theme.palette.value === option.value ? 'primary' : 'outline'"
-            :aria-pressed="theme.palette.value === option.value"
-            @click="theme.setPalette(option.value)"
-          >
-            {{ option.label }}
-            <span class="text-[0.6875rem] opacity-70">{{ option.description }}</span>
-          </Button>
-        </div>
+        <!-- Draws nothing where the server cannot offer passkeys. -->
+        <PasskeyManager />
 
-        <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.accent") }}</h3>
-        <p class="mt-1 text-xs text-muted-foreground">
-          {{ $t("settings.accentHint") }}
-        </p>
+        <!-- A program's way in without a password, scoped by what it is denied. -->
+        <ApiTokens />
 
-        <div class="mt-2 flex flex-wrap items-start gap-1.5">
-          <label class="sr-only" for="accent">{{ $t("settings.accentColour") }}</label>
-          <Input
-            class="w-40"
-            id="accent"
-            v-model="accentDraft"
-            placeholder="#4f46e5"
-            :aria-invalid="Boolean(accentRefusal)"
-            :aria-describedby="accentRefusal ? 'accent-refusal' : undefined"
-            @keydown.enter.prevent="applyAccent"
-          />
-          <Button variant="outline" @click="applyAccent">{{ $t("settings.apply") }}</Button>
-          <Button variant="ghost" v-if="theme.accent.value" @click="clearAccent">
-            {{ $t("settings.reset") }}
-          </Button>
-        </div>
+        <section>
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+            <Monitor class="size-3.5 text-muted-foreground" />
+            {{ $t("auth.signedInDevices") }}
+          </h2>
+          <p class="mt-0.5 text-xs text-muted-foreground">
+            {{ $t("auth.endingSessionSignsOut") }}
+          </p>
 
-        <!-- The number, not just "that will not work": somebody who is 0.2
-             short of readable should be told how far off they are. -->
-        <p
-          v-if="accentRefusal"
-          id="accent-refusal"
-          role="alert"
-          class="mt-1.5 text-xs text-destructive"
-        >
-          {{ accentRefusal }}
-        </p>
-      </section>
+          <ul class="mt-3 space-y-1.5">
+            <li
+              v-for="session in sessions"
+              :key="session.id"
+              class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-surface px-3 py-2.5"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm">
+                  {{ deviceName(session.userAgent) }}
+                  <span
+                    v-if="session.current"
+                    class="ml-1.5 rounded bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-medium text-success-text"
+                  >
+                    {{ $t("auth.thisDevice") }}
+                  </span>
+                </p>
+                <p class="text-xs text-muted-foreground">
+                  <time>{{ when(session.lastSeenAt) }}</time>
+                </p>
+              </div>
+              <Button
+                variant="danger"
+                v-if="!session.current"
+                :disabled="busy === session.id"
+                @click="ending = session"
+              >
+                {{ busy === session.id ? $t("settings.endingSession") : $t("auth.endSession") }}
+              </Button>
+            </li>
+          </ul>
+        </section>
+      </div>
 
-      <section class="space-y-3">
-        <InterfacePreferences heading />
-      </section>
+      <div
+        v-show="tab === 'appearance'"
+        id="settings-panel-appearance"
+        role="tabpanel"
+        aria-labelledby="settings-tab-appearance"
+        data-settings-panel="appearance"
+        class="space-y-8"
+      >
+        <section>
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+            <Sun class="size-4" />
+            {{ $t("settings.appearance") }}
+          </h2>
+          <p class="mt-1 text-xs text-muted-foreground">
+            {{ $t("settings.appearanceHint") }}
+          </p>
 
-      <!-- What only this kind of device has: notifications through the
-           browser's service worker on the web, the window and the updater on
-           the desktop. Each client supplies its own; see DeviceSettings. -->
-      <DeviceSettings />
+          <!-- Light or dark, contrast, colours and Crystal Neuo's materials, glass
+               and accent: the same chooser as the appearance dialog and the
+               desktop client's appearance window. -->
+          <AppearanceChooser class="mt-3" />
+        </section>
 
-      <!-- A summary by email instead of a push per conversation, where the
-           server can send mail; it draws nothing where it cannot. -->
-      <DigestPreferences />
+        <section class="space-y-3">
+          <InterfacePreferences heading />
+        </section>
+      </div>
 
-      <!-- Translating messages, where the server offers it. Lazy: the
-           provider forms and their validation are needed only here. -->
-      <LazyTranslationSettings v-if="serverOffers('translation')" />
+      <div
+        v-show="tab === 'notifications'"
+        id="settings-panel-notifications"
+        role="tabpanel"
+        aria-labelledby="settings-tab-notifications"
+        data-settings-panel="notifications"
+        class="space-y-8"
+      >
+        <!-- What only this kind of device has: notifications through the
+             browser's service worker on the web, the window and the updater on
+             the desktop. Each client supplies its own; see DeviceSettings. -->
+        <DeviceSettings />
 
-      <!-- How calls ring on this device, where the server offers calls. -->
-      <section v-if="serverOffers('calls')" class="space-y-2">
-        <h2 class="text-sm font-semibold">{{ $t("calls.ringtones") }}</h2>
-        <p class="text-xs text-muted-foreground">{{ $t("calls.ringtonesHint") }}</p>
-        <CallRingtones />
-      </section>
+        <!-- A summary by email instead of a push per conversation, where the
+             server can send mail; it draws nothing where it cannot. -->
+        <DigestPreferences />
 
-      <section>
-        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
-          <Compass class="size-4" />
-          {{ $t("settings.gettingAround") }}
-        </h2>
-        <p class="mt-1 text-xs text-muted-foreground">
-          {{ $t("settings.gettingAroundHint") }}
-        </p>
+        <!-- How calls ring on this device, where the server offers calls. -->
+        <section v-if="serverOffers('calls')" class="space-y-2">
+          <h2 class="text-sm font-semibold">{{ $t("calls.ringtones") }}</h2>
+          <p class="text-xs text-muted-foreground">{{ $t("calls.ringtonesHint") }}</p>
+          <CallRingtones />
+        </section>
+      </div>
 
-        <Button variant="ghost" class="mt-3" @click="showTourAgain">
-          <Compass class="size-3.5" />
-          {{ $t("settings.showMeAround") }}
-        </Button>
-      </section>
+      <div
+        v-show="tab === 'privacy'"
+        id="settings-panel-privacy"
+        role="tabpanel"
+        aria-labelledby="settings-tab-privacy"
+        data-settings-panel="privacy"
+        class="space-y-8"
+      >
+        <section>
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+            <ShieldCheck class="size-4" />
+            {{ $t("settings.privacy") }}
+          </h2>
+          <p class="mt-1 text-xs text-muted-foreground">
+            {{ $t("settings.privacyHint") }}
+          </p>
 
-      <section>
-        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
-          <ShieldCheck class="size-4" />
-          {{ $t("settings.privacy") }}
-        </h2>
-        <p class="mt-1 text-xs text-muted-foreground">
-          {{ $t("settings.privacyHint") }}
-        </p>
-
-        <div class="mt-3 space-y-1">
-          <label
-            v-for="option in directMessageOptions"
-            :key="option.value"
-            class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
-          >
-            <input
-              type="radio"
-              :value="option.value"
-              :checked="personal.directMessages.value === option.value"
-              class="mt-0.5 cursor-pointer accent-primary"
-              @change="personal.setDirectMessages(option.value)"
-            />
-            <span class="min-w-0">
-              <span class="block text-sm font-medium">{{ option.label }}</span>
-              <span class="block text-xs text-muted-foreground">{{ option.detail }}</span>
-            </span>
-          </label>
-        </div>
-
-        <!-- Who may ring you, where the server offers calls. Ringing is the
-             more intrusive way of reaching somebody, so it has its own say. -->
-        <template v-if="serverOffers('calls')">
-          <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.calls.title") }}</h3>
-          <p class="mt-1 text-xs text-muted-foreground">{{ $t("settings.calls.hint") }}</p>
-          <div class="mt-3 space-y-1" data-call-privacy>
+          <div class="mt-3 space-y-1">
             <label
-              v-for="option in callOptions"
+              v-for="option in directMessageOptions"
               :key="option.value"
               class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
             >
               <input
                 type="radio"
-                name="call-privacy"
                 :value="option.value"
-                :checked="personal.calls.value === option.value"
+                :checked="personal.directMessages.value === option.value"
                 class="mt-0.5 cursor-pointer accent-primary"
-                @change="personal.setCalls({ calls: option.value })"
+                @change="personal.setDirectMessages(option.value)"
               />
               <span class="min-w-0">
                 <span class="block text-sm font-medium">{{ option.label }}</span>
                 <span class="block text-xs text-muted-foreground">{{ option.detail }}</span>
               </span>
             </label>
+          </div>
+
+          <!-- Who may ring you, where the server offers calls. Ringing is the
+               more intrusive way of reaching somebody, so it has its own say. -->
+          <template v-if="serverOffers('calls')">
+            <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.calls.title") }}</h3>
+            <p class="mt-1 text-xs text-muted-foreground">{{ $t("settings.calls.hint") }}</p>
+            <div class="mt-3 space-y-1" data-call-privacy>
+              <label
+                v-for="option in callOptions"
+                :key="option.value"
+                class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+              >
+                <input
+                  type="radio"
+                  name="call-privacy"
+                  :value="option.value"
+                  :checked="personal.calls.value === option.value"
+                  class="mt-0.5 cursor-pointer accent-primary"
+                  @change="personal.setCalls({ calls: option.value })"
+                />
+                <span class="min-w-0">
+                  <span class="block text-sm font-medium">{{ option.label }}</span>
+                  <span class="block text-xs text-muted-foreground">{{ option.detail }}</span>
+                </span>
+              </label>
+              <label
+                class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+              >
+                <input
+                  type="checkbox"
+                  class="mt-0.5 cursor-pointer accent-primary"
+                  :checked="personal.callsFromOtherServers.value"
+                  @change="
+                    personal.setCalls({
+                      callsFromOtherServers: !personal.callsFromOtherServers.value,
+                    })
+                  "
+                />
+                <span class="min-w-0">
+                  <span class="block text-sm font-medium">{{
+                    $t("settings.calls.otherServers")
+                  }}</span>
+                  <span class="block text-xs text-muted-foreground">
+                    {{ $t("settings.calls.otherServersHint") }}
+                  </span>
+                </span>
+              </label>
+            </div>
+          </template>
+
+          <!-- What a member list says about you. Your name and address are not
+               here because they are how a message is attributed and a
+               conversation is opened: a list without them is not a member list.
+               Anything you turn off is left out of what the server sends, rather
+               than sent and hidden. -->
+          <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.whatOthersCanSee") }}</h3>
+          <p class="mt-1 text-xs text-muted-foreground">
+            {{ $t("settings.whatOthersCanSeeHint") }}
+          </p>
+
+          <div class="mt-3 space-y-1">
             <label
+              v-for="detail in disclosureOptions"
+              :key="detail.field"
               class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
             >
               <input
                 type="checkbox"
                 class="mt-0.5 cursor-pointer accent-primary"
-                :checked="personal.callsFromOtherServers.value"
+                :checked="personal.disclosure.value[detail.field]"
                 @change="
-                  personal.setCalls({
-                    callsFromOtherServers: !personal.callsFromOtherServers.value,
-                  })
+                  personal.setDisclosure(detail.field, !personal.disclosure.value[detail.field])
                 "
               />
               <span class="min-w-0">
-                <span class="block text-sm font-medium">{{
-                  $t("settings.calls.otherServers")
-                }}</span>
-                <span class="block text-xs text-muted-foreground">
-                  {{ $t("settings.calls.otherServersHint") }}
-                </span>
+                <span class="block text-sm font-medium">{{ detail.label }}</span>
+                <span class="block text-xs text-muted-foreground">{{ detail.detail }}</span>
               </span>
             </label>
           </div>
-        </template>
 
-        <!-- What a member list says about you. Your name and address are not
-             here because they are how a message is attributed and a
-             conversation is opened: a list without them is not a member list.
-             Anything you turn off is left out of what the server sends, rather
-             than sent and hidden. -->
-        <h3 class="mt-5 text-xs font-semibold">{{ $t("settings.whatOthersCanSee") }}</h3>
-        <p class="mt-1 text-xs text-muted-foreground">
-          {{ $t("settings.whatOthersCanSeeHint") }}
-        </p>
+          <p class="mt-2 text-[0.6875rem] text-muted-foreground">
+            {{ $t("settings.moderatorCanSeeDisclosure") }}
+          </p>
 
-        <div class="mt-3 space-y-1">
+          <!-- Whether others see you writing. Off, this device stops saying so
+               and the server ignores any device that still does. -->
           <label
-            v-for="detail in disclosureOptions"
-            :key="detail.field"
-            class="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+            class="mt-3 flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
+            data-typing-preference
           >
             <input
               type="checkbox"
               class="mt-0.5 cursor-pointer accent-primary"
-              :checked="personal.disclosure.value[detail.field]"
-              @change="
-                personal.setDisclosure(detail.field, !personal.disclosure.value[detail.field])
-              "
+              :checked="typing.sends.value !== false"
+              @change="setTyping(typing.sends.value === false)"
             />
             <span class="min-w-0">
-              <span class="block text-sm font-medium">{{ detail.label }}</span>
-              <span class="block text-xs text-muted-foreground">{{ detail.detail }}</span>
+              <span class="block text-sm font-medium">{{ $t("settings.showsTyping") }}</span>
+              <span class="block text-xs text-muted-foreground">{{
+                $t("settings.showsTypingHint")
+              }}</span>
             </span>
           </label>
-        </div>
+        </section>
 
-        <p class="mt-2 text-[0.6875rem] text-muted-foreground">
-          {{ $t("settings.moderatorCanSeeDisclosure") }}
-        </p>
+        <section>
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+            <UserX class="size-4" />
+            {{ $t("settings.blocked") }}
+          </h2>
+          <p class="mt-1 text-xs text-muted-foreground">
+            {{ $t("settings.blockedHint") }}
+          </p>
 
-        <!-- Whether others see you writing. Off, this device stops saying so
-             and the server ignores any device that still does. -->
-        <label
-          class="mt-3 flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-accent"
-          data-typing-preference
-        >
-          <input
-            type="checkbox"
-            class="mt-0.5 cursor-pointer accent-primary"
-            :checked="typing.sends.value !== false"
-            @change="setTyping(typing.sends.value === false)"
-          />
-          <span class="min-w-0">
-            <span class="block text-sm font-medium">{{ $t("settings.showsTyping") }}</span>
-            <span class="block text-xs text-muted-foreground">{{
-              $t("settings.showsTypingHint")
-            }}</span>
-          </span>
-        </label>
-      </section>
+          <p v-if="!personal.blocked.value.length" class="mt-3 text-xs text-muted-foreground">
+            {{ $t("settings.blockedNobody") }}
+          </p>
 
-      <LazyEventsFeedSettings v-if="serverOffers('events')" />
-
-      <section>
-        <h2 class="flex items-center gap-1.5 text-sm font-semibold">
-          <UserX class="size-4" />
-          {{ $t("settings.blocked") }}
-        </h2>
-        <p class="mt-1 text-xs text-muted-foreground">
-          {{ $t("settings.blockedHint") }}
-        </p>
-
-        <p v-if="!personal.blocked.value.length" class="mt-3 text-xs text-muted-foreground">
-          {{ $t("settings.blockedNobody") }}
-        </p>
-
-        <ul v-else class="mt-3 space-y-1">
-          <li
-            v-for="person in personal.blocked.value"
-            :key="person.id"
-            class="flex items-center gap-2 rounded-lg px-2 py-1.5"
-          >
-            <Avatar :name="nameOf(person)" size="sm" />
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-medium">{{ nameOf(person) }}</span>
-              <span class="block truncate text-xs text-muted-foreground">
-                @{{ person.username }}
+          <ul v-else class="mt-3 space-y-1">
+            <li
+              v-for="person in personal.blocked.value"
+              :key="person.id"
+              class="flex items-center gap-2 rounded-lg px-2 py-1.5"
+            >
+              <Avatar :name="nameOf(person)" size="sm" />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm font-medium">{{ nameOf(person) }}</span>
+                <span class="block truncate text-xs text-muted-foreground">
+                  @{{ person.username }}
+                </span>
               </span>
-            </span>
-            <Button variant="ghost" class="h-7 px-2 text-xs" @click="unblocking = person">
-              {{ $t("settings.unblock") }}
-            </Button>
-          </li>
-        </ul>
-      </section>
+              <Button variant="ghost" class="h-7 px-2 text-xs" @click="unblocking = person">
+                {{ $t("settings.unblock") }}
+              </Button>
+            </li>
+          </ul>
+        </section>
 
-      <!-- Integrations: webhooks and the programs pointed at this server. -->
-      <section>
-        <h2 class="text-sm font-semibold">{{ $t("integrations.title") }}</h2>
-        <p class="mt-1 text-xs text-muted-foreground">{{ $t("integrations.settingsHint") }}</p>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <NuxtLink :to="localeRoute({ name: 'integrations' })" class="btn btn-outline">
-            {{ $t("integrations.manage") }}
-          </NuxtLink>
-          <NuxtLink
-            v-if="can('server.applications.manage')"
-            :to="localeRoute({ name: 'applications' })"
-            class="btn btn-outline"
-          >
-            {{ $t("integrations.applications") }}
-          </NuxtLink>
-        </div>
-      </section>
+        <!-- Integrations: webhooks and the programs pointed at this server. -->
+      </div>
 
-      <section
-        v-if="
-          can('server.audit.read') ||
-          can('moderation.review') ||
-          can('server.configure') ||
-          can('server.restart') ||
-          can('server.backup') ||
-          can('server.restore') ||
-          can('user.suspend') ||
-          can('user.invite') ||
-          can('role.manage') ||
-          can('role.assign')
-        "
+      <div
+        v-show="tab === 'more'"
+        id="settings-panel-more"
+        role="tabpanel"
+        aria-labelledby="settings-tab-more"
+        data-settings-panel="more"
+        class="space-y-8"
       >
-        <h2 class="text-sm font-semibold">{{ $t("nav.administration") }}</h2>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <NuxtLink
-            v-if="can('server.configure') || can('server.restart')"
-            :to="localeRoute({ name: 'admin' })"
-            class="btn btn-outline"
-          >
-            <SlidersHorizontal class="size-3.5" />
-            {{ $t("settings.serverSettings") }}
-          </NuxtLink>
-          <NuxtLink
-            v-if="can('server.backup') || can('server.restore')"
-            :to="localeRoute({ name: 'backups' })"
-            class="btn btn-outline"
-          >
-            <DatabaseBackup class="size-3.5" />
-            {{ $t("operations.title") }}
-          </NuxtLink>
-          <NuxtLink
-            v-if="can('user.suspend') || can('user.invite')"
-            :to="localeRoute({ name: 'people' })"
-            class="btn btn-outline"
-          >
-            <Users class="size-3.5" />
-            {{ $t("nav.people") }}
-          </NuxtLink>
-          <NuxtLink
-            v-if="can('role.manage') || can('role.assign')"
-            :to="localeRoute({ name: 'roles' })"
-            class="btn btn-outline"
-          >
-            <KeyRound class="size-3.5" />
-            {{ $t("roles.title") }}
-          </NuxtLink>
-          <NuxtLink
-            v-if="can('moderation.review')"
-            :to="localeRoute({ name: 'reports' })"
-            class="btn btn-outline"
-          >
-            <Flag class="size-3.5" />
-            {{ $t("moderation.reports") }}
-            <!-- The count is fetched by the queue itself; a badge here would
-                 mean every settings visit reads the moderation queue. -->
-          </NuxtLink>
-          <NuxtLink
-            v-if="can('server.audit.read')"
-            :to="localeRoute({ name: 'audit' })"
-            class="btn btn-outline"
-          >
-            <ScrollText class="size-3.5" />
-            {{ $t("settings.viewAuditLog") }}
-          </NuxtLink>
-        </div>
-      </section>
+        <!-- Translating messages, where the server offers it. Lazy: the
+             provider forms and their validation are needed only here. -->
+        <LazyTranslationSettings v-if="serverOffers('translation')" />
+
+        <LazyEventsFeedSettings v-if="serverOffers('events')" />
+
+        <section>
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+            <Compass class="size-4" />
+            {{ $t("settings.gettingAround") }}
+          </h2>
+          <p class="mt-1 text-xs text-muted-foreground">
+            {{ $t("settings.gettingAroundHint") }}
+          </p>
+
+          <Button variant="ghost" class="mt-3" @click="showTourAgain">
+            <Compass class="size-3.5" />
+            {{ $t("settings.showMeAround") }}
+          </Button>
+        </section>
+
+        <section>
+          <h2 class="text-sm font-semibold">{{ $t("integrations.title") }}</h2>
+          <p class="mt-1 text-xs text-muted-foreground">{{ $t("integrations.settingsHint") }}</p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <NuxtLink :to="localeRoute({ name: 'integrations' })" class="btn btn-outline">
+              {{ $t("integrations.manage") }}
+            </NuxtLink>
+            <NuxtLink
+              v-if="can('server.applications.manage')"
+              :to="localeRoute({ name: 'applications' })"
+              class="btn btn-outline"
+            >
+              {{ $t("integrations.applications") }}
+            </NuxtLink>
+          </div>
+        </section>
+
+        <section
+          v-if="
+            can('server.audit.read') ||
+            can('moderation.review') ||
+            can('server.configure') ||
+            can('server.restart') ||
+            can('server.backup') ||
+            can('server.restore') ||
+            can('user.suspend') ||
+            can('user.invite') ||
+            can('role.manage') ||
+            can('role.assign')
+          "
+        >
+          <h2 class="text-sm font-semibold">{{ $t("nav.administration") }}</h2>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <NuxtLink
+              v-if="can('server.configure') || can('server.restart')"
+              :to="localeRoute({ name: 'admin' })"
+              class="btn btn-outline"
+            >
+              <SlidersHorizontal class="size-3.5" />
+              {{ $t("settings.serverSettings") }}
+            </NuxtLink>
+            <NuxtLink
+              v-if="can('server.backup') || can('server.restore')"
+              :to="localeRoute({ name: 'backups' })"
+              class="btn btn-outline"
+            >
+              <DatabaseBackup class="size-3.5" />
+              {{ $t("operations.title") }}
+            </NuxtLink>
+            <NuxtLink
+              v-if="can('user.suspend') || can('user.invite')"
+              :to="localeRoute({ name: 'people' })"
+              class="btn btn-outline"
+            >
+              <Users class="size-3.5" />
+              {{ $t("nav.people") }}
+            </NuxtLink>
+            <NuxtLink
+              v-if="can('role.manage') || can('role.assign')"
+              :to="localeRoute({ name: 'roles' })"
+              class="btn btn-outline"
+            >
+              <KeyRound class="size-3.5" />
+              {{ $t("roles.title") }}
+            </NuxtLink>
+            <NuxtLink
+              v-if="can('moderation.review')"
+              :to="localeRoute({ name: 'reports' })"
+              class="btn btn-outline"
+            >
+              <Flag class="size-3.5" />
+              {{ $t("moderation.reports") }}
+              <!-- The count is fetched by the queue itself; a badge here would
+                   mean every settings visit reads the moderation queue. -->
+            </NuxtLink>
+            <NuxtLink
+              v-if="can('server.audit.read')"
+              :to="localeRoute({ name: 'audit' })"
+              class="btn btn-outline"
+            >
+              <ScrollText class="size-3.5" />
+              {{ $t("settings.viewAuditLog") }}
+            </NuxtLink>
+          </div>
+        </section>
+      </div>
 
       <section class="border-t pt-6">
         <Button variant="danger" @click="leave">

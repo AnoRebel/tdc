@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
+	"github.com/AnoRebel/tdc/server/internal/settings"
 	"github.com/labstack/echo/v5"
 )
 
@@ -25,7 +26,7 @@ should not have to be rewritten when it does.
 */
 
 type appearance struct {
-	// Palette names a set of colours: "default", "congrator", or empty for
+	// Palette names a set of colours, one of settings.Palettes, or empty for
 	// whatever the operator chose.
 	Palette string `json:"palette"`
 	// Mode is "light", "dark", "auto", or empty. Auto is a choice rather than
@@ -37,8 +38,7 @@ type appearance struct {
 }
 
 var (
-	knownPalettes = map[string]bool{"": true, "default": true, "congrator": true}
-	knownModes    = map[string]bool{"": true, "light": true, "dark": true, "auto": true}
+	knownModes = map[string]bool{"": true, "light": true, "dark": true, "auto": true}
 )
 
 // handleGetAppearance reports what this person chose.
@@ -77,7 +77,7 @@ func (s *Server) handleSetAppearance(c *echo.Context) error {
 	request.Mode = strings.TrimSpace(request.Mode)
 	request.Accent = strings.TrimSpace(request.Accent)
 
-	if !knownPalettes[request.Palette] {
+	if !settings.KnownPalette(request.Palette) {
 		return echo.NewHTTPError(http.StatusBadRequest,
 			fmt.Sprintf("%q is not a palette this server has", request.Palette))
 	}

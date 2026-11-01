@@ -10,6 +10,7 @@ import {
   KeyboardOff,
   LogOut,
   Moon,
+  Palette,
   Plus,
   ScrollText,
   Settings,
@@ -45,6 +46,7 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
   const { $localeRoute: localeRoute, $ts } = useI18n();
   // The motion and keyboard preferences, which a dialog in the layout shows.
   const showingInterface = useState("interface.open", () => false);
+  const showingAppearance = useState("appearance.open", () => false);
   const { shortcuts: shortcutsOn } = useInterfacePreferences();
   const { can, signOut } = useAuth();
   const router = useRouter();
@@ -134,6 +136,15 @@ export function useCommands(options: { openShortcuts: () => void; createChannel:
         keywords: "motion animation reduce density compact keyboard shortcuts",
         run: () => {
           showingInterface.value = true;
+        },
+      },
+      {
+        id: "appearance",
+        label: $ts("appearance.command"),
+        icon: Palette,
+        keywords: "theme colours colors material glass contrast rangi",
+        run: () => {
+          showingAppearance.value = true;
         },
       },
       {

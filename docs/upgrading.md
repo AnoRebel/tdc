@@ -45,7 +45,7 @@ docker compose cp database:/tmp/tdc.dump ./before-upgrade.dump
 docker compose exec -T database rm /tmp/tdc.dump
 ```
 
-Or take one from the application — Settings → Backups, everything — and download
+Or take one from the application — Settings → More → Administration → Backups, everything — and download
 it. Either works for going back; a dump is restored with Postgres's own tools,
 and an archive from the application is restored by the release that made it
 (an archive refuses a server at another schema version), so roll back the

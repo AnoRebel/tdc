@@ -509,7 +509,7 @@ way.
 
 You can also have translation happen without asking:
 
-- **Everything on this server** — in **Settings → Translation**.
+- **Everything on this server** — in **Settings → More → Translation**.
 - **One conversation** — the translate button in the conversation's header
   turns it on or off there, whatever the server-wide choice is.
 
@@ -520,7 +520,7 @@ back exactly as written; the words around them are translated piece by piece,
 which occasionally costs a little fluency around inline code.
 
 **Which language.** The one you read the interface in, unless you choose another
-in **Settings → Translation**.
+in **Settings → More → Translation**.
 
 ![Settings, Translation: the language to translate into, the provider, the switch for translating everything automatically, and the providers with which are available and connected](images/using-tdc/translation-settings.webp)
 
@@ -1249,7 +1249,7 @@ yourself. A separate switch decides whether people on connected servers may
 ring you, where your server allows that at all. Whoever is refused is not told
 why.
 
-**How it sounds** is in **Settings → Ringing**, kept on each device and, in
+**How it sounds** is in **Settings → Notifications → Ringing**, kept on each device and, in
 the desktop application, for each server separately: turn the ringer off,
 choose a tone, add your own (an audio file under 400 KB), give particular
 people their own tone by address (`name@server`), and, on phones whose browser
@@ -1572,7 +1572,7 @@ On an event's page, **Add to your calendar** offers:
   you asked.
 
 To have **all** your events appear in your calendar, and keep up to date, use
-**your calendar address**: **Settings → Your calendar → Make my calendar
+**your calendar address**: **Settings → More → Your calendar → Make my calendar
 address**. It holds the events you are going to, hosting or speaking at, and
 your channels' events, and it is **shown once** — copy it then. Anybody holding
 it can read your calendar, so treat it like a password: **Make a new address**
@@ -1587,7 +1587,7 @@ Adding it:
 - **Outlook** — **Calendar → Add calendar → Subscribe from web**, paste the
   address, **Import**.
 - **Apple Calendar** — **File → New Calendar Subscription**, paste the address.
-  On an iPhone: **Settings → Calendar → Accounts → Add Account → Other → Add
+  On an iPhone: **Settings → More → Calendar → Accounts → Add Account → Other → Add
   Subscribed Calendar**.
 - Anything else that subscribes to a calendar by address (Thunderbird, GNOME
   Calendar…) works the same way. **Open in your calendar application** offers it
@@ -1639,6 +1639,13 @@ may do what.
 
 ## Making it yours
 
+**Settings** is in tabs, one subject each: **Profile** (your names, location,
+status and automatic replies), **Account and security** (email, two-step
+sign-in, passkeys, API tokens and signed-in devices), **Appearance**,
+**Notifications**, **Privacy** (who may reach you and who you have blocked) and
+**More** (translation, your calendar, the tour, integrations and
+administration). The tab you are on is in the address, so a link can open one.
+
 ### Appearance
 
 Light or dark, following your system by default. Two colour palettes ship,
@@ -1647,7 +1654,45 @@ independently of the palette — pick a colour and the application derives a
 readable shade for light and for dark rather than accepting or refusing what you
 picked. A colour that cannot be made readable is refused.
 
-![Appearance settings: Follow my device, Light or Dark, the Cool and Warm palettes, and the accent colour](images/using-tdc/appearance.webp)
+![Appearance settings: light or dark, high contrast, the Cool and Warm palettes, the six Crystal Neuo materials each drawn in itself, and the accent colour](images/using-tdc/appearance.webp)
+
+Besides the two palettes there are six **Crystal Neuo materials**, whole looks
+from the [Crystal Neuo design system](https://crystal-neuo.anorebel.net), each
+with its own colours, corners, borders, shadows and type, in light and dark:
+
+| Material       | What it looks like                                             |
+| -------------- | -------------------------------------------------------------- |
+| **Refraction** | Frosted glass for the sidebar, menus and dialogs, calm content |
+| **Tactile**    | Ink borders and hard shadows; buttons press in like keys       |
+| **Signal**     | Soft raised surfaces, headings in a monospaced face            |
+| **Folio**      | Flat and shadowless, set in IBM Plex                           |
+| **Bloom**      | Round corners, soft glass and warm colour                      |
+| **Hybrid**     | Refraction's glass with Tactile's ink buttons                  |
+
+Each is shown in its card as it will look, so you can compare before
+choosing. A material replaces the palette; your accent still applies on top.
+Refraction, Bloom and Hybrid draw the sidebar, menus and dialogs in frosted
+glass: **Frosted glass** turns that off and draws them solid, and glass steps
+aside by itself if your system asks for reduced transparency. A material's
+styles and fonts are downloaded only once you choose one.
+
+![The golang channel in Refraction: a frosted sidebar over a faint wash of colour](images/using-tdc/material-refraction.webp)
+
+![The golang channel in Tactile: messages and buttons drawn with ink borders and hard offset shadows](images/using-tdc/material-tactile.webp)
+
+![The golang channel in Signal, dark: soft raised surfaces with an orange accent and a monospaced heading](images/using-tdc/material-signal.webp)
+
+**High contrast** draws white on black with a yellow accent, with no shadows
+and nothing see-through, over whichever colours you chose. It is off unless
+you turn it on, or set it to follow your device's own contrast setting. Like
+motion, it is kept in this browser rather than on your account.
+
+The same choices are a press away from anywhere: the palette button at the
+foot of the sidebar offers light or dark and the two palettes, and **More
+colours and materials…** opens them all in a dialog. So does "Appearance" in
+the command palette (`Ctrl K`).
+
+![The appearance dialog over the application, with the six materials shown as small previews](images/using-tdc/appearance-dialog.webp)
 
 **Your choice is stored on your account**, so it follows you to another browser
 or to the desktop client rather than living in one browser's storage. Your
@@ -1691,6 +1736,12 @@ the screen. **Keyboard shortcuts** can be switched off entirely if you keep
 setting them off by accident; `Esc` and `Ctrl K` keep working either way.
 **Show formatting in messages** is on unless you turn it off; off, every
 message is shown as the text that was typed (see [Formatting](#formatting)).
+
+**Show in the interface** puts away what you do not use: the Directory, Events
+and Projects links in the sidebar, link previews under messages, who is
+typing, and the dots that say who is online. Only you see the difference —
+nobody else's view changes, and a page whose link you hid is still reachable
+from search.
 
 All of these apply the moment you choose them and are kept **in this browser** (or
 this desktop app) rather than on your account — you may want motion on a big
@@ -1816,7 +1867,7 @@ What the desktop client adds:
 
 - **Notifications from the operating system**, which respect system quiet modes
   and open the conversation they are about when you activate them. Where your
-  system wants permission first, **Settings → This computer** is where to give
+  system wants permission first, **Settings → Notifications → This computer** is where to give
   it: TDC asks only when you press the button there, because some systems ask
   only once.
 - **Window and update settings** alongside the rest, under the same heading:
@@ -1855,7 +1906,7 @@ What works differently, because the window is not a browser:
   reminders raise a system notification as well as appearing in the window,
   even while the window is closed to the tray.
 - **Translating on this device** depends on the browser engine, and the one the
-  desktop window uses usually does not have it. **Settings → Translation** says
+  desktop window uses usually does not have it. **Settings → More → Translation** says
   so where it is missing; choose another provider there.
 
 ### Which Linux download to take

@@ -41,6 +41,8 @@ const emit = defineEmits<{ create: []; search: [] }>();
 
 const { user } = useAuth();
 const route = useRoute();
+// The links somebody may have put away; the pages stay reachable by search.
+const { shows } = useInterfacePreferences();
 
 const peers = computed(() => props.servers);
 
@@ -189,7 +191,7 @@ function isCurrent(roomId: string): boolean {
 </script>
 
 <template>
-  <aside class="flex w-60 shrink-0 flex-col border-r bg-surface-sunken">
+  <aside data-chrome class="flex w-60 shrink-0 flex-col border-r bg-surface-sunken">
     <!-- What the operator called this server, applied at runtime rather than
          compiled in. A logo where they set one, their initials otherwise. -->
     <header class="flex h-12 items-center gap-2 border-b px-3">
@@ -229,7 +231,7 @@ function isCurrent(roomId: string): boolean {
       <!-- The directory, where the server offers one. Asked of the server
            rather than assumed, because it is off unless an operator turned it
            on, and a link to a directory that answers 404 is worse than none. -->
-      <section v-if="offers('directory')">
+      <section v-if="offers('directory') && shows('directory')">
         <ul class="space-y-px">
           <li>
             <NuxtLink
@@ -244,7 +246,7 @@ function isCurrent(roomId: string): boolean {
         </ul>
       </section>
       <!-- Events: what is coming up, on servers that offer them. -->
-      <ul v-if="offers('events')" class="space-y-px">
+      <ul v-if="offers('events') && shows('events')" class="space-y-px">
         <li>
           <NuxtLink
             :to="localeRoute({ name: 'events' })"
@@ -258,46 +260,48 @@ function isCurrent(roomId: string): boolean {
       </ul>
       <!-- Projects: where work agreed in these conversations is tracked. -->
       <ul class="space-y-px">
-        <li>
-          <NuxtLink
-            :to="localeRoute({ name: 'projects' })"
-            class="nav-item"
-            :data-active="route.path.startsWith('/projects')"
-          >
-            <Icon name="lucide:kanban" class="size-3.5 shrink-0 opacity-60" />
-            <span class="truncate">{{ $t("projects.title") }}</span>
-          </NuxtLink>
-        </li>
-        <li>
-          <NuxtLink
-            :to="localeRoute({ name: 'issues' })"
-            class="nav-item"
-            :data-active="route.path === '/issues'"
-          >
-            <Icon name="lucide:circle-user-round" class="size-3.5 shrink-0 opacity-60" />
-            <span class="truncate">{{ $t("projects.mine.title") }}</span>
-          </NuxtLink>
-        </li>
-        <li>
-          <NuxtLink
-            :to="localeRoute({ name: 'issues-search' })"
-            class="nav-item"
-            :data-active="route.path === '/issues/search'"
-          >
-            <Icon name="lucide:file-search" class="size-3.5 shrink-0 opacity-60" />
-            <span class="truncate">{{ $t("projects.search.title") }}</span>
-          </NuxtLink>
-        </li>
-        <li>
-          <NuxtLink
-            :to="localeRoute({ name: 'views' })"
-            class="nav-item"
-            :data-active="route.path.startsWith('/views')"
-          >
-            <Icon name="lucide:bookmark" class="size-3.5 shrink-0 opacity-60" />
-            <span class="truncate">{{ $t("projects.saved.title") }}</span>
-          </NuxtLink>
-        </li>
+        <template v-if="shows('projects')">
+          <li>
+            <NuxtLink
+              :to="localeRoute({ name: 'projects' })"
+              class="nav-item"
+              :data-active="route.path.startsWith('/projects')"
+            >
+              <Icon name="lucide:kanban" class="size-3.5 shrink-0 opacity-60" />
+              <span class="truncate">{{ $t("projects.title") }}</span>
+            </NuxtLink>
+          </li>
+          <li>
+            <NuxtLink
+              :to="localeRoute({ name: 'issues' })"
+              class="nav-item"
+              :data-active="route.path === '/issues'"
+            >
+              <Icon name="lucide:circle-user-round" class="size-3.5 shrink-0 opacity-60" />
+              <span class="truncate">{{ $t("projects.mine.title") }}</span>
+            </NuxtLink>
+          </li>
+          <li>
+            <NuxtLink
+              :to="localeRoute({ name: 'issues-search' })"
+              class="nav-item"
+              :data-active="route.path === '/issues/search'"
+            >
+              <Icon name="lucide:file-search" class="size-3.5 shrink-0 opacity-60" />
+              <span class="truncate">{{ $t("projects.search.title") }}</span>
+            </NuxtLink>
+          </li>
+          <li>
+            <NuxtLink
+              :to="localeRoute({ name: 'views' })"
+              class="nav-item"
+              :data-active="route.path.startsWith('/views')"
+            >
+              <Icon name="lucide:bookmark" class="size-3.5 shrink-0 opacity-60" />
+              <span class="truncate">{{ $t("projects.saved.title") }}</span>
+            </NuxtLink>
+          </li>
+        </template>
         <!-- Only while something is waiting: an empty list is not worth a
              permanent line in the sidebar. -->
         <li v-if="scheduled.scheduled.value.length">

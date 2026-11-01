@@ -63,6 +63,52 @@ export function isDensity(value: unknown): value is Density {
   return typeof value === "string" && (DENSITIES as readonly string[]).includes(value);
 }
 
+/*
+ * High contrast: Crystal Neuo's shared high-contrast theme, over whichever
+ * palette or material is chosen — black ground, white text, a yellow accent,
+ * no shadows and no translucency.
+ *
+ * Off unless somebody turns it on, or asks to follow their device: an
+ * operating system set to increase contrast means different things on
+ * different systems, and somebody who has used this application for months
+ * should not find it repainted because of a setting they made elsewhere.
+ */
+export const CONTRAST_PREFERENCES = ["standard", "more", "system"] as const;
+export type ContrastPreference = (typeof CONTRAST_PREFERENCES)[number];
+
+export function isContrastPreference(value: unknown): value is ContrastPreference {
+  return typeof value === "string" && (CONTRAST_PREFERENCES as readonly string[]).includes(value);
+}
+
+/** Whether high contrast applies; anything unreadable is the default, off. */
+export function resolveContrast(preference: unknown, systemWantsMore: boolean): boolean {
+  if (preference === "more") return true;
+  if (preference === "system") return systemWantsMore;
+  return false;
+}
+
+/*
+ * Parts of the interface somebody may put away.
+ *
+ * Each is something a person can do without, not something they need to be
+ * told: a hidden sidebar link still leaves its page reachable from the search
+ * palette and by address, and hiding typing or online status hides it from
+ * this person only — nobody else sees anything different.
+ */
+export const HIDEABLE = [
+  "directory",
+  "events",
+  "projects",
+  "previews",
+  "typing",
+  "presence",
+] as const;
+export type Hideable = (typeof HIDEABLE)[number];
+
+export function isHideable(value: unknown): value is Hideable {
+  return typeof value === "string" && (HIDEABLE as readonly string[]).includes(value);
+}
+
 /** Where each choice is stored, so the script and the composable agree. */
 export const MOTION_STORAGE_KEY = "tdc-motion";
 export const SHORTCUTS_STORAGE_KEY = "tdc-shortcuts";
@@ -71,9 +117,14 @@ export const DENSITY_STORAGE_KEY = "tdc-density";
 export const FORMATTING_STORAGE_KEY = "tdc-formatting";
 /** Whether the composer shows its row of formatting buttons. */
 export const FORMATTING_TOOLBAR_STORAGE_KEY = "tdc-formatting-toolbar";
+export const CONTRAST_STORAGE_KEY = "tdc-contrast";
+/** Whether a material's glass is frosted, or drawn solid. */
+export const GLASS_STORAGE_KEY = "tdc-glass";
+/** The parts of the interface put away, as a list of names. */
+export const HIDDEN_STORAGE_KEY = "tdc-hidden";
 
 /**
- * The motion and density decisions, made before the first paint.
+ * The motion, density, contrast and glass decisions, made before the first paint.
  *
  * For the same reason the theme's is: an attribute set from a component lands
  * after the browser has drawn, and the first thing drawn is the thing most
@@ -93,4 +144,10 @@ export const PREPAINT_INTERFACE_SCRIPT =
   "?'reduced':'full';}" +
   "r.setAttribute('data-motion',m);" +
   "if(localStorage.getItem('tdc-density')==='compact')r.setAttribute('data-density','compact');" +
+  // After the theme's script, so high contrast can insist on dark.
+  "var c=localStorage.getItem('tdc-contrast');" +
+  "if(c==='more'||(c==='system'&&window.matchMedia&&" +
+  "window.matchMedia('(prefers-contrast: more)').matches)){" +
+  "r.setAttribute('data-contrast','more');r.classList.add('dark');r.classList.remove('light');}" +
+  "if(localStorage.getItem('tdc-glass')==='false')r.setAttribute('data-glass','off');" +
   "}catch(e){}})();";

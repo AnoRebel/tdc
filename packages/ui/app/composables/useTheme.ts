@@ -8,11 +8,13 @@ import {
   THEME_STORAGE_KEY,
   deriveAccent,
   isAppearance,
+  isMaterial,
   isPalette,
   type AccentRefusal,
   type Appearance,
   type Palette,
 } from "#layers/ui/app/lib/theme";
+import { loadMaterials } from "#layers/ui/app/lib/materials";
 
 /** What somebody has chosen, rather than what is currently shown. */
 export type ThemePreference = Appearance;
@@ -56,6 +58,8 @@ export function useTheme() {
   }));
 
   const api = useApi();
+  /** What the account holds, shared with the appearance sync that reads it. */
+  const onAccount = useState<StoredAppearance | undefined>("appearance-mine", () => undefined);
 
   /** Whether dark is what should currently be shown. */
   function resolve(choice: Appearance): boolean {
@@ -70,7 +74,9 @@ export function useTheme() {
   function apply(choice: Appearance) {
     if (import.meta.server) return;
 
-    const dark = resolve(choice);
+    // High contrast is drawn dark whatever was chosen: it has one set of
+    // colours, and the stylesheet's dark rules are what the rest key off.
+    const dark = resolve(choice) || document.documentElement.hasAttribute("data-contrast");
     const classes = document.documentElement.classList;
     classes.toggle("dark", dark);
     classes.toggle("light", !dark);
@@ -93,6 +99,31 @@ export function useTheme() {
       style.removeProperty("--accent-light");
       style.removeProperty("--accent-dark");
     }
+  }
+
+  /**
+   * Puts a palette on the page.
+   *
+   * A material's stylesheet is fetched first, the first time one is chosen,
+   * so the page never carries a material's name with none of its rules — which
+   * would show the default with the wrong corners for as long as the fetch
+   * took. Checked again once it arrives, in case somebody chose something else
+   * meanwhile.
+   */
+  function showPalette(choice: Palette) {
+    const root = document.documentElement;
+    const show = () => {
+      if (palette.value !== choice) return;
+      /*
+       * The default is the absence of the attribute rather than
+       * data-theme="default": the stylesheet's own :root rules are the default
+       * palette, and marking it would mean writing them twice.
+       */
+      if (choice === "default") root.removeAttribute("data-theme");
+      else root.setAttribute("data-theme", choice);
+    };
+    if (isMaterial(choice)) void loadMaterials().then(show);
+    else show();
   }
 
   /** Stores a choice, or gives up quietly when storage refuses. */
@@ -118,12 +149,20 @@ export function useTheme() {
   async function publish() {
     if (import.meta.server) return;
 
+    const choice = {
+      palette: chosen.value.palette ? palette.value : "",
+      mode: chosen.value.mode ? preference.value : "",
+      accent: chosen.value.accent ? accent.value : "",
+    };
+    /*
+     * What the account holds, as the appearance sync last read it, made what
+     * was just chosen. Otherwise the copy read at startup outranks every later
+     * choice: somebody who had saved Warm, and chose Cool, saw Warm come back
+     * the moment anything made the sync settle again.
+     */
+    onAccount.value = choice;
     try {
-      await api.put<StoredAppearance>("/api/me/preferences/appearance", {
-        palette: chosen.value.palette ? palette.value : "",
-        mode: chosen.value.mode ? preference.value : "",
-        accent: chosen.value.accent ? accent.value : "",
-      });
+      await api.put<StoredAppearance>("/api/me/preferences/appearance", choice);
     } catch {
       // Not signed in, or nothing reachable. This browser still has it.
     }
@@ -141,16 +180,7 @@ export function useTheme() {
     palette.value = choice;
     chosen.value = { ...chosen.value, palette: true };
 
-    if (!import.meta.server) {
-      const root = document.documentElement;
-      /*
-       * The default is the absence of the attribute rather than
-       * data-theme="default": the stylesheet's own :root rules are the default
-       * palette, and marking it would mean writing them twice.
-       */
-      if (choice === "default") root.removeAttribute("data-theme");
-      else root.setAttribute("data-theme", choice);
-    }
+    if (!import.meta.server) showPalette(choice);
 
     remember(PALETTE_STORAGE_KEY, choice === "default" ? "" : choice);
     void publish();
@@ -244,8 +274,6 @@ export function useTheme() {
   function settle(operator: { accent?: string; palette?: string }, mine?: StoredAppearance) {
     if (import.meta.server) return;
 
-    const root = document.documentElement;
-
     /*
      * The palette: this person's stored choice, then a choice they have just
      * made, then the operator's, then whatever is already applied.
@@ -273,8 +301,7 @@ export function useTheme() {
           : palette.value;
     chosen.value = { ...chosen.value, palette: isPalette(mine?.palette) || chosenHere };
     palette.value = wantedPalette;
-    if (wantedPalette === "default") root.removeAttribute("data-theme");
-    else root.setAttribute("data-theme", wantedPalette);
+    showPalette(wantedPalette);
 
     // Light or dark. The operator has no say here: it is a property of the
     // room somebody is sitting in, not of the instance they are using.

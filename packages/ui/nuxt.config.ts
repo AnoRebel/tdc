@@ -53,6 +53,26 @@ export default defineNuxtConfig({
    */
   css: [`${here}app/assets/css/main.css`],
 
+  hooks: {
+    /*
+     * Crystal Neuo's materials are linked by address when somebody chooses
+     * one (app/lib/materials.ts). Left to itself the build preloads every
+     * stylesheet the first load refers to, which would have every visitor
+     * download all six materials and their faces to use none of them.
+     */
+    "build:manifest": (manifest) => {
+      const materials = (file: string) => /(^|\/)materials\.[\w-]+\.css$/.test(file);
+      for (const chunk of Object.values(manifest)) {
+        if (materials(chunk.file)) {
+          chunk.preload = false;
+          chunk.prefetch = false;
+        }
+        chunk.assets = chunk.assets?.filter((file) => !materials(file));
+        chunk.css = chunk.css?.filter((file) => !materials(file));
+      }
+    },
+  },
+
   /*
    * The guides' screenshots, copied from docs/images into what each client
    * serves (the web build, and the desktop's embedded dist) as plain files

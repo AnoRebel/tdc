@@ -26,6 +26,9 @@ const props = withDefaults(
   { size: "md" },
 );
 
+// Online status can be put away, for somebody who would rather not watch it.
+const { shows } = useInterfacePreferences();
+
 /** The part before the "@", so an address does not become the initials. */
 const local = computed(() => props.name.split("@")[0] ?? props.name);
 
@@ -88,7 +91,7 @@ const sizes = {
          labelling an element that has none, so a screen reader would either
          ignore this or announce a stray word with nothing attached to it. -->
     <span
-      v-if="props.online"
+      v-if="props.online && shows('presence')"
       class="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-surface bg-success"
       role="img"
       aria-label="Online"

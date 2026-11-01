@@ -25,6 +25,7 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -244,12 +245,30 @@ const (
 	/*
 		BrandPalette is which set of colours this instance uses by default.
 
-		"default" or "congrator". A person may choose otherwise for themselves;
+		"default", "congrator", or one of Crystal Neuo's materials (see
+		Palettes). A person may choose otherwise for themselves;
 		this is what somebody sees who has not, which is most people and
 		everybody on their first visit.
 	*/
 	BrandPalette Key = "brand.palette"
 )
+
+/*
+Palettes are the names an interface's colours may be chosen by: the two
+palettes, then Crystal Neuo's six materials, each a palette with its own
+corners, borders, shadows and type. The operator's default and a person's own
+choice are both checked against this one list, so neither can name something
+the other cannot.
+*/
+var Palettes = []string{
+	"default", "congrator",
+	"refraction", "tactile", "signal", "folio", "bloom", "hybrid",
+}
+
+// KnownPalette reports whether name is a palette, or empty for none chosen.
+func KnownPalette(name string) bool {
+	return name == "" || slices.Contains(Palettes, name)
+}
 
 // definition describes one setting: how to validate it, and what it means when
 // nobody has set it.
@@ -351,10 +370,9 @@ var definitions = map[Key]definition{
 	},
 	BrandPalette: {
 		fallback:    "default",
-		description: `The colours this instance uses: "default" or "congrator".`,
+		description: `The colours this instance uses: "default", "congrator", or a Crystal Neuo material: "refraction", "tactile", "signal", "folio", "bloom" or "hybrid".`,
 		validate: func(value string) error {
-			switch value {
-			case "", "default", "congrator":
+			if KnownPalette(value) {
 				return nil
 			}
 			/*
@@ -362,7 +380,7 @@ var definitions = map[Key]definition{
 				needs to know which names exist, and a message saying only
 				that the value is wrong sends them to the source.
 			*/
-			return fmt.Errorf(`%w: expected "default" or "congrator"`, ErrInvalidValue)
+			return fmt.Errorf(`%w: expected one of %s`, ErrInvalidValue, strings.Join(Palettes, ", "))
 		},
 	},
 	ServerVisibility: {

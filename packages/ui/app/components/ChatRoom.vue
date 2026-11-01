@@ -612,8 +612,12 @@ const onlineCount = computed(
   () => Object.values(presenceByUser.value).filter((p) => p.state === "online").length,
 );
 
+/** Whether this person has put typing away, among other parts of the interface. */
+const { shows } = useInterfacePreferences();
+
 /** Reads as "Amina is typing" or "Amina and Juma are typing". */
 const typingLabel = computed(() => {
+  if (!shows("typing")) return "";
   const names = typingNow.value.map((person) => person.displayName);
   if (names.length === 0) return "";
   if (names.length === 1) return $ts("room.typing", { names: names[0]! });

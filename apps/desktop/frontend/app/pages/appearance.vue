@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Button } from "#layers/ui/app/components/ui/button";
 import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
 import { ArrowLeft } from "lucide-vue-next";
 
@@ -10,10 +9,17 @@ const router = useRouter();
 /**
  * How the application looks.
  *
- * The palette and light-or-dark come from the shared toggle, which both
- * clients have. What is here instead of there is the one thing a browser tab
- * cannot do: show what is behind it.
+ * The colours and the interface preferences are the shared ones, the same
+ * as the web client's settings. What is here besides is the one thing a
+ * browser tab cannot do: show what is behind it.
  */
+/*
+ * In the application's own frame, like every other screen somebody reaches
+ * while signed in: a call that rings while this is open is answered here, not
+ * only from the system's banner.
+ */
+definePageMeta({ middleware: "auth", layout: "app" });
+
 useHead({ title: $ts("settings.appearance") });
 
 const { opacity, refresh, set } = useWindowOpacity();
@@ -45,35 +51,6 @@ onMounted(() => {
   ignoredHere.value = navigator.userAgent.includes("Linux");
 });
 
-/*
- * The palette and light-or-dark, as buttons rather than the sidebar's toggle.
- *
- * That toggle is built for a footer: it opens upwards and sizes itself to a
- * narrow strip, which on a full page leaves stretched labels and collapsed
- * swatches. A settings screen has room to show the choices outright, and a
- * menu that has to be opened to see what is selected is worse here anyway.
- */
-const theme = useTheme();
-
-const appearances = [
-  { value: "auto" as const, label: $ts("settings.followMyDevice") },
-  { value: "light" as const, label: $ts("settings.light") },
-  { value: "dark" as const, label: $ts("settings.dark") },
-];
-
-const palettes = [
-  {
-    value: "default" as const,
-    label: $ts("settings.paletteCool"),
-    description: $ts("settings.paletteCoolDescription"),
-  },
-  {
-    value: "congrator" as const,
-    label: $ts("settings.paletteWarm"),
-    description: $ts("settings.paletteWarmDescription"),
-  },
-];
-
 onMounted(async () => {
   await refresh();
   running.value = opacity.value;
@@ -90,38 +67,12 @@ onMounted(async () => {
     </button>
     <h1 class="text-lg font-semibold">{{ $t("settings.appearance") }}</h1>
 
+    <!-- The same chooser as the web client's settings and the appearance
+         dialog: light or dark, contrast, colours and Crystal Neuo's materials,
+         glass and accent. Shown outright rather than as the sidebar's menu,
+         which is built for a narrow footer. -->
     <section class="mt-5">
-      <h2 class="text-sm font-semibold">{{ $t("settings.colours") }}</h2>
-      <p class="mt-1 text-xs text-muted-foreground">
-        {{ $t("desktop.appearance.coloursHint") }}
-      </p>
-
-      <h3 class="mt-4 text-xs font-semibold">{{ $t("desktop.appearance.lightOrDark") }}</h3>
-      <div class="mt-2 flex flex-wrap gap-1.5">
-        <Button
-          v-for="option in appearances"
-          :key="option.value"
-          :variant="theme.preference.value === option.value ? 'primary' : 'outline'"
-          :aria-pressed="theme.preference.value === option.value"
-          @click="theme.set(option.value)"
-        >
-          {{ option.label }}
-        </Button>
-      </div>
-
-      <h3 class="mt-4 text-xs font-semibold">{{ $t("desktop.appearance.palette") }}</h3>
-      <div class="mt-2 flex flex-wrap gap-1.5">
-        <Button
-          v-for="option in palettes"
-          :key="option.value"
-          :variant="theme.palette.value === option.value ? 'primary' : 'outline'"
-          :aria-pressed="theme.palette.value === option.value"
-          @click="theme.setPalette(option.value)"
-        >
-          {{ option.label }}
-          <span class="text-[0.6875rem] opacity-70">{{ option.description }}</span>
-        </Button>
-      </div>
+      <AppearanceChooser />
     </section>
 
     <section class="mt-5">

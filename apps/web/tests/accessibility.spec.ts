@@ -186,13 +186,16 @@ test.describe("the pages somebody arrives at", () => {
     expect(violations, `\n  ${describe(violations)}\n`).toEqual([]);
   });
 
-  test("settings has no accessibility violations", async ({ page }) => {
-    await page.goto("/settings");
+  // Each tab, since a hidden panel is not audited.
+  for (const tab of ["profile", "security", "appearance", "notifications", "privacy", "more"]) {
+    test(`settings (${tab}) has no accessibility violations`, async ({ page }) => {
+      await page.goto(`/settings?tab=${tab}`);
 
-    await settled(page);
+      await settled(page);
 
-    const { violations } = await auditor(page).analyze();
+      const { violations } = await auditor(page).analyze();
 
-    expect(violations, `\n  ${describe(violations)}\n`).toEqual([]);
-  });
+      expect(violations, `\n  ${describe(violations)}\n`).toEqual([]);
+    });
+  }
 });

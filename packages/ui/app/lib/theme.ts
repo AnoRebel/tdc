@@ -12,8 +12,22 @@
  * them for themselves. Both are applied here so the two paths cannot disagree.
  */
 
+/**
+ * Crystal Neuo's six materials (https://crystal-neuo.anorebel.net).
+ *
+ * Each is chosen as a palette is, and replaces one, but brings more than
+ * colours: its own corners, borders, shadows, type and, for three of them,
+ * frosted glass. Their stylesheet is loaded only once one is chosen.
+ */
+export const MATERIALS = ["refraction", "tactile", "signal", "folio", "bloom", "hybrid"] as const;
+export type Material = (typeof MATERIALS)[number];
+
+export function isMaterial(value: unknown): value is Material {
+  return typeof value === "string" && (MATERIALS as readonly string[]).includes(value);
+}
+
 /** A palette, by the name that selects it. */
-export const PALETTES = ["default", "congrator"] as const;
+export const PALETTES = ["default", "congrator", ...MATERIALS] as const;
 export type Palette = (typeof PALETTES)[number];
 
 export function isPalette(value: unknown): value is Palette {
@@ -26,6 +40,18 @@ export type Appearance = (typeof APPEARANCES)[number];
 
 export function isAppearance(value: unknown): value is Appearance {
   return typeof value === "string" && (APPEARANCES as readonly string[]).includes(value);
+}
+
+/**
+ * Whether a stored light-or-dark choice means dark, given the device.
+ *
+ * The rule the head script applies, for code that has to decide again without
+ * the theme composable: nothing stored, or auto, follows the device.
+ */
+export function meansDark(stored: unknown, deviceIsDark: boolean): boolean {
+  if (stored === "dark") return true;
+  if (stored === "light") return false;
+  return deviceIsDark;
 }
 
 /** Where each choice is stored, so the script and the composable agree. */

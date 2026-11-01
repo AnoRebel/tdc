@@ -51,8 +51,14 @@ const BUDGETS = {
    * connection's ring handling and the hook that loads the call host. The
    * call window, the incoming-call window and everything that places a call
    * load only on servers that offer calls, after the page.
+   *
+   * And to 223 for the appearance choices every page has to apply before it
+   * draws anything: high contrast, solid or frosted glass, the parts of the
+   * interface somebody has put away, and fetching a Crystal Neuo material's
+   * stylesheet when one is chosen. The materials themselves — six of them in
+   * light and dark, and their faces — load only for somebody who chose one.
    */
-  blocking: 222,
+  blocking: 223,
   prefetched: 90,
 };
 

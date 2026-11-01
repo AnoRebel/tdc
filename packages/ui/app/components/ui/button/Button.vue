@@ -59,6 +59,7 @@ const sizes: Record<Size, string> = {
   <button
     :type="props.type"
     :disabled="props.disabled"
+    :data-variant="props.variant"
     :aria-label="props.label ?? undefined"
     :title="props.label ?? undefined"
     :class="

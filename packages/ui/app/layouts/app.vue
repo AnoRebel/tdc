@@ -255,6 +255,8 @@ const showingShortcuts = useState("shortcuts.open", () => false);
  * shortcut list. Shared state for the same reason the search palette is.
  */
 const showingInterface = useState("interface.open", () => false);
+// How it looks, from the sidebar's appearance menu or the palette.
+const showingAppearance = useState("appearance.open", () => false);
 
 /*
  * Whether each has ever been opened, so it is fetched on first use and then
@@ -266,6 +268,7 @@ const opened = reactive({
   search: false,
   shortcuts: false,
   interface: false,
+  appearance: false,
   newMessage: false,
   status: false,
   scheduled: false,
@@ -277,6 +280,7 @@ watchEffect(() => {
   if (searching.value) opened.search = true;
   if (showingShortcuts.value) opened.shortcuts = true;
   if (showingInterface.value) opened.interface = true;
+  if (showingAppearance.value) opened.appearance = true;
   if (newMessage.state.value.open) opened.newMessage = true;
   if (showingStatus.value) opened.status = true;
   if (showingScheduled.value.open) opened.scheduled = true;
@@ -601,7 +605,7 @@ provide("openSearch", () => {
 </script>
 
 <template>
-  <div class="flex h-dvh overflow-hidden bg-background">
+  <div data-shell class="flex h-dvh overflow-hidden bg-background">
     <!--
       The sidebar is a column beside the conversation on a wide screen and a
       drawer over it on a narrow one.
@@ -685,6 +689,7 @@ provide("openSearch", () => {
       @preferences="showingInterface = true"
     />
     <LazyInterfacePreferencesDialog v-if="opened.interface" v-model="showingInterface" />
+    <LazyAppearanceDialog v-if="opened.appearance" v-model="showingAppearance" />
     <LazyNewMessageDialog v-if="opened.newMessage" />
     <LazyStatusDialog v-if="opened.status" v-model="showingStatus" />
     <LazyScheduledList v-if="opened.scheduled" :rooms="[...joined, ...direct]" />
