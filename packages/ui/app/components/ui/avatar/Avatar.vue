@@ -21,6 +21,11 @@ const props = withDefaults(
     size?: "sm" | "md" | "lg";
     /** Draws a ring in the presence colour when the person is reachable. */
     online?: boolean;
+    /**
+     * Who this is, for the picture they chose: initials are drawn without one,
+     * or while it loads, or if it cannot be.
+     */
+    address?: string;
     class?: HTMLAttributes["class"];
   }>(),
   { size: "md" },
@@ -28,6 +33,15 @@ const props = withDefaults(
 
 // Online status can be put away, for somebody who would rather not watch it.
 const { shows } = useInterfacePreferences();
+
+const avatars = useAvatars();
+const base = useMediaBase();
+const picture = computed(() => {
+  const path = avatars.pathOf(props.address);
+  return path ? base + path : "";
+});
+// A picture that fails to load falls back to initials rather than a broken image.
+const failed = ref("");
 
 /** The part before the "@", so an address does not become the initials. */
 const local = computed(() => props.name.split("@")[0] ?? props.name);
@@ -86,7 +100,16 @@ const sizes = {
     }"
     :title="props.name"
   >
-    {{ initials }}
+    <img
+      v-if="picture && failed !== picture"
+      :src="picture"
+      alt=""
+      class="absolute inset-0 size-full rounded-[inherit] object-cover"
+      loading="lazy"
+      decoding="async"
+      @error="failed = picture"
+    />
+    <template v-else>{{ initials }}</template>
     <!-- A dot with a name, which needs a role to carry one: ARIA forbids
          labelling an element that has none, so a screen reader would either
          ignore this or announce a stray word with nothing attached to it. -->

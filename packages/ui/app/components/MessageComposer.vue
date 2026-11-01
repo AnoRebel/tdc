@@ -517,7 +517,7 @@ defineExpose({
           @mousedown.prevent="choose(member)"
           @mousemove="highlighted = index"
         >
-          <Avatar :name="member.address" size="sm" />
+          <Avatar :address="member.address" :name="member.address" size="sm" />
           <span class="truncate font-medium">{{ nameOf(member) }}</span>
           <span class="truncate text-xs text-muted-foreground">@{{ member.username }}</span>
         </li>

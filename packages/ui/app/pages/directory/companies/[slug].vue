@@ -179,7 +179,7 @@ await load();
               :key="member.username"
               class="flex items-center gap-3 rounded-lg border p-3"
             >
-              <Avatar :name="nameOf(member)" size="sm" />
+              <Avatar :address="member.address" :name="nameOf(member)" size="sm" />
               <div class="min-w-0 flex-1">
                 <NuxtLink
                   :to="

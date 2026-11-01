@@ -1505,6 +1505,7 @@ type Querier interface {
 	SetTranslationPreferences(ctx context.Context, arg SetTranslationPreferencesParams) error
 	SetTranslationRoomRule(ctx context.Context, arg SetTranslationRoomRuleParams) error
 	SetTypingPreference(ctx context.Context, arg SetTypingPreferenceParams) error
+	SetUserAvatar(ctx context.Context, arg SetUserAvatarParams) error
 	// Whether two people are in the same open call now.
 	ShareAnOpenCall(ctx context.Context, arg ShareAnOpenCallParams) (bool, error)
 	// Whether two people are in any channel together, for the 'shared' policy.
@@ -1637,10 +1638,13 @@ type Querier interface {
 	// Counts a use, refusing one past the limit in the same statement so two
 	// people arriving at once cannot both take the last.
 	UseCallLink(ctx context.Context, id uuid.UUID) (int64, error)
+	UserAvatar(ctx context.Context, id uuid.UUID) (UserAvatarRow, error)
 	UserByRemoteAddress(ctx context.Context, remoteAddress *string) (User, error)
 	// Whether somebody else gave this name up recently enough that it is still
 	// theirs to come back to.
 	UsernameHeldByOther(ctx context.Context, arg UsernameHeldByOtherParams) (bool, error)
+	// Everybody on this server with a picture, for the interface to draw theirs.
+	UsersWithAvatars(ctx context.Context) ([]UsersWithAvatarsRow, error)
 	// A company as a viewer of the given rank may see it, or nothing.
 	ViewCompanyProfile(ctx context.Context, arg ViewCompanyProfileParams) (CompanyProfile, error)
 	ViewDirectoryProfile(ctx context.Context, arg ViewDirectoryProfileParams) (ViewDirectoryProfileRow, error)

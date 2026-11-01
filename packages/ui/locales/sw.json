@@ -3444,5 +3444,27 @@
         "description": "Kioo cha Refraction na vidhibiti vya wino vya Tactile"
       }
     }
+  },
+  "avatar": {
+    "title": "Picha",
+    "hint": "Huonyeshwa kando ya jina lako kwa kila mtu kwenye seva hii. Bila picha, herufi za mwanzo za jina lako huonyeshwa.",
+    "choose": "Chagua picha",
+    "change": "Badilisha picha",
+    "remove": "Ondoa",
+    "notAPicture": "Chagua picha ya PNG, JPEG, WebP au GIF.",
+    "tooLarge": "Picha hiyo ni MB {size}; chagua iliyo chini ya MB {limit}.",
+    "frameTitle": "Weka picha yako kwenye fremu",
+    "frameHint": "Iburute kuisogeza, kuza ili itoshee, na uizungushe au uigeuze. Kilicho ndani ya fremu ndicho kinachohifadhiwa.",
+    "frameLabel": "Picha yako, ndani ya fremu. Vitufe vya mishale huisogeza; jumlisha na toa hukuza.",
+    "unreadable": "Picha hiyo haikuweza kufunguliwa. Jaribu nyingine.",
+    "zoom": "Kuza",
+    "turnLeft": "Zungusha kushoto",
+    "turnRight": "Zungusha kulia",
+    "flip": "Geuza",
+    "centre": "Weka katikati",
+    "reset": "Anza upya",
+    "use": "Tumia picha hii",
+    "saving": "Inahifadhi…",
+    "couldNotSave": "Picha haikuweza kuhifadhiwa. Jaribu tena."
   }
 }

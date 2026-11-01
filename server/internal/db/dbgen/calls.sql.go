@@ -282,7 +282,7 @@ func (q *Queries) CreateCallLink(ctx context.Context, arg CreateCallLinkParams) 
 const createRemoteShadow = `-- name: CreateRemoteShadow :one
 INSERT INTO users (id, username, username_folded, display_name, guest_call, remote_address, remote_server)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type
 `
 
 type CreateRemoteShadowParams struct {
@@ -332,6 +332,8 @@ func (q *Queries) CreateRemoteShadow(ctx context.Context, arg CreateRemoteShadow
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }
@@ -1074,7 +1076,7 @@ func (q *Queries) UseCallLink(ctx context.Context, id uuid.UUID) (int64, error) 
 }
 
 const userByRemoteAddress = `-- name: UserByRemoteAddress :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server FROM users WHERE remote_address = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type FROM users WHERE remote_address = $1
 `
 
 func (q *Queries) UserByRemoteAddress(ctx context.Context, remoteAddress *string) (User, error) {
@@ -1106,6 +1108,8 @@ func (q *Queries) UserByRemoteAddress(ctx context.Context, remoteAddress *string
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }

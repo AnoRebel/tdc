@@ -287,6 +287,10 @@ watchEffect(() => {
 });
 const { notice } = useNotice();
 
+// The pictures people chose, read once for every face this layout draws.
+const avatars = useAvatars();
+onMounted(() => void avatars.load());
+
 /*
  * Whether the sidebar is put away on a wide screen.
  *

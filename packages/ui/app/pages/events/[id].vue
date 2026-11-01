@@ -517,7 +517,9 @@ const answers = computed(() => [
                   :key="person.userId"
                   class="flex items-center gap-2 text-sm"
                 >
-                  <Avatar :name="nameOf(person)" size="sm" />{{ nameOf(person) }}
+                  <Avatar :address="person.address" :name="nameOf(person)" size="sm" />{{
+                    nameOf(person)
+                  }}
                 </li>
               </ul>
             </div>
@@ -531,7 +533,9 @@ const answers = computed(() => [
                   :key="person.userId"
                   class="flex items-center gap-2 text-sm"
                 >
-                  <Avatar :name="nameOf(person)" size="sm" />{{ nameOf(person) }}
+                  <Avatar :address="person.address" :name="nameOf(person)" size="sm" />{{
+                    nameOf(person)
+                  }}
                 </li>
               </ul>
             </div>

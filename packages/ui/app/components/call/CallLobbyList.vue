@@ -32,7 +32,7 @@ const waiting = computed(() =>
       :key="person.userId"
       class="flex items-center gap-2 rounded px-1 py-0.5"
     >
-      <Avatar :name="nameOf(person)" size="sm" />
+      <Avatar :address="person.username" :name="nameOf(person)" size="sm" />
       <span class="min-w-0 flex-1 truncate text-xs">
         {{ nameOf(person) }}
       </span>

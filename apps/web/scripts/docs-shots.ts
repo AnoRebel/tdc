@@ -594,6 +594,47 @@ export const shots: Shot[] = [
   },
   {
     guide: "using-tdc",
+    name: "picture",
+    async take(studio) {
+      const page = await open(studio, "neema", "/settings?tab=profile");
+      // A picture drawn by the page itself, as somebody's photograph would be.
+      const photograph = await page.evaluate(async () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1200;
+        canvas.height = 800;
+        const draw = canvas.getContext("2d")!;
+        const sky = draw.createLinearGradient(0, 0, 0, 800);
+        sky.addColorStop(0, "#0e7490");
+        sky.addColorStop(1, "#fbbf24");
+        draw.fillStyle = sky;
+        draw.fillRect(0, 0, 1200, 800);
+        draw.fillStyle = "#7c2d12";
+        draw.beginPath();
+        draw.arc(600, 330, 150, 0, Math.PI * 2);
+        draw.fill();
+        draw.fillRect(420, 500, 360, 300);
+        const blob = await new Promise<Blob>((done) =>
+          canvas.toBlob((made) => done(made!), "image/jpeg", 0.9),
+        );
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        return Array.from(bytes);
+      });
+      await page
+        .locator('input[type="file"]')
+        .first()
+        .setInputFiles({
+          name: "neema.jpg",
+          mimeType: "image/jpeg",
+          buffer: Buffer.from(photograph),
+        });
+      await page.getByRole("dialog", { name: "Frame your picture" }).waitFor();
+      await page.getByRole("slider", { name: "Zoom" }).fill("1.6");
+      await settle(page);
+      return window(page);
+    },
+  },
+  {
+    guide: "using-tdc",
     name: "appearance-dialog",
     async take(studio) {
       const page = await open(studio, "neema", room(studio, "golang"));

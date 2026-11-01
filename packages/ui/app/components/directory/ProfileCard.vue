@@ -35,7 +35,7 @@ const hasContact = computed(
 <template>
   <article class="space-y-6">
     <header class="flex items-start gap-4">
-      <Avatar :name="nameOf(props.profile)" size="lg" />
+      <Avatar :address="props.profile.address" :name="nameOf(props.profile)" size="lg" />
       <div class="min-w-0">
         <h1 class="text-lg font-semibold break-words">
           {{ nameOf(props.profile) }}

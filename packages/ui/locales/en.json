@@ -3444,5 +3444,27 @@
         "description": "Refraction's glass with Tactile's ink controls"
       }
     }
+  },
+  "avatar": {
+    "title": "Picture",
+    "hint": "Shown beside your name to everybody on this server. Without one, your initials are.",
+    "choose": "Choose a picture",
+    "change": "Change picture",
+    "remove": "Remove",
+    "notAPicture": "Choose a PNG, JPEG, WebP or GIF picture.",
+    "tooLarge": "That picture is {size} MB; choose one under {limit} MB.",
+    "frameTitle": "Frame your picture",
+    "frameHint": "Drag to move it, zoom to fit, and turn or flip it. What is inside the frame is kept.",
+    "frameLabel": "Your picture, inside the frame. Arrow keys move it; plus and minus zoom.",
+    "unreadable": "That picture could not be opened. Try another.",
+    "zoom": "Zoom",
+    "turnLeft": "Turn left",
+    "turnRight": "Turn right",
+    "flip": "Flip",
+    "centre": "Centre",
+    "reset": "Start again",
+    "use": "Use this picture",
+    "saving": "Saving…",
+    "couldNotSave": "The picture could not be saved. Try again."
   }
 }

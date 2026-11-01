@@ -196,7 +196,12 @@ const listId = "new-message-people";
                     :key="person.id"
                     class="flex items-center gap-1 rounded-md bg-accent py-0.5 pr-0.5 pl-1 text-xs"
                   >
-                    <Avatar :name="person.address" size="sm" class="size-4 text-[0.5rem]" />
+                    <Avatar
+                      :address="person.address"
+                      :name="person.address"
+                      size="sm"
+                      class="size-4 text-[0.5rem]"
+                    />
                     {{ nameOf(person) }}
                     <button
                       type="button"
@@ -250,7 +255,7 @@ const listId = "new-message-people";
                   @click="choose(person)"
                   @mousemove="active = index"
                 >
-                  <Avatar :name="person.address" size="sm" />
+                  <Avatar :address="person.address" :name="person.address" size="sm" />
                   <span class="truncate font-medium">{{ nameOf(person) }}</span>
                   <span class="truncate text-xs text-muted-foreground">@{{ person.username }}</span>
                   <Check

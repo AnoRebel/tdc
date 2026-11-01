@@ -1818,16 +1818,16 @@ another machine.
 
 ### What a backup can hold
 
-| Part                                    | What is in it                                                                                                                                                         | Brings with it               |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Server settings and branding            | Runtime policy, feature switches, statuses, the legal documents, the server's signing key                                                                             | —                            |
-| Accounts and roles                      | Accounts, password hashes and second factors, roles and grants, privacy settings, locations, automatic replies, calendar addresses, blocks                            | —                            |
-| Channels and messages                   | Every room (or chosen channels) and everything in it: members, messages, reactions, pins, calls held, events and who is going, followed calendars, attachment records | Accounts                     |
-| Attached files                          | The bytes of files uploaded here and their previews — not copies of other servers' files, which are fetched again when next opened                                    | Channels                     |
-| Projects and issues                     | Projects, issues, states, cycles, milestones, views                                                                                                                   | Accounts, every channel      |
-| Directory                               | Profiles, companies, skills, enquiries, engagements and agreements                                                                                                    | Accounts, channels, projects |
-| Integrations, webhooks and applications | Applications, tokens, incoming webhooks, subscriptions and their delivery history                                                                                     | Accounts, every channel      |
-| Audit log                               | The whole log                                                                                                                                                         | Accounts                     |
+| Part                                    | What is in it                                                                                                                                                                                | Brings with it               |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| Server settings and branding            | Runtime policy, feature switches, statuses, the legal documents, the server's signing key                                                                                                    | —                            |
+| Accounts and roles                      | Accounts, password hashes and second factors, roles and grants, privacy settings, locations, automatic replies, calendar addresses, blocks                                                   | —                            |
+| Channels and messages                   | Every room (or chosen channels) and everything in it: members, messages, reactions, pins, calls held, events and who is going, followed calendars, attachment records                        | Accounts                     |
+| Attached files                          | The bytes of files uploaded here and their previews, and the pictures people chose (in a whole-server backup) — not copies of other servers' files, which are fetched again when next opened | Channels                     |
+| Projects and issues                     | Projects, issues, states, cycles, milestones, views                                                                                                                                          | Accounts, every channel      |
+| Directory                               | Profiles, companies, skills, enquiries, engagements and agreements                                                                                                                           | Accounts, channels, projects |
+| Integrations, webhooks and applications | Applications, tokens, incoming webhooks, subscriptions and their delivery history                                                                                                            | Accounts, every channel      |
+| Audit log                               | The whole log                                                                                                                                                                                | Accounts                     |
 
 A part brings what it cannot be restored without: a message names its sender,
 so channels bring accounts. Choosing only some channels is allowed with parts

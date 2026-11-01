@@ -27,7 +27,7 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 const createGuestUser = `-- name: CreateGuestUser :one
 INSERT INTO users (id, username, username_folded, display_name, guest_call)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type
 `
 
 type CreateGuestUserParams struct {
@@ -73,6 +73,8 @@ func (q *Queries) CreateGuestUser(ctx context.Context, arg CreateGuestUserParams
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }
@@ -80,7 +82,7 @@ func (q *Queries) CreateGuestUser(ctx context.Context, arg CreateGuestUserParams
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, username, username_folded, display_name, email, email_folded, email_verified)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type
 `
 
 type CreateUserParams struct {
@@ -130,6 +132,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }
@@ -173,7 +177,7 @@ func (q *Queries) GetTourProgress(ctx context.Context, id uuid.UUID) ([]byte, er
 }
 
 const getUserByCurrentUsername = `-- name: GetUserByCurrentUsername :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server FROM users WHERE username_folded = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type FROM users WHERE username_folded = $1
 `
 
 // Only the account holding the name now: whether a name is free to take.
@@ -206,12 +210,14 @@ func (q *Queries) GetUserByCurrentUsername(ctx context.Context, usernameFolded s
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server FROM users WHERE email_folded = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type FROM users WHERE email_folded = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, emailFolded *string) (User, error) {
@@ -243,12 +249,14 @@ func (q *Queries) GetUserByEmail(ctx context.Context, emailFolded *string) (User
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server FROM users WHERE id = $1
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -280,12 +288,14 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server FROM users WHERE id = user_named($1)
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type FROM users WHERE id = user_named($1)
 `
 
 // Whoever a name means: its holder, or the account that most recently gave it
@@ -321,6 +331,8 @@ func (q *Queries) GetUserByUsername(ctx context.Context, folded string) (User, e
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }
@@ -451,7 +463,7 @@ func (q *Queries) ListFormerUsernamesFor(ctx context.Context, userIds []uuid.UUI
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server FROM users
+SELECT id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type FROM users
 WHERE guest_call IS NULL
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
@@ -497,6 +509,8 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.GuestCall,
 			&i.RemoteAddress,
 			&i.RemoteServer,
+			&i.AvatarKey,
+			&i.AvatarType,
 		); err != nil {
 			return nil, err
 		}
@@ -542,7 +556,7 @@ SET username        = $1,
     username_folded = $2,
     updated_at      = NOW()
 WHERE id = $3
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type
 `
 
 type RenameUserParams struct {
@@ -580,6 +594,8 @@ func (q *Queries) RenameUser(ctx context.Context, arg RenameUserParams) (User, e
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
 	return i, err
 }
@@ -621,6 +637,21 @@ func (q *Queries) SetTourProgress(ctx context.Context, arg SetTourProgressParams
 	return err
 }
 
+const setUserAvatar = `-- name: SetUserAvatar :exec
+UPDATE users SET avatar_key = $2, avatar_type = $3 WHERE id = $1
+`
+
+type SetUserAvatarParams struct {
+	ID         uuid.UUID
+	AvatarKey  string
+	AvatarType string
+}
+
+func (q *Queries) SetUserAvatar(ctx context.Context, arg SetUserAvatarParams) error {
+	_, err := q.db.Exec(ctx, setUserAvatar, arg.ID, arg.AvatarKey, arg.AvatarType)
+	return err
+}
+
 const suspendUser = `-- name: SuspendUser :exec
 UPDATE users
 SET suspended_at    = NOW(),
@@ -653,7 +684,7 @@ UPDATE users
 SET display_name = $2,
     updated_at   = NOW()
 WHERE id = $1
-RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server
+RETURNING id, username, username_folded, display_name, email, email_folded, email_verified, suspended_at, suspended_until, suspended_by, suspension_note, created_at, updated_at, sends_typing_indication, link_previews_enabled, hide_push_content, appearance_palette, appearance_mode, appearance_accent, tour_progress, webauthn_handle, pending_email, guest_call, remote_address, remote_server, avatar_key, avatar_type
 `
 
 type UpdateUserProfileParams struct {
@@ -690,7 +721,25 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.GuestCall,
 		&i.RemoteAddress,
 		&i.RemoteServer,
+		&i.AvatarKey,
+		&i.AvatarType,
 	)
+	return i, err
+}
+
+const userAvatar = `-- name: UserAvatar :one
+SELECT avatar_key, avatar_type FROM users WHERE id = $1
+`
+
+type UserAvatarRow struct {
+	AvatarKey  string
+	AvatarType string
+}
+
+func (q *Queries) UserAvatar(ctx context.Context, id uuid.UUID) (UserAvatarRow, error) {
+	row := q.db.QueryRow(ctx, userAvatar, id)
+	var i UserAvatarRow
+	err := row.Scan(&i.AvatarKey, &i.AvatarType)
 	return i, err
 }
 
@@ -716,4 +765,35 @@ func (q *Queries) UsernameHeldByOther(ctx context.Context, arg UsernameHeldByOth
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const usersWithAvatars = `-- name: UsersWithAvatars :many
+SELECT id, username, avatar_key FROM users WHERE avatar_key <> '' ORDER BY username
+`
+
+type UsersWithAvatarsRow struct {
+	ID        uuid.UUID
+	Username  string
+	AvatarKey string
+}
+
+// Everybody on this server with a picture, for the interface to draw theirs.
+func (q *Queries) UsersWithAvatars(ctx context.Context) ([]UsersWithAvatarsRow, error) {
+	rows, err := q.db.Query(ctx, usersWithAvatars)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UsersWithAvatarsRow{}
+	for rows.Next() {
+		var i UsersWithAvatarsRow
+		if err := rows.Scan(&i.ID, &i.Username, &i.AvatarKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

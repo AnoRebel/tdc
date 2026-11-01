@@ -1639,12 +1639,31 @@ may do what.
 
 ## Making it yours
 
-**Settings** is in tabs, one subject each: **Profile** (your names, location,
-status and automatic replies), **Account and security** (email, two-step
+**Settings** is in tabs, one subject each: **Profile** (your picture, names,
+location, status and automatic replies), **Account and security** (email, two-step
 sign-in, passkeys, API tokens and signed-in devices), **Appearance**,
 **Notifications**, **Privacy** (who may reach you and who you have blocked) and
 **More** (translation, your calendar, the tour, integrations and
 administration). The tab you are on is in the address, so a link can open one.
+
+### Your picture
+
+**Settings → Profile → Picture** puts a picture beside your name, everywhere
+people on your server see you: your messages, member lists, the directory,
+calls. Without one, your initials are shown, on a colour of their own.
+
+**Choose a picture** opens a PNG, JPEG, WebP or GIF of up to 20 MB, and frames
+it before anything is sent: drag it to move it, zoom with the slider or the
+mouse wheel, turn it left or right, flip it, centre it, or start again. The
+arrow keys move it and `+` and `−` zoom. What is inside the frame is kept, as a
+square of 512 pixels. Only that square leaves your device — never the original
+file, and not what a phone photograph carries besides the picture, such as
+where it was taken. The server checks it again and refuses anything over 2 MB.
+
+![Frame your picture: a photograph inside a rounded frame, with a zoom slider, buttons to turn, flip and centre it, and Use this picture](images/using-tdc/picture.webp)
+
+**Remove** goes back to your initials. People on other servers see your
+initials for now.
 
 ### Appearance
 

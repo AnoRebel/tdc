@@ -493,6 +493,15 @@ func (s *Server) routes() {
 	me.GET("/preferences/appearance", s.handleGetAppearance)
 	me.PUT("/preferences/appearance", s.handleSetAppearance)
 	/*
+		A picture somebody chose for themselves. Who has one is for people
+		signed in; the picture itself is served without a session, at an
+		address nobody can guess, so the desktop client can draw it.
+	*/
+	me.PUT("/avatar", s.handleSetAvatar)
+	me.DELETE("/avatar", s.handleRemoveAvatar)
+	s.echo.GET("/api/avatars", s.handleListAvatars, requireAuthentication)
+	s.echo.GET("/api/avatars/:user/:token", s.handleAvatar)
+	/*
 		Which introductions have been given, on the account for the same
 		reason: one shown on the web client should not be shown again on the
 		desktop one.

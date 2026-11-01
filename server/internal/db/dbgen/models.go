@@ -1260,6 +1260,8 @@ type User struct {
 	GuestCall             *uuid.UUID
 	RemoteAddress         *string
 	RemoteServer          *string
+	AvatarKey             string
+	AvatarType            string
 }
 
 type UserBlock struct {

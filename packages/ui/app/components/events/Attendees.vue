@@ -53,7 +53,9 @@ const groups = computed(() => {
             :key="person.userId"
             class="flex items-center gap-1.5 rounded-full border bg-surface py-0.5 pr-2.5 pl-0.5 text-xs"
           >
-            <Avatar :name="nameOf(person)" size="sm" />{{ nameOf(person) }}
+            <Avatar :address="person.address" :name="nameOf(person)" size="sm" />{{
+              nameOf(person)
+            }}
           </li>
           <li
             v-if="group.unnamed"

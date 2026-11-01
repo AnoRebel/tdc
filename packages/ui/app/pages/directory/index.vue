@@ -243,7 +243,7 @@ const filtered = computed(() => Object.values(fromQuery()).some(Boolean));
               "
               class="flex gap-3 rounded-lg border p-3 transition-colors hover:bg-accent"
             >
-              <Avatar :name="nameOf(hit)" />
+              <Avatar :address="hit.address" :name="nameOf(hit)" />
               <span class="min-w-0 flex-1">
                 <span class="flex flex-wrap items-center gap-2">
                   <span class="text-sm font-medium">{{ nameOf(hit) }}</span>

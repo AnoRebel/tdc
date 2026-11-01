@@ -448,7 +448,7 @@ const others = computed(() => members.value.filter((member) => member.id !== use
               :key="member.id"
               class="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5"
             >
-              <Avatar :name="nameOf(member)" size="sm" />
+              <Avatar :address="member.address" :name="nameOf(member)" size="sm" />
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm">{{ nameOf(member) }}</span>
                 <span class="block truncate text-[0.6875rem] text-muted-foreground">

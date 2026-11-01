@@ -147,3 +147,13 @@ UPDATE users SET tour_progress = $2 WHERE id = $1;
 INSERT INTO users (id, username, username_folded, display_name, guest_call)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
+
+-- name: SetUserAvatar :exec
+UPDATE users SET avatar_key = $2, avatar_type = $3 WHERE id = $1;
+
+-- name: UserAvatar :one
+SELECT avatar_key, avatar_type FROM users WHERE id = $1;
+
+-- Everybody on this server with a picture, for the interface to draw theirs.
+-- name: UsersWithAvatars :many
+SELECT id, username, avatar_key FROM users WHERE avatar_key <> '' ORDER BY username;

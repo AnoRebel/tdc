@@ -297,6 +297,10 @@ func attachmentKeys(ctx context.Context, q querier, rooms []uuid.UUID) ([]string
 		UNION ALL
 		SELECT preview_key, room_id FROM attachments
 		WHERE preview_key IS NOT NULL AND preview_key <> '' AND origin_server IS NULL
+		UNION ALL
+		-- People's pictures belong to no room, so only a whole-server backup
+		-- carries them: a room filter compares their null and leaves them out.
+		SELECT avatar_key, NULL::uuid FROM users WHERE avatar_key <> ''
 	) keys`
 	var args []any
 	if len(rooms) > 0 {

@@ -578,7 +578,7 @@ function toggleStatus(current: string[], key: string, on: boolean): string[] {
               </div>
               <div class="rounded-lg border bg-background p-3">
                 <div class="flex items-center gap-2">
-                  <Avatar :name="user ? nameOf(user) : ''" size="sm" />
+                  <Avatar :address="user?.address" :name="user ? nameOf(user) : ''" size="sm" />
                   <span class="text-xs font-semibold">{{ user && nameOf(user) }}</span>
                   <span
                     class="rounded border border-border px-1 text-[0.625rem] font-medium tracking-wide text-muted-foreground uppercase"

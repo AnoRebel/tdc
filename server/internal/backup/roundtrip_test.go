@@ -61,8 +61,9 @@ func TestEachPartRoundTripsIntoAnEmptyDatabase(t *testing.T) {
 					t.Errorf("%s was backed up without %s, which it needs", part, needed)
 				}
 			}
-			if part == PartFiles && summary.Files != 1 {
-				t.Errorf("files part wrote %d files, want 1", summary.Files)
+			// The attachment, and the picture Bob chose.
+			if part == PartFiles && summary.Files != 2 {
+				t.Errorf("files part wrote %d files, want 2", summary.Files)
 			}
 
 			result, err := Restore(ctx, target, targetStore, bytes.NewReader(archive), RestoreOptions{
@@ -88,6 +89,15 @@ func TestEachPartRoundTripsIntoAnEmptyDatabase(t *testing.T) {
 				_ = body.Close()
 				if !bytes.Equal(got, f.attachmentBytes) {
 					t.Errorf("restored file holds %q", got)
+				}
+				picture, _, err := targetStore.Get(ctx, f.avatarKey)
+				if err != nil {
+					t.Fatalf("restored picture: %v", err)
+				}
+				got, _ = io.ReadAll(picture)
+				_ = picture.Close()
+				if !bytes.Equal(got, f.avatarBytes) {
+					t.Errorf("restored picture holds %q", got)
 				}
 			}
 

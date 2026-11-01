@@ -825,6 +825,9 @@ func (r *restoreRun) allowFiles(ctx context.Context) error {
 		SELECT preview_key, COALESCE(NULLIF(preview_type, ''), 'application/octet-stream') FROM attachments
 		WHERE preview_key IS NOT NULL AND preview_key <> '' AND origin_server IS NULL
 		  AND ($1::uuid[] IS NULL OR room_id = ANY($1::uuid[]))
+		UNION ALL
+		SELECT avatar_key, avatar_type FROM users
+		WHERE avatar_key <> '' AND $1::uuid[] IS NULL
 		ON CONFLICT (key) DO NOTHING`, rooms)
 	if err != nil {
 		return fmt.Errorf("backup: listing files to restore: %w", err)

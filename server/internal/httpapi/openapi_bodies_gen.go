@@ -138,6 +138,11 @@ var routeBodies = map[string]routeBodySet{
 			{Status: 204, Type: nil},
 		},
 	},
+	"DELETE /api/me/avatar": {
+		Responses: []responseBody{
+			{Status: 204, Type: nil},
+		},
+	},
 	"DELETE /api/me/blocks/:id": {
 		Responses: []responseBody{
 			{Status: 204, Type: nil},
@@ -496,6 +501,11 @@ var routeBodies = map[string]routeBodySet{
 	},
 	"GET /api/auth/recover": {
 		Query: []string{"token"},
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
+		},
+	},
+	"GET /api/avatars": {
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[map[string]any]()},
 		},
@@ -2379,6 +2389,11 @@ var routeBodies = map[string]routeBodySet{
 		Request: reflect.TypeFor[automaticReplyRequest](),
 		Responses: []responseBody{
 			{Status: 200, Type: reflect.TypeFor[automaticReplyResponse]()},
+		},
+	},
+	"PUT /api/me/avatar": {
+		Responses: []responseBody{
+			{Status: 200, Type: reflect.TypeFor[map[string]string]()},
 		},
 	},
 	"PUT /api/me/display-name": {

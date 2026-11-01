@@ -453,7 +453,11 @@ function isCurrent(roomId: string): boolean {
         @click="openUserMenu"
       >
         <span class="relative shrink-0">
-          <Avatar :name="user ? nameOf(user) : $ts('room.you')" size="sm" />
+          <Avatar
+            :address="user?.address"
+            :name="user ? nameOf(user) : $ts('room.you')"
+            size="sm"
+          />
           <span
             class="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-surface-sunken transition-colors duration-(--motion-duration-fast)"
             :class="presenceDotClass(ownStatus.own.value.status, ownStatus.own.value.invisible)"

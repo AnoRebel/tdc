@@ -109,7 +109,11 @@ function when(notification: Notification): string {
         @click="go(notification)"
       >
         <span class="relative mt-0.5 shrink-0">
-          <Avatar :name="notification.actorName || nameAt(notification.actor)" size="sm" />
+          <Avatar
+            :address="notification.actor"
+            :name="notification.actorName || nameAt(notification.actor)"
+            size="sm"
+          />
           <!-- The reason, on the avatar rather than beside it: the list stays
                one column and the icon is where the eye already is. -->
           <span

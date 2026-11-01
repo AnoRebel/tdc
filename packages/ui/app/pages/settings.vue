@@ -400,13 +400,21 @@ function deviceName(userAgent: string): string {
       >
         <section>
           <div class="flex items-center gap-3">
-            <Avatar :name="user ? nameOf(user) : $ts('room.you')" size="lg" online />
+            <Avatar
+              :address="user?.address"
+              :name="user ? nameOf(user) : $ts('room.you')"
+              size="lg"
+              online
+            />
             <div class="min-w-0">
               <p class="truncate font-medium">{{ user && nameOf(user) }}</p>
               <p class="truncate text-sm text-muted-foreground">{{ user?.address }}</p>
             </div>
           </div>
         </section>
+
+        <!-- Your picture, beside who you are. -->
+        <AvatarSetting />
 
         <!-- What you are called, straight under who you are: the display name
              and the username that is half of the address above. -->
@@ -727,7 +735,7 @@ function deviceName(userAgent: string): string {
               :key="person.id"
               class="flex items-center gap-2 rounded-lg px-2 py-1.5"
             >
-              <Avatar :name="nameOf(person)" size="sm" />
+              <Avatar :address="person.username" :name="nameOf(person)" size="sm" />
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm font-medium">{{ nameOf(person) }}</span>
                 <span class="block truncate text-xs text-muted-foreground">

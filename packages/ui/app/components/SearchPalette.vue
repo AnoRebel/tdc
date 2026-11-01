@@ -356,7 +356,12 @@ function iconFor(room: RoomHit) {
                   @click="choose({ kind: 'person', person })"
                   @mousemove="active = peopleFrom + index"
                 >
-                  <Avatar :name="person.address" size="sm" class="shrink-0" />
+                  <Avatar
+                    :address="person.address"
+                    :name="person.address"
+                    size="sm"
+                    class="shrink-0"
+                  />
                   <span class="truncate font-medium">{{ nameOf(person) }}</span>
                   <span class="truncate text-xs text-muted-foreground">@{{ person.username }}</span>
                   <!-- Said only on the row it applies to, so it reads as an

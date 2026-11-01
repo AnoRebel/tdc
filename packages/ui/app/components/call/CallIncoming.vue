@@ -170,7 +170,12 @@ function where(ring: CallRing) {
     <ul class="max-h-80 space-y-1.5 overflow-y-auto">
       <li v-for="ring in newestFirst" :key="ring.call" class="rounded-lg border bg-background p-2">
         <div class="flex items-center gap-2.5">
-          <Avatar :name="nameOf(ring.from)" size="md" class="ring-pulse" />
+          <Avatar
+            :address="ring.from.address"
+            :name="nameOf(ring.from)"
+            size="md"
+            class="ring-pulse"
+          />
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-semibold">{{ nameOf(ring.from) }}</p>
             <p v-if="ring.conference" class="text-xs text-muted-foreground">

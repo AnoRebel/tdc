@@ -51,7 +51,11 @@ function attach(element: unknown, stream: MediaStream | null | undefined) {
         class="size-full -scale-x-100 object-cover"
       />
       <div v-else class="grid size-full place-items-center">
-        <Avatar :name="user ? nameOf(user) : ''" :size="compact ? 'md' : 'lg'" />
+        <Avatar
+          :address="user?.address"
+          :name="user ? nameOf(user) : ''"
+          :size="compact ? 'md' : 'lg'"
+        />
       </div>
       <span class="tile-label">
         <MicOff v-if="!c.microphone.value" class="size-3" :aria-label="$ts('calls.muted')" />
@@ -69,7 +73,7 @@ function attach(element: unknown, stream: MediaStream | null | undefined) {
         :class="!person.video && 'invisible absolute'"
       />
       <div v-if="!person.video" class="grid size-full place-items-center">
-        <Avatar :name="nameOf(person)" :size="compact ? 'md' : 'lg'" />
+        <Avatar :address="person.address" :name="nameOf(person)" :size="compact ? 'md' : 'lg'" />
       </div>
       <span class="tile-label">
         <MicOff v-if="!person.audio" class="size-3" :aria-label="$ts('calls.muted')" />

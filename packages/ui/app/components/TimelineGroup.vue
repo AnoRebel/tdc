@@ -39,7 +39,7 @@ function senderOf(run: MessageRun): string {
 <template>
   <MessageGroup :mine="run.mine">
     <div class="flex items-center gap-2 px-0.5" :class="run.mine ? 'flex-row-reverse' : 'flex-row'">
-      <Avatar :name="senderOf(run)" size="sm" />
+      <Avatar :address="viaOf(run) ? undefined : run.sender" :name="senderOf(run)" size="sm" />
       <span class="text-xs font-semibold">
         {{ run.mine ? $t("room.you") : senderOf(run) }}
       </span>

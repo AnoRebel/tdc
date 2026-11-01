@@ -70,6 +70,8 @@ type fixture struct {
 	rootEvent, reply   string
 	attachmentKey      string
 	attachmentBytes    []byte
+	avatarKey          string
+	avatarBytes        []byte
 	deletedEventMarker string
 }
 
@@ -87,8 +89,10 @@ func seed(t *testing.T, pool *pgxpool.Pool, store storage.Store) fixture {
 		rootEvent: "$root-" + uuid.New().String(), reply: "$reply-" + uuid.New().String(),
 		attachmentKey:      "attachments/" + uuid.New().String(),
 		attachmentBytes:    []byte("the bytes of a file somebody shared"),
+		avatarBytes:        []byte("the bytes of a picture somebody chose"),
 		deletedEventMarker: "a message somebody will delete",
 	}
+	f.avatarKey = "avatars/" + f.bob.String() + "/0a1b2c"
 	role, project2, state, priority, skill, app, sub := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	_ = project2
 
@@ -104,6 +108,7 @@ func seed(t *testing.T, pool *pgxpool.Pool, store storage.Store) fixture {
 		{`INSERT INTO users (id, username, username_folded) VALUES ($1, 'alice', 'alice'), ($2, 'bob', 'bob'), ($3, 'admin', 'admin')`,
 			[]any{f.alice, f.bob, f.admin}},
 		{`UPDATE users SET suspended_by = $1, suspended_at = NOW() WHERE id = $2`, []any{f.admin, f.alice}},
+		{`UPDATE users SET avatar_key = $1, avatar_type = 'image/png' WHERE id = $2`, []any{f.avatarKey, f.bob}},
 		{`INSERT INTO credentials (id, user_id, kind, secret) VALUES ($1, $2, 'password', 'argon2id-hash')`, []any{uuid.New(), f.alice}},
 		{`INSERT INTO roles (id, name) VALUES ($1, 'Moderator')`, []any{role}},
 		{`INSERT INTO role_permissions (role_id, permission) VALUES ($1, 'message.delete.any')`, []any{role}},
@@ -148,6 +153,10 @@ func seed(t *testing.T, pool *pgxpool.Pool, store storage.Store) fixture {
 		}
 	}
 
+	if err := store.Put(ctx, f.avatarKey, bytes.NewReader(f.avatarBytes),
+		int64(len(f.avatarBytes)), "image/png"); err != nil {
+		t.Fatalf("seed picture: %v", err)
+	}
 	if err := store.Put(ctx, f.attachmentKey, bytes.NewReader(f.attachmentBytes),
 		int64(len(f.attachmentBytes)), "text/plain"); err != nil {
 		t.Fatalf("seed file: %v", err)

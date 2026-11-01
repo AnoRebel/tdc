@@ -1717,6 +1717,7 @@ watch(roomId, load, { immediate: true });
               @click="jumpTo(item.message.id)"
             >
               <Avatar
+                :address="item.message.sender"
                 :name="item.message.senderName || nameAt(item.message.sender)"
                 size="sm"
                 class="mt-0.5 shrink-0"
@@ -1835,7 +1836,7 @@ watch(roomId, load, { immediate: true });
                sent and is not is the worse of the two mistakes. -->
           <MessageGroup v-if="waiting.length" :mine="true">
             <div class="flex flex-row-reverse items-center gap-2 px-0.5">
-              <Avatar :name="user?.address ?? ''" size="sm" />
+              <Avatar :address="user?.address" :name="user?.address ?? ''" size="sm" />
               <span class="text-xs font-semibold">You</span>
               <span class="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
                 <CloudOff class="size-3" />

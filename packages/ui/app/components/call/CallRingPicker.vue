@@ -76,7 +76,7 @@ async function ringAddress() {
         :key="member.id"
         class="flex items-center gap-2 rounded px-1.5 py-1 hover:bg-muted"
       >
-        <Avatar :name="nameOf(member)" size="sm" />
+        <Avatar :address="member.username" :name="nameOf(member)" size="sm" />
         <span class="min-w-0 flex-1 truncate text-xs">{{ nameOf(member) }}</span>
         <Button
           size="small"
