@@ -26,14 +26,22 @@ type recordedBanner struct {
 }
 
 type spyNotifier struct {
-	mu    sync.Mutex
-	shown []recordedBanner
+	mu        sync.Mutex
+	shown     []recordedBanner
+	withdrawn []Target
 }
 
 func (s *spyNotifier) Show(title, body string, target Target) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.shown = append(s.shown, recordedBanner{title, body, target})
+	return nil
+}
+
+func (s *spyNotifier) Withdraw(target Target) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.withdrawn = append(s.withdrawn, target)
 	return nil
 }
 
@@ -209,6 +217,32 @@ func TestARingIsAnnounced(t *testing.T) {
 	}
 }
 
+// A ring that stops — answered elsewhere, declined, given up — takes its
+// banner down, and only its own.
+func TestARingThatEndsTakesItsBannerDown(t *testing.T) {
+	bridge, spy := bridgeWith(t, "me@example.test")
+	raw, _ := json.Marshal(map[string]any{
+		"type": "call.ring", "roomId": "room-7",
+		"payload": map[string]any{
+			"call": "call-1", "roomId": "room-7", "roomName": "standup", "kind": "channel",
+			"from": map[string]any{"userId": "u1", "username": "amina", "address": "amina@example.test"},
+		},
+	})
+	bridge.notify(raw)
+
+	other, _ := json.Marshal(map[string]any{"type": "call.ring_ended", "payload": map[string]any{"call": "call-9"}})
+	bridge.notify(other)
+	if len(spy.withdrawn) != 0 {
+		t.Fatalf("a call that never rang here took down %v", spy.withdrawn)
+	}
+
+	ended, _ := json.Marshal(map[string]any{"type": "call.ring_ended", "payload": map[string]any{"call": "call-1"}})
+	bridge.notify(ended)
+	if len(spy.withdrawn) != 1 || spy.withdrawn[0].Room != "room-7" {
+		t.Errorf("the ended ring withdrew %v, want the banner for room-7", spy.withdrawn)
+	}
+}
+
 // A caller with a display name is called by it.
 func TestARingCallsTheCallerByTheirName(t *testing.T) {
 	bridge, spy := bridgeWith(t, "me@example.test")
@@ -258,5 +292,52 @@ func TestAnEventReminderIsAnnounced(t *testing.T) {
 	}
 	if shown := spy.shown[0]; shown.title != "Go meetup" || shown.body != "Starts in 15 minutes" || shown.target.Room != "event-3" {
 		t.Errorf("the reminder's banner reads %+v", shown)
+	}
+}
+
+// With messages kept off the lock screen, a banner says who wrote, not what.
+func TestAPrivateBannerKeepsTheWordsBack(t *testing.T) {
+	bridge, spy := bridgeWith(t, "me@example.test")
+	bridge.service.KeepContentPrivate(true, "New message")
+	bridge.notify(messageFrame("someone@example.test", "the launch date is 3 March", nil))
+
+	if spy.count() != 1 || spy.shown[0].body != "New message" {
+		t.Errorf("the private banner reads %+v", spy.shown)
+	}
+
+	bridge.service.KeepContentPrivate(false, "New message")
+	bridge.notify(messageFrame("someone@example.test", "the launch date is 3 March", nil))
+	if spy.shown[1].body != "the launch date is 3 March" {
+		t.Errorf("the banner after turning it off reads %q", spy.shown[1].body)
+	}
+}
+
+// Banners speak the interface's language once the webview gives the words.
+func TestBannersUseTheWordsTheyAreGiven(t *testing.T) {
+	bridge, spy := bridgeWith(t, "me@example.test")
+	bridge.service.UseBannerWords(BannerWords{Calling: "{name} anapiga simu", InChannel: "Katika #{room}"})
+	raw, _ := json.Marshal(map[string]any{
+		"type": "call.ring", "roomId": "room-7",
+		"payload": map[string]any{
+			"call": "call-1", "roomId": "room-7", "roomName": "standup", "kind": "channel",
+			"from": map[string]any{"userId": "u1", "username": "amina", "address": "amina@example.test"},
+		},
+	})
+	bridge.notify(raw)
+	if shown := spy.shown[0]; shown.title != "amina anapiga simu" || shown.body != "Katika #standup" {
+		t.Errorf("the ring's banner reads %+v", shown)
+	}
+}
+
+// One hour, and one minute, are not plurals.
+func TestAReminderCountsInWords(t *testing.T) {
+	bridge, _ := bridgeWith(t, "me@example.test")
+	for minutes, want := range map[int]string{
+		60: "Starts in an hour", 180: "Starts in 3 hours", 1: "Starts in a minute",
+		15: "Starts in 15 minutes", 0: "Starting soon", 2000: "Starts tomorrow",
+	} {
+		if got := bridge.service.startsIn(minutes); got != want {
+			t.Errorf("%d minutes reads %q, want %q", minutes, got, want)
+		}
 	}
 }

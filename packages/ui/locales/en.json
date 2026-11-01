@@ -512,7 +512,8 @@
       "eventChanged": "New time or place: {event}",
       "eventCancelled": "Cancelled: {event}",
       "eventPromoted": "A place freed up, so you are going to {event}"
-    }
+    },
+    "privateBody": "New message"
   },
   "digests": {
     "title": "Summaries by email",
@@ -1929,6 +1930,18 @@
       "waitingForBrowser": "Waiting for your browser. You can come back here when you are done.",
       "differentServer": "Signing in to a different server?",
       "chooseOne": "Choose one"
+    },
+    "banners": {
+      "calling": "{name} is calling",
+      "directCall": "A direct call",
+      "conference": "Invites you to join a conference call",
+      "inChannel": "In #{room}",
+      "startingSoon": "Starting soon",
+      "startsTomorrow": "Starts tomorrow",
+      "startsInHour": "Starts in an hour",
+      "startsInHours": "Starts in {count} hours",
+      "startsInMinute": "Starts in a minute",
+      "startsInMinutes": "Starts in {count} minutes"
     }
   },
   "help": {

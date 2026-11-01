@@ -27,6 +27,7 @@ type fakePlatform struct {
 	asked     int
 	grants    bool
 	responder func(notifications.NotificationResult)
+	removed   []string
 }
 
 func (f *fakePlatform) SendNotification(options notifications.NotificationOptions) error {
@@ -49,6 +50,13 @@ func (f *fakePlatform) RequestNotificationAuthorization() (bool, error) {
 
 func (f *fakePlatform) OnNotificationResponse(callback func(notifications.NotificationResult)) {
 	f.responder = callback
+}
+
+func (f *fakePlatform) RemoveNotification(identifier string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.removed = append(f.removed, identifier)
+	return nil
 }
 
 /** Delivers an activation as the platform would. */
@@ -281,5 +289,22 @@ func TestANotificationNeedsATitle(t *testing.T) {
 
 	if err := notifier.Show("  ", "Karibu", Target{Room: "general"}); err == nil {
 		t.Error("a notification with no title was sent")
+	}
+}
+
+// Withdrawing takes down exactly the banner shown for the same target.
+func TestAWithdrawnNotificationIsTheOneShown(t *testing.T) {
+	platform := &fakePlatform{allowed: true}
+	notifier := New(platform)
+	target := Target{Server: "https://tdc.or.tz", Room: "standup"}
+
+	if err := notifier.Show("amina is calling", "In #standup", target); err != nil {
+		t.Fatalf("showing: %v", err)
+	}
+	if err := notifier.Withdraw(target); err != nil {
+		t.Fatalf("withdrawing: %v", err)
+	}
+	if len(platform.removed) != 1 || platform.removed[0] != platform.sent[0].ID {
+		t.Errorf("withdrew %v, but the banner shown was %q", platform.removed, platform.sent[0].ID)
 	}
 }

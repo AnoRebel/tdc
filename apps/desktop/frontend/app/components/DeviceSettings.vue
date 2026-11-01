@@ -31,6 +31,26 @@ const current = computed(() => servers.value.find((server) => server.current)?.u
  */
 const refused = ref(false);
 
+/*
+ * Whether banners keep what was written to themselves. The account's setting,
+ * shared with the web client's notifications. Written through rather than
+ * bound, so the box shows what the account says, not what was clicked.
+ */
+const privacy = useBannerPrivacy();
+const savingPrivacy = ref(false);
+
+async function chooseBannerPrivacy(event: Event) {
+  const box = event.target as HTMLInputElement;
+  savingPrivacy.value = true;
+  try {
+    await privacy.set(box.checked);
+  } catch {
+    box.checked = privacy.hide.value;
+  } finally {
+    savingPrivacy.value = false;
+  }
+}
+
 async function turnOnNotifications() {
   refused.value = !(await notifications.ask());
 }
@@ -103,6 +123,22 @@ const screens = computed(() => [
     <p v-if="refused" role="alert" class="mt-2 text-xs text-warning">
       {{ $t("desktop.settings.notificationsRefused") }}
     </p>
+
+    <label class="mt-3 flex cursor-pointer items-start gap-2">
+      <input
+        type="checkbox"
+        class="mt-0.5 accent-primary"
+        :checked="privacy.hide.value"
+        :disabled="savingPrivacy"
+        @change="chooseBannerPrivacy"
+      />
+      <span class="min-w-0">
+        <span class="block text-xs font-medium">{{ $t("notification.keepOffLockScreen") }}</span>
+        <span class="block text-[0.6875rem] text-muted-foreground">
+          {{ $t("notification.keepOffLockScreenHint") }}
+        </span>
+      </span>
+    </label>
 
     <ul class="mt-3 space-y-px">
       <li v-for="screen in screens" :key="screen.name">

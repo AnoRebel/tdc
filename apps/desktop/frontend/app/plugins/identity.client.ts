@@ -18,6 +18,32 @@ export default defineNuxtPlugin({
   name: "tdc:identity",
   setup() {
     const { user } = useAuth();
+    // Asked for here, in setup, and used whenever somebody signs in.
+    const privacy = useBannerPrivacy();
+    const { $ts, $getLocale } = useI18n();
+
+    /*
+     * What banners say around the names in them, in this person's language.
+     * Go raises the banners and has no translations, so it is handed the
+     * words, with their placeholders left for it to fill.
+     */
+    function sendBannerWords() {
+      const word = (key: string) =>
+        $ts(`desktop.banners.${key}`, { name: "{name}", room: "{room}", count: "{count}" });
+      void Api.Service.UseBannerWords({
+        calling: word("calling"),
+        directCall: word("directCall"),
+        conference: word("conference"),
+        inChannel: word("inChannel"),
+        startingSoon: word("startingSoon"),
+        startsTomorrow: word("startsTomorrow"),
+        startsInHour: word("startsInHour"),
+        startsInHours: word("startsInHours"),
+        startsInMinute: word("startsInMinute"),
+        startsInMinutes: word("startsInMinutes"),
+      }).catch(() => {});
+    }
+    watch(() => $getLocale(), sendBannerWords, { immediate: true });
 
     watch(
       () => user.value?.address ?? "",
@@ -26,8 +52,12 @@ export default defineNuxtPlugin({
 
         // Failure here costs a banner for one's own message, or one missed for
         // somebody else's. Neither is worth interrupting anything over.
-        if (address) void Api.Service.SignedInAs(address).catch(() => {});
-        else void Api.Service.SignedOut().catch(() => {});
+        if (address) {
+          void Api.Service.SignedInAs(address).catch(() => {});
+          // Whether their banners show what was written: an account setting,
+          // so read once they are somebody.
+          void privacy.refresh().catch(() => {});
+        } else void Api.Service.SignedOut().catch(() => {});
       },
       { immediate: true },
     );

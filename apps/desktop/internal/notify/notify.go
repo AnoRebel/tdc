@@ -43,6 +43,7 @@ type Platform interface {
 	CheckNotificationAuthorization() (bool, error)
 	RequestNotificationAuthorization() (bool, error)
 	OnNotificationResponse(callback func(result notifications.NotificationResult))
+	RemoveNotification(identifier string) error
 }
 
 type Notifier struct {
@@ -243,6 +244,17 @@ func (n *Notifier) Show(title, body string, target Target) error {
 		*/
 		InterruptionLevel: "active",
 	})
+}
+
+/*
+Withdraw takes down the notification about a target, if one is showing.
+
+For a banner that has stopped being true: a call that was answered on another
+device, or that the caller gave up on, should not go on saying somebody is
+calling. Nothing showing is not an error.
+*/
+func (n *Notifier) Withdraw(target Target) error {
+	return n.service.RemoveNotification(identify(target))
 }
 
 /*

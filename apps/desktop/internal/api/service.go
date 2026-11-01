@@ -115,6 +115,8 @@ type Service struct {
 	// Who the webview signed in as, so a message this person sent does not
 	// raise a banner on their own machine. See whoami.go.
 	who identity
+	// What banners say, in the interface's language.
+	words bannerWords
 }
 
 // ErrNoServer is what a request before choosing a server gets.

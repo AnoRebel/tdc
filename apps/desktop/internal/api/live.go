@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -39,6 +38,8 @@ subscriptions — stays in the webview. This is only the socket it was missing.
 // and a test that required one would not run anywhere useful.
 type Notifier interface {
 	Show(title, body string, target Target) error
+	// Withdraw takes down the banner about a target, if one is showing.
+	Withdraw(target Target) error
 }
 
 // Target is where a notification takes somebody when it is pressed.
@@ -56,6 +57,14 @@ type LiveBridge struct {
 	mu     sync.Mutex
 	conn   *websocket.Conn
 	cancel context.CancelFunc
+
+	/*
+		The banner each ringing call raised, by the call's identifier, so the
+		frame saying it stopped ringing — which names only the call — can
+		take the right one down.
+	*/
+	ringsMu sync.Mutex
+	rings   map[string]Target
 }
 
 // The events a frame, an opening and a closing arrive under in the webview.
@@ -249,6 +258,10 @@ func (b *LiveBridge) notify(data []byte) {
 		b.announceRing(data)
 		return
 	}
+	if frame.Type == "call.ring_ended" {
+		b.withdrawRing(data)
+		return
+	}
 	if frame.Type == "event.reminder" {
 		b.announceReminder(data)
 		return
@@ -285,7 +298,7 @@ func (b *LiveBridge) notify(data []byte) {
 	if title == "" {
 		title = frame.Payload.Sender
 	}
-	_ = b.notifier.Show(title, plainText(frame.Payload.Content.Body), Target{
+	_ = b.notifier.Show(title, b.service.bannerBody(plainText(frame.Payload.Content.Body)), Target{
 		Server:  server,
 		Room:    frame.RoomID,
 		Message: frame.Payload.ID,
@@ -303,6 +316,7 @@ func (b *LiveBridge) announceRing(data []byte) {
 	var ring struct {
 		RoomID  string `json:"roomId"`
 		Payload struct {
+			Call     string `json:"call"`
 			RoomName string `json:"roomName"`
 			Kind     string `json:"kind"`
 			From     struct {
@@ -316,13 +330,14 @@ func (b *LiveBridge) announceRing(data []byte) {
 		return
 	}
 
-	where := "A direct call"
+	where := b.service.banner(func(w BannerWords) string { return w.DirectCall }, nil)
 	switch {
 	case ring.Payload.Kind == "conference":
 		// Somebody merging calls; the conversation is not theirs to see.
-		where = "Invites you to join a conference call"
+		where = b.service.banner(func(w BannerWords) string { return w.Conference }, nil)
 	case ring.Payload.Kind != "direct" && ring.Payload.RoomName != "":
-		where = "In #" + ring.Payload.RoomName
+		where = b.service.banner(func(w BannerWords) string { return w.InChannel },
+			map[string]string{"room": ring.Payload.RoomName})
 	}
 
 	b.service.mu.RLock()
@@ -334,10 +349,41 @@ func (b *LiveBridge) announceRing(data []byte) {
 	if strings.TrimSpace(from) == "" {
 		from = ring.Payload.From.Username
 	}
-	_ = b.notifier.Show(from+" is calling", where, Target{
-		Server: server,
-		Room:   ring.RoomID,
-	})
+	target := Target{Server: server, Room: ring.RoomID}
+	if ring.Payload.Call != "" {
+		b.ringsMu.Lock()
+		if b.rings == nil {
+			b.rings = map[string]Target{}
+		}
+		b.rings[ring.Payload.Call] = target
+		b.ringsMu.Unlock()
+	}
+	_ = b.notifier.Show(b.service.banner(func(w BannerWords) string { return w.Calling },
+		map[string]string{"name": from}), where, target)
+}
+
+/*
+withdrawRing takes down a ringing call's banner once it has stopped ringing:
+answered on another device, declined, or given up on by the caller. The web
+client closes its own the same way; without this the banner went on saying
+somebody was calling after the call had ended.
+*/
+func (b *LiveBridge) withdrawRing(data []byte) {
+	var ended struct {
+		Payload struct {
+			Call string `json:"call"`
+		} `json:"payload"`
+	}
+	if err := json.Unmarshal(data, &ended); err != nil || ended.Payload.Call == "" {
+		return
+	}
+	b.ringsMu.Lock()
+	target, ok := b.rings[ended.Payload.Call]
+	delete(b.rings, ended.Payload.Call)
+	b.ringsMu.Unlock()
+	if ok {
+		_ = b.notifier.Withdraw(target)
+	}
 }
 
 /*
@@ -357,15 +403,7 @@ func (b *LiveBridge) announceReminder(data []byte) {
 	if err := json.Unmarshal(data, &reminder); err != nil || reminder.Payload.Title == "" {
 		return
 	}
-	body := "Starting soon"
-	switch minutes := reminder.Payload.Minutes; {
-	case minutes >= 1440:
-		body = "Starts tomorrow"
-	case minutes >= 60:
-		body = fmt.Sprintf("Starts in %d hours", minutes/60)
-	case minutes > 0:
-		body = fmt.Sprintf("Starts in %d minutes", minutes)
-	}
+	body := b.service.startsIn(reminder.Payload.Minutes)
 
 	b.service.mu.RLock()
 	server := b.service.current

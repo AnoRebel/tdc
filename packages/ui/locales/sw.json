@@ -512,7 +512,8 @@
       "eventChanged": "Muda au mahali papya: {event}",
       "eventCancelled": "Limeghairiwa: {event}",
       "eventPromoted": "Nafasi imepatikana, kwa hiyo unahudhuria {event}"
-    }
+    },
+    "privateBody": "Ujumbe mpya"
   },
   "digests": {
     "title": "Muhtasari kwa barua pepe",
@@ -1929,6 +1930,18 @@
       "waitingForBrowser": "Inasubiri kivinjari chako. Unaweza kurudi hapa ukimaliza.",
       "differentServer": "Unaingia kwenye seva nyingine?",
       "chooseOne": "Chagua moja"
+    },
+    "banners": {
+      "calling": "{name} anapiga simu",
+      "directCall": "Simu ya moja kwa moja",
+      "conference": "Anakualika kujiunga na simu ya mkutano",
+      "inChannel": "Katika #{room}",
+      "startingSoon": "Inaanza hivi karibuni",
+      "startsTomorrow": "Inaanza kesho",
+      "startsInHour": "Inaanza baada ya saa moja",
+      "startsInHours": "Inaanza baada ya saa {count}",
+      "startsInMinute": "Inaanza baada ya dakika moja",
+      "startsInMinutes": "Inaanza baada ya dakika {count}"
     }
   },
   "help": {

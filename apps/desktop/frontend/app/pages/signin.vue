@@ -73,12 +73,23 @@ const returnedState = ref("");
 const askInterval = 2000;
 const giveUpAfter = 10 * 60 * 1000;
 
+/*
+ * Where they were trying to reach before any of this started: the sign-in
+ * gate sends them here with it, and the web client returns them to it. The
+ * desktop's did not, so a link opened while signed out ended on the
+ * conversations list instead.
+ */
+function intendedNext(): string | undefined {
+  const next = router.currentRoute.value.query.next;
+  return typeof next === "string" ? next : undefined;
+}
+
 async function chooseProvider(provider: string) {
   error.value = null;
   openingProvider.value = provider;
 
   try {
-    const start = await begin(provider);
+    const start = await begin(provider, intendedNext());
     await Api.Service.OpenSignIn(start.url);
     openingProvider.value = null;
     await waitForProvider(start.state);
@@ -121,20 +132,20 @@ async function waitForProvider(state: string) {
 /** Somebody finished a sign-in that owed a second factor. */
 async function signedInWithSecondFactor() {
   awaitingSecondFactor.value = null;
-  await router.push(localeRoute({ name: "index" }));
+  await router.push(intendedNext() || localeRoute({ name: "index" }));
 }
 
 /** Somebody signed in with a passkey, which is already a session. */
 async function signedInWithPasskey() {
   await refresh();
-  await router.push(localeRoute({ name: "index" }));
+  await router.push(intendedNext() || localeRoute({ name: "index" }));
 }
 
 /** Somebody signed in through a provider, one way or another. */
 async function signedInThroughProvider(result: OAuthResult) {
   returned.value = null;
   await refresh();
-  await router.push(result.redirectTo || localeRoute({ name: "index" }));
+  await router.push(result.redirectTo || intendedNext() || localeRoute({ name: "index" }));
 }
 
 // Nothing is waited for once this screen is gone.
@@ -259,7 +270,7 @@ const form = useForm({
         }
       }
 
-      await router.push(localeRoute({ name: "index" }));
+      await router.push(intendedNext() || localeRoute({ name: "index" }));
     } catch (cause) {
       if (isApiError(cause) && cause.code === "rate-limited") {
         const wait = cause.retryAfterSeconds;

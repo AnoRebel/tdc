@@ -18,6 +18,37 @@ last one.
 type identity struct {
 	mu      sync.RWMutex
 	address string
+
+	/*
+		Whether banners keep what was written to themselves, and what they say
+		instead. The account's "keep messages off the lock screen", which the
+		web client applies to its push notifications; a desktop banner is shown
+		to whoever is at the screen just the same. The words are the webview's,
+		in this person's language.
+	*/
+	private     bool
+	placeholder string
+}
+
+/*
+KeepContentPrivate says whether message banners show what was written, and
+what they say in its place when they do not.
+*/
+func (s *Service) KeepContentPrivate(private bool, placeholder string) {
+	s.who.mu.Lock()
+	defer s.who.mu.Unlock()
+	s.who.private = private
+	s.who.placeholder = placeholder
+}
+
+// bannerBody is what a message's banner says: its words, or the placeholder.
+func (s *Service) bannerBody(words string) string {
+	s.who.mu.RLock()
+	defer s.who.mu.RUnlock()
+	if s.who.private && s.who.placeholder != "" {
+		return s.who.placeholder
+	}
+	return words
 }
 
 // SignedInAs records who the webview signed in as.
@@ -32,6 +63,8 @@ func (s *Service) SignedOut() {
 	s.who.mu.Lock()
 	defer s.who.mu.Unlock()
 	s.who.address = ""
+	// The next person at this machine has their own setting.
+	s.who.private = false
 }
 
 /*

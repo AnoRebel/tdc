@@ -131,6 +131,10 @@ func bannersFor(notifier *notify.Notifier) api.Notifier {
 
 type bannerAdapter struct{ notifier *notify.Notifier }
 
+func (b bannerAdapter) Withdraw(target api.Target) error {
+	return b.notifier.Withdraw(notify.Target{Server: target.Server, Room: target.Room})
+}
+
 func (b bannerAdapter) Show(title, body string, target api.Target) error {
 	return b.notifier.Show(title, body, notify.Target{
 		Server:  target.Server,
