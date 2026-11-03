@@ -65,6 +65,7 @@ type Querier interface {
 	// undo a later one, which would resend events the peer already holds.
 	AdvanceRoomPeerCursor(ctx context.Context, arg AdvanceRoomPeerCursorParams) error
 	AdvanceTOTPPeriod(ctx context.Context, arg AdvanceTOTPPeriodParams) (Credential, error)
+	AllTranslationConnections(ctx context.Context) ([]AllTranslationConnectionsRow, error)
 	// The next issue number, under the project row's lock, so two people filing at
 	// once cannot both be given the same one.
 	AllocateIssueNumber(ctx context.Context, id uuid.UUID) (int64, error)
@@ -1301,6 +1302,8 @@ type Querier interface {
 	ReportOperationProgress(ctx context.Context, arg ReportOperationProgressParams) (bool, error)
 	RequestCompletion(ctx context.Context, arg RequestCompletionParams) (int64, error)
 	RequestOperationCancel(ctx context.Context, id uuid.UUID) (int64, error)
+	// Only if unchanged since it was read, so a key saved meanwhile is kept.
+	ResealTranslationConnection(ctx context.Context, arg ResealTranslationConnectionParams) (int64, error)
 	// Clears presence for connections that ended without a clean close, which is
 	// what makes an ungraceful disconnect expire rather than persist.
 	ResetStalePresence(ctx context.Context, lastSeenAt time.Time) error

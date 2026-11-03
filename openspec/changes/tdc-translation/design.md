@@ -101,5 +101,5 @@ The desktop application uses the shared layer unchanged. WebView2 is Chromium-ba
 ## Risks
 
 - **Another person's message goes to a third party.** The reader chooses that, as they could by pasting it; the guide says so per provider, the operator can deny providers, and the privacy-policy template has a paragraph for it.
-- **A lost `translation.secret_key` makes saved keys unreadable.** They are then refused as if absent and people reconnect; nothing else depends on the key. Rotation is not built: the guide says to remove and reconnect.
+- **A lost `translation.secret_key` makes saved keys unreadable.** They are then refused as if absent and people reconnect; nothing else depends on the key. To change it, the old key is kept as `translation.previous_secret_key` for one start, which seals every saved key again under the new one.
 - **Public LibreTranslate instances rate-limit and change.** None is configured by default; a person who adds one sees its errors as "the provider could not be reached".

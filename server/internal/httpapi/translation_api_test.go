@@ -13,7 +13,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"uuid"
 
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 	"github.com/AnoRebel/tdc/server/internal/translation"
 	"github.com/AnoRebel/tdc/server/internal/unfurl"
 )
@@ -277,6 +279,52 @@ func TestAConnectedKeyNeverComesBack(t *testing.T) {
 	mustCall(t, handler, http.MethodDelete, "/api/me/translation/connections/google", nil, token, http.StatusNoContent)
 	if recorder, _ := translate(t, handler, token, roomID, "google", sendMessage(t, handler, token, roomID, "later")); recorder.Code != http.StatusConflict {
 		t.Errorf("translating after removing the key returned %d, want 409", recorder.Code)
+	}
+}
+
+/*
+TestTheSecretKeyIsReplacedWithoutReconnecting is translation.previous_secret_key:
+a server started with a new secret key and the old one as previous seals every
+saved key again under the new one, so the old one can then be removed and the
+keys still open.
+*/
+func TestTheSecretKeyIsReplacedWithoutReconnecting(t *testing.T) {
+	handler, _, _ := withTranslationProvider(t)
+	token := completeSetup(t, handler)
+	const key = "AIza-kept-across-the-change"
+	mustCall(t, handler, http.MethodPut, "/api/me/translation/connections/google",
+		map[string]string{"apiKey": key}, token, http.StatusNoContent)
+
+	newKey, _ := translation.GenerateSecretKey()
+	build := func(settings translation.Settings) *translation.Service {
+		service, err := translation.NewService(settings, unfurl.DialContext, slog.New(slog.DiscardHandler))
+		if err != nil {
+			t.Fatalf("building translation: %v", err)
+		}
+		return service
+	}
+	ctx, queries := context.Background(), dbgen.New(poolForTest)
+
+	changing := build(translation.Settings{SecretKey: newKey, PreviousSecretKey: translationKeyForTest})
+	if moved, err := changing.ResealAll(ctx, queries); err != nil || moved != 1 {
+		t.Fatalf("ResealAll = %d, %v; want 1 key moved", moved, err)
+	}
+	if moved, _ := changing.ResealAll(ctx, queries); moved != 0 {
+		t.Errorf("a second start moved %d keys again", moved)
+	}
+
+	var owner uuid.UUID
+	var sealed []byte
+	if err := poolForTest.QueryRow(ctx,
+		"SELECT user_id, sealed_key FROM translation_connections WHERE provider = 'google'").Scan(&owner, &sealed); err != nil {
+		t.Fatalf("reading the stored key: %v", err)
+	}
+	changed := build(translation.Settings{SecretKey: newKey})
+	if got, err := changed.Open(owner, translation.Google, sealed); err != nil || got != key {
+		t.Errorf("under the new key alone the saved key opens as %q, %v", got, err)
+	}
+	if _, err := build(translation.Settings{SecretKey: translationKeyForTest}).Open(owner, translation.Google, sealed); err == nil {
+		t.Error("the old key still opens it, so it was not sealed again")
 	}
 }
 

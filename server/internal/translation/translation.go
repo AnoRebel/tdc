@@ -100,6 +100,9 @@ type Settings struct {
 	// SecretKey seals personal keys; base64 of 32 bytes. Empty means personal
 	// keys cannot be saved.
 	SecretKey string
+	// PreviousSecretKey is the secret key being replaced: keys sealed under
+	// it still open, and ResealAll moves them to SecretKey.
+	PreviousSecretKey string
 	// Timeout bounds one call to a provider.
 	Timeout time.Duration
 
@@ -128,6 +131,7 @@ func (s Settings) WithTestProviders(bases map[Provider]string, dial DialFunc, co
 type Service struct {
 	settings Settings
 	sealer   *sealer
+	previous *sealer
 	log      *slog.Logger
 
 	// operator reaches the operator's own instance: their choice, often on a
@@ -165,6 +169,15 @@ func NewService(settings Settings, dial DialFunc, log *slog.Logger) (*Service, e
 			return nil, fmt.Errorf("translation.secret_key %w", err)
 		}
 		if service.sealer, err = newSealer(key); err != nil {
+			return nil, err
+		}
+	}
+	if settings.PreviousSecretKey != "" && service.sealer != nil {
+		key, err := ParseSecretKey(settings.PreviousSecretKey)
+		if err != nil {
+			return nil, fmt.Errorf("translation.previous_secret_key %w", err)
+		}
+		if service.previous, err = newSealer(key); err != nil {
 			return nil, err
 		}
 	}

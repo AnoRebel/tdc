@@ -1,6 +1,7 @@
 package translation
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -8,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"uuid"
+
+	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
 )
 
 // ErrCannotStoreKeys is returned when the operator has not configured
@@ -104,7 +107,56 @@ func (s *Service) Open(userID uuid.UUID, provider Provider, sealed []byte) (stri
 	if s.sealer == nil {
 		return "", ErrCannotStoreKeys
 	}
-	return s.sealer.open(userID, provider, sealed)
+	plain, err := s.sealer.open(userID, provider, sealed)
+	if err != nil && s.previous != nil {
+		return s.previous.open(userID, provider, sealed)
+	}
+	return plain, err
+}
+
+/*
+ResealAll moves every saved key still sealed under the previous secret key to
+the current one, so the previous key can then be removed from configuration
+without anybody connecting again.
+
+Run at startup. A key that opens under neither is left alone, and goes on
+asking its owner to connect again, as it did. A row changed while this ran
+keeps its change.
+*/
+func (s *Service) ResealAll(ctx context.Context, queries *dbgen.Queries) (int, error) {
+	if s.sealer == nil || s.previous == nil {
+		return 0, nil
+	}
+	rows, err := queries.AllTranslationConnections(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("translation: reading saved keys: %w", err)
+	}
+	moved := 0
+	for _, row := range rows {
+		provider := Provider(row.Provider)
+		if len(row.SealedKey) == 0 {
+			continue
+		}
+		if _, err := s.sealer.open(row.UserID, provider, row.SealedKey); err == nil {
+			continue
+		}
+		plain, err := s.previous.open(row.UserID, provider, row.SealedKey)
+		if err != nil {
+			continue
+		}
+		resealed, err := s.sealer.seal(row.UserID, provider, plain)
+		if err != nil {
+			return moved, err
+		}
+		changed, err := queries.ResealTranslationConnection(ctx, dbgen.ResealTranslationConnectionParams{
+			UserID: row.UserID, Provider: row.Provider, Resealed: resealed, Sealed: row.SealedKey,
+		})
+		if err != nil {
+			return moved, fmt.Errorf("translation: resealing a key: %w", err)
+		}
+		moved += int(changed)
+	}
+	return moved, nil
 }
 
 // CanStoreKeys reports whether personal keys can be saved here.

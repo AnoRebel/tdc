@@ -281,6 +281,7 @@ func Load(path string) (Config, error) {
 	cfg.Translation.LibreTranslateURL = l.str("translation.libretranslate_url", d.Translation.LibreTranslateURL)
 	cfg.Translation.LibreTranslateAPIKey = l.str("translation.libretranslate_api_key", d.Translation.LibreTranslateAPIKey)
 	cfg.Translation.SecretKey = l.str("translation.secret_key", d.Translation.SecretKey)
+	cfg.Translation.PreviousSecretKey = l.str("translation.previous_secret_key", d.Translation.PreviousSecretKey)
 	cfg.Translation.Timeout = l.duration("translation.timeout", d.Translation.Timeout)
 	cfg.Attachments.MediaSidecarAddress = l.str("attachments.media_sidecar_address", d.Attachments.MediaSidecarAddress)
 	cfg.Attachments.MediaSidecarTimeout = l.duration("attachments.media_sidecar_timeout", d.Attachments.MediaSidecarTimeout)
@@ -374,10 +375,19 @@ func (c Config) validate() []Problem {
 		A translation secret key that is not one is refused at startup, rather
 		than discovered by the first member who tries to save a key.
 	*/
-	if key := strings.TrimSpace(c.Translation.SecretKey); key != "" {
-		if decoded, err := base64.StdEncoding.DecodeString(key); err != nil || len(decoded) != 32 {
-			add("translation.secret_key", "must be base64 of 32 bytes; generate one with tdc-server -translation-key")
+	for name, key := range map[string]string{
+		"translation.secret_key":          c.Translation.SecretKey,
+		"translation.previous_secret_key": c.Translation.PreviousSecretKey,
+	} {
+		if key = strings.TrimSpace(key); key == "" {
+			continue
 		}
+		if decoded, err := base64.StdEncoding.DecodeString(key); err != nil || len(decoded) != 32 {
+			add(name, "must be base64 of 32 bytes; generate one with tdc-server -translation-key")
+		}
+	}
+	if strings.TrimSpace(c.Translation.PreviousSecretKey) != "" && strings.TrimSpace(c.Translation.SecretKey) == "" {
+		add("translation.previous_secret_key", "needs translation.secret_key, the key it is being replaced by")
 	}
 	if address := strings.TrimSpace(c.Translation.LibreTranslateURL); address != "" {
 		if parsed, err := url.Parse(address); err != nil ||

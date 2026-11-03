@@ -36,6 +36,14 @@ SET sealed_key = EXCLUDED.sealed_key,
     region = EXCLUDED.region,
     updated_at = NOW();
 
+-- name: AllTranslationConnections :many
+SELECT user_id, provider, sealed_key FROM translation_connections;
+
+-- name: ResealTranslationConnection :execrows
+-- Only if unchanged since it was read, so a key saved meanwhile is kept.
+UPDATE translation_connections SET sealed_key = sqlc.arg(resealed)
+WHERE user_id = $1 AND provider = $2 AND sealed_key = sqlc.arg(sealed);
+
 -- name: DeleteTranslationConnection :exec
 DELETE FROM translation_connections WHERE user_id = $1 AND provider = $2;
 

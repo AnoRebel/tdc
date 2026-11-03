@@ -380,10 +380,16 @@ func run() (restartRequest, error) {
 		LibreTranslateURL:    cfg.Translation.LibreTranslateURL,
 		LibreTranslateAPIKey: cfg.Translation.LibreTranslateAPIKey,
 		SecretKey:            cfg.Translation.SecretKey,
+		PreviousSecretKey:    cfg.Translation.PreviousSecretKey,
 		Timeout:              cfg.Translation.Timeout,
 	}, unfurl.DialContext, log)
 	if err != nil {
 		return restartRequest{}, err
+	}
+	if moved, err := translationService.ResealAll(ctx, queries); err != nil {
+		return restartRequest{}, err
+	} else if moved > 0 {
+		log.Info("translation keys sealed under the new secret key; translation.previous_secret_key can now be removed", "keys", moved)
 	}
 
 	services := httpapi.Services{

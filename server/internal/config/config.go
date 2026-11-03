@@ -315,6 +315,12 @@ type TranslationConfig struct {
 		save keys; losing it means they connect again.
 	*/
 	SecretKey string
+	/*
+		PreviousSecretKey is the one SecretKey replaces. Keys sealed under it
+		are sealed again under SecretKey when the server starts; once it has
+		started, this can be removed.
+	*/
+	PreviousSecretKey string
 	// Timeout bounds one call to a provider.
 	Timeout time.Duration
 }

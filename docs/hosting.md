@@ -1193,14 +1193,19 @@ tdc-server -translation-key   # prints TDC_TRANSLATION_SECRET_KEY=…
 Without it members cannot save keys (the settings screen says so), and on-device
 translation and your instance still work. Keep it with your other secrets and
 back it up: if it is lost, saved keys cannot be read and members must connect
-again. There is no rotation; to change it, set a new one and ask members to
-reconnect. It is redacted from `/api/admin/configuration`, as is the instance key.
+again. It is redacted from `/api/admin/configuration`, as is the instance key.
+
+To change it without anybody reconnecting, move the current key to
+`translation.previous_secret_key`, set a new `translation.secret_key`, and
+restart. On start the server seals every saved key again under the new one and
+logs how many it moved; then remove the previous key and restart again.
 
 | Setting                              | Default |                                             |
 | ------------------------------------ | ------- | ------------------------------------------- |
 | `translation.libretranslate_url`     | —       | Your LibreTranslate instance, for everybody |
 | `translation.libretranslate_api_key` | —       | Its key, if it needs one                    |
 | `translation.secret_key`             | —       | Base64 of 32 bytes; encrypts members' keys  |
+| `translation.previous_secret_key`    | —       | The key being replaced, while changing it   |
 | `translation.timeout`                | `10s`   | Bounds one call to a provider               |
 
 Policy, in **Administration** while the server runs:

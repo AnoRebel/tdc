@@ -11,6 +11,36 @@ import (
 	uuid "uuid"
 )
 
+const allTranslationConnections = `-- name: AllTranslationConnections :many
+SELECT user_id, provider, sealed_key FROM translation_connections
+`
+
+type AllTranslationConnectionsRow struct {
+	UserID    uuid.UUID
+	Provider  string
+	SealedKey []byte
+}
+
+func (q *Queries) AllTranslationConnections(ctx context.Context) ([]AllTranslationConnectionsRow, error) {
+	rows, err := q.db.Query(ctx, allTranslationConnections)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AllTranslationConnectionsRow{}
+	for rows.Next() {
+		var i AllTranslationConnectionsRow
+		if err := rows.Scan(&i.UserID, &i.Provider, &i.SealedKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteTranslationConnection = `-- name: DeleteTranslationConnection :exec
 DELETE FROM translation_connections WHERE user_id = $1 AND provider = $2
 `
@@ -167,6 +197,32 @@ func (q *Queries) ListTranslationRoomRules(ctx context.Context, userID uuid.UUID
 		return nil, err
 	}
 	return items, nil
+}
+
+const resealTranslationConnection = `-- name: ResealTranslationConnection :execrows
+UPDATE translation_connections SET sealed_key = $3
+WHERE user_id = $1 AND provider = $2 AND sealed_key = $4
+`
+
+type ResealTranslationConnectionParams struct {
+	UserID   uuid.UUID
+	Provider string
+	Resealed []byte
+	Sealed   []byte
+}
+
+// Only if unchanged since it was read, so a key saved meanwhile is kept.
+func (q *Queries) ResealTranslationConnection(ctx context.Context, arg ResealTranslationConnectionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, resealTranslationConnection,
+		arg.UserID,
+		arg.Provider,
+		arg.Resealed,
+		arg.Sealed,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setTranslationConnection = `-- name: SetTranslationConnection :exec

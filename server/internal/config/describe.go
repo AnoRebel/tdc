@@ -62,6 +62,8 @@ var secretKeys = map[string]bool{
 		copy of the database holds every key a member connected.
 	*/
 	"translation.secret_key": true,
+	// The key being replaced, which opens the same keys until they move.
+	"translation.previous_secret_key": true,
 	/*
 		The mail account's password. Whoever holds it can send mail as this
 		server, which for a server that sends recovery links is the whole
@@ -224,6 +226,7 @@ func (c Config) values() []settingValue {
 		{"translation.libretranslate_url", c.Translation.LibreTranslateURL, defaults.Translation.LibreTranslateURL},
 		{"translation.libretranslate_api_key", c.Translation.LibreTranslateAPIKey, defaults.Translation.LibreTranslateAPIKey},
 		{"translation.secret_key", c.Translation.SecretKey, defaults.Translation.SecretKey},
+		{"translation.previous_secret_key", c.Translation.PreviousSecretKey, defaults.Translation.PreviousSecretKey},
 		{"translation.timeout", c.Translation.Timeout.String(), defaults.Translation.Timeout.String()},
 		{"log.level", c.Log.Level, defaults.Log.Level},
 		{"log.format", c.Log.Format, defaults.Log.Format},

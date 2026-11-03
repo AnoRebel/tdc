@@ -23,4 +23,4 @@ Scope note: these tasks implement `messaging/translation` against the running pl
 
 ## 3. Not done
 
-- [ ] 3.1 Rotating `translation.secret_key` without members reconnecting
+- [x] 3.1 Rotating `translation.secret_key` without members reconnecting: `translation.previous_secret_key` still opens saved keys, and the server seals them again under the new key at startup
