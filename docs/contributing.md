@@ -363,7 +363,7 @@ reports rather than fails — the number going down is the point.
 
 The guides in `docs/` are published as a site as well as shown in the
 application's help centre: [tdc.anorebel.net](https://tdc.anorebel.net) for
-`main`, `beta.tdc.anorebel.net` for `beta` and `dev.tdc.anorebel.net` for
+`main`, `tdc-beta.anorebel.net` for `beta` and `tdc-dev.anorebel.net` for
 `dev`, with a switcher in the header to move between them. The site is
 `apps/docs`, built with Docus, and it reads `docs/` directly — there is no
 copy, so a guide is edited in one place whichever way it is edited.
