@@ -154,10 +154,24 @@ func (b *LiveBridge) pump(ctx context.Context, conn *websocket.Conn) {
 	for {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
-			// A read error is the connection ending, deliberately or not. The
-			// webview's machinery decides whether to reconnect; this only tells
-			// it the socket is gone.
-			b.emit(LiveCloseEvent)
+			/*
+				A read error is the connection ending, deliberately or not. The
+				webview's machinery decides whether to reconnect; this only tells
+				it the socket is gone — and only if it is still the socket. One
+				replaced by a reconnection ends too, after the new one has
+				opened, and saying so would have the webview reconnect again,
+				and again.
+			*/
+			b.mu.Lock()
+			current, cancel := b.conn == conn, b.cancel
+			if current {
+				b.conn, b.cancel = nil, nil
+			}
+			b.mu.Unlock()
+			if current {
+				cancel()
+				b.emit(LiveCloseEvent)
+			}
 			return
 		}
 		b.emit(LiveFrameEvent, string(data))

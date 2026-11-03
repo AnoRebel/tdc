@@ -1962,10 +1962,12 @@ installed. The `.deb`, `.rpm` and Arch packages bring them in themselves. With
 another kind of download, or where they are missing, the conversation header
 shows a crossed-out phone instead of the call buttons, and pressing it says
 what to install — `gstreamer1.0-plugins-bad` and `gstreamer1.0-nice` on Debian
-and Ubuntu, `gstreamer1-plugins-bad-free` and `libnice-gstreamer1` on Fedora,
-`gst-plugins-bad` and `libnice` on Arch. A WebKitGTK built without WebRTC at all
-is said the same way; the desktop application switches WebRTC on in the
-WebKitGTK it is given, reloading its page once at start to do it. On macOS the
+and Ubuntu, `gstreamer1-plugins-bad-free` and `libnice-gstreamer1` on Fedora.
+A WebKitGTK built without WebRTC at all is said the same way, and no plugin
+fixes that: Arch's `webkitgtk-6.0` and `webkit2gtk-4.1` (2.54) are built
+without it, so on Arch calls are for TDC in a browser. Elsewhere the desktop
+application switches WebRTC on in the WebKitGTK it is given, reloading its page
+once at start to do it. On macOS the
 first call asks for the camera and microphone in the system's own dialog; on
 Windows, calls need nothing extra.
 

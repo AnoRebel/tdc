@@ -4,6 +4,7 @@ package shell
 
 /*
 #cgo linux pkg-config: gtk4 webkitgtk-6.0
+#include <stdlib.h>
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
 
@@ -26,6 +27,9 @@ static int tdcEnableWebRTC(void *window) {
 	int was = webkit_settings_get_enable_webrtc(settings) && webkit_settings_get_enable_media_stream(settings);
 	webkit_settings_set_enable_media_stream(settings, TRUE);
 	webkit_settings_set_enable_webrtc(settings, TRUE);
+	// A camera and microphone that are WebKit's own, for demonstrating calls
+	// on a machine whose real ones should not be used.
+	if (getenv("TDC_MOCK_MEDIA") != NULL) webkit_settings_set_enable_mock_capture_devices(settings, TRUE);
 	return was ? 0 : 1;
 }
 */
