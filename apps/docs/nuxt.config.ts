@@ -20,11 +20,7 @@ const [owner = "AnoRebel", repo = "tdc"] = (process.env.DOCS_REPOSITORY || "AnoR
   "/",
 );
 
-/**
- * Where each version is published. NUXT_PUBLIC_DOCS_VERSIONS replaces it at runtime, as JSON.
- * One level under the domain: Cloudflare's certificate covers *.anorebel.net,
- * not *.tdc.anorebel.net, so dev.tdc.anorebel.net fails its TLS handshake.
- */
+/** Where each version is published. NUXT_PUBLIC_DOCS_VERSIONS replaces it at runtime, as JSON. */
 const versions = [
   { version: "main", label: "Stable", url: "https://tdc.anorebel.net" },
   { version: "beta", label: "Beta", url: "https://tdc-beta.anorebel.net" },
