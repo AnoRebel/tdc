@@ -61,3 +61,7 @@ playwright-report/
 # the module writes for routes it finds, and regenerate on every build.
 apps/web/locales/
 apps/desktop/frontend/locales/
+
+# The update signing key. Its public half is apps/desktop/build/tdc.key.pub;
+# this half lives in the TDC_UPDATER_KEY secret and an offline backup.
+tdc.key

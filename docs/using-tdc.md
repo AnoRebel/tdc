@@ -1903,8 +1903,11 @@ What the desktop client adds:
 - **Launching at login**, off unless you turn it on, and your window's position
   restored — adjusted if the display it was on has gone.
 - **Updates that verify what they downloaded**, refusing anything not signed
-  by TDC's release process for that version, and install and restart in one
-  step — going back to the version you had if the new one will not start.
+  with TDC's update key, and install and restart in one step — going back to
+  the version you had if the new one will not start. The AppImage, the macOS
+  app and the Windows program update themselves; a `.deb` or `.rpm`, the plain
+  binary and the GTK3 build are told of a new version and given its download
+  page, since your package manager or you installed them.
 - **Letting somebody in a call control your screen**, when you present your
   whole screen from here; a browser cannot move the pointer, so it cannot offer
   this. See **Letting somebody control your screen** under Calls.

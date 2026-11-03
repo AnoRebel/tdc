@@ -165,6 +165,44 @@ jobs:
           EXTRA_TAGS: ${{ matrix.variant == 'gtk3' && 'gtk3' || '' }}
         run: go run github.com/wailsapp/wails/v3/cmd/wails3 task build
 
+      - name: Package it
+        id: packages
+        if: matrix.goos != 'windows' && !matrix.variant
+        working-directory: apps/desktop
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+          # The AppImage tool is itself an AppImage, and runners have no FUSE.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        # What can update itself — an AppImage, a .app bundle — and what a
+        # distribution installs. The plain binary stays beside them for
+        # anybody who wants only that.
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          stem="tdc-${version}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          wails() { go run github.com/wailsapp/wails/v3/cmd/wails3 "$@"; }
+          made=()
+          if [ "${{ matrix.goos }}" = "darwin" ]; then
+            wails task darwin:package
+            # ditto keeps the bundle's symlinks and attributes, which zip does not.
+            ditto -c -k --keepParent bin/tdc.app "../../${stem}.app.zip"
+            made+=("${stem}.app.zip")
+          else
+            # The AppImage only on amd64: the tool that makes one has no arm64
+            # build, so arm64 is told of updates and given the release page.
+            if [ "${{ matrix.goarch }}" = "amd64" ]; then
+              wails task linux:create:appimage
+              mv bin/*.AppImage "../../${stem}.AppImage"
+              made+=("${stem}.AppImage")
+            fi
+            wails task linux:create:deb
+            wails task linux:create:rpm
+            mv bin/*.deb "../../${stem}.deb"
+            mv bin/*.rpm "../../${stem}.rpm"
+            made+=("${stem}.deb" "${stem}.rpm")
+          fi
+          echo "paths=${made[*]}" >> "$GITHUB_OUTPUT"
+
       - name: Name the artifact
         id: artifact
         shell: bash
@@ -189,20 +227,18 @@ jobs:
       - name: Sign it
         uses: sigstore/gh-action-sigstore-python@v3.5.0
         with:
-          inputs: ${{ steps.artifact.outputs.path }}
-          # The bundle beside the artifact, which is what the client fetches and
-          # checks. Nothing is uploaded to a release without one.
+          inputs: ${{ steps.artifact.outputs.path }} ${{ steps.packages.outputs.paths }}
+          # A bundle beside each artifact, for anybody checking a download by
+          # hand. Nothing is uploaded to a release without one.
           upload-signing-artifacts: false
 
       - name: Keep the artifact and its proof together
         uses: actions/upload-artifact@v7
         with:
           name: tdc-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}
-          # The bundle's name is the artifact's with .sigstore.json appended,
-          # which is where the desktop client looks for it.
+          # Each bundle's name is its artifact's with .sigstore.json appended.
           path: |
-            ${{ steps.artifact.outputs.path }}
-            ${{ steps.artifact.outputs.path }}.sigstore.json
+            tdc-*
           if-no-files-found: error
 
   # The server, which unlike the desktop client cross-compiles.
@@ -402,6 +438,46 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/desktop/go.mod
+          cache-dependency-path: apps/desktop/go.sum
+
+      - name: Write the update manifest
+        # What each copy that can update itself downloads, one per platform:
+        # the AppImage, the .app, the Windows executable — and arm64 Linux's
+        # plain binary, which has no AppImage, so it is told of the update and
+        # given this release's page. Each entry is signed with the key whose
+        # public half the client carries; the private half is only here.
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          TDC_UPDATER_KEY: ${{ secrets.TDC_UPDATER_KEY }}
+        run: |
+          if [ -z "$TDC_UPDATER_KEY" ]; then
+            echo "TDC_UPDATER_KEY is not set, so no update can be signed" >&2
+            exit 1
+          fi
+          key="$(mktemp)"
+          trap 'rm -f "$key"' EXIT
+          chmod 600 "$key"
+          printf '%s\n' "$TDC_UPDATER_KEY" > "$key"
+
+          mkdir offered
+          for file in \
+            "artifacts/tdc-${VERSION}-linux-amd64.AppImage" \
+            "artifacts/tdc-${VERSION}-linux-arm64" \
+            artifacts/tdc-"${VERSION}"-darwin-*.app.zip \
+            artifacts/tdc-"${VERSION}"-windows-*.exe; do
+            ln "$file" offered/
+          done
+
+          wails() { (cd apps/desktop && go run github.com/wailsapp/wails/v3/cmd/wails3 "$@"); }
+          wails updater manifest -version "$VERSION" -key "$key" \
+            -url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/" \
+            -output "$PWD/artifacts/update-manifest.json" "$PWD/offered"
+          wails updater verify -manifest "$PWD/artifacts/update-manifest.json" \
+            -publickey "$PWD/apps/desktop/build/tdc.key.pub" -dir "$PWD/offered"
 
       - name: Write the checksums
         # One file covering every artifact, so somebody who downloaded over a

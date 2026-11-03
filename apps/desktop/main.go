@@ -61,10 +61,17 @@ person's own icon theme for panels that resolve tray icons by name.
 var trayIconTheme embed.FS
 
 /*
-updateRepository is whose GitHub releases this updates from. What makes an
-update trustworthy is its signature, not where it was found.
+updateManifest is the signed list of what the newest release offers each
+platform. GitHub's /latest/ skips drafts and pre-releases.
 */
-const updateRepository = "AnoRebel/tdc"
+const updateManifest = "https://github.com/AnoRebel/tdc/releases/latest/download/update-manifest.json"
+
+/*
+updateKey is the public half of the key every update is signed with. Built
+in, so somebody able to change a release still cannot sign one.
+*/
+//go:embed build/tdc.key.pub
+var updateKey []byte
 
 /*
 windowSettingsPath is where how-the-window-looks is kept.
@@ -143,7 +150,7 @@ func main() {
 	notifier := notify.New(notifications.New())
 
 	// Updates, which verify or refuse.
-	updates := updater.NewService(updateRepository, updater.DefaultPath())
+	updates := updater.NewService(updateManifest, updateKey, updater.DefaultPath())
 
 	// Held by name because the live bridge, registered once the application
 	// exists, needs the same instance the webview's requests go through — the

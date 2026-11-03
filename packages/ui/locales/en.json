@@ -1901,6 +1901,7 @@
       "downloadVersion": "Download {version}",
       "downloadIt": "Download it",
       "installIt": "Install and restart",
+      "byHand": "This copy cannot update itself, so download the new version and install it the way you installed this one.",
       "whenToLook": "When to look",
       "whenToLookHint": "Checking tells the release server that TDC is installed here and which version. Nothing is downloaded or installed without you saying so.",
       "checkOnLaunch": "Also check shortly after starting",

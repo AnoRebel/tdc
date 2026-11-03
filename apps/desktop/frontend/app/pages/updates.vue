@@ -103,6 +103,13 @@ const intervals = [
           </span>
         </div>
 
+        <p
+          v-if="state.available && state.enabled && !state.selfUpdate"
+          class="mt-2 text-xs text-muted-foreground"
+        >
+          {{ $t("desktop.updates.byHand") }}
+        </p>
+
         <p v-if="state.notes" class="mt-2 text-xs whitespace-pre-line text-muted-foreground">
           {{ state.notes }}
         </p>
@@ -117,9 +124,9 @@ const intervals = [
           <!-- Where this build cannot install, the only thing offered is the
                page somebody downloads from. -->
           <a
-            v-if="!state.enabled"
+            v-if="!state.enabled || !state.selfUpdate"
             class="btn btn-primary"
-            :href="releasesURL"
+            :href="`${releasesURL}/tag/v${state.available}`"
             target="_blank"
             rel="noreferrer"
           >

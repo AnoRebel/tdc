@@ -3,6 +3,8 @@ package updater
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/AnoRebel/tdc/apps/desktop/internal/buildinfo"
 	wails "github.com/wailsapp/wails/v3/pkg/updater"
+	"github.com/wailsapp/wails/v3/pkg/updater/providers/endpoint"
 )
 
 /*
@@ -23,9 +26,13 @@ The three are separate methods for that reason rather than for tidiness.
 
 // State is what the interface shows about updates.
 type State struct {
-	// Enabled is false where this build cannot install updates, in which case
-	// nothing else here will happen.
+	// Enabled is false where this build cannot check for updates at all.
 	Enabled bool `json:"enabled"`
+	// SelfUpdate is whether this copy can replace itself. When it cannot, it
+	// is still told of updates, and given the release page.
+	SelfUpdate bool `json:"selfUpdate"`
+	// NotSelf is why it cannot, in words.
+	NotSelf string `json:"notSelf,omitempty"`
 	// Current is the version running now.
 	Current string `json:"current"`
 	// Available is the newest version found, or empty.
@@ -44,30 +51,36 @@ type State struct {
 Service holds the updater's state for the life of the application.
 
 One per application: two would check twice and could both be downloading the
-same release. Wails' updater does the downloading, matching, swapping and
-restarting; this decides when, and says how it went.
+same release. Wails' updater does the checking, downloading, verifying,
+swapping and restarting; this decides when, and says how it went.
 */
 type Service struct {
-	source wails.Provider
-	store  *Store
-	wails  *wails.Updater
+	manifestURL string
+	publicKey   []byte
+	store       *Store
+	wails       *wails.Updater
+
+	// Eligibility says whether this copy can replace itself; a field so tests
+	// can say either.
+	Eligibility func() (bool, string)
 
 	mu    sync.RWMutex
 	state State
 }
 
-// NewService builds the updater, finding releases in a GitHub repository's.
-func NewService(repository, settingsPath string) *Service {
-	source, err := releasesOf(repository, &http.Client{Timeout: 5 * time.Minute})
-	service := &Service{
-		source: source,
-		store:  OpenStore(settingsPath),
-		state:  State{Current: buildinfo.Version},
+/*
+NewService builds the updater: the signed manifest it reads, and the public
+key every update must be signed with. Built into the application, so whoever
+can change a release still cannot sign one.
+*/
+func NewService(manifestURL string, publicKey []byte, settingsPath string) *Service {
+	return &Service{
+		manifestURL: manifestURL,
+		publicKey:   publicKey,
+		store:       OpenStore(settingsPath),
+		Eligibility: CanSelfUpdate,
+		state:       State{Current: buildinfo.Version},
 	}
-	if err != nil {
-		service.state.Problem = err.Error()
-	}
-	return service
 }
 
 /*
@@ -77,21 +90,52 @@ No window of Wails' own: the Updates page is where this is shown, and nothing
 happens that somebody there did not ask for.
 */
 func (s *Service) Use(updater *wails.Updater) error {
-	if s.source == nil {
-		return errors.New(s.state.Problem)
+	if len(s.publicKey) == 0 {
+		return errors.New("no update signing key")
+	}
+	source, err := endpoint.New(endpoint.Config{URL: s.manifestURL, HTTPClient: httpClient()})
+	if err != nil {
+		return err
 	}
 	if err := updater.Init(wails.Config{
 		CurrentVersion: buildinfo.Version,
-		Providers:      []wails.Provider{s.source},
+		Providers:      []wails.Provider{source},
+		PublicKey:      s.publicKey,
 		Window:         wails.WindowNone,
 	}); err != nil {
 		return err
 	}
+	self, why := s.Eligibility()
 	s.mu.Lock()
 	s.wails = updater
 	s.state.Enabled = true
+	s.state.SelfUpdate, s.state.NotSelf = self, why
 	s.mu.Unlock()
 	return nil
+}
+
+/*
+httpClient bounds connecting and waiting for headers, not the whole request:
+a whole-request limit would cut off a large download on a slow link. A
+missing manifest is an error, so a release without one reads as a failed
+check rather than as being up to date.
+*/
+func httpClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{Timeout: 30 * time.Second}).DialContext
+	transport.ResponseHeaderTimeout = 30 * time.Second
+	return &http.Client{Transport: notFoundIsError{transport}}
+}
+
+type notFoundIsError struct{ base http.RoundTripper }
+
+func (t notFoundIsError) RoundTrip(r *http.Request) (*http.Response, error) {
+	response, err := t.base.RoundTrip(r)
+	if err == nil && response.StatusCode == http.StatusNotFound {
+		_ = response.Body.Close()
+		return nil, fmt.Errorf("%s: not found", r.URL)
+	}
+	return response, err
 }
 
 // UpdateState reports what the interface should show.
@@ -116,9 +160,24 @@ func (s *Service) ready() (*wails.Updater, string) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.wails == nil {
-		return nil, "This build cannot install updates; download a new version from the releases page."
+		return nil, "This build cannot check for updates; download a new version from the releases page."
 	}
 	return s.wails, ""
+}
+
+// installable is the updater, if this copy can replace itself with what it
+// downloads: there is no point downloading what cannot be installed.
+func (s *Service) installable() (*wails.Updater, string) {
+	updater, problem := s.ready()
+	if updater == nil {
+		return nil, problem
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.state.SelfUpdate {
+		return nil, "This copy cannot update itself (" + s.state.NotSelf + "); download the new version from the releases page."
+	}
+	return updater, ""
 }
 
 /*
@@ -168,7 +227,7 @@ Separate from installing, so somebody can have it ready without having agreed
 to replace what they are running.
 */
 func (s *Service) DownloadUpdate(ctx context.Context) State {
-	updater, problem := s.ready()
+	updater, problem := s.installable()
 	if updater == nil {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -201,7 +260,7 @@ The application quits; Wails' helper swaps the files once it has, and starts
 the new version — rolling back to this one if the new one will not start.
 */
 func (s *Service) InstallUpdate(ctx context.Context) error {
-	updater, problem := s.ready()
+	updater, problem := s.installable()
 	if updater == nil {
 		return errors.New(problem)
 	}

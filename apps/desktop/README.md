@@ -506,31 +506,39 @@ git tag v0.2.0 && git push origin v0.2.0
 and `VERSION` disagree — a binary that reports one version and is published as
 another is worse than a release that did not happen.
 
-What it produces, per platform: the binary and a sigstore bundle beside it,
-named the same with `.sigstore.json` appended.
+What it produces, per platform:
 
-**Nothing is signed with a key.** GitHub vouches for the workflow through OIDC,
-sigstore records the certificate in a public transparency log, and the client
-checks that the certificate names `release.yml` run for the tag of the version
-it is offered — so another workflow here cannot sign a release, and an old
-release cannot be offered as a newer one. There is no key to leak, rotate or
-lose, and no maintainer holds one. The client's half of that contract is
-`certIdentityIssuer` and `releaseWorkflow` in `internal/updater/verify.go`:
-renaming this repository or the workflow breaks verification until they change,
-which is the correct outcome.
+- the plain binary;
+- what can update itself: an AppImage on Linux amd64, a zipped `.app` on macOS,
+  the `.exe` on Windows;
+- for distributions, a `.deb` and an `.rpm` (amd64 and arm64);
+- `update-manifest.json`, listing one of those per platform, each signed;
+- a sigstore bundle beside every artifact (`.sigstore.json` appended), for
+  anybody checking a download by hand: it proves `release.yml` built it for
+  that tag, with no key involved.
 
 ### How the client updates
 
-Wails' updater does the work: it finds the newest release through GitHub's
-releases API, downloads it, swaps it for the running application — the
-AppImage or the `.app` where that is what is running — restarts, and rolls
-back if the new version will not start. `internal/updater` puts sigstore in
-front of it: before anything is downloaded the bundle is checked, and the
-digest it vouches for is what Wails holds the download to.
+Wails' updater does the work. It reads `update-manifest.json` from the latest
+release, downloads this platform's artifact, checks it was signed with the key
+whose public half is built into the application
+(`build/tdc.key.pub`), swaps it for the running copy — the AppImage, or the
+`.app` bundle — restarts, and rolls back if the new version will not start.
 
-Sigstore's trusted root is fetched over TUF, checked against the root
-sigstore-go carries, and cached under the user's cache directory, so a key
-rotation at sigstore does not strand every installed copy.
+Only a copy that can be replaced updates itself: an AppImage, a `.app`, or a
+Windows executable, each somewhere it may write (`internal/updater`'s
+`CanSelfUpdate`). Everything else — a `.deb` or `.rpm`, the plain binary, the
+GTK3 build, Linux on arm64, which has no AppImage — is told of the update and
+given the release page. The manifest has one entry per platform because Wails
+takes the first that matches.
+
+### The signing key
+
+`wails3 updater genkey -out tdc.key` made it. The private half is `tdc.key`
+(gitignored), kept as the `TDC_UPDATER_KEY` repository secret and an offline
+backup; the release fails before publishing without it. Losing it strands every
+installed copy, since no update can then be signed for them. To change it, ship
+one release signed with the old key whose `build/tdc.key.pub` is the new one.
 
 ## Platforms
 

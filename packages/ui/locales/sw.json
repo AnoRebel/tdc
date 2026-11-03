@@ -1901,6 +1901,7 @@
       "downloadVersion": "Pakua {version}",
       "downloadIt": "Lipakue",
       "installIt": "Sakinisha na uianzishe upya",
+      "byHand": "Nakala hii haiwezi kujisasisha yenyewe, kwa hivyo pakua toleo jipya na ulisakinishe kwa njia ileile uliyosakinisha hili.",
       "whenToLook": "Wakati wa kuangalia",
       "whenToLookHint": "Kuangalia huiambia seva ya matoleo kwamba TDC imesakinishwa hapa na ni toleo lipi. Hakuna kinachopakuliwa wala kusakinishwa bila wewe kusema.",
       "checkOnLaunch": "Angalia pia muda mfupi baada ya kuanza",
