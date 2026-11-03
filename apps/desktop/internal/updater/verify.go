@@ -3,8 +3,8 @@ Package updater finds newer releases and refuses to install anything it cannot
 prove came from us.
 
 The trust model is one sentence: an artifact is installed only when a sigstore
-bundle proves it was built by this project's release workflow. No bundle, no
-trusted root, no match — nothing is installed, and somebody is told why.
+bundle proves it was built by this project's release workflow, for that
+version's tag. No bundle, no trusted root, no match — nothing is installed, and somebody is told why.
 
 Fail closed is the whole point. An updater that falls back to "well, it
 downloaded" when verification is unavailable is worse than no updater: it is a
@@ -16,11 +16,14 @@ package updater
 import (
 	"errors"
 	"fmt"
-	"io"
+	"os"
+	"path/filepath"
+	"regexp"
 	"sync"
 
 	sigbundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	sigroot "github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
 	sigverify "github.com/sigstore/sigstore-go/pkg/verify"
 )
 
@@ -37,19 +40,28 @@ const (
 	certIdentityIssuer = "https://token.actions.githubusercontent.com"
 
 	/*
-		certIdentitySANRegex matches the signing certificate's subject.
-
-		Anchored at both ends and escaping the dots, so it matches this
-		repository and nothing that merely contains its name — a repository
-		called AnoRebel/tdc-not-really would otherwise pass.
+		releaseWorkflow is the signing certificate's subject, less the
+		version: the release workflow, run for a version's tag. Other
+		workflows in this repository can sign too, and none of them makes
+		releases.
 	*/
-	certIdentitySANRegex = `^https://github\.com/AnoRebel/tdc/`
+	releaseWorkflow = "https://github.com/AnoRebel/tdc/.github/workflows/release.yml@refs/tags/v"
 )
 
+/*
+signerFor is the one subject a release of this version may be signed by,
+matched whole, so AnoRebel/tdc-not-really does not pass. Tied to the version
+so a feed cannot offer an old signed release as a newer one: its signature
+names the old tag.
+*/
+func signerFor(version string) string {
+	return "^" + regexp.QuoteMeta(releaseWorkflow+version) + "$"
+}
+
 var (
-	// ErrNoTrustRoot is returned when nothing can be verified, so nothing is
-	// installed. Not an error in the update — an error in this build.
-	ErrNoTrustRoot = errors.New("updates are disabled: no trust root is configured")
+	// ErrNoTrustRoot is returned when sigstore's trusted root could not be
+	// had, so nothing can be checked and nothing is installed.
+	ErrNoTrustRoot = errors.New("updates cannot be checked: sigstore's trusted root could not be fetched")
 
 	// ErrUnverified is returned when a bundle is missing, malformed, or does
 	// not prove what it claims. Always terminal.
@@ -57,92 +69,81 @@ var (
 )
 
 var (
-	trustMu sync.RWMutex
-	// trustJSON is the pinned sigstore trusted root, as embedded at build time.
-	trustJSON []byte
-	/*
-		trustOverride lets tests point verification at an in-process signing
-		authority instead of the real one.
-
-		Necessary rather than convenient: verifying a real bundle needs a real
-		release, and a test that could only run after a release is a test that
-		never runs before one.
-	*/
-	trustOverride sigroot.TrustedMaterial
+	trustMu sync.Mutex
+	trust   sigroot.TrustedMaterial
 )
 
 /*
-SetTrustedRoot installs the sigstore trusted root for this process.
+trustedMaterial is sigstore's public trusted root, fetched over TUF.
 
-Called once at startup with the embedded bytes. A placeholder — which is what
-ships until a release pipeline exists — leaves updates disabled rather than
-unverified.
+Fetched rather than embedded: sigstore's keys rotate, and a copy built into the
+application would refuse every release signed after the next rotation. TUF
+checks what it fetches against the root sigstore-go carries, so whoever answers
+the request cannot substitute their own. Cached under the user's cache
+directory, and held for the life of the process once had.
 */
-func SetTrustedRoot(trustedRootJSON []byte) {
+func trustedMaterial() (sigroot.TrustedMaterial, error) {
 	trustMu.Lock()
 	defer trustMu.Unlock()
-	trustJSON = trustedRootJSON
-	trustOverride = nil
+	if trust != nil {
+		return trust, nil
+	}
+	options := tuf.DefaultOptions()
+	if cache, err := os.UserCacheDir(); err == nil && cache != "" {
+		options.CachePath = filepath.Join(cache, "tdc", "sigstore")
+	}
+	fetched, err := sigroot.FetchTrustedRootWithOptions(options)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrNoTrustRoot, err)
+	}
+	trust = fetched
+	return trust, nil
 }
 
 // setTrustedMaterial points verification at material a test supplies.
 func setTrustedMaterial(material sigroot.TrustedMaterial) {
 	trustMu.Lock()
 	defer trustMu.Unlock()
-	trustOverride = material
-	trustJSON = nil
+	trust = material
 }
 
 /*
-trustedMaterial returns what to verify against, and whether there is any.
+VerifiedDigest checks a release's bundle and returns the SHA-256 digest of the
+artifact it vouches for.
 
-Unparseable and absent are the same answer: without a trust root there is
-nothing to check a download against, so there is nothing safe to do with one.
+The bundle is checked before anything is downloaded; the digest is what the
+download must then match, which Wails' updater checks as the bytes arrive.
+Beyond fetching the trusted root, offline: the bundle carries the signing
+certificate and the transparency-log inclusion proof.
 */
-func trustedMaterial() (sigroot.TrustedMaterial, bool) {
-	trustMu.RLock()
-	override, pinned := trustOverride, trustJSON
-	trustMu.RUnlock()
-
-	if override != nil {
-		return override, true
-	}
-	if len(pinned) == 0 {
-		return nil, false
-	}
-
-	root, err := sigroot.NewTrustedRootFromJSON(pinned)
+func VerifiedDigest(bundleJSON []byte, version string) ([]byte, error) {
+	trust, err := trustedMaterial()
 	if err != nil {
-		return nil, false
-	}
-	return root, true
-}
-
-// Enabled reports whether this build can verify an update at all.
-func Enabled() bool {
-	_, ok := trustedMaterial()
-	return ok
-}
-
-/*
-Verify checks that an artifact is what its bundle says it is.
-
-Offline: the bundle carries the signing certificate and the transparency-log
-inclusion proof, so this needs no network and cannot be defeated by controlling
-what the machine can reach.
-*/
-func Verify(bundleJSON []byte, artifact io.Reader) error {
-	trust, ok := trustedMaterial()
-	if !ok {
-		return ErrNoTrustRoot
+		return nil, err
 	}
 
 	var bundle sigbundle.Bundle
 	if err := bundle.UnmarshalJSON(bundleJSON); err != nil {
-		return fmt.Errorf("%w: the signature file could not be read: %v", ErrUnverified, err)
+		return nil, fmt.Errorf("%w: the signature file could not be read: %v", ErrUnverified, err)
 	}
+	return digestOf(trust, &bundle, version)
+}
 
-	return verifyEntity(trust, &bundle, artifact)
+// digestOf verifies an entity's signature over the digest it carries.
+func digestOf(trust sigroot.TrustedMaterial, entity sigverify.SignedEntity, version string) ([]byte, error) {
+	content, err := entity.SignatureContent()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnverified, err)
+	}
+	message := content.MessageSignatureContent()
+	if message == nil || (message.DigestAlgorithm() != "SHA2_256" && message.DigestAlgorithm() != "sha256") {
+		return nil, fmt.Errorf("%w: the signature is not over a SHA-256 digest", ErrUnverified)
+	}
+	digest := message.Digest()
+	if err := verifyEntity(trust, entity, sigverify.WithArtifactDigest("sha256", digest), version); err != nil {
+		return nil, err
+	}
+	return digest, nil
 }
 
 /*
@@ -153,9 +154,9 @@ alone leaves a gap: a signature with no log entry cannot be shown to have
 existed before somebody noticed a key was stolen, and a log entry with no
 timestamp cannot be placed in time at all.
 */
-func verifyEntity(trust sigroot.TrustedMaterial, entity sigverify.SignedEntity, artifact io.Reader) error {
+func verifyEntity(trust sigroot.TrustedMaterial, entity sigverify.SignedEntity, artifact sigverify.ArtifactPolicyOption, version string) error {
 	identity, err := sigverify.NewShortCertificateIdentity(
-		certIdentityIssuer, "", "", certIdentitySANRegex)
+		certIdentityIssuer, "", "", signerFor(version))
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrUnverified, err)
 	}
@@ -169,7 +170,7 @@ func verifyEntity(trust sigroot.TrustedMaterial, entity sigverify.SignedEntity, 
 	}
 
 	policy := sigverify.NewPolicy(
-		sigverify.WithArtifact(artifact),
+		artifact,
 		sigverify.WithCertificateIdentity(identity),
 	)
 

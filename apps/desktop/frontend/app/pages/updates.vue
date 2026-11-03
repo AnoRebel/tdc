@@ -3,8 +3,9 @@
  * Whether there is a newer version, and when to look.
  *
  * Nothing on this screen happens on its own. Checking says what exists,
- * downloading prepares it, and installing replaces the application — which is
- * somebody's decision, so it is a button rather than a consequence.
+ * downloading prepares it, and installing replaces the application and
+ * restarts it — which is somebody's decision, so it is a button rather than a
+ * consequence.
  */
 import { Interval } from "#bindings/updater/models";
 import { Button } from "#layers/ui/app/components/ui/button";
@@ -26,17 +27,7 @@ const releasesURL = "https://github.com/AnoRebel/tdc/releases";
 
 const { state, settings, busy, refresh, check, download, install, discard, save } = useUpdates();
 
-const restartNeeded = ref(false);
-
 onMounted(() => void refresh());
-
-async function installAndSay() {
-  await install();
-  // The replacement is on disk; what is running is still the old version in
-  // memory. Saying so is more honest than a progress bar that finishes into
-  // nothing visible.
-  restartNeeded.value = true;
-}
 
 /** Saves one field without disturbing the others. */
 async function change(field: "onLaunch" | "download", value: boolean) {
@@ -140,7 +131,7 @@ const intervals = [
           </Button>
 
           <template v-else>
-            <Button :disabled="busy" @click="installAndSay">
+            <Button :disabled="busy" @click="install">
               {{ $t("desktop.updates.installIt") }}
             </Button>
             <Button variant="ghost" :disabled="busy" @click="discard">
@@ -148,10 +139,6 @@ const intervals = [
             </Button>
           </template>
         </div>
-
-        <p v-if="restartNeeded" class="mt-3 text-xs text-success-text">
-          {{ $t("desktop.updates.installed") }}
-        </p>
       </section>
 
       <section v-if="settings" class="mt-8">

@@ -2,6 +2,7 @@ package updater
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AnoRebel/tdc/apps/desktop/internal/buildinfo"
+	wails "github.com/wailsapp/wails/v3/pkg/updater"
 )
 
 /*
@@ -21,7 +23,7 @@ The three are separate methods for that reason rather than for tidiness.
 
 // State is what the interface shows about updates.
 type State struct {
-	// Enabled is false where this build cannot verify anything, in which case
+	// Enabled is false where this build cannot install updates, in which case
 	// nothing else here will happen.
 	Enabled bool `json:"enabled"`
 	// Current is the version running now.
@@ -42,38 +44,54 @@ type State struct {
 Service holds the updater's state for the life of the application.
 
 One per application: two would check twice and could both be downloading the
-same release.
+same release. Wails' updater does the downloading, matching, swapping and
+restarting; this decides when, and says how it went.
 */
 type Service struct {
-	feedURL    string
-	store      *Store
-	downloader *Downloader
-	client     *http.Client
+	source wails.Provider
+	store  *Store
+	wails  *wails.Updater
 
-	mu        sync.RWMutex
-	state     State
-	release   Release
-	readyPath string
+	mu    sync.RWMutex
+	state State
+}
+
+// NewService builds the updater, finding releases in a GitHub repository's.
+func NewService(repository, settingsPath string) *Service {
+	source, err := releasesOf(repository, &http.Client{Timeout: 5 * time.Minute})
+	service := &Service{
+		source: source,
+		store:  OpenStore(settingsPath),
+		state:  State{Current: buildinfo.Version},
+	}
+	if err != nil {
+		service.state.Problem = err.Error()
+	}
+	return service
 }
 
 /*
-NewService builds the updater.
+Use hands over the application's updater, once the application exists.
 
-The feed URL is passed in rather than fixed here so a fork can point at its own
-releases without editing code — verification still binds to this project's
-signing identity, so pointing it elsewhere yields refusals rather than somebody
-else's application.
+No window of Wails' own: the Updates page is where this is shown, and nothing
+happens that somebody there did not ask for.
 */
-func NewService(feedURL, settingsPath, downloadDir string) *Service {
-	client := &http.Client{Timeout: 5 * time.Minute}
-
-	return &Service{
-		feedURL:    feedURL,
-		store:      OpenStore(settingsPath),
-		downloader: NewDownloader(client, downloadDir),
-		client:     client,
-		state:      State{Enabled: Enabled(), Current: buildinfo.Version},
+func (s *Service) Use(updater *wails.Updater) error {
+	if s.source == nil {
+		return errors.New(s.state.Problem)
 	}
+	if err := updater.Init(wails.Config{
+		CurrentVersion: buildinfo.Version,
+		Providers:      []wails.Provider{s.source},
+		Window:         wails.WindowNone,
+	}); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.wails = updater
+	s.state.Enabled = true
+	s.mu.Unlock()
+	return nil
 }
 
 // UpdateState reports what the interface should show.
@@ -93,132 +111,117 @@ func (s *Service) SetUpdateSettings(settings Settings) error {
 	return s.store.Save(settings)
 }
 
+// ready is the updater, or why there is none to use.
+func (s *Service) ready() (*wails.Updater, string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.wails == nil {
+		return nil, "This build cannot install updates; download a new version from the releases page."
+	}
+	return s.wails, ""
+}
+
 /*
-CheckForUpdate asks the feed what the newest release is.
+CheckForUpdate asks the feed what the newest release is, and whether its
+signature proves it ours.
 
 Returns the state rather than an error for an ordinary failure: a feed that
 could not be reached is something to tell somebody quietly, not an exception
 for the interface to handle.
 */
 func (s *Service) CheckForUpdate(ctx context.Context) State {
+	updater, problem := s.ready()
 	s.mu.Lock()
-	if !s.state.Enabled {
+	if updater == nil {
 		defer s.mu.Unlock()
-		s.state.Problem = "This build cannot verify updates, so it will not install one."
+		s.state.Problem = problem
 		return s.state
 	}
 	s.state.Checking = true
 	s.state.Problem = ""
 	s.mu.Unlock()
 
-	release, newer, err := Check(ctx, s.client, s.feedURL, buildinfo.Version)
+	release, err := updater.Check(ctx)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.state.Checking = false
-
 	if err != nil {
 		s.state.Problem = err.Error()
 		return s.state
 	}
-
 	s.store.MarkChecked(time.Now())
-
-	if !newer {
-		s.state.Available = ""
-		s.state.Notes = ""
+	if release == nil {
+		s.state.Available, s.state.Notes, s.state.Ready = "", "", false
 		return s.state
 	}
-
-	s.release = release
 	s.state.Available = release.Version
 	s.state.Notes = release.Notes
-
 	return s.state
 }
 
 /*
-DownloadUpdate fetches the release found by the last check and verifies it.
+DownloadUpdate fetches the release found by the last check and holds it to
+the digest its signature vouches for.
 
 Separate from installing, so somebody can have it ready without having agreed
 to replace what they are running.
 */
 func (s *Service) DownloadUpdate(ctx context.Context) State {
-	s.mu.RLock()
-	release := s.release
-	s.mu.RUnlock()
-
-	if release.Version == "" {
+	updater, problem := s.ready()
+	if updater == nil {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		s.state.Problem = "There is nothing to download; check for an update first."
+		s.state.Problem = problem
 		return s.state
 	}
 
-	path, err := s.downloader.Fetch(ctx, release)
+	err := updater.DownloadAndInstall(ctx)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	if errors.Is(err, wails.ErrNoPendingRelease) {
+		s.state.Problem = "There is nothing to download; check for an update first."
+		return s.state
+	}
 	if err != nil {
 		s.state.Problem = err.Error()
 		s.state.Ready = false
 		return s.state
 	}
-
-	s.readyPath = path
 	s.state.Ready = true
 	s.state.Problem = ""
-
 	return s.state
 }
 
 /*
-InstallUpdate puts a downloaded update in place.
+InstallUpdate puts the downloaded update in place and restarts into it.
 
-The application has to be restarted afterwards, which the caller does: this
-package should not decide when somebody's application closes.
+The application quits; Wails' helper swaps the files once it has, and starts
+the new version — rolling back to this one if the new one will not start.
 */
-func (s *Service) InstallUpdate() error {
-	s.mu.RLock()
-	path := s.readyPath
-	s.mu.RUnlock()
-
-	if path == "" {
-		return ErrNotVerified
+func (s *Service) InstallUpdate(ctx context.Context) error {
+	updater, problem := s.ready()
+	if updater == nil {
+		return errors.New(problem)
 	}
-
-	if err := s.downloader.Install(path); err != nil {
+	if err := updater.Restart(ctx); err != nil {
 		s.mu.Lock()
 		s.state.Problem = err.Error()
 		s.mu.Unlock()
 		return err
 	}
-
-	s.mu.Lock()
-	s.state.Ready = false
-	s.readyPath = ""
-	s.mu.Unlock()
-
 	return nil
 }
 
 /*
-DiscardUpdate forgets a downloaded update and removes it.
-
-Called when somebody declines. A verified binary left in a temporary directory
-is a thing somebody may later run without knowing what it is.
+DiscardUpdate declines a downloaded update for now. Wails' updater replaces
+what it staged when the next one is downloaded.
 */
 func (s *Service) DiscardUpdate() {
 	s.mu.Lock()
-	path := s.readyPath
-	s.readyPath = ""
+	defer s.mu.Unlock()
 	s.state.Ready = false
-	s.mu.Unlock()
-
-	if path != "" {
-		s.downloader.Discard(path)
-	}
 }
 
 /*
@@ -281,19 +284,12 @@ func (s *Service) checkAndMaybeDownload(ctx context.Context) {
 }
 
 /*
-DefaultPaths returns where settings and downloads belong on this machine.
-
-Under the user's own configuration and cache directories, so nothing is written
-where another account could read or replace it.
+DefaultPath returns where update settings belong on this machine: under the
+user's own configuration directory, where another account cannot change them.
 */
-func DefaultPaths() (settings string, downloads string) {
+func DefaultPath() string {
 	if config, err := os.UserConfigDir(); err == nil && config != "" {
-		settings = filepath.Join(config, "tdc", "updates.json")
+		return filepath.Join(config, "tdc", "updates.json")
 	}
-
-	if cache, err := os.UserCacheDir(); err == nil && cache != "" {
-		downloads = filepath.Join(cache, "tdc", "updates")
-	}
-
-	return settings, downloads
+	return ""
 }

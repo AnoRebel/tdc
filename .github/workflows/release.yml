@@ -199,7 +199,7 @@ jobs:
         with:
           name: tdc-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}
           # The bundle's name is the artifact's with .sigstore.json appended,
-          # which is what the feed below points at.
+          # which is where the desktop client looks for it.
           path: |
             ${{ steps.artifact.outputs.path }}
             ${{ steps.artifact.outputs.path }}.sigstore.json
@@ -387,7 +387,7 @@ jobs:
     needs: [version, desktop, server, image]
     runs-on: ubuntu-latest
     permissions:
-      # Creating the release and writing the feed to it.
+      # Creating the release.
       contents: write
 
     steps:
@@ -402,67 +402,6 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-
-      - name: Write the feed
-        id: feed
-        env:
-          VERSION: ${{ needs.version.outputs.version }}
-        # The document the client asks "is there something newer". It carries no
-        # signature of its own, deliberately: a feed vouching for itself would be
-        # proving something about itself. What makes an update trustworthy is the
-        # bundle beside the artifact, checked after the download.
-        run: |
-          python3 - <<'PY'
-          import json, os, pathlib, datetime
-
-          version = os.environ["VERSION"]
-          base = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/v{version}"
-
-          artifacts = {}
-          for binary in sorted(pathlib.Path("artifacts").iterdir()):
-              if binary.name.endswith(".sigstore.json"):
-                  continue
-              # The feed is what the desktop client reads to find its own
-              # update. The server's tarballs are published in the same release
-              # and are not that, so they are left out rather than offered to a
-              # client that would try to run one.
-              if not binary.name.startswith(f"tdc-{version}-"):
-                  continue
-              bundle = binary.with_name(binary.name + ".sigstore.json")
-              if not bundle.exists():
-                  # An artifact with no proof is one the client would refuse, so
-                  # leaving it out says the same thing earlier and more clearly.
-                  print(f"skipping {binary.name}: no sigstore bundle beside it")
-                  continue
-
-              # tdc-1.2.3-linux-amd64      -> linux/amd64
-              # tdc-1.2.3-linux-amd64-gtk3 -> linux/amd64-gtk3
-              #
-              # A variant keeps its suffix on purpose. The client built against
-              # that toolkit asks for the suffixed key and nothing else, so the
-              # two builds are never offered to each other's machines — see
-              # PlatformKey in internal/updater.
-              stem = binary.name.removesuffix(".exe")
-              _, _, platform = stem.partition(f"-{version}-")
-              goos, _, rest = platform.partition("-")
-
-              artifacts[f"{goos}/{rest}"] = {
-                  "url": f"{base}/{binary.name}",
-                  "bundleUrl": f"{base}/{bundle.name}",
-                  "size": binary.stat().st_size,
-              }
-
-          if not artifacts:
-              raise SystemExit("nothing signed to publish")
-
-          feed = {
-              "version": version,
-              "published": datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
-              "artifacts": artifacts,
-          }
-          pathlib.Path("latest.json").write_text(json.dumps(feed, indent=2) + "\n")
-          print(json.dumps(feed, indent=2))
-          PY
 
       - name: Write the checksums
         # One file covering every artifact, so somebody who downloaded over a
@@ -518,7 +457,7 @@ jobs:
             echo "\`\`\`"
             echo "cosign verify-blob \\"
             echo "  --bundle <artifact>.sigstore.json \\"
-            echo "  --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/' \\"
+            echo "  --certificate-identity 'https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/v${VERSION}' \\"
             echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
             echo "  <artifact>"
             echo "\`\`\`"
@@ -531,8 +470,8 @@ jobs:
         with:
           tag_name: v${{ needs.version.outputs.version }}
           body_path: release-notes.md
-          # Every binary, every bundle, and the feed the client reads.
+          # Every binary and every bundle; the desktop client finds its update
+          # here through GitHub's releases API.
           files: |
             artifacts/*
-            latest.json
           fail_on_unmatched_files: true

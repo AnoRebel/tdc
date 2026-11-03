@@ -54,10 +54,8 @@ export function useUpdates() {
   }
 
   /**
-   * Installs what was downloaded.
-   *
-   * The application has to be restarted afterwards — this replaces the file on
-   * disk, and the version somebody is running is the one already in memory.
+   * Installs what was downloaded and restarts into it. On success the
+   * application quits here, so only a failure comes back, in the state.
    */
   async function install() {
     busy.value = true;

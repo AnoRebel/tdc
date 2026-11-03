@@ -506,33 +506,31 @@ git tag v0.2.0 && git push origin v0.2.0
 and `VERSION` disagree — a binary that reports one version and is published as
 another is worse than a release that did not happen.
 
-What it produces, per platform: the binary, a sigstore bundle beside it, and
-`latest.json` — the feed this client asks whether there is anything newer.
+What it produces, per platform: the binary and a sigstore bundle beside it,
+named the same with `.sigstore.json` appended.
 
 **Nothing is signed with a key.** GitHub vouches for the workflow through OIDC,
 sigstore records the certificate in a public transparency log, and the client
-checks that the certificate names this repository and that issuer. There is no
-key to leak, rotate or lose, and no maintainer holds one. The client's half of
-that contract is `certIdentityIssuer` and `certIdentitySANRegex` in
-`internal/updater/verify.go`, and the two have to agree: renaming this
-repository breaks verification until both change, which is the correct
-outcome — an artifact from somewhere else should not install.
+checks that the certificate names `release.yml` run for the tag of the version
+it is offered — so another workflow here cannot sign a release, and an old
+release cannot be offered as a newer one. There is no key to leak, rotate or
+lose, and no maintainer holds one. The client's half of that contract is
+`certIdentityIssuer` and `releaseWorkflow` in `internal/updater/verify.go`:
+renaming this repository or the workflow breaks verification until they change,
+which is the correct outcome.
 
-The feed carries no signature of its own, deliberately. A document vouching for
-itself proves nothing; what makes an update trustworthy is the bundle beside the
-artifact, checked after the download and before anything is written.
+### How the client updates
 
-`internal/updater/testdata/workflow-feed.json` is the workflow's own output, and
-a test parses it with the same types the client uses. Two languages describe
-that document — Python writes it, Go reads it — and nothing else makes them
-agree. Regenerate it if the workflow's shape changes.
+Wails' updater does the work: it finds the newest release through GitHub's
+releases API, downloads it, swaps it for the running application — the
+AppImage or the `.app` where that is what is running — restarts, and rolls
+back if the new version will not start. `internal/updater` puts sigstore in
+front of it: before anything is downloaded the bundle is checked, and the
+digest it vouches for is what Wails holds the download to.
 
-### The trust root
-
-`build/trust/sigstore-root.json` is still a placeholder, so this build verifies
-nothing and installs nothing — it says so rather than pretending. Replace it
-with sigstore's real trusted root before the first signed release, or every
-update will be refused for a reason that has nothing to do with the artifact.
+Sigstore's trusted root is fetched over TUF, checked against the root
+sigstore-go carries, and cached under the user's cache directory, so a key
+rotation at sigstore does not strand every installed copy.
 
 ## Platforms
 

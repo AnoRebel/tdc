@@ -61,24 +61,10 @@ person's own icon theme for panels that resolve tray icons by name.
 var trayIconTheme embed.FS
 
 /*
-What a release must be signed by for this build to install it.
-
-A placeholder until there is a release pipeline, which leaves updates disabled
-rather than unverified — the application says so, and installs nothing. Replaced
-at release time with the real sigstore trusted root.
+updateRepository is whose GitHub releases this updates from. What makes an
+update trustworthy is its signature, not where it was found.
 */
-//go:embed build/trust/sigstore-root.json
-var sigstoreRoot []byte
-
-/*
-updateFeedURL is where this asks whether there is a newer version.
-
-A plain document rather than an API, so it can be served from anything —
-release hosting, a static file, somebody's own server for a fork. What makes an
-update trustworthy is the signature on the artifact, not where the list came
-from.
-*/
-const updateFeedURL = "https://raw.githubusercontent.com/AnoRebel/tdc/main/releases/latest.json"
+const updateRepository = "AnoRebel/tdc"
 
 /*
 windowSettingsPath is where how-the-window-looks is kept.
@@ -156,16 +142,8 @@ func main() {
 	*/
 	notifier := notify.New(notifications.New())
 
-	/*
-		Updates, which verify or refuse.
-
-		The trusted root is installed before anything can check: an updater
-		that could run before its trust was configured would have a window in
-		which it accepted anything.
-	*/
-	updater.SetTrustedRoot(sigstoreRoot)
-	settingsPath, downloadDir := updater.DefaultPaths()
-	updates := updater.NewService(updateFeedURL, settingsPath, downloadDir)
+	// Updates, which verify or refuse.
+	updates := updater.NewService(updateRepository, updater.DefaultPath())
 
 	// Held by name because the live bridge, registered once the application
 	// exists, needs the same instance the webview's requests go through — the
@@ -471,6 +449,9 @@ func main() {
 		window existed would be doing so on somebody's behalf without showing
 		them anything.
 	*/
+	if err := updates.Use(app.Updater); err != nil {
+		log.Printf("tdc: updates are off: %v", err)
+	}
 	updateContext, stopUpdates := context.WithCancel(context.Background())
 	defer stopUpdates()
 	updates.Start(updateContext)
