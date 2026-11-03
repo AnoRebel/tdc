@@ -65,3 +65,8 @@ apps/desktop/frontend/locales/
 # The update signing key. Its public half is apps/desktop/build/tdc.key.pub;
 # this half lives in the TDC_UPDATER_KEY secret and an offline backup.
 tdc.key
+
+# What the AppImage task copies in and builds, each run.
+apps/desktop/build/linux/appimage/tdc
+apps/desktop/build/linux/appimage/tdc.png
+apps/desktop/build/linux/appimage/build/
