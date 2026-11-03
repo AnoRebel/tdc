@@ -64,7 +64,7 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 
 - [x] 7.1 Degrade video then audio as bandwidth falls, never the call first; the client says what it changed
 - [x] 7.2 Warn before starting or joining on a connection reported as metered
-- [x] 7.3 Desktop: Windows, macOS (usage descriptions) and Linux (WebKitGTK with GStreamer WebRTC, declared in the packages) verified; a desktop that cannot call says why
+- [x] 7.3 Desktop: Windows, macOS (usage descriptions) and Linux (WebKitGTK with GStreamer WebRTC, declared in the packages) verified; a desktop that cannot call says why. Later found (2026-11-03): no common distribution builds WebKitGTK with WebRTC — Arch, Fedora, Debian and the GNOME runtime were each checked for `RTCPeerConnection` — so Linux desktops always take the "says why" path, and the packages no longer depend on the WebRTC plugins
 - [x] 7.4 Keyboard shortcuts and motion preferences honoured by the call interface
 - [x] 7.5 A call's start and end shown as lines in the conversation's timeline
 - [ ] **MILESTONE 7** — Demonstrate a call that steps down to audio on a throttled connection and recovers, and a call between the web client and the desktop client. Tag `v1.55.0-dev`.

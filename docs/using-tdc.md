@@ -1959,18 +1959,12 @@ would only need to do after upgrading the operating system.
 
 macOS and Windows have one build each; there is nothing to choose.
 
-**Calls on Linux** go through GStreamer, which WebKitGTK uses for sound and
-video: its WebRTC plugin (in `gst-plugins-bad`) and libnice's plugin must be
-installed. The `.deb`, `.rpm` and Arch packages bring them in themselves. With
-another kind of download, or where they are missing, the conversation header
-shows a crossed-out phone instead of the call buttons, and pressing it says
-what to install — `gstreamer1.0-plugins-bad` and `gstreamer1.0-nice` on Debian
-and Ubuntu, `gstreamer1-plugins-bad-free` and `libnice-gstreamer1` on Fedora.
-A WebKitGTK built without WebRTC at all is said the same way, and no plugin
-fixes that: Arch's `webkitgtk-6.0` and `webkit2gtk-4.1` (2.54) are built
-without it, so on Arch calls are for TDC in a browser. Elsewhere the desktop
-application switches WebRTC on in the WebKitGTK it is given, reloading its page
-once at start to do it. On macOS the
+**Calls on Linux** are not possible from the desktop application yet. WebKitGTK,
+which draws its window, can place calls only when it is built with WebRTC, and
+no common distribution builds it that way: Arch, Fedora and Debian's packages
+and the GNOME runtime all leave it out, and no plugin adds it. The conversation
+header shows a crossed-out phone instead of the call buttons, and pressing it
+says why; calls work in TDC in a browser on the same machine. On macOS the
 first call asks for the camera and microphone in the system's own dialog; on
 Windows, calls need nothing extra.
 
