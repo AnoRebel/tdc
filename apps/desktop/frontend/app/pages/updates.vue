@@ -25,7 +25,14 @@ useHead({ title: $ts("desktop.settings.updates") });
  */
 const releasesURL = "https://github.com/AnoRebel/tdc/releases";
 
-const { state, settings, busy, refresh, check, download, install, discard, save } = useUpdates();
+const { state, settings, busy, step, progress, refresh, check, download, install, discard, save } =
+  useUpdates();
+
+/** Megabytes, to one place: an AppImage is a hundred and more of them. */
+const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(1);
+const percent = computed(() =>
+  progress.value?.total ? Math.round((progress.value.written / progress.value.total) * 100) : null,
+);
 
 onMounted(() => void refresh());
 
@@ -116,11 +123,54 @@ const intervals = [
 
         <!-- The server's own words about what went wrong. It knows and this
              does not, and the reason is usually actionable. -->
+        <!-- What the download is doing, as it does it: an AppImage is large,
+             and a button greyed out for half a minute says nothing. -->
+        <div v-if="step" class="mt-3" role="status" aria-live="polite">
+          <template v-if="step === 'downloading'">
+            <div
+              class="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              :aria-valuenow="percent ?? undefined"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="$ts('desktop.updates.downloadingLabel')"
+            >
+              <div
+                class="h-full rounded-full bg-primary transition-[width] duration-300"
+                :class="percent === null && 'w-1/3 animate-pulse'"
+                :style="percent === null ? undefined : { width: `${percent}%` }"
+              />
+            </div>
+            <p class="mt-1.5 text-xs text-muted-foreground tabular">
+              <template v-if="progress && progress.total">
+                {{
+                  $t("desktop.updates.downloadedOf", {
+                    done: megabytes(progress.written),
+                    total: megabytes(progress.total),
+                    rate: megabytes(progress.rate),
+                  })
+                }}
+              </template>
+              <template v-else>{{ $t("desktop.updates.downloadStarting") }}</template>
+            </p>
+          </template>
+          <p v-else class="flex items-center gap-2 text-xs text-muted-foreground">
+            <span
+              class="size-3 animate-spin rounded-full border-2 border-current border-t-transparent"
+            />
+            {{
+              step === "verifying"
+                ? $t("desktop.updates.verifying")
+                : $t("desktop.updates.installing")
+            }}
+          </p>
+        </div>
+
         <p v-if="state.problem" role="alert" class="mt-2 text-xs text-destructive">
           {{ state.problem }}
         </p>
 
-        <div v-if="state.available" class="mt-3 flex flex-wrap gap-2">
+        <div v-if="state.available && !step" class="mt-3 flex flex-wrap gap-2">
           <!-- Where this build cannot install, the only thing offered is the
                page somebody downloads from. -->
           <a

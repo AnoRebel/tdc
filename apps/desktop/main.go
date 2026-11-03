@@ -150,7 +150,16 @@ func main() {
 	notifier := notify.New(notifications.New())
 
 	// Updates, which verify or refuse.
-	updates := updater.NewService(updateManifest, updateKey, updater.DefaultPath())
+	/*
+		TDC_UPDATE_MANIFEST points the updater at another manifest, for
+		trying an update against a local one. What it offers must still be
+		signed with updateKey, so this cannot install anything else.
+	*/
+	manifest := updateManifest
+	if override := os.Getenv("TDC_UPDATE_MANIFEST"); override != "" {
+		manifest = override
+	}
+	updates := updater.NewService(manifest, updateKey, updater.DefaultPath())
 
 	// Held by name because the live bridge, registered once the application
 	// exists, needs the same instance the webview's requests go through — the

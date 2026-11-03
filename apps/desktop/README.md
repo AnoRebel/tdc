@@ -532,6 +532,15 @@ GTK3 build, Linux on arm64, which has no AppImage — is told of the update and
 given the release page. The manifest has one entry per platform because Wails
 takes the first that matches.
 
+**Trying an update locally.** Build an AppImage, change the version in
+`internal/buildinfo/version.go` and build another, sign a manifest for the
+second with `wails3 updater manifest -key tdc.key -url-prefix
+http://localhost:8491/`, serve that directory, and run the first AppImage with
+`TDC_UPDATE_MANIFEST=http://localhost:8491/update-manifest.json`. Help → Check
+for updates then finds, downloads, verifies, installs and restarts into it. The
+override only changes where the manifest is read from: what it offers must
+still be signed with `tdc.key`.
+
 ### The signing key
 
 `wails3 updater genkey -out tdc.key` made it. The private half is `tdc.key`

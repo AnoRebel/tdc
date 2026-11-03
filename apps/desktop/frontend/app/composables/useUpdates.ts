@@ -1,3 +1,5 @@
+import { Events } from "@wailsio/runtime";
+
 import * as Updater from "#bindings/updater";
 import type { Settings, State } from "#bindings/updater/models";
 
@@ -22,6 +24,43 @@ export function useUpdates() {
   const state = useState<UpdateState | null>("update-state", () => null);
   const settings = useState<UpdateSettings | null>("update-settings", () => null);
   const busy = useState("update-busy", () => false);
+
+  /*
+   * What the download is doing, from Wails' updater's own events: how much
+   * has arrived, then checking the signature, then putting it in place.
+   * Null when nothing is under way.
+   */
+  const step = useState<"downloading" | "verifying" | "installing" | null>(
+    "update-step",
+    () => null,
+  );
+  const progress = useState<{ written: number; total: number; rate: number } | null>(
+    "update-progress",
+    () => null,
+  );
+  const payload = (event: { data?: unknown }) =>
+    (Array.isArray(event.data) ? event.data[0] : event.data) as
+      { written?: number; total?: number; rate?: number } | undefined;
+  const offs = [
+    Events.On("wails:updater:download-started", () => {
+      step.value = "downloading";
+      progress.value = null;
+    }),
+    Events.On("wails:updater:download-progress", (event: { data?: unknown }) => {
+      const data = payload(event);
+      step.value = "downloading";
+      progress.value = {
+        written: data?.written ?? 0,
+        total: data?.total ?? 0,
+        rate: data?.rate ?? 0,
+      };
+    }),
+    Events.On("wails:updater:verifying", () => (step.value = "verifying")),
+    Events.On("wails:updater:installing", () => (step.value = "installing")),
+    Events.On("wails:updater:update-ready", () => (step.value = null)),
+    Events.On("wails:updater:error", () => (step.value = null)),
+  ];
+  onScopeDispose(() => offs.forEach((off) => off()));
 
   async function refresh() {
     const [current, chosen] = await Promise.all([
@@ -50,6 +89,8 @@ export function useUpdates() {
       state.value = await Updater.Service.DownloadUpdate();
     } finally {
       busy.value = false;
+      step.value = null;
+      progress.value = null;
     }
   }
 
@@ -59,11 +100,13 @@ export function useUpdates() {
    */
   async function install() {
     busy.value = true;
+    step.value = "installing";
     try {
       await Updater.Service.InstallUpdate();
       await refresh();
     } finally {
       busy.value = false;
+      step.value = null;
     }
   }
 
@@ -78,5 +121,17 @@ export function useUpdates() {
     await refresh();
   }
 
-  return { state, settings, busy, refresh, check, download, install, discard, save };
+  return {
+    state,
+    settings,
+    busy,
+    step,
+    progress,
+    refresh,
+    check,
+    download,
+    install,
+    discard,
+    save,
+  };
 }
