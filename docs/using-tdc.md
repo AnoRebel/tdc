@@ -1219,11 +1219,15 @@ way whether it rang them or not, so TDC tells you only that they were rung _if
 they accept calls from other servers_. If they join, they appear in the call
 like anybody else. If your own server cannot ring that address — it is not
 connected to theirs, or the address is one of this server's own, whom you ring
-from the list — the field says so.
+from the list — the field says so. Rung from another server, you see the same
+incoming window as for anybody else, inviting you to join their call, with
+**Join** and **Video**.
 
 **From a profile.** The phone and camera buttons on somebody's directory
 profile, and beside people in a channel's member list, open your direct
-conversation with them — or the one you already have — and ring them.
+conversation with them — or the one you already have — and ring them. If
+their settings do not let you ring them, the call starts and nothing rings
+them; you are not told why.
 
 **Being rung.** An incoming call appears as a small window at the edge of the
 screen, never over what you are doing; drag it anywhere, or move it from the
@@ -1245,7 +1249,9 @@ stay.
 
 **Who may call you** is in **Settings → Privacy**: anybody on this server,
 only people you share a conversation with, or nobody — you can still join calls
-yourself. A separate switch decides whether people on connected servers may
+yourself. Sharing a conversation means a channel: a direct conversation
+somebody opened with you does not count, or writing to you first would be a way
+round the setting. A separate switch decides whether people on connected servers may
 ring you, where your server allows that at all. Whoever is refused is not told
 why.
 
@@ -1368,7 +1374,8 @@ can make a link to a conversation's call from the link button in the call
 window: with a label, a lobby where people wait until somebody in the call lets
 them in, a passcode, an expiry and a limit on how many people it lets in. The
 link is shown once — copy it then. Whoever opens it sees the conversation's
-name and who is in the call, signs in if they have not, and joins the call —
+name and who is in the call, signs in if they have not, gives the passcode if
+the link has one, waits to be let in if it has a lobby, and joins the call —
 only the call: the conversation, its messages and members stay closed to them.
 Links already made are listed below the form, with a button to withdraw each. A
 link to a call that has not started waits for it. People waiting in a lobby are
@@ -1434,8 +1441,9 @@ picture to everybody else, so what matters is your own connection:
 Each extra person adds to what _you_ send, not only to what you receive. On a
 phone, or on a connection that charges for data, prefer voice. Past four
 people (or your server's mesh limit), a call either moves to the server's
-forwarding unit — everybody then sends once, to the server, and the picture
-freezes for a second while the call moves — or, where the server does not
+forwarding unit — everybody then sends once, to the server, the picture
+freezes for a second while the call moves, and from then on the call window
+says the call goes through the server — or, where the server does not
 forward calls, is full, and the next person is told so. However it is carried,
 a call holds at most the server's limit, 25 unless your operator chose
 otherwise.
@@ -1547,6 +1555,10 @@ the desktop application, in your email summary if you chose one, and at the
 corner of the page if you have TDC open. You are also told when an event you
 are going to changes its time or place, or is cancelled.
 
+Everything about one event — the invitation, a place freeing up, its
+reminders — is one entry in your notifications, saying the newest and how many
+there are: "Starting soon: Intro to Go workshop — 3 new".
+
 **Remind me before it starts**, on the event's page, turns an event's reminders
 off for you, and back on. (It mutes the event's own conversation, which is what
 reminders belong to.)
@@ -1560,7 +1572,11 @@ everything in [Calls](#calls) applies. Somebody who is not going cannot start
 or join it, and only hosts can start it.
 
 To bring in people who have no account here, a host who may make call links
-(`call.link`) makes one from the call window once the call has started.
+(`call.link`) makes one from the call window once the call has started — **Links
+to this call**, then, where the operator allows guests, **Let people without an
+account join**. Whoever opens it gives a name and joins as a guest of that call
+only — waiting in the lobby until somebody in the call lets them in, unless the
+link was made without one (see [Calls](#calls)).
 
 ### Putting events in your own calendar
 
@@ -1610,8 +1626,9 @@ import, where they belong and who can see them.
 **Followed calendars** (for people holding `event.calendars.manage`) keeps a
 calendar published elsewhere — a community's Google Calendar, a conference's
 feed — appearing here: paste its ICS or `webcal://` address, and the server
-fetches it on a schedule, adding, changing and cancelling events as it does.
-Those events change only where they come from.
+fetches it on a schedule, adding, changing and cancelling events as it does;
+**Refresh now** fetches it at once. Those events change only where they come
+from, and their page says **From a followed calendar**.
 
 ## Projects
 

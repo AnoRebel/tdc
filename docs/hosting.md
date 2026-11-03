@@ -1255,8 +1255,10 @@ scheduling to some people, server-wide or in one channel. `event.manage.any`
 (changing, cancelling and deleting anybody's events, and seeing everybody
 going) and `event.calendars.manage` (following external calendars) are held by
 nobody until you give them; both can be granted server-wide or in one channel.
-Hosts who should be able to bring in guests without accounts through a call
-link need `call.link` as well.
+An event hosted in a call here has its call only while calls are on (see
+Calls): with the `calls` feature off, its page offers no call. Hosts who should
+be able to bring in guests without accounts through a call link need
+`call.link` as well, and guests come in only while `calls.guests` is on.
 
 **What it stores.** Every event has a room behind it, of kind `event` — its own
 conversation, holding what happens to the event and its call. Like a project's
@@ -1395,6 +1397,11 @@ curl -X PUT https://tdc.example/api/admin/settings/calls.turn_urls \
 ```
 
 It also answers STUN, so `calls.stun_urls` can be `stun:tdc.example:3478`.
+coturn is not required: any TURN server that takes coturn's shared-secret
+credentials (`use-auth-secret`, the "TURN REST" scheme) works in its place with
+the same secret — for example one built on
+[pion/turn](https://github.com/pion/turn) (MIT licence), whose
+`LongTermTURNRESTAuthHandler` is that scheme.
 
 - **Ports to open:** `3478` UDP and TCP, and `49160–49200` UDP for relayed media.
   The container uses the host's network, so these are the host's ports. Each
@@ -1655,6 +1662,29 @@ saying which. The server advertises `calls.recording` while it is on.
   notices within about fifteen seconds — writes `call.recording_stopped` and
   `call.recording.stopped` the same way. Somebody joining a recorded call is
   told before their media is sent.
+
+To let somebody record, turn recording on and give them `call.record` through a
+role — here one of its own (add `"channel": "<room id>"` to the grant to allow
+it in one channel only):
+
+```sh
+curl -X PUT https://tdc.example/api/admin/settings/calls.recording \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value": "true"}'
+ROLE=$(curl -s -X POST https://tdc.example/api/admin/roles \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name": "Recorders", "description": "May record calls"}' | jq -r .id)
+curl -X PUT "https://tdc.example/api/admin/roles/$ROLE/permissions" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"permission": "call.record", "granted": true}'
+curl -X POST "https://tdc.example/api/admin/roles/$ROLE/members" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"user\": \"$USER_ID\"}"
+```
+
+Afterwards the audit log (**Audit log** in the search box's commands, or
+`/audit`) lists each `call.recording.started` and `call.recording.stopped` with
+who and when, and the conversation keeps a line for each.
 
 **Remote control** of a shared screen happens entirely between two people's
 clients: the request, the grant and the pointer and keyboard input travel on

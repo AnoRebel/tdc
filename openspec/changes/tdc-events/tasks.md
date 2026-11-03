@@ -13,7 +13,8 @@ Scope note: these tasks implement `calendar/events` against the running platform
 - [x] 1.5 Time zones and repeats: the RRULE subset validated, expanded in the event's zone with exceptions, `last_ends_at` kept; verify a weekly series keeps its local time across a daylight-saving change, and in EAT against a UTC database
 - [x] 1.6 `GET /api/events` over a range, occurrences expanded; routes in the API catalogue and the OpenAPI bodies regenerated
 - [x] 1.7 Clients: Events page (agenda, month, week; upcoming and past; channel filter), event page, create and edit dialog (TanStack Form, Valibot), a channel's next events in its header, the sidebar entry; both locales; payload budget not raised
-- [ ] **MILESTONE 1** — Demonstrate: a member schedules a weekly meetup in a channel in Dar es Salaam time, somebody in London sees it at their own time with the organiser's beside it, and somebody outside the channel cannot find it.
+- [x] **MILESTONE 1** — Demonstrate: a member schedules a weekly meetup in a channel in Dar es Salaam time, somebody in London sees it at their own time with the organiser's beside it, and somebody outside the channel cannot find it.
+  Demonstrated by `scripts/demo-milestone-events-1.sh`.
 
 ## 2. Phase 2 — Invitations, answers and reminders
 
@@ -23,14 +24,16 @@ Scope note: these tasks implement `calendar/events` against the running platform
 - [x] 2.4 Reminders: the pass, its claim, `event.reminder` in the log, notification, push, live frame; desktop banner; digests; verify one reminder per occurrence and lead across two passes, none for a past occurrence, none for a muted event
 - [x] 2.5 Change, cancellation and promotion notifications
 - [x] 2.6 Webhooks: the four types in the catalogue; forwarded to the event's channel's subscriptions; never for invite-only events
-- [ ] **MILESTONE 2** — Demonstrate: a host invites a channel to a twenty-place workshop; the twenty-first person is waitlisted and moves up when somebody declines; everybody going is reminded a day before on web and desktop.
+- [x] **MILESTONE 2** — Demonstrate: a host invites a channel to a twenty-place workshop; the twenty-first person is waitlisted and moves up when somebody declines; everybody going is reminded a day before on web and desktop.
+  Demonstrated by `scripts/demo-milestone-events-2.sh`.
 
 ## 3. Phase 3 — Hosting
 
 - [x] 3.1 The event's call: started by a host from the event page, joined by attendees from it; verify an attendee cannot start it, and joins once a host has
 - [x] 3.2 Guest links from the event page for hosts holding `call.link`, through the existing call links
 - [x] 3.3 Cover images, uploaded to the event's conversation, shown to anybody who can see the event, never reclaimed as an orphan
-- [ ] **MILESTONE 3** — Demonstrate: a host starts a talk's call from its page; two attendees join from theirs; a guest joins through a link.
+- [x] **MILESTONE 3** — Demonstrate: a host starts a talk's call from its page; two attendees join from theirs; a guest joins through a link.
+  Demonstrated by `scripts/demo-milestone-events-3.sh`.
 
 ## 4. Phase 4 — Calendars out
 
@@ -38,13 +41,15 @@ Scope note: these tasks implement `calendar/events` against the running platform
 - [x] 4.2 Personal feed address: make, show once, revoke, audited; fetch decided for its owner on every request; verify a revoked address refuses and a left channel's events leave the feed
 - [x] 4.3 Public feed behind `events.public_feed`
 - [x] 4.4 Verify an exported file parses in a second implementation (Python `icalendar`) with the same instants, repeats and zones
-- [ ] **MILESTONE 4** — Demonstrate: a person adds their feed to a calendar application and sees their meetups there at the right local time.
+- [x] **MILESTONE 4** — Demonstrate: a person adds their feed to a calendar application and sees their meetups there at the right local time.
+  Demonstrated by `scripts/demo-milestone-events-4.sh`.
 
 ## 5. Phase 5 — Calendars in
 
 - [x] 5.1 `.ics` import with a preview: create, update or skip by UID, zones resolved (IANA, Windows names, fixed `VTIMEZONE`), all-day events, repeats in the subset, warnings for the rest
 - [x] 5.2 Subscriptions to external calendars: made with `event.calendars.manage`, fetched through the private-address guard with size, time and redirect limits, refreshed on a schedule claimed by one node, upserted by UID, vanished events cancelled, paused after repeated failure; verify a subscription to a private address is refused at creation and at fetch, including after a redirect
-- [ ] **MILESTONE 5** — Demonstrate: an exported Google Calendar file imports with its weekly event at the right times, and a subscribed community calendar's new event appears after a refresh.
+- [x] **MILESTONE 5** — Demonstrate: an exported Google Calendar file imports with its weekly event at the right times, and a subscribed community calendar's new event appears after a refresh.
+  Demonstrated by `scripts/demo-milestone-events-5.sh`.
 
 ## 6. Phase 6 — Ready
 

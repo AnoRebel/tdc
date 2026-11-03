@@ -13,7 +13,8 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [x] 1.3 Signalling frames on the live connection (`call.signal`, `call.state`), each authorised per frame for sender and recipient, crossing nodes through the broker's private path; verify a frame addressed to a non-participant, or from somebody no longer allowed, is refused and not relayed
 - [x] 1.4 `GET /api/calls/ice` with short-lived TURN credentials in coturn's shared-secret scheme; coturn as an optional compose service; verify credentials expire and are per person
 - [x] 1.5 Shared `useCall` and `CallPanel`: start, join with or without video, mute, camera, leave; nothing captured before permission; participants' state shown; departure updates everybody; verify two browsers on one machine complete a call, one audio-only
-- [ ] **MILESTONE 1** — Demonstrate: an operator enables calling, two members of a channel hold a video call, one mutes and the other sees it, one leaves and the call ends in the conversation's history; with a TURN relay, a call between two networks that cannot reach each other connects. Tag `v1.49.0-dev`.
+- [x] **MILESTONE 1** — Demonstrate: an operator enables calling, two members of a channel hold a video call, one mutes and the other sees it, one leaves and the call ends in the conversation's history; with a TURN relay, a call between two networks that cannot reach each other connects. Tag `v1.49.0-dev`.
+  Demonstrated by `scripts/demo-milestone-calls-1.sh` (both parts; the relay is pion/turn with coturn's shared-secret scheme, between two network namespaces that cannot reach each other).
 
 ## 2. Phase 2 — Ringing, and who may call whom
 
@@ -25,7 +26,8 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [x] 2.6 Declining, or ending a call to take another, with a message: quick replies or the person's own words, posted in the conversation and shown to the caller at once
 - [x] 2.7 Holding and switching: answering or placing a call while in another puts the first on hold — nothing sent to it, its people told you are holding — and the person switches between their calls freely; verify media goes only to the active call
 - [x] 2.8 Merging into a conference: the people of a held call are invited into the active one as call participants, joining only if they accept, and seeing nothing of the active call's conversation if they are not in it; verify a merged participant cannot read the conversation
-- [ ] **MILESTONE 2** — Demonstrate: somebody rings a colleague from their profile; it rings on two of the colleague's devices without covering what they were doing; answering on one stops the other; somebody whose privacy says "people I share a conversation with" cannot be rung by a stranger. Tag `v1.50.0-dev`.
+- [x] **MILESTONE 2** — Demonstrate: somebody rings a colleague from their profile; it rings on two of the colleague's devices without covering what they were doing; answering on one stops the other; somebody whose privacy says "people I share a conversation with" cannot be rung by a stranger. Tag `v1.50.0-dev`.
+      Demonstrated by `scripts/demo-milestone-calls-2.sh`.
 
 ## 3. Phase 3 — Call links, public or protected
 
@@ -33,7 +35,8 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [x] 3.2 The link page and joining by link as a call participant who is not a room member; verify every room route still refuses them and they see nothing of the conversation but its name and who is in the call
 - [x] 3.3 Protected links: constant-time passcode check with failures limited per link and per address and recorded; a lobby that people in the call admit from; verify a wrong passcode past the limit is refused even with the right one
 - [x] 3.4 Guests (`calls.guests`, off by default): a pass valid for one call only, a chosen name and a guest label, expiring with their leaving or the call's end; verify a guest pass opens nothing but that call's routes and connection
-- [ ] **MILESTONE 3** — Demonstrate: a protected link with a lobby admits a signed-in person from elsewhere on the server and, with guests allowed, a guest without an account, neither of whom can see the conversation. Tag `v1.51.0-dev`.
+- [x] **MILESTONE 3** — Demonstrate: a protected link with a lobby admits a signed-in person from elsewhere on the server and, with guests allowed, a guest without an account, neither of whom can see the conversation. Tag `v1.51.0-dev`.
+      Demonstrated by `scripts/demo-milestone-calls-3.sh`.
 
 ## 4. Phase 4 — Calls across servers
 
@@ -41,7 +44,8 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [x] 4.2 Federated call signalling: rings, call state and negotiation between servers as signed federated requests (the protocol's RFC 9421 signing), each server authorising its own people — the receiving server applies its policy and its person's privacy; each side gets relay credentials from its own server; verify a server not trusted, or with calls not federated, refuses and nothing reaches the person
 - [x] 4.3 Calls in rooms shared with other servers, with the home server holding the call as it holds the room
 - [x] 4.4 Protocol documentation for the call family; verify an independent implementation could ring and call a TDC user from the document
-- [ ] **MILESTONE 4** — Demonstrate: a person on one server rings a person on another, who answers by video; with either server's federated calling off, or the person's setting refusing other servers, the ring never arrives. Tag `v1.52.0-dev`.
+- [x] **MILESTONE 4** — Demonstrate: a person on one server rings a person on another, who answers by video; with either server's federated calling off, or the person's setting refusing other servers, the ring never arrives. Tag `v1.52.0-dev`.
+      Demonstrated by `scripts/demo-milestone-calls-4.sh`.
 
 ## 5. Phase 5 — Screens, presentations and recording
 
@@ -52,13 +56,15 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [x] 5.5 Device-side recording (stage and mixed audio, MediaRecorder); on stop the file is saved to the conversation as an attachment through the ordinary path (limits, scanning, retention), or offered as a download when larger than the server accepts; `call.recording_stopped` recorded, including when the recorder leaves or drops
 - [x] 5.6 Reactions in a call: raise and lower a hand (kept in order, shown to everybody, lowered by the person or a moderator), and passing reactions — clap, laugh, heart, thumbs up, surprise — floated over the sender's tile and counted for whoever presents; respect the motion preference; rate-limited per person; verify a reaction reaches only the call's participants
 - [x] 5.7 Remote control of a shared screen: the person sharing their whole screen from the desktop application may hand control to one participant at a time, who sends pointer and keyboard input on a data channel; control is asked for, granted explicitly, shown on the sharer's screen, revocable at once (and by a key the controller cannot send), ends with the share, and is refused where the sharer is in a browser (which cannot move the pointer) or on a platform where input cannot be injected — saying which; verify no input is applied without a grant in force
-- [ ] **MILESTONE 5** — Demonstrate: one person presents a browser tab, another records with everybody told, the recording appears in the conversation, and the conversation and audit log show who recorded and when. Tag `v1.53.0-dev`.
+- [x] **MILESTONE 5** — Demonstrate: one person presents a browser tab, another records with everybody told, the recording appears in the conversation, and the conversation and audit log show who recorded and when. Tag `v1.53.0-dev`.
+  Demonstrated by `scripts/demo-milestone-calls-5.sh`.
 
 ## 6. Phase 6 — Group calls
 
 - [x] 6.1 Mesh calls up to `calls.mesh_limit`; the participant limit refused with its reason
 - [x] 6.2 The built-in forwarding unit (Pion), off unless enabled, one peer connection per participant, simulcast layers per receiver; a call moves to it when it passes the mesh limit; verify a six-person call works with the unit on and is refused past the mesh limit with it off
-- [ ] **MILESTONE 6** — Demonstrate a six-person call through the forwarding unit and a four-person mesh call without it. Tag `v1.54.0-dev`.
+- [x] **MILESTONE 6** — Demonstrate a six-person call through the forwarding unit and a four-person mesh call without it. Tag `v1.54.0-dev`.
+  Demonstrated by `scripts/demo-milestone-calls-6.sh`.
 
 ## 7. Phase 7 — Constrained networks and every client
 
@@ -68,6 +74,8 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [x] 7.4 Keyboard shortcuts and motion preferences honoured by the call interface
 - [x] 7.5 A call's start and end shown as lines in the conversation's timeline
 - [ ] **MILESTONE 7** — Demonstrate a call that steps down to audio on a throttled connection and recovers, and a call between the web client and the desktop client. Tag `v1.55.0-dev`.
+  - Throttled connection: demonstrated by `scripts/demo-milestone-calls-7.sh` (a network namespace, loopback UDP limited with tc to 100 kbit/s, then freed).
+  - Web and desktop: still to do, on Windows or macOS. No Linux WebKitGTK has WebRTC (task 7.3), so a Linux desktop cannot take part.
 
 ## 8. Phase 8 — Ready to run
 
@@ -76,3 +84,4 @@ Scope note: these tasks implement `calls/voice-video` against the running platfo
 - [x] 8.4 What hosting costs: a worked guide to the resources and money an event takes — voice only and with video, for audiences of 10, 50, 200 and 1,000, on one server and spread over several connected servers — with bandwidth, CPU and memory per person through the relay and the forwarding unit, and example prices from common hosts
 - [x] 8.3 Browser checks for two-person calls (fake media devices) in Chromium and Firefox, WebKit in CI
 - [ ] **MILESTONE 8** — A stranger following the hosting guide enables calling with a relay and holds a call. Tag `v1.56.0-dev`.
+  - Needs a person who has not seen the project, by definition. `scripts/demo-milestone-calls-1.sh` shows the guide's relay settings working between two networks that cannot reach each other, which is the mechanical half.
