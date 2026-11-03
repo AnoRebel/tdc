@@ -309,8 +309,22 @@ bun run --cwd apps/web demo:milestone-8  # installing, offline, notifications
 scripts/demo-milestone-10a.sh            # a program asking a channel a question
 ```
 
+The later ones are named for their area, `scripts/demo-milestone-<area>-<n>.sh`
+— `events-1` to `events-5`, `calls-1` to `calls-7`, `projects-*`,
+`federation-*`, `directory-*`, `integrations-*`, `project-federation-*`. Each
+builds the server from the checkout and serves its own copy of the web client
+(`NUXT_PUBLIC_API_BASE="" bun run generate` in `apps/web` first, or
+`SKIP_WEB_BUILD=1` to reuse a build), and runs a Playwright spec from
+`apps/web/milestones/`.
+
 Each brings up what it needs and tears it down afterwards. They want the
 database container running (`docker compose up -d database`) and nothing else.
+
+Some calls demonstrations need a network shaped a particular way, and build it
+without root: `calls-1` (two networks that can reach a relay but not each
+other) and `calls-6` and `calls-7` (a connection throttled with `tc`) run in
+network namespaces made with `unshare`, reaching the database through a socket
+bridged in with `socat`.
 
 **Where a demonstration cannot show something, it says so rather than
 skipping it.** Milestone 8 cannot show a push arriving with the browser
