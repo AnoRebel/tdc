@@ -36,6 +36,7 @@ if [[ "${1:-}" == "--inside" ]]; then
   ip link set calls0 up
   ip route add default dev calls0
   socat TCP-LISTEN:55433,bind=127.0.0.1,fork,reuseaddr "UNIX-CONNECT:$WORK/pg.sock" &
+  bridge=$!
   sleep 0.5
 
   TDC_DATABASE_URL="${DATABASE_SERVER}/${DATABASE}?sslmode=disable" \
@@ -45,7 +46,8 @@ if [[ "${1:-}" == "--inside" ]]; then
   TDC_SERVER_WEB_ROOT="$ROOT/apps/web/.output/public" \
     "$WORK/tdc-server" >"$WORK/server.log" 2>&1 &
   server=$!
-  trap 'kill $server 2>/dev/null || true' EXIT
+  # The bridge too: left running, it keeps the namespace alive after the demo.
+  trap 'kill $server $bridge 2>/dev/null || true' EXIT
   for _ in $(seq 1 120); do
     curl -sf "http://localhost:${PORT}/api/health" >/dev/null 2>&1 && break
     sleep 1
