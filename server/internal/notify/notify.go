@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 	"uuid"
@@ -624,6 +624,13 @@ func (s *Service) Grouped(ctx context.Context, userID uuid.UUID) ([]Notification
 		return nil, fmt.Errorf("notify: reading grouped notifications: %w", err)
 	}
 
+	// Newest first across conversations. The query orders by room so that
+	// DISTINCT ON can pick each room's newest, which is not the order to show;
+	// the rows are sorted themselves, before anything is built from them.
+	slices.SortStableFunc(rows, func(a, b dbgen.ListUnreadNotificationsGroupedRow) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
+	})
+
 	notifications := make([]Notification, 0, len(rows))
 	for _, row := range rows {
 		notification := Notification{
@@ -643,12 +650,6 @@ func (s *Service) Grouped(ctx context.Context, userID uuid.UUID) ([]Notification
 		}
 		notifications = append(notifications, notification)
 	}
-
-	// Newest first across conversations. The query orders by room so that
-	// DISTINCT ON can pick each room's newest, which is not the order to show.
-	sort.Slice(notifications, func(a, b int) bool {
-		return rows[a].CreatedAt.After(rows[b].CreatedAt)
-	})
 
 	return notifications, nil
 }

@@ -629,6 +629,45 @@ func TestSeparateConversationsStaySeparate(t *testing.T) {
 }
 
 /*
+TestGroupsAreNewestFirst keeps the list in the order it is read.
+
+The query picks each conversation's newest by ordering on the room, so the
+entries are sorted again by time afterwards. That sort once compared rows by
+their original positions while moving the entries, so a conversation with
+something new could sit below one that had been quiet for hours — an event's
+reminder below yesterday's mention.
+*/
+func TestGroupsAreNewestFirst(t *testing.T) {
+	handler := newTestAPI(t)
+
+	owner := completeSetup(t, handler)
+	other := registerAndSignIn(t, handler, "amina")
+
+	rooms := map[string]string{}
+	for _, slug := range []string{"alpha", "bravo", "charlie", "delta"} {
+		rooms[slug] = makeRoom(t, handler, owner, slug, "public")
+		joinRoom(t, handler, other, rooms[slug])
+	}
+	// Spoken to in an order unlike the one the rooms were made in.
+	order := []string{"charlie", "alpha", "delta", "bravo"}
+	for _, slug := range order {
+		sendMessage(t, handler, owner, rooms[slug], "Habari @amina from "+slug)
+	}
+
+	hits := groupedFor(t, handler, other)
+	if len(hits) != len(order) {
+		t.Fatalf("%d entries, expected %d", len(hits), len(order))
+	}
+	for i, hit := range hits {
+		want := order[len(order)-1-i]
+		if hit.RoomID != rooms[want] {
+			t.Errorf("entry %d is not %s, the conversation spoken to %s", i, want,
+				[]string{"last", "second last", "second", "first"}[i])
+		}
+	}
+}
+
+/*
 TestDismissingAGroupDismissesWhatItStoodFor is what makes the grouping usable.
 
 The entry summarises several notifications. Clearing it has to clear all of
