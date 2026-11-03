@@ -30,7 +30,28 @@ export default defineConfig({
     {
       name: "desktop",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /project-federation\.spec\.ts/,
+      testIgnore: /project-federation\.spec\.ts|calls-throttled\.spec\.ts/,
+    },
+    /*
+     * A call on a connection that is throttled and then freed. Run by
+     * scripts/demo-milestone-calls-7.sh inside a network namespace of its own,
+     * where the spec may throttle loopback with tc. Addresses are offered as
+     * they are: nothing in the namespace answers the multicast that would
+     * resolve the names Chromium otherwise hides them behind.
+     */
+    {
+      name: "calls-throttled",
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: [
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+            "--disable-features=WebRtcHideLocalIpsWithMdns",
+          ],
+        },
+      },
+      testMatch: /calls-throttled\.spec\.ts/,
     },
     /*
      * A project shared between two servers, in each engine a release is gated
