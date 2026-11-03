@@ -86,6 +86,11 @@ function attach(element: unknown, stream: MediaStream | null | undefined) {
       </span>
     </li>
   </ul>
+  <!-- Carried by the forwarding unit: the server handles everybody's media
+       from here on, as it never does in a mesh call, so everybody is told. -->
+  <p v-if="c.call.value?.mode === 'sfu'" role="status" class="mt-2 text-xs text-muted-foreground">
+    {{ $t("calls.forwarded") }}
+  </p>
 </template>
 
 <style scoped>

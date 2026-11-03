@@ -1073,8 +1073,17 @@ export const useCall = createGlobalState(() => {
   async function onAdmitted(use: CallLinkUse) {
     const waiting = waitingIn.value;
     if (!waiting || waiting.callId !== use.callId) return;
-    waitingIn.value = null;
-    await join(use.roomId, waiting.video, { asGuestOf: use.callId });
+    /*
+     * Still waiting until the join is done: whoever watches for the wait to
+     * end (the link page) learns the call's room from roomId, which the join
+     * sets. Cleared first, it ended while roomId was still empty, and the page
+     * went on offering to join the call the person was already in.
+     */
+    try {
+      await join(use.roomId, waiting.video, { asGuestOf: use.callId });
+    } finally {
+      waitingIn.value = null;
+    }
   }
 
   function onTurnedAway(use: CallLinkUse) {

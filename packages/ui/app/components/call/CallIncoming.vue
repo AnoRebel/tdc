@@ -9,7 +9,7 @@ import {
   Pause,
   PhoneOff,
   Send,
-  Video,
+  Video as VideoIcon,
   Volume2,
   VolumeX,
 } from "lucide-vue-next";
@@ -222,10 +222,18 @@ function where(ring: CallRing) {
           </Button>
           <!-- Being merged: the call shared with whoever merges is left for
                the conference, so there is nothing to hold or end. -->
-          <Button v-if="ring.conference" size="small" class="flex-1" @click="c.answer(ring, false)">
-            <Mic class="size-3.5" aria-hidden="true" />
-            {{ $t("calls.joinConference") }}
-          </Button>
+          <!-- Joined by voice or with the camera, as any call is answered:
+               this is also how somebody on another server rings. -->
+          <template v-if="ring.conference">
+            <Button variant="outline" size="small" class="flex-1" @click="c.answer(ring, false)">
+              <Mic class="size-3.5" aria-hidden="true" />
+              {{ $t("calls.joinConference") }}
+            </Button>
+            <Button size="small" class="flex-1" @click="c.answer(ring, true)">
+              <VideoIcon class="size-3.5" aria-hidden="true" />
+              {{ $t("calls.answerVideo") }}
+            </Button>
+          </template>
           <div v-else-if="busy" class="flex basis-full gap-1.5">
             <Button variant="outline" size="small" class="flex-1" @click="c.answer(ring, false)">
               <Pause class="size-3.5" aria-hidden="true" />
@@ -246,7 +254,7 @@ function where(ring: CallRing) {
               {{ $t("calls.answer") }}
             </Button>
             <Button size="small" class="flex-1" @click="c.answer(ring, true)">
-              <Video class="size-3.5" aria-hidden="true" />
+              <VideoIcon class="size-3.5" aria-hidden="true" />
               {{ $t("calls.answerVideo") }}
             </Button>
           </template>

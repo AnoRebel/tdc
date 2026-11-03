@@ -105,6 +105,17 @@ export function describeNotification(
    * shown once for five notifications, does not.
    */
   const count = notification.count ?? 1;
+  /*
+   * Except an event's. Its invitation, reminders and changes share the
+   * event's conversation, and most come from the server rather than a person,
+   * so "localhost and 1 other" would name nobody and not the event either.
+   * The newest says what matters now — it is starting, it moved — and the
+   * count says there is more.
+   */
+  if (count > 1 && notification.reason.startsWith("event_")) {
+    const newest = describeNotification({ ...notification, count: 1 }, say);
+    return say("notification.reasons.eventGrouped", { newest, count });
+  }
   if (count > 1) {
     const others = (notification.actors ?? 1) - 1;
     const people =
