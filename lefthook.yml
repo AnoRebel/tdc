@@ -24,7 +24,7 @@ pre-commit:
       run: cd server && go vet ./...
 
     - name: version consistency
-      glob: "{VERSION,**/package.json,**/config.yml,**/version.go}"
+      glob: "{VERSION,**/package.json,**/config.yml,**/version.go,**/Info*.plist,**/info.json,**/*.manifest,**/wails_tools.nsh,**/msix/*.xml,**/nfpm.yaml}"
       run: bun run version:check
 
 pre-push:
