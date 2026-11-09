@@ -287,9 +287,14 @@ watchEffect(() => {
 });
 const { notice } = useNotice();
 
-// The pictures people chose, read once for every face this layout draws.
+// The pictures people chose, read once for every face this layout draws, and
+// again on coming back to the window after a while, so a picture somebody else
+// changed in the meantime shows without a reload.
 const avatars = useAvatars();
 onMounted(() => void avatars.load());
+watch(focused, (now) => {
+  if (now) void avatars.refreshIfStale();
+});
 
 /*
  * Whether the sidebar is put away on a wide screen.

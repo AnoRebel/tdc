@@ -13,10 +13,12 @@ vi.stubGlobal("useState", (key: string, init: () => unknown) => {
   if (!state.has(key)) state.set(key, { value: init() });
   return state.get(key)!;
 });
+let fetches = 0;
 vi.stubGlobal("useApi", () => ({
-  get: async () => ({
-    avatars: [{ address: "amina@tdc.or.tz", url: "/api/avatars/u1/abc" }],
-  }),
+  get: async () => {
+    fetches++;
+    return { avatars: [{ address: "amina@tdc.or.tz", url: "/api/avatars/u1/abc" }] };
+  },
 }));
 
 const { useAvatars } = await import("./useAvatars");
@@ -41,5 +43,18 @@ describe("pictures", () => {
     avatars.setOwn("juma@tdc.or.tz", "");
     expect(avatars.pathOf("juma@tdc.or.tz")).toBe("");
     expect(avatars.pathOf("juma")).toBe("");
+  });
+
+  it("reads the list again on coming back, only once it is old", async () => {
+    vi.useFakeTimers();
+    const avatars = useAvatars();
+    await avatars.load();
+    const before = fetches;
+    await avatars.refreshIfStale();
+    expect(fetches).toBe(before);
+    vi.advanceTimersByTime(5 * 60_000 + 1);
+    await avatars.refreshIfStale();
+    expect(fetches).toBe(before + 1);
+    vi.useRealTimers();
   });
 });

@@ -1671,7 +1671,8 @@ calls. Without one, your initials are shown, on a colour of their own.
 
 **Choose a picture** opens a PNG, JPEG, WebP or GIF of up to 20 MB, and frames
 it before anything is sent: drag it to move it, zoom with the slider or the
-mouse wheel, turn it left or right, flip it, centre it, or start again. The
+mouse wheel, turn it left or right, flip it left to right as you see it, centre
+it, or start again. The
 arrow keys move it and `+` and `−` zoom. What is inside the frame is kept, as a
 square of 512 pixels. Only that square leaves your device — never the original
 file, and not what a phone photograph carries besides the picture, such as
@@ -1681,6 +1682,10 @@ where it was taken. The server checks it again and refuses anything over 2 MB.
 
 **Remove** goes back to your initials. People on other servers see your
 initials for now.
+
+Pictures also show beside a conversation with one other person in the sidebar;
+a conversation with several shows their initials. Somebody else's new picture
+reaches you when you come back to the window after five minutes or more away.
 
 ### Appearance
 

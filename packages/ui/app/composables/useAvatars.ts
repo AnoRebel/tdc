@@ -8,9 +8,13 @@
  * Anybody not in the list is drawn with their initials.
  *
  * People on other servers are not in it; their initials are shown.
+ *
+ * Somebody else's new picture is not announced live; the list is read again
+ * when the window comes back into view after a while (see refreshIfStale).
  */
 export function useAvatars() {
   const paths = useState<Record<string, string>>("avatars", () => ({}));
+  const loadedAt = useState("avatars-loaded-at", () => 0);
   const api = useApi();
 
   /** Reads the list again. Signed out, or unreachable, it is left as it was. */
@@ -23,6 +27,7 @@ export function useAvatars() {
        * By address, and by username too: everybody listed is on this server,
        * so a username names them as surely, and some lists carry only that.
        */
+      loadedAt.value = Date.now();
       paths.value = Object.fromEntries(
         avatars.flatMap((each) => [
           [each.address, each.url],
@@ -52,5 +57,10 @@ export function useAvatars() {
     paths.value = next;
   }
 
-  return { load, pathOf, setOwn };
+  /** Reads the list again if it is older than this, in milliseconds. */
+  async function refreshIfStale(maxAge = 5 * 60_000) {
+    if (Date.now() - loadedAt.value > maxAge) await load();
+  }
+
+  return { load, refreshIfStale, pathOf, setOwn };
 }
