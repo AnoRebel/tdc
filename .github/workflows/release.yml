@@ -398,7 +398,9 @@ jobs:
           context: .
           file: server/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          # Built either way, pushed only for a release: a manual run is a
+          # rehearsal, and must not publish an image under the version.
+          push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.tags.outputs.tags }}
           build-args: |
             VERSION=${{ needs.version.outputs.version }}
@@ -410,6 +412,7 @@ jobs:
           sbom: true
 
       - name: Sign the image
+        if: github.event_name == 'push'
         # By digest rather than tag: a tag can be moved afterwards, and a
         # signature that followed it would attest to whatever it was moved to.
         env:
@@ -542,12 +545,25 @@ jobs:
           cat release-notes.md
 
       - name: Publish
+        # Only for a tag. A manual run is a rehearsal: everything is built,
+        # signed and checked, and kept below instead of published.
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ needs.version.outputs.version }}
           body_path: release-notes.md
-          # Every binary and every bundle; the desktop client finds its update
-          # here through GitHub's releases API.
+          # Every artifact, its signature, and update-manifest.json, which the
+          # desktop client reads from the latest release.
           files: |
             artifacts/*
           fail_on_unmatched_files: true
+
+      - name: Keep what a release would have published
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-rehearsal-${{ needs.version.outputs.version }}
+          path: |
+            artifacts/*
+            release-notes.md
+          if-no-files-found: error
