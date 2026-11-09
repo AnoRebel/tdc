@@ -423,6 +423,7 @@ container listens on port 3000 and is configured at runtime:
 | `STUDIO_GITHUB_CLIENT_ID`, `STUDIO_GITHUB_CLIENT_SECRET` | A GitHub OAuth app for this deployment. Leave both unset and Studio is off.                                                                        |
 | `NUXT_STUDIO_AUTH_SESSION_SECRET`                        | At least 32 random characters (`openssl rand -hex 32`). Required when Studio is on; the server refuses to start without it.                        |
 | `STUDIO_GITHUB_MODERATORS`                               | Optional: the GitHub email addresses allowed to sign in, comma-separated.                                                                          |
+| `NUXT_UMAMI_SITE_ID`, `NUXT_RYBBIT_SITE_ID`              | Optional: this deployment's site ids on umami.anorebel.net and rybbit.anorebel.net. Each analytics script is added only when its id is set.        |
 
 Each GitHub OAuth app's callback URL is the deployment's address followed by
 `/__nuxt_studio/auth/github`. Studio asks for the `repo` scope, because the

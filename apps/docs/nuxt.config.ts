@@ -87,6 +87,13 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    /*
+     * Analytics site ids, read from NUXT_UMAMI_SITE_ID and NUXT_RYBBIT_SITE_ID
+     * when the server starts. Empty, as in development and on anybody else's
+     * copy, means no script is added at all.
+     */
+    umamiSiteId: "",
+    rybbitSiteId: "",
     public: {
       docs: {
         version,
