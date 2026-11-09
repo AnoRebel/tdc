@@ -170,6 +170,17 @@ function turn(by: 1 | -1) {
   quarterTurns.value = (quarterTurns.value + by + 4) % 4;
 }
 
+/*
+ * Mirrored left to right as it is on screen. The picture is drawn turned and
+ * then mirrored on its own axis, so once it has been turned that axis is not
+ * the screen's; reversing the turn as well gives the mirror image of exactly
+ * what is shown.
+ */
+function flip() {
+  flipped.value = !flipped.value;
+  quarterTurns.value = (4 - quarterTurns.value) % 4;
+}
+
 function centre() {
   offset.x = 0;
   offset.y = 0;
@@ -304,7 +315,7 @@ const zoomId = useId();
             size="icon"
             :label="$ts('avatar.flip')"
             :aria-pressed="flipped"
-            @click="flipped = !flipped"
+            @click="flip"
           >
             <FlipHorizontal2 class="size-4" />
           </Button>
