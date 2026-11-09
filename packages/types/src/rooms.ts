@@ -19,6 +19,11 @@ export interface Room {
    */
   member: boolean;
   /**
+   * The other person's address, in a direct conversation between two, so
+   * their picture can be shown beside it. Absent for anything else.
+   */
+  counterpart?: string;
+  /**
    * The server that owns this room, when it is not this one.
    *
    * Absent for an ordinary room. Present for a replica of a room hosted

@@ -118,6 +118,49 @@ func (q *Queries) CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, e
 	return i, err
 }
 
+const directCounterparts = `-- name: DirectCounterparts :many
+SELECT others.room_id, others.username, others.address
+FROM (
+    SELECT room_members.room_id, users.username, ''::TEXT AS address
+    FROM room_members
+    JOIN users ON users.id = room_members.user_id
+    WHERE room_members.user_id <> $1
+    UNION ALL
+    SELECT remote_members.room_id, ''::TEXT AS username, remote_members.address
+    FROM remote_members
+) AS others
+JOIN rooms ON rooms.id = others.room_id AND rooms.kind = 'direct'
+JOIN room_members AS mine ON mine.room_id = others.room_id AND mine.user_id = $1
+`
+
+type DirectCounterpartsRow struct {
+	RoomID   uuid.UUID
+	Username string
+	Address  string
+}
+
+// For each direct conversation somebody is in, everybody else in it: a
+// username here (address empty), or the address of somebody elsewhere.
+func (q *Queries) DirectCounterparts(ctx context.Context, userID uuid.UUID) ([]DirectCounterpartsRow, error) {
+	rows, err := q.db.Query(ctx, directCounterparts, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DirectCounterpartsRow{}
+	for rows.Next() {
+		var i DirectCounterpartsRow
+		if err := rows.Scan(&i.RoomID, &i.Username, &i.Address); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRoomByID = `-- name: GetRoomByID :one
 SELECT id, slug, slug_folded, name, topic, kind, visibility, home_server, created_by, created_at, updated_at, archived_at, archived_by, message_ttl_seconds, participant_key, federated FROM rooms WHERE id = $1
 `

@@ -406,6 +406,9 @@ type Querier interface {
 	// A server that accepted a project is a peer of its room and of every issue's
 	// discussion, the new ones included.
 	DeliverToOfferedReplicas(ctx context.Context) error
+	// For each direct conversation somebody is in, everybody else in it: a
+	// username here (address empty), or the address of somebody elsewhere.
+	DirectCounterparts(ctx context.Context, userID uuid.UUID) ([]DirectCounterpartsRow, error)
 	// Only an active one, so the owner is told once rather than at every failure
 	// that follows.
 	DisableWebhookSubscription(ctx context.Context, arg DisableWebhookSubscriptionParams) (WebhookSubscription, error)

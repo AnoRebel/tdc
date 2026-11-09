@@ -126,6 +126,7 @@ onBeforeUnmount(cancelPress);
       <Avatar
         v-else-if="room.kind === 'direct'"
         :name="name"
+        :address="room.counterpart"
         size="sm"
         class="size-5 shrink-0 text-[0.5rem]"
       />

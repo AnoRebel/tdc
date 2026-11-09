@@ -24,6 +24,22 @@ WHERE (room_members.user_id IS NOT NULL
   AND rooms.kind NOT IN ('project', 'issue-discussion', 'event')
 ORDER BY rooms.name;
 
+-- name: DirectCounterparts :many
+-- For each direct conversation somebody is in, everybody else in it: a
+-- username here (address empty), or the address of somebody elsewhere.
+SELECT others.room_id, others.username, others.address
+FROM (
+    SELECT room_members.room_id, users.username, ''::TEXT AS address
+    FROM room_members
+    JOIN users ON users.id = room_members.user_id
+    WHERE room_members.user_id <> sqlc.arg(user_id)
+    UNION ALL
+    SELECT remote_members.room_id, ''::TEXT AS username, remote_members.address
+    FROM remote_members
+) AS others
+JOIN rooms ON rooms.id = others.room_id AND rooms.kind = 'direct'
+JOIN room_members AS mine ON mine.room_id = others.room_id AND mine.user_id = sqlc.arg(user_id);
+
 -- name: ListRoomsUserIsIn :many
 SELECT rooms.*
 FROM rooms

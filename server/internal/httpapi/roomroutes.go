@@ -35,6 +35,9 @@ type roomResponse struct {
 	// Member says whether the requester is in this room, so a client can
 	// distinguish a room it can read from one it must join first.
 	Member bool `json:"member"`
+	// Counterpart is the other person's address, in a direct conversation
+	// between two people, so a client can show their picture beside it.
+	Counterpart string `json:"counterpart,omitempty"`
 
 	/*
 		HomeServer is the server that owns this room, when that is not this
@@ -240,9 +243,27 @@ func (s *Server) handleListRooms(c *echo.Context) error {
 		member[room.ID] = true
 	}
 
+	// The other person in each conversation between two, by room.
+	others, err := s.queries.DirectCounterparts(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	counterparts := make(map[uuid.UUID][]string, len(others))
+	for _, other := range others {
+		address := other.Address
+		if address == "" {
+			address = s.rooms.UserAddress(other.Username)
+		}
+		counterparts[other.RoomID] = append(counterparts[other.RoomID], address)
+	}
+
 	response := make([]roomResponse, 0, len(discoverable))
 	for _, room := range discoverable {
-		response = append(response, s.roomResponse(room, member[room.ID]))
+		entry := s.roomResponse(room, member[room.ID])
+		if people := counterparts[room.ID]; len(people) == 1 {
+			entry.Counterpart = people[0]
+		}
+		response = append(response, entry)
 	}
 
 	return c.JSON(http.StatusOK, response)
