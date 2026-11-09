@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { whenBriefly } from "#layers/ui/app/lib/dates";
-import { nameOf } from "#layers/ui/app/lib/names";
+import { nameAt, nameOf } from "#layers/ui/app/lib/names";
 import { useForm } from "@tanstack/vue-form";
 import * as v from "valibot";
 
@@ -600,12 +600,13 @@ async function setPolicy(cyclePolicy: CyclePolicy | undefined) {
                 :key="request.address"
                 class="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-accent"
               >
-                <UiAvatar :name="request.address" size="sm" />
+                <UiAvatar :name="nameAt(request.address)" :address="request.address" size="sm" />
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm">{{ request.address }}</span>
-                  <span class="block text-xs text-muted-foreground">{{
-                    $t("projects.join.askedWhen", { when: whenBriefly(request.requestedAt) })
-                  }}</span>
+                  <span class="block truncate text-sm">{{ nameAt(request.address) }}</span>
+                  <span class="block truncate text-xs text-muted-foreground">
+                    {{ request.address }} ·
+                    {{ $t("projects.join.askedWhen", { when: whenBriefly(request.requestedAt) }) }}
+                  </span>
                 </span>
                 <Button
                   size="small"

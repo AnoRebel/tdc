@@ -294,7 +294,7 @@ async function confirmDelete() {
                 <h2 class="mb-1 text-xs font-semibold text-muted-foreground">
                   {{ $t("projects.filedBy") }}
                 </h2>
-                <p class="text-xs">{{ issue.author }}</p>
+                <p class="text-xs">{{ issue.author ? nameAt(issue.author) : "" }}</p>
                 <p class="text-xs text-muted-foreground">{{ fully(issue.createdAt) }}</p>
               </div>
               <ProjectsIssueFields :issue="issue" @changed="changed" />
