@@ -130,7 +130,7 @@ export default defineNuxtConfig({
       // Studio commits to <rootDir>/content/<file>; app/plugins/studio-paths
       // turns that into docs/<file>.
       rootDir: "apps/docs",
-      private: true,
+      private: false,
     },
     editor: {
       // The guides are read by the application as plain GitHub-flavoured

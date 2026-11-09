@@ -426,10 +426,9 @@ container listens on port 3000 and is configured at runtime:
 | `NUXT_UMAMI_SITE_ID`, `NUXT_RYBBIT_SITE_ID`              | Optional: this deployment's site ids on umami.anorebel.net and rybbit.anorebel.net. Each analytics script is added only when its id is set.        |
 
 Each GitHub OAuth app's callback URL is the deployment's address followed by
-`/__nuxt_studio/auth/github`. Studio asks for the `repo` scope, because the
-repository is private: that lets the signed-in editor's token read and write
-every repository they can, for as long as the session lasts, which is worth
-knowing before signing in.
+`/__nuxt_studio/auth/github`. Studio asks for the `public_repo` scope: the
+signed-in editor's token can read and write every public repository they can,
+for as long as the session lasts, which is worth knowing before signing in.
 
 **Search engines and link previews.** Only the stable site is indexed. A build
 with `DOCS_VERSION` other than `main` serves a robots.txt of `Disallow: /`,
