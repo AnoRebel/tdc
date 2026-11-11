@@ -224,7 +224,7 @@ function previewStyle(attachment: Attachment) {
           @expand="open(attachment)"
         />
 
-        <VideoPlayer
+        <VideoClip
           v-else-if="attachment.kind === 'video'"
           :src="mediaUrl(attachment.url)"
           :title="attachment.filename"

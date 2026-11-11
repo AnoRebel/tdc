@@ -142,16 +142,12 @@ onBeforeUnmount(() => {
           @click.stop
         />
 
-        <!-- As with audio: a cross-origin media element sends no cookies
-             unless asked, and the session is a cookie. -->
-        <video
+        <VideoClip
           v-else-if="kind === 'video'"
           :src="mediaUrl(current!.url)"
-          crossorigin="use-credentials"
-          controls
+          :title="current!.filename"
           autoplay
-          playsinline
-          class="max-h-full max-w-full rounded-lg"
+          fill
           @click.stop
         />
 

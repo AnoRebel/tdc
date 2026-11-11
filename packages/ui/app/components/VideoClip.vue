@@ -35,6 +35,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{ expand: [] }>();
 
+const media = useTemplateRef<HTMLVideoElement>("media");
+
+/** The viewer plays its own copy; two soundtracks at once is nobody's intent. */
+function expand() {
+  media.value?.pause();
+  emit("expand");
+}
+
 /**
  * The space the video will occupy, so the conversation does not jump when it
  * loads. Falls back to widescreen, which is what most recordings are.
@@ -47,7 +55,7 @@ const shape = computed(() =>
 </script>
 
 <template>
-  <div class="group/video relative" :class="props.fill ? 'h-full w-full' : 'w-full max-w-md'">
+  <div class="group/video relative" :class="props.fill ? 'h-full w-full' : 'w-md max-w-full'">
     <media-i18n :lang="$getLocale()">
       <video-player>
         <video-neutral-skin class="tdc-video" :style="shape">
@@ -56,6 +64,7 @@ const shape = computed(() =>
                session is a cookie. Without it, video silently never loads in
                development. -->
           <video
+            ref="media"
             :src="props.src"
             :aria-label="props.title"
             crossorigin="use-credentials"
@@ -73,7 +82,7 @@ const shape = computed(() =>
       class="absolute top-2 right-2 z-10 grid size-7 place-items-center rounded-md bg-black/50 text-white opacity-0 transition-opacity group-hover/video:opacity-100 focus-visible:opacity-100"
       :aria-label="$ts('attachment.openInViewer')"
       :title="$ts('attachment.openInViewer')"
-      @click="emit('expand')"
+      @click="expand"
     >
       <Maximize2 class="size-3.5" />
     </button>

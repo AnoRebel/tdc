@@ -39,6 +39,17 @@ export default defineNuxtConfig({
   modules: ["nuxt-i18n-micro", "@nuxt/icon", "@vueuse/nuxt"],
 
   /*
+   * Video.js's elements, which Vue would otherwise try to resolve as
+   * components. Named one by one rather than by prefix, so a misspelled
+   * component of ours still fails loudly.
+   */
+  vue: {
+    compilerOptions: {
+      isCustomElement: (tag) => ["media-i18n", "video-player", "video-neutral-skin"].includes(tag),
+    },
+  },
+
+  /*
    * The theme, which lives here because the components here depend on it.
    *
    * It used to sit in the web application, and the layer's components carried
