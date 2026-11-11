@@ -212,7 +212,7 @@ function unrelate(kind: RelationKind, other: RelatedIssue) {
           :key="label.id"
           type="button"
           class="rounded-full transition-opacity"
-          :class="hasLabel(label.id) ? 'opacity-100' : 'opacity-55 hover:opacity-90'"
+          :class="hasLabel(label.id) ? 'opacity-100' : 'opacity-65 hover:opacity-90'"
           :aria-pressed="hasLabel(label.id)"
           @click="toggleLabel(label.id)"
         >

@@ -354,28 +354,17 @@ onMounted(load);
               <Spinner v-if="busy" size="sm" />
               {{ busy ? $t("auth.turningOff") : $t("auth.turnOff") }}
             </Button>
-            <Button
-              variant="ghost"
-              class="h-9"
-              :label="$ts('auth.keepTwoStep')"
-              @click="disabling = false"
-            >
-              {{ $t("auth.keepItOn") }}
+            <Button variant="ghost" class="h-9" @click="disabling = false">
+              {{ $t("auth.keepTwoStep") }}
             </Button>
           </div>
         </form>
       </template>
 
       <!-- Off, and offered. -->
-      <Button
-        v-else
-        class="h-9"
-        :disabled="busy"
-        :label="$ts('auth.setUpTwoStep')"
-        @click="startSetup"
-      >
+      <Button v-else class="h-9" :disabled="busy" @click="startSetup">
         <Spinner v-if="busy" size="sm" />
-        {{ $t("auth.setItUp") }}
+        {{ $t("auth.setUpTwoStep") }}
       </Button>
     </template>
   </section>

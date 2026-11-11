@@ -447,9 +447,6 @@ function isCurrent(roomId: string): boolean {
         aria-haspopup="menu"
         data-user-menu
         :title="statusLine ?? undefined"
-        :aria-label="
-          statusLine ? $ts('status.menuWithStatus', { status: statusLine }) : $ts('status.menu')
-        "
         @click="openUserMenu"
       >
         <span class="relative shrink-0">
@@ -479,6 +476,10 @@ function isCurrent(roomId: string): boolean {
             <span class="truncate">{{ statusLine ?? user?.address }}</span>
           </span>
         </span>
+        <!-- Named by what it shows, then what it does: a label that left out
+             the visible name would not match what somebody using voice
+             control reads off the screen. -->
+        <span class="sr-only">{{ $ts("status.menu") }}</span>
       </button>
 
       <LazyContextMenu
