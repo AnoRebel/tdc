@@ -220,7 +220,8 @@ test.describe("the appearance toggle", () => {
         // Nothing stored is the state we wanted anyway.
       }
     });
-    await page.goto("/");
+    // No navigation here: each test makes its own, and a second one arriving
+    // while the first is still starting up is the interruption above.
   });
 
   test("changes the palette from the sidebar", async ({ page }) => {
