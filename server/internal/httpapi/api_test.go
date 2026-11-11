@@ -242,7 +242,14 @@ func newTestAPIConfigured(
 	if err := db.Migrate(ctx, url, logger); err != nil {
 		t.Fatalf("Migrate: %v", err)
 	}
-	pool, err := db.Open(ctx, db.Config{URL: url}, logger)
+	// Sized as a deployed server's is. Left to the driver, the pool is one
+	// connection per CPU, at least four: on a four-core runner the four webhook
+	// delivery workers can hold every connection and leave posting to queue
+	// behind them, a cost no server configured as shipped would have.
+	pool, err := db.Open(ctx, db.Config{
+		URL:            url,
+		MaxConnections: config.Default().Database.MaxConnections,
+	}, logger)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
