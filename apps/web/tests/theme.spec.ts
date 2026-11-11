@@ -35,22 +35,23 @@ async function palette(page: Page): Promise<Record<string, string>> {
 
 test.describe("themes", () => {
   /*
-   * Waits for the application to finish applying what the server told it.
+   * Opens a page and waits for the application to finish applying what the
+   * server told it.
    *
-   * The stored appearance arrives asynchronously and is applied when it does,
-   * so a test that set the palette itself and looked immediately would be
-   * measuring whichever won the race. Waiting for the request to land makes
-   * the order deterministic.
+   * The stored appearance arrives after the page mounts and is applied when it
+   * does, classes, palette and all. It is shared by every engine, since every
+   * engine signs in as the founder, so a palette another engine's checks chose
+   * can land on top of what a check here has just set. Listening starts before
+   * the navigation so an early reply is not missed, and one frame passes after
+   * it so what it carries has been applied.
    */
-  async function settled(page: Page) {
-    await page
-      .waitForResponse((response) => response.url().includes("/preferences/appearance"), {
-        timeout: 10_000,
-      })
-      .catch(() => {
-        // Signed out, or already fetched on an earlier navigation. Either way
-        // there is nothing still in flight to overwrite what the test sets.
-      });
+  async function open(page: Page, url: string) {
+    const stored = page.waitForResponse((response) =>
+      response.url().includes("/preferences/appearance"),
+    );
+    await page.goto(url);
+    await stored;
+    await page.evaluate(() => new Promise(requestAnimationFrame));
   }
 
   /* Sets the appearance and the palette together, since a token is only
@@ -80,8 +81,7 @@ test.describe("themes", () => {
    */
   for (const appearance of ["light", "dark"] as const) {
     test(`a second palette changes every colour in ${appearance}`, async ({ page }) => {
-      await page.goto("/settings");
-      await settled(page);
+      await open(page, "/settings");
 
       await wear(page, null, appearance);
       const before = await palette(page);
@@ -137,18 +137,7 @@ test.describe("themes", () => {
   /* Light and dark are a property of the palette, not a third palette: each
      one has to define both, or switching appearance inside it does nothing. */
   test("each palette defines both light and dark", async ({ page }) => {
-    /*
-     * The stored appearance arrives after the page mounts and is applied when
-     * it does, classes and all. Changed before then, the root is changed back
-     * underneath the check — dark read twice, in the engines slow enough to
-     * let the reply land between the two readings.
-     */
-    const stored = page.waitForResponse((response) =>
-      response.url().includes("/api/me/preferences/appearance"),
-    );
-    await page.goto("/settings");
-    await stored;
-    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await open(page, "/settings");
 
     for (const theme of [null, "congrator"]) {
       await page.evaluate((name) => {
@@ -182,7 +171,7 @@ test.describe("themes", () => {
    * to do nothing.
    */
   test("a chosen accent reaches what it should colour", async ({ page }) => {
-    await page.goto("/settings?tab=appearance");
+    await open(page, "/settings?tab=appearance");
 
     const chosen = "oklch(0.55 0.2 150)";
     await page.evaluate((colour) => {
