@@ -31,7 +31,7 @@ require (
 	github.com/valkey-io/valkey-go v1.0.79
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb
 	golang.org/x/image v0.47.0
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/tools v0.52.0
 )
 
