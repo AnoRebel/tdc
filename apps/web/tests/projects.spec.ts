@@ -146,6 +146,9 @@ test("a batch that is only partly allowed changes what it may and says what it r
   // The outsider files one while a member, and then is not one.
   await must(page, "PUT", `/api/projects/${key}/members/e2e-outsider`, { role: "member" });
   await outsider.page.goto("/");
+  // Started up before anything else navigates it: a second navigation while
+  // the first is still settling is aborted in Firefox.
+  await outsider.page.getByRole("button", { name: /Search/ }).waitFor();
   await must(outsider.page, "POST", `/api/projects/${key}/issues`, {
     title: "Filed by the outsider",
   });
