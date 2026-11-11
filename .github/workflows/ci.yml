@@ -183,6 +183,10 @@ jobs:
           TDC_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
           TDC_SERVER_WEB_ROOT: ${{ github.workspace }}/apps/web/.output/public
           TDC_SERVER_ADDRESS: 127.0.0.1:8099
+          # Plain HTTP: a Secure session cookie is never sent back over it.
+          # Chromium makes an exception for a loopback address; WebKit does
+          # not, and signs nobody in.
+          TDC_SERVER_SECURE_COOKIES: "false"
         run: |
           go build -o /tmp/tdc-server ./cmd/tdc-server
           /tmp/tdc-server &
@@ -221,6 +225,10 @@ jobs:
           TDC_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
           TDC_SERVER_WEB_ROOT: ${{ github.workspace }}/apps/web/.output/public
           TDC_SERVER_ADDRESS: 127.0.0.1:8099
+          # Plain HTTP: a Secure session cookie is never sent back over it.
+          # Chromium makes an exception for a loopback address; WebKit does
+          # not, and signs nobody in.
+          TDC_SERVER_SECURE_COOKIES: "false"
           TDC_DIRECTORY_RUN: ci${{ github.run_id }}${{ github.run_attempt }}
         run: |
           for project in directory directory-webkit directory-firefox; do
