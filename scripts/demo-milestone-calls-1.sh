@@ -181,7 +181,7 @@ func main() {
 }
 GO
 turn_version="$(awk '$1 == "github.com/pion/turn/v5" {print $2}' "$ROOT/server/go.mod")"
-printf 'module demorelay\n\ngo 1.25\n\nrequire github.com/pion/turn/v5 %s\n' "$turn_version" >"$WORK/relay-src/go.mod"
+printf 'module demorelay\n\ngo 1.27.4\n\nrequire github.com/pion/turn/v5 %s\n' "$turn_version" >"$WORK/relay-src/go.mod"
 cp "$ROOT/server/go.sum" "$WORK/relay-src/go.sum"
 (cd "$WORK/relay-src" && GOWORK=off GOFLAGS=-mod=mod GOPROXY="${GOPROXY:-off}" go build -o "$WORK/relay" .)
 if [[ -z "${SKIP_WEB_BUILD:-}" || ! -f "$ROOT/apps/web/.output/public/index.html" ]]; then
