@@ -107,11 +107,14 @@ test("a company is created, and lists only people who accepted", async ({ page, 
   await account(request, developer);
   const owner = await account(request, people.client);
   const slug = `kilima-${Date.now().toString(36)}`;
+  // Named for this run too: every engine runs on one database, and a second
+  // company of the same name would be a second invitation in the same list.
+  const name = `Kilima Labs ${slug.slice("kilima-".length)}`;
 
   // The owner makes the company and invites the developer, over the API.
   const created = await request.post("/api/directory/companies", {
     headers: owner,
-    data: { slug, name: "Kilima Labs", location: "Arusha", visibility: "members", role: "Founder" },
+    data: { slug, name, location: "Arusha", visibility: "members", role: "Founder" },
   });
   expect(created.status()).toBe(201);
   const invited = await request.post(`/api/directory/companies/${slug}/members`, {
@@ -124,12 +127,12 @@ test("a company is created, and lists only people who accepted", async ({ page, 
 
   // Not listed yet: the company asked, and nobody has answered.
   await page.goto(`/directory/companies/${slug}`);
-  await expect(page.getByRole("heading", { name: "Kilima Labs" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: developer })).toHaveCount(0);
 
   // The developer answers from their own page.
   await page.goto("/directory/profile");
-  const invitation = page.getByRole("listitem").filter({ hasText: "Kilima Labs" });
+  const invitation = page.getByRole("listitem").filter({ hasText: name });
   await expect(invitation.getByText(/Asked you to be listed/)).toBeVisible();
   await invitation.getByRole("button", { name: "Accept" }).click();
   await expect(invitation.getByRole("button", { name: "Leave" })).toBeVisible();
