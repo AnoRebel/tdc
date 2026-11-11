@@ -175,7 +175,14 @@ jobs:
         # these checks are worth having on every run rather than only when
         # cheap.
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: bunx --bun playwright install --with-deps chromium firefox webkit
+        run: bunx --bun playwright install chromium firefox webkit
+        working-directory: apps/web
+
+      - name: Install what the browsers need from the system
+        # Every run, cache or not: the cache restores the browsers but not the
+        # libraries they load, and a runner image without one of those (WebKit's
+        # libevent, once) fails every WebKit check at launch.
+        run: bunx --bun playwright install-deps chromium firefox webkit
         working-directory: apps/web
 
       - name: Serve the application
