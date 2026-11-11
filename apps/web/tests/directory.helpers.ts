@@ -159,6 +159,25 @@ export async function account(request: APIRequestContext, username: string) {
   return token;
 }
 
+/**
+ * Where somebody is, set the way settings sets it.
+ *
+ * Not part of the profile: a location belongs to the account and the profile
+ * only shows it. Public, so a search by place finds the person whatever their
+ * profile's own visibility, which is what the checks here vary.
+ */
+export async function placeIn(
+  request: APIRequestContext,
+  headers: { Authorization: string },
+  place: string,
+) {
+  const set = await request.put("/api/me/location", {
+    headers,
+    data: { mode: "manual", place, visibility: "public" },
+  });
+  expect(set.ok(), `setting ${place}: ${await set.text()}`).toBeTruthy();
+}
+
 /*
 Tokens already issued in this run, by username.
 

@@ -14,6 +14,7 @@ import {
   people,
   secondPhone,
   signInAs,
+  placeIn,
 } from "./directory.helpers";
 
 /*
@@ -67,9 +68,9 @@ test("two people go from a profile to finished, tracked work through the interfa
   if (!asDeveloper) throw new Error("the developer could not sign in after joining");
   // Earlier specs may have given this person a profile; the guide starts without one.
   await request.delete("/api/directory/me", { headers: asDeveloper });
+  await placeIn(request, asDeveloper, place);
   await page.goto("/directory/profile");
   await page.getByLabel("Headline").fill("Payments developer");
-  await page.getByLabel("Location").fill(place);
   const finder = page.getByPlaceholder("Find a skill");
   await finder.fill("golang");
   await page.getByRole("button", { name: "Go", exact: true }).click();

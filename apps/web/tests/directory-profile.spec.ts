@@ -7,6 +7,7 @@ import {
   onlyInDirectoryProjects,
   people,
   signInAs,
+  placeIn,
 } from "./directory.helpers";
 
 /*
@@ -29,6 +30,7 @@ test("a profile is created, edited and restricted on a phone", async ({ page, re
   const asDeveloper = await account(request, developer);
   // Other specs give this person a profile too; this one starts without.
   await request.delete("/api/directory/me", { headers: asDeveloper });
+  await placeIn(request, asDeveloper, "Mwanza");
 
   await signInAs(page, developer);
   await page.goto("/directory/profile");
@@ -38,7 +40,6 @@ test("a profile is created, edited and restricted on a phone", async ({ page, re
   await fitsThePhone(page);
 
   await page.getByLabel("Headline").fill("Mobile developer");
-  await page.getByLabel("Location").fill("Mwanza");
   await page.getByLabel("About", { exact: true }).fill("Flutter and Kotlin, mostly for NGOs.");
   await page.getByRole("button", { name: "Add a link" }).click();
   await page.getByLabel("Title").fill("Clinic booking app");

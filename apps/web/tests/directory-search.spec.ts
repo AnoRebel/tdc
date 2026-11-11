@@ -8,6 +8,7 @@ import {
   people,
   secondPhone,
   signInAs,
+  placeIn,
 } from "./directory.helpers";
 
 /*
@@ -30,11 +31,11 @@ test("skills and availability make a developer findable", async ({ page, request
   await account(request, client);
   // Other specs give this person a profile too; this one writes it from nothing.
   await request.delete("/api/directory/me", { headers: asDeveloper });
+  await placeIn(request, asDeveloper, "Zanzibar");
 
   await signInAs(page, developer);
   await page.goto("/directory/profile");
   await page.getByLabel("Headline").fill("Flutter developer");
-  await page.getByLabel("Location").fill("Zanzibar");
 
   // Two skills from the vocabulary, one by another spelling of it.
   const finder = page.getByPlaceholder("Find a skill");

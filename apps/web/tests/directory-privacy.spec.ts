@@ -7,6 +7,7 @@ import {
   onlyInDirectoryProjects,
   people,
   signInAs,
+  placeIn,
 } from "./directory.helpers";
 
 /*
@@ -83,13 +84,13 @@ async function choose(
   });
   expect(privacy.status(), await privacy.text()).toBe(204);
 
+  await placeIn(request, asDeveloper, place);
   const own = await (await request.get("/api/directory/me", { headers: asDeveloper })).json();
   const saved = await request.put("/api/directory/me", {
     headers: asDeveloper,
     data: {
       ...(own.profile ?? {}),
       headline: "Ledger developer",
-      location: place,
       visibility,
       detailsVisibility: "public",
     },
