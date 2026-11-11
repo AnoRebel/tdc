@@ -374,10 +374,12 @@ jobs:
       - name: Install the webview's dependencies
         # What Wails links against on Linux. Named rather than pulled in by a
         # setup action so an upgrade is somebody's decision.
+        # GTK 4 and WebKitGTK 6, as Wails 3.1 builds by default and the release
+        # does; the GTK 3 build has its own job below.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libgtk-3-dev libwebkit2gtk-4.1-dev
+            libgtk-4-dev libwebkitgtk-6.0-dev
 
       - run: bun install --frozen-lockfile
 
@@ -596,7 +598,12 @@ jobs:
 
       - name: Build it and check what it needs
         working-directory: apps/desktop
+        # A stand-in for the built frontend, which the binary embeds: what this
+        # checks is which libraries and glibc it needs, and the files it carries
+        # change neither. The Desktop job builds the real thing.
         run: |
+          mkdir -p frontend/dist
+          [ -e frontend/dist/index.html ] || echo '<!doctype html>' > frontend/dist/index.html
           go build -tags "production,gtk3" -o /tmp/tdc-gtk3 .
 
           # Every versioned glibc symbol the binary imports. The highest is the
