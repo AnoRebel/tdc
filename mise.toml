@@ -13,7 +13,7 @@
 # there, for the reason above.
 
 [tools]
-go = "1.27.3"
+go = "1.27.4"
 sqlc = "1.31.1"
 air = "1.67.4"
 golangci-lint = "2.15.0"

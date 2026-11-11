@@ -1,6 +1,6 @@
 module github.com/AnoRebel/tdc/apps/desktop
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/99designs/keyring v1.2.2

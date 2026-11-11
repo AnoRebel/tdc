@@ -209,7 +209,7 @@ note that the port is 55433. Tests that need an object store or a link-preview
 target skip themselves when those are absent, so a missing optional service does
 not block you.
 
-Tool versions are pinned in [`mise.toml`](../mise.toml) — Go 1.27.3, Bun 1.4.4,
+Tool versions are pinned in [`mise.toml`](../mise.toml) — Go 1.27.4, Bun 1.4.4,
 and the `sqlc`, `air`, `golangci-lint` and `task` versions that go with them.
 `mise install` after cloning gets the same toolchain everybody else has.
 Continuous integration deliberately differs on one point: it takes the latest
