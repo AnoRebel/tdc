@@ -137,7 +137,18 @@ test.describe("themes", () => {
   /* Light and dark are a property of the palette, not a third palette: each
      one has to define both, or switching appearance inside it does nothing. */
   test("each palette defines both light and dark", async ({ page }) => {
+    /*
+     * The stored appearance arrives after the page mounts and is applied when
+     * it does, classes and all. Changed before then, the root is changed back
+     * underneath the check — dark read twice, in the engines slow enough to
+     * let the reply land between the two readings.
+     */
+    const stored = page.waitForResponse((response) =>
+      response.url().includes("/api/me/preferences/appearance"),
+    );
     await page.goto("/settings");
+    await stored;
+    await page.evaluate(() => new Promise(requestAnimationFrame));
 
     for (const theme of [null, "congrator"]) {
       await page.evaluate((name) => {
