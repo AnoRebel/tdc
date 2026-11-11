@@ -209,8 +209,28 @@ jobs:
       # difference between them. The calls-* projects hold a two-person call in
       # each engine with fake camera and microphone; WebKit takes them as
       # granted permissions, and skips saying so where its build has no WebRTC.
+      # The first-arrival checks register fresh accounts and sign the founder
+      # in, and by the time the three engines are done the server's in-memory
+      # allowance for both is spent. They run against the server started
+      # afresh, as the directory's journeys below do.
       - name: Check
-        run: bun run test:e2e
+        env:
+          TDC_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          TDC_SERVER_WEB_ROOT: ${{ github.workspace }}/apps/web/.output/public
+          TDC_SERVER_ADDRESS: 127.0.0.1:8099
+          TDC_SERVER_SECURE_COOKIES: "false"
+        run: |
+          status=0
+          bunx playwright test --project=setup --project=chromium --project=firefox --project=webkit --project=calls-chromium --project=calls-firefox --project=calls-webkit || status=1
+          pkill -f /tmp/tdc-server || true
+          sleep 1
+          /tmp/tdc-server >/tmp/tdc-server.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8099/api/server >/dev/null && break
+            sleep 1
+          done
+          bunx playwright test --project=setup --project=arrival --output=test-results/arrival || status=1
+          exit $status
         working-directory: apps/web
 
       # The directory's journeys, in the same three engines, each against the
