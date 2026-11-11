@@ -97,10 +97,12 @@ const filtered = computed(() => Object.values(fromQuery()).some(Boolean));
 
 <template>
   <div class="flex-1 overflow-y-auto">
-    <header class="flex h-12 items-center gap-3 border-b px-4">
+    <!-- Wraps rather than running off a phone: four places to go do not fit
+         beside the title at that width. -->
+    <header class="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-1.5">
       <Contact class="size-4 text-muted-foreground" />
       <h1 class="text-sm font-semibold">{{ $t("directory.title") }}</h1>
-      <div class="ml-auto flex items-center gap-1">
+      <div class="ml-auto flex flex-wrap items-center justify-end gap-1">
         <NuxtLink
           v-if="can('directory.skills.manage') || can('directory.verify')"
           :to="localeRoute({ name: 'directory-review' })"
