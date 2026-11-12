@@ -32,7 +32,8 @@ printed so a change in them is visible.
 
 const (
 	// deliveryThroughputTarget is the least the pool should manage, per second,
-	// to receivers on the same machine with the default four workers.
+	// to receivers on the same machine with the default four workers and the
+	// default pace of a hundred a second.
 	deliveryThroughputTarget = 50.0
 	/*
 		latencyAllowance is how much slower posting may be with a stalled

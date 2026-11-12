@@ -111,6 +111,18 @@ const (
 	*/
 	DeliveryWorkers Key = "integrations.delivery_workers"
 
+	/*
+		DeliveriesPerSecond is how many deliveries this server starts a
+		second, across every subscription.
+
+		Every attempt is two commits — claiming it and recording how it went —
+		and an unpaced pool on a fast network starts hundreds a second, which
+		is enough to make posting a message wait its turn at the database. The
+		default is twice what the documentation promises receivers, and keeps
+		the people in the channel ahead of the integrations listening to it.
+	*/
+	DeliveriesPerSecond Key = "integrations.deliveries_per_second"
+
 	// DeliveryHistoryDays is how long finished deliveries and their attempts
 	// are kept for owners to inspect.
 	DeliveryHistoryDays Key = "integrations.delivery_history_days"
@@ -198,6 +210,11 @@ func init() {
 			fallback:    "4",
 			description: "How many deliveries are attempted at once across the server. Read at startup.",
 			validate:    positive,
+		},
+		DeliveriesPerSecond: {
+			fallback:    "100",
+			description: "How many deliveries are started a second across the server, or 0 for no limit.",
+			validate:    nonNegative,
 		},
 		DeliveryHistoryDays: {
 			fallback:    "30",
