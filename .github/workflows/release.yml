@@ -242,17 +242,11 @@ jobs:
           fi
           echo "key=${{ matrix.goos }}/${{ matrix.goarch }}" >> "$GITHUB_OUTPUT"
 
-      - name: Give the signer an x64 Python
-        # The signer installs cryptography, which publishes no Windows arm64
-        # wheel and fails to compile without OpenSSL. The x64 wheel runs under
-        # Windows' emulation.
-        if: matrix.os == 'windows-11-arm'
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-          architecture: x64
-
       - name: Sign it
+        # Not on Windows arm64: the signer needs cryptography, which has no
+        # wheel there and will not compile without OpenSSL. That one is signed
+        # by the job below instead.
+        if: matrix.os != 'windows-11-arm'
         uses: sigstore/gh-action-sigstore-python@v3.5.0
         with:
           inputs: ${{ steps.artifact.outputs.path }} ${{ steps.packages.outputs.paths }}
@@ -464,8 +458,37 @@ jobs:
           go install github.com/sigstore/cosign/v2/cmd/cosign@latest
           cosign sign --yes "${IMAGE}@${DIGEST}"
 
+  sign-windows-arm64:
+    # The signature a Windows arm64 runner cannot make. Same workflow, same
+    # keyless identity, so it verifies exactly like every other one.
+    needs: desktop
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: tdc-windows-arm64
+          path: signed
+
+      - name: Sign it
+        uses: sigstore/gh-action-sigstore-python@v3.5.0
+        with:
+          inputs: signed/tdc-*.exe
+          upload-signing-artifacts: false
+
+      - name: Put it back with its proof
+        uses: actions/upload-artifact@v7
+        with:
+          name: tdc-windows-arm64
+          path: signed/tdc-*
+          overwrite: true
+          if-no-files-found: error
+
   publish:
-    needs: [version, desktop, server, image]
+    needs: [version, desktop, sign-windows-arm64, server, image]
     runs-on: ubuntu-latest
     permissions:
       # Creating the release.
