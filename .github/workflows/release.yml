@@ -504,6 +504,9 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
+          # Ours only. The image build also uploads a Docker build record,
+          # which is not a release file and does not download as one.
+          pattern: tdc-*
           path: artifacts
           merge-multiple: true
 
