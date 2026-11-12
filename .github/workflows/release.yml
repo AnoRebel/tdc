@@ -447,6 +447,10 @@ jobs:
           provenance: mode=max
           sbom: true
 
+      - name: Install cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@v4.1.2
+
       - name: Sign the image
         if: github.event_name == 'push'
         # By digest rather than tag: a tag can be moved afterwards, and a
@@ -455,7 +459,6 @@ jobs:
           DIGEST: ${{ steps.push.outputs.digest }}
           IMAGE: ${{ steps.tags.outputs.image }}
         run: |
-          go install github.com/sigstore/cosign/v2/cmd/cosign@latest
           cosign sign --yes "${IMAGE}@${DIGEST}"
 
   sign-windows-arm64:
