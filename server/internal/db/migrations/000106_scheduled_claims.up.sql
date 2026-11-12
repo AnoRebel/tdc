@@ -1,0 +1,11 @@
+-- Who is sending a scheduled message, and until when.
+--
+-- The delivery pass used to read due rows FOR UPDATE SKIP LOCKED outside any
+-- transaction, so each lock was released the moment the statement finished and
+-- two servers reading together both sent the same message. Claiming writes the
+-- claim into the row in the same statement that finds it: another server's pass
+-- skips the row while it is locked and, once committed, while the claim holds.
+--
+-- A claim expires rather than lasting forever, so a server that stops between
+-- claiming a message and sending it delays that message instead of losing it.
+ALTER TABLE scheduled_messages ADD COLUMN claimed_until TIMESTAMPTZ;

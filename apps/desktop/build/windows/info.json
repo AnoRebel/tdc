@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "Tanzania Developers Community",
+			"FileDescription": "Chat, project tracking, and a directory connecting developers with the people who need them.",
+			"LegalCopyright": "(c) 2026 Ano Rebel and contributors",
+			"ProductName": "TDC",
+			"Comments": "Self-hosted, by the community, for the community."
+		}
+	}
+}

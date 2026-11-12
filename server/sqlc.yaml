@@ -1,0 +1,46 @@
+# sqlc generates typed Go from the SQL in internal/db/queries.
+#
+# The schema is read from the migration directory rather than a separate
+# schema file, so there is exactly one description of the database: a query
+# referring to a column that no migration creates fails to generate, rather
+# than failing at runtime.
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "internal/db/migrations"
+    queries: "internal/db/queries"
+    gen:
+      go:
+        package: "dbgen"
+        out: "internal/db/dbgen"
+        sql_package: "pgx/v5"
+        emit_json_tags: false
+        emit_prepared_queries: false
+        emit_interface: true
+        emit_empty_slices: true
+        emit_pointers_for_null_types: true
+        # Postgres timestamps map to time.Time rather than pgtype wrappers,
+        # so that code outside this package never has to import pgtype.
+        overrides:
+          # UUIDs map to the standard library's uuid rather than pgtype.UUID,
+          # so that no code outside the generated package has to import pgtype
+          # to pass an identifier. pgx reads and writes it as a [16]byte.
+          - db_type: "uuid"
+            go_type:
+              import: "uuid"
+              package: "uuid"
+              type: "UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "uuid"
+              package: "uuid"
+              type: "UUID"
+              pointer: true
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true

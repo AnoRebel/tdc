@@ -1,0 +1,1 @@
+ALTER TABLE room_peers DROP COLUMN IF EXISTS address;

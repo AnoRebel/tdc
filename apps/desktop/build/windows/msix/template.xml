@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MsixPackagingToolTemplate
+    xmlns="http://schemas.microsoft.com/msix/packaging/msixpackagingtool/template/2022">
+    <Settings
+        AllowTelemetry="false"
+        ApplyACLsToPackageFiles="true"
+        GenerateCommandLineFile="true"
+        AllowPromptForPassword="false">
+    </Settings>
+    <Installer
+        Path="tdc"
+        Arguments=""
+        InstallLocation="C:\Program Files\Tanzania Developers Community\TDC">
+    </Installer>
+    <PackageInformation
+        PackageName="TDC"
+        PackageDisplayName="TDC"
+        PublisherName="CN=Tanzania Developers Community"
+        PublisherDisplayName="Tanzania Developers Community"
+        Version="0.1.0.0"
+        PackageDescription="Chat, project tracking, and a directory connecting developers with the people who need them.">
+        <Capabilities>
+            <Capability Name="runFullTrust" />
+            
+        </Capabilities>
+        <Applications>
+            <Application
+                Id="net.anorebel.tdc"
+                Description="Chat, project tracking, and a directory connecting developers with the people who need them."
+                DisplayName="TDC"
+                ExecutableName="tdc"
+                EntryPoint="Windows.FullTrustApplication">
+                
+            </Application>
+        </Applications>
+        <Resources>
+            <Resource Language="en-us" />
+        </Resources>
+        <Dependencies>
+            <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
+        </Dependencies>
+        <Properties>
+            <Framework>false</Framework>
+            <DisplayName>TDC</DisplayName>
+            <PublisherDisplayName>Tanzania Developers Community</PublisherDisplayName>
+            <Description>Chat, project tracking, and a directory connecting developers with the people who need them.</Description>
+            <Logo>Assets\AppIcon.png</Logo>
+        </Properties>
+    </PackageInformation>
+    <SaveLocation PackagePath="tdc.msix" />
+    <PackageIntegrity>
+        <CertificatePath></CertificatePath>
+    </PackageIntegrity>
+</MsixPackagingToolTemplate>

@@ -3,7 +3,16 @@
     "target": "ES2023",
     "module": "preserve",
     "moduleResolution": "bundler",
-    "lib": ["ES2023"],
+    /*
+     * DOM alongside the language itself, for one reason: the chart adapter
+     * draws into an HTMLElement, and describing where a chart goes without
+     * naming an element would mean `unknown` and a cast at every call site.
+     *
+     * Nothing here may *use* the DOM — this package is types only, and the
+     * server reads it too. Referring to an element's type is not the same as
+     * touching one.
+     */
+    "lib": ["ES2023", "DOM"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,

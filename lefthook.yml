@@ -24,7 +24,7 @@ pre-commit:
       run: cd server && go vet ./...
 
     - name: version consistency
-      glob: "{VERSION,**/package.json,**/config.yml,**/version.go}"
+      glob: "{VERSION,**/package.json,**/config.yml,**/version.go,**/Info*.plist,**/info.json,**/*.manifest,**/wails_tools.nsh,**/msix/*.xml,**/nfpm.yaml}"
       run: bun run version:check
 
 pre-push:
@@ -35,3 +35,15 @@ pre-push:
 
     - name: go build
       run: cd server && go build ./...
+
+    # Two seconds on a warm cache, beside a test suite that takes far longer.
+    # Skipped rather than failed where the tool is not installed: the version
+    # is pinned in mise.toml, and somebody who has not run "mise install" yet
+    # should be told, not blocked from pushing.
+    - name: go lint
+      run: |
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          echo "golangci-lint is not installed; run 'mise install'. Skipping."
+          exit 0
+        fi
+        cd server && golangci-lint run

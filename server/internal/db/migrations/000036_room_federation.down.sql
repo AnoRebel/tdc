@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS room_peers;
+ALTER TABLE rooms DROP COLUMN IF EXISTS federated;

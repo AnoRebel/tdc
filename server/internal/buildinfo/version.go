@@ -10,10 +10,15 @@ package buildinfo
 // at the repository root and run "bun run version:sync".
 const Version = "0.1.0"
 
-// ProtocolVersion identifies the federation wire protocol this build speaks.
-// It moves independently of Version: the software can be released many times
+// ProtocolVersion identifies the federation wire protocol this build speaks,
+// newest first where it speaks several (see federation.SupportedVersions). It
+// moves independently of Version: the software can be released many times
 // without the protocol changing.
-const ProtocolVersion = "0"
+const ProtocolVersion = "tdc/1"
+
+// APIVersion is the version of the client API under /api/v1, which /api also
+// serves. It changes only when something a client relies on stops working.
+const APIVersion = "1"
 
 var (
 	// Commit is the git revision this binary was built from.
@@ -26,6 +31,7 @@ var (
 type Info struct {
 	Version         string `json:"version"`
 	ProtocolVersion string `json:"protocolVersion"`
+	APIVersion      string `json:"apiVersion"`
 	Commit          string `json:"commit,omitempty"`
 	BuildTime       string `json:"buildTime,omitempty"`
 }
@@ -35,6 +41,7 @@ func Current() Info {
 	return Info{
 		Version:         Version,
 		ProtocolVersion: ProtocolVersion,
+		APIVersion:      APIVersion,
 		Commit:          Commit,
 		BuildTime:       BuildTime,
 	}

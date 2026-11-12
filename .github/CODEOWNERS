@@ -1,0 +1,6 @@
+# Every file needs the maintainer's review.
+#
+# This is the enforcement behind the rule in CONTRIBUTING.md: with branch
+# protection requiring code-owner review, a pull request cannot merge without
+# it, whoever else has approved.
+*   @AnoRebel

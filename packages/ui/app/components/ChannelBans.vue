@@ -1,0 +1,114 @@
+<script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
+import { ShieldOff } from "lucide-vue-next";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { onDayAtTime } from "#layers/ui/app/lib/dates";
+
+/**
+ * Who is currently kept out of a channel, and the way back in.
+ *
+ * A ban that can only be issued is a ban nobody reverses. This is the other
+ * half: seeing who is out, why, and until when — and lifting it.
+ */
+
+const { $t, $ts } = useI18n();
+
+const props = defineProps<{ roomId: string }>();
+
+const roomId = computed(() => props.roomId);
+const bans = useChannelBans(roomId);
+
+const lifting = ref<{ userId: string; name: string } | null>(null);
+
+onMounted(() => void bans.refresh());
+watch(roomId, () => void bans.refresh());
+
+async function lift(userId: string) {
+  lifting.value = null;
+  try {
+    await bans.lift(userId);
+  } catch {
+    // The list is refreshed either way, so a failure shows the ban still
+    // there rather than a message about it.
+    await bans.refresh();
+  }
+}
+
+/** When a ban lifts, in words rather than a timestamp. */
+function until(ban: { expiresAt?: string }): string {
+  if (!ban.expiresAt) return $ts("moderation.permanent");
+
+  const when = new Date(ban.expiresAt);
+  if (when.getTime() <= Date.now()) return $ts("admin.expired");
+
+  return $ts("admin.untilWhen", { when: onDayAtTime(when) });
+}
+</script>
+
+<template>
+  <section>
+    <h2 class="flex items-center gap-1.5 text-sm font-semibold">
+      <ShieldOff class="size-4" />
+      {{ $t("moderation.bannedFromThisChannel") }}
+    </h2>
+
+    <!-- Most people cannot read this list, and the refusal is expected rather
+         than exceptional: the section simply says so. -->
+    <p v-if="bans.failed.value" class="mt-1 text-xs text-muted-foreground">
+      {{ $t("moderation.cannotSeeWhoIsBanned") }}
+    </p>
+
+    <template v-else>
+      <p class="mt-1 text-xs text-muted-foreground">
+        {{ $t("moderation.banAppliesToChannelOnlyHint") }}
+      </p>
+
+      <p v-if="!bans.bans.value.length" class="mt-3 text-xs text-muted-foreground">
+        {{ $t("moderation.nobodyBannedFromThisChannel") }}
+      </p>
+
+      <ul v-else class="mt-3 space-y-1">
+        <li
+          v-for="ban in bans.bans.value"
+          :key="ban.userId"
+          class="flex items-start gap-2 rounded-lg border border-border px-3 py-2"
+        >
+          <Avatar :name="ban.displayName" size="sm" class="mt-0.5" />
+
+          <span class="min-w-0 flex-1">
+            <span class="flex items-center gap-2">
+              <span class="truncate text-sm font-medium">{{ ban.displayName }}</span>
+              <span class="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
+                {{ until(ban) }}
+              </span>
+            </span>
+            <!-- The reason, shown rather than stored and forgotten: a decision
+                 nobody can see is one nobody can review. -->
+            <span class="mt-0.5 block text-xs text-muted-foreground">{{ ban.reason }}</span>
+            <span class="block text-[0.6875rem] text-muted-foreground">
+              {{ $ts("moderation.byWhom", { who: ban.bannedByName || nameAt(ban.bannedBy) }) }}
+            </span>
+          </span>
+
+          <Button
+            variant="ghost"
+            class="h-7 shrink-0 px-2 text-xs"
+            @click="lifting = { userId: ban.userId, name: ban.displayName }"
+          >
+            {{ $t("moderation.liftBan") }}
+          </Button>
+        </li>
+      </ul>
+    </template>
+
+    <ConfirmDialog
+      v-if="lifting"
+      :title="$ts('moderation.liftThisBan')"
+      :detail="$ts('moderation.liftBanConsequence', { name: lifting.name })"
+      :confirm-label="$ts('moderation.liftBan')"
+      @cancel="lifting = null"
+      @confirm="lift(lifting.userId)"
+    />
+  </section>
+</template>

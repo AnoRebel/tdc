@@ -1,0 +1,38 @@
+## Why
+
+A community that meets in TDC still leaves it to talk. A pairing session, a mentorship hour, a chapter's weekly stand-up, a client walking a developer through what they need — each is a link to somebody else's meeting product, with somebody else's account, data and pricing. `calls/voice-video` has been specified since the foundation and is the one capability on the original roadmap with nothing built.
+
+## What Changes
+
+This change implements `calls/voice-video` in full, as an optional capability, off by default, that needs no paid service.
+
+- **Calls in conversations.** A call belongs to a channel or a direct conversation; starting and joining take `call.start` and `call.join` (catalogued since the foundation, enforced for the first time), on top of being able to post there. Members see that a call is in progress and join it from the conversation.
+- **Signalling over the connection clients already hold.** Session negotiation is relayed through the existing live connection as frames of their own, every one authorised against the call's conversation; the server never relays a frame to somebody who may not be in the call.
+- **Media peer to peer, relayed when it must be.** WebRTC, encrypted in transit as WebRTC always is (DTLS-SRTP). Direct where the network permits; through a TURN relay where it does not. The relay is coturn (BSD licence), optional in the compose file, and the server issues short-lived relay credentials so the relay is not an open proxy.
+- **Group calls.** Small calls are a full mesh and need nothing deployed. Above an operator-set size, a selective forwarding unit carries the call: built into the server with Pion (MIT), so it is one binary and no extra service, and off unless the operator turns it on. A per-call participant limit, enforced with the reason given.
+- **Controls.** Mute, camera on and off, leave, audio-only joining, each participant's state shown to the others; nothing captured before the person grants the browser or system permission; a warning before starting on a connection the platform reports as metered.
+- **Degrading rather than dropping.** Bandwidth estimates step video down, then off, before audio; the client says what it did.
+- **Clients.** The web and desktop clients share the call interface through the shared layer. The desktop webviews' media support differs by platform and is verified on each.
+
+- **Invites.** Somebody in a call can ring people who may join it — everybody in a direct conversation by default, chosen people in a channel — who see an incoming call they can accept or decline, on every device they are signed in on, and a missed-call notification if they do not answer.
+- **Who may call whom.** Each person chooses who may ring them from their own server — everybody, people they share a conversation with, or nobody — and, separately, whether people on connected servers may; the operator chooses whether connected servers may call people here at all (`calls.federated`, off by default), which is final. An incoming call is a small window that never covers the page, which the person can move anywhere and answer by voice or video, or decline, on whichever device they like; answering on one stops the others ringing.
+- **Calls across servers.** Ringing and calling people on connected servers, signalled between the servers with the federation protocol's signed requests, each server authorising its own people and applying its own policy and its person's privacy; calls in rooms shared with other servers, held by the room's home server.
+- **Call links, public or protected.** Somebody holding the new `call.link` permission can make a link to a conversation's call. Joining by link puts a person in the call and nowhere else: never the conversation, its history or its members. A *public* link admits anybody who has it; a *protected* one asks for a passcode (attempts limited and recorded), or puts the person in a lobby until somebody in the call lets them in, or both. A link can expire, be limited to a number of uses, and be revoked; making and revoking one is audited. People without an account on the server may join through a link as named guests only where the operator has allowed guests (`calls.guests`, off by default): a guest is given a pass valid for that one call, shown to everybody as a guest, and can do nothing else on the server.
+- **Screen sharing and presentations.** Anybody in a call may share a screen, a window or a browser tab (with its audio where the platform offers it). Presenting puts one person's shared screen on everybody's main stage; one presenter at a time, handed over or stopped by them or by a moderator of the conversation.
+- **Recording, saved to the conversation.** Off unless the operator enables it, and then only by somebody holding the new `call.record` permission in that conversation. Recording happens on the recorder's own device — the call's audio and the stage composed into one file in the browser — so no call media passes through or is retained by the server for it. Before recording begins every participant is told, and an indicator stays on screen for everybody while it lasts, including people who join later (who are told before their own media starts). When it stops, the file is saved to the conversation as an attachment through the ordinary attachment path — size limits, scanning and retention apply — or offered as a download where it is larger than the server accepts. Starting and stopping are in the conversation's log and the audit log.
+
+**Out of scope:** recording on the server (it would need the server to see media it otherwise never does).
+
+## Capabilities
+
+### Modified Capabilities
+
+- `calls/voice-video`: specified-but-unimplemented to implemented, with screen sharing, presentations and device-side recording added to its requirements.
+- `platform/server-config`: the calling switch, relay settings, mesh size and participant limit.
+- `identity/authorization`: `call.start` and `call.join` enforced; `call.record` and `call.link` added.
+
+## Impact
+
+- **Dependencies:** Pion WebRTC (MIT) in the server, only exercised when the forwarding unit is on; coturn as an optional compose service. Nothing paid, nothing AGPL.
+- **Operators:** a relay needs UDP ports open; the hosting guide states which, and what works without one (calls between people on reachable networks, and nothing else).
+- **Security:** the relay's credentials are minted per person per call and expire; signalling is authorised per frame; the forwarding unit sees media in the clear inside the server process, which the hosting guide states plainly because it differs from a mesh call.

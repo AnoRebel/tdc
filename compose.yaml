@@ -1,0 +1,202 @@
+# A working TDC deployment: the server and its database.
+#
+# This runs unedited for local evaluation. Before using it in production,
+# change every value marked CHANGE ME below — the server also warns about
+# unsafe settings at startup.
+
+name: tdc
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      # The call forwarding unit's media port, used only when the calls.sfu
+      # setting is on. Nothing listens on it until a call is forwarded.
+      - "7882:7882/udp"
+    environment:
+      TDC_SERVER_NAME: "TDC"
+      TDC_SERVER_DESCRIPTION: "A Tanzania Developers Community server"
+      # CHANGE ME: the address clients and federated peers use to reach this
+      # server. Without it the server cannot state a stable address.
+      TDC_SERVER_CANONICAL_ADDRESS: "localhost:8080"
+      TDC_SERVER_ADDRESS: ":8080"
+      # CHANGE ME: the password here must match the one set on the database.
+      # sslmode=disable is acceptable only because both run on this host.
+      TDC_DATABASE_URL: "postgres://tdc:tdc@database:5432/tdc?sslmode=disable"
+      # Browser origins allowed to call this API cross-origin. Empty in a
+      # normal deployment, where the web app is served from this same origin.
+      # Set here for local development, where the app runs on port 3000.
+      TDC_SERVER_ALLOWED_ORIGINS: "http://localhost:3000"
+      # CHANGE ME: session cookies are marked Secure by default, so a browser
+      # sends them only over TLS. This local stack is served over plain HTTP,
+      # where a Secure cookie would be set and then never sent back. Remove
+      # this line for any deployment served over HTTPS.
+      TDC_SERVER_SECURE_COOKIES: "false"
+      TDC_LOG_FORMAT: "json"
+      TDC_LOG_LEVEL: "info"
+      # The secret the call relay (the turn service below) shares with this
+      # server; empty means no relay is offered. Set the same value for both.
+      TDC_CALLS_TURN_SECRET: "${TDC_CALLS_TURN_SECRET:-}"
+      # The forwarding unit sits behind Docker's NAT and cannot see the
+      # address people reach this host by: give it the host's public IP.
+      TDC_CALLS_SFU_PUBLIC_IPS: "${TDC_CALLS_SFU_PUBLIC_IPS:-}"
+      # Where uploaded files are kept. Inside the volume mounted below, so they
+      # survive a restart: without it they are written to the container's
+      # writable layer and every attachment is lost the next time the image is
+      # rebuilt or the container recreated.
+      TDC_STORAGE_BACKEND: "local"
+      TDC_STORAGE_DIRECTORY: "/var/lib/tdc/attachments"
+      # Uncomment, and start the media profile, to generate previews in a
+      # separate container instead of in this process. Optional: with this
+      # unset the server does the work itself, which is safe because image
+      # decoding is pure Go.
+      # TDC_ATTACHMENTS_MEDIA_SIDECAR_ADDRESS: "http://media:8081"
+    volumes:
+      - attachments:/var/lib/tdc
+    networks:
+      # default carries the database; media carries the optional sidecar.
+      default: {}
+      media: {}
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # Optional. Previews are generated inside the server unless this is running
+  # and the server is pointed at it, which is what TDC_ATTACHMENTS_MEDIA_SIDECAR
+  # ADDRESS below does. Start it with:
+  #
+  #   docker compose --profile media up -d
+  #
+  # Worth it for a large or public deployment, where a decoder failure taking
+  # down a disposable container rather than the server is worth a second
+  # image. Unnecessary for a community server: image decoding is pure Go, so
+  # there is no library in C to be exploited.
+  media:
+    profiles: ["media"]
+    build:
+      context: .
+      dockerfile: server/Dockerfile.media
+    restart: unless-stopped
+    # No published ports: the server reaches it over the compose network, and
+    # nothing outside the host has any business talking to it.
+    expose:
+      - "8081"
+    # It makes no outbound connections of its own — it is handed bytes and
+    # returns a smaller picture — so it needs no name resolution and no route
+    # off this network.
+    networks:
+      media: {}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # A decompression bomb is refused from its header before a pixel is
+    # allocated, so these are the second bound rather than the first. They are
+    # what turns "this container was killed" into the failure mode instead of
+    # "the host ran out of memory".
+    mem_limit: 512m
+    cpus: 1.0
+    # No health check: a scratch image has no shell and no wget to run one
+    # with, and adding a userland purely to be able to curl itself would give
+    # up the isolation this container exists for. The server treats an
+    # unreachable sidecar as "no preview" rather than as a failure, so an
+    # unhealthy one degrades rather than breaks.
+
+  # The relay for calls that cannot connect directly — people behind
+  # restrictive networks, mobile carriers, most offices. Optional: without it,
+  # calls connect between people who can reach each other and fail between
+  # those who cannot. Enable with `docker compose --profile calls up -d`, set
+  # TDC_CALLS_TURN_SECRET (the same value is passed to the server above), and
+  # set calls.turn_urls to turn:YOUR-HOST:3478. See "Calls" in docs/hosting.md
+  # for the ports to open and what it costs.
+  turn:
+    profiles: ["calls"]
+    image: coturn/coturn
+    restart: unless-stopped
+    # Host networking: a relay hands out a port per relayed stream, and
+    # publishing a range through Docker's proxy costs a process per port.
+    network_mode: host
+    environment:
+      TDC_CALLS_TURN_SECRET: "${TDC_CALLS_TURN_SECRET:-}"
+      TDC_CALLS_TURN_REALM: "${TDC_CALLS_TURN_REALM:-tdc}"
+    # Refuses to start without a secret: an empty one is a key anybody can
+    # compute, which would make this an open relay. And never relays into
+    # private networks, which would let anybody holding credentials reach the
+    # machines behind it.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        [ -n "$$TDC_CALLS_TURN_SECRET" ] || { echo "set TDC_CALLS_TURN_SECRET" >&2; exit 1; }
+        exec turnserver \
+          --listening-port=3478 --min-port=49160 --max-port=49200 \
+          --use-auth-secret --static-auth-secret="$$TDC_CALLS_TURN_SECRET" \
+          --realm="$$TDC_CALLS_TURN_REALM" \
+          --fingerprint --no-cli --no-multicast-peers \
+          --denied-peer-ip=0.0.0.0-0.255.255.255 \
+          --denied-peer-ip=10.0.0.0-10.255.255.255 \
+          --denied-peer-ip=100.64.0.0-100.127.255.255 \
+          --denied-peer-ip=127.0.0.0-127.255.255.255 \
+          --denied-peer-ip=169.254.0.0-169.254.255.255 \
+          --denied-peer-ip=172.16.0.0-172.31.255.255 \
+          --denied-peer-ip=192.168.0.0-192.168.255.255 \
+          --denied-peer-ip=::1 \
+          --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff \
+          --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+
+  database:
+    # The Debian-based image rather than Alpine: it is the better-tested
+    # variant for production, and Alpine's musl libc has historically caused
+    # locale and collation differences that are painful to discover late.
+    image: postgres:18
+    restart: unless-stopped
+    ports:
+      # Exposed for local development and tests. A production deployment
+      # should remove this: the server reaches the database over the compose
+      # network, and nothing outside the host needs to.
+      - "127.0.0.1:55433:5432"
+    environment:
+      POSTGRES_USER: tdc
+      # CHANGE ME: this password is published in this file and is not a secret.
+      POSTGRES_PASSWORD: tdc
+      POSTGRES_DB: tdc
+    volumes:
+      # PostgreSQL 18 changed PGDATA to a version-specific directory
+      # (/var/lib/postgresql/18/docker) and moved the declared volume to
+      # /var/lib/postgresql. Mounting the parent is what allows a later
+      # major-version upgrade to use "pg_upgrade --link"; mounting the old
+      # .../data path leaves the container writing to an anonymous volume and
+      # failing to start.
+      - database:/var/lib/postgresql
+    healthcheck:
+      # The server refuses to start until the database accepts connections,
+      # so this gate is what makes an unedited "compose up" work first time.
+      test: ["CMD-SHELL", "pg_isready -U tdc -d tdc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  # The media processor sits on a network of its own with no gateway, so it
+  # cannot reach the internet, the database, or anything else the operator
+  # runs — only the server can reach it.
+  media:
+    internal: true
+
+volumes:
+  database:
+  # Uploaded files. Separate from the database volume so an operator can back
+  # the two up on different schedules — the database is small and changes
+  # constantly, attachments are large and are written once.
+  attachments:

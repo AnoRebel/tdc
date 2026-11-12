@@ -37,6 +37,107 @@ export interface ServerInfo {
   capabilities: Capability[];
   /** Default interface language for users who have not chosen one. */
   defaultLanguage: string;
+  /**
+   * Whether media marked sensitive should arrive covered.
+   *
+   * The operator's policy rather than each client's choice, so the same server
+   * behaves the same way in the web application and the desktop one.
+   */
+  obscureSensitiveMedia: boolean;
+  /**
+   * How the operator has chosen this server to look.
+   *
+   * Applied by clients at runtime, so a community can look like itself
+   * without maintaining a fork. It governs presentation only: the canonical
+   * address above is not part of it and cannot be changed by it.
+   */
+  branding: Branding;
+  /**
+   * The sign-in providers this server offers, if any.
+   *
+   * Absent rather than empty on a server whose operator has configured none,
+   * so a client can tell "no providers" from an older server that does not
+   * know about them. A name to put in the URL and a label to show on the
+   * button; nothing here is secret.
+   */
+  signInProviders?: SignInProvider[];
+  /**
+   * Whether this server signs people in with passkeys.
+   *
+   * A passkey is bound to a hostname, so a server with no canonical address
+   * cannot offer them — and a button for something that answers 404 is worse
+   * than no button.
+   *
+   * Optional here rather than required, because an older server does not send
+   * it and absent must read as "no" rather than as a type error.
+   */
+  passkeys?: boolean;
+  /**
+   * Whether this server can mail somebody a way back into their account.
+   *
+   * A "forgotten your password" link on a server that cannot send is worse than
+   * no link: it promises something nobody can deliver.
+   */
+  recovery?: boolean;
+  /**
+   * Where the operator publishes this server's own policies.
+   *
+   * Absent when neither is set, and each link absent when that one is not. A
+   * client shows nothing in their place — never the templates in the
+   * repository, which are not this server's promises.
+   */
+  legal?: LegalLinks;
+}
+
+/** Links to the policies an operator has published for their server. */
+export interface LegalLinks {
+  privacyPolicyUrl?: string;
+  termsUrl?: string;
+}
+
+/** A way of signing in that this server offers through somebody else. */
+export interface SignInProvider {
+  /** The configured name, which is what identifies it in a request. */
+  name: string;
+  /** What appears on the button. */
+  label: string;
+}
+
+/** What an operator may change about how their server looks. */
+export interface Branding {
+  /** What the server calls itself, falling back to its configured name. */
+  name: string;
+  /** Shown where there is no room for the name. */
+  initials: string;
+  /** A logo shown in place of the initials, when set. */
+  logoUrl?: string;
+  /** A CSS colour used for emphasis. */
+  accent?: string;
+  /**
+   * Which set of colours this instance uses by default.
+   *
+   * What somebody sees who has chosen nothing for themselves, which is most
+   * people and everybody on their first visit.
+   */
+  palette?: string;
+}
+
+/**
+ * What one person chose the interface to look like.
+ *
+ * Empty in any field means they have chosen nothing there and take the
+ * operator's default. Kept as three values rather than one because they are
+ * three independent choices, and resolved against the operator's branding by
+ * the client — the operator's default can change while somebody is signed in,
+ * and their own choice should not have to be rewritten when it does.
+ */
+export interface Appearance {
+  /** "default", "congrator", or empty. */
+  palette: string;
+  /** "light", "dark", "auto", or empty. */
+  mode: string;
+  /** A CSS colour, or empty for the palette's own. */
+  accent: string;
 }
 
 /**
@@ -47,19 +148,116 @@ export interface ServerInfo {
  */
 export type Capability =
   | "federation"
-  | "voice-video"
+  // Voice and video calls in conversations. Off unless an operator turns it on.
+  | "calls"
+  // Recording a call on the recorder's device, where calls are on and the
+  // operator allows it.
+  | "calls.recording"
+  // Ringing people on other servers into a call, where calls, federation
+  // and the operator's calls.federated are all on.
+  | "calls.federated"
   | "webhooks"
   | "applications"
   | "interactive-messages"
   | "link-previews"
   | "web-push"
   | "disposable-chats"
+  | "projects"
+  // Projects opened to other servers, where this server federates.
+  | "projects.federated"
+  // Meetups, talks, workshops and office hours. On unless an operator turns
+  // it off.
+  | "events"
+  // Searching a third-party GIF library, which needs an operator's own API
+  // key with that provider. Absent on a server that has not configured one.
+  | "gif-search"
+  // Listing public channels to somebody who has not joined them. A server run
+  // for one organisation may want every channel found only by invitation.
+  | "public-directory"
+  // Issuing invitation links and codes.
+  | "invitations"
+  // Writing a message now and sending it later.
+  | "scheduled-messages"
+  // Uploading files and images.
+  | "attachments"
+  // Sending a file straight to another person's device in a direct
+  // conversation. On unless an operator turns it off.
+  | "direct-transfers"
+  // The developer and company directory, enquiries and engagements. Off
+  // unless an operator turns it on.
   | "directory"
-  | "projects";
+  // Emailed summaries of missed activity, for people who choose them. Absent
+  // on a server that cannot send mail, whatever its toggle says.
+  | "notification-digests"
+  // Translating messages inline, each person with the provider they chose.
+  // On unless an operator switches it off.
+  | "translation";
 
 /** Health of a running server, for operators and uptime checks. */
 export interface HealthStatus {
   status: "ok" | "degraded" | "unavailable";
   /** Per-subsystem detail, e.g. { database: "ok" }. */
   checks: Record<string, "ok" | "degraded" | "unavailable">;
+}
+
+/**
+ * How discoverable a server is to the rest of the network.
+ *
+ * The same three-way choice a room has, applied one level up: an operator
+ * running a server for a particular community decides who may find it at all,
+ * and that decision is enforced by the server itself rather than by whatever
+ * client happens to be asking.
+ */
+export type ServerVisibility =
+  /** Any connected server may discover it and browse the rooms it publishes. */
+  | "public"
+  /** Only servers its operator has listed may discover it. */
+  | "limited"
+  /** Not discoverable; reachable only through an existing explicit connection. */
+  | "private";
+
+/**
+ * Another server this one is connected to.
+ *
+ * A person browses these to find rooms beyond their own server. What comes
+ * back has already been filtered by each peer's visibility, so a client can
+ * present everything it receives without deciding what to hide.
+ */
+export interface ConnectedServer {
+  /** The domain that identifies it, e.g. "vue.tdc.or.tz". */
+  domain: string;
+  /** Operator-chosen display name. */
+  name: string;
+  /** Short description of who the server is for. */
+  description: string;
+  visibility: ServerVisibility;
+  /**
+   * Whether the connection is currently usable. A server that is listed but
+   * unreachable is still shown, so its absence is visible rather than silent.
+   */
+  reachable: boolean;
+  /** How many of its rooms this person may browse, when it publishes any. */
+  publishedRoomCount?: number;
+}
+
+/**
+ * A capability toggle as an administrator sees it.
+ *
+ * Distinct from Capability, which is what a server advertises to everybody.
+ * This is the operator's view: what the switch is set to, what it would be if
+ * they had not touched it, and whether it can work at all.
+ */
+export interface FeatureToggle {
+  name: Capability;
+  description: string;
+  /** What the operator has chosen, or the default if they have not. */
+  enabled: boolean;
+  /** What this feature is when nobody has chosen. */
+  default: boolean;
+  /**
+   * False when a feature is switched on but cannot work — GIF search with no
+   * provider configured, say. The toggle is intent; this is whether the intent
+   * can be honoured.
+   */
+  available: boolean;
 }

@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "tdc-test",
+      "credentials": [
+        {
+          "accessKey": "tdc-test-access-key",
+          "secretKey": "tdc-test-secret-key"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

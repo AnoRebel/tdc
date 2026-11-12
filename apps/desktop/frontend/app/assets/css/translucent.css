@@ -1,0 +1,74 @@
+/*
+ * The ground, tinted rather than removed.
+ *
+ * The window can be translucent, and the page has to let that through without
+ * giving up the theme's own colour. Painting nothing at all was the first
+ * attempt and it broke light mode: with no background, a light theme showed
+ * whatever WebKitGTK clears to, which is dark — dark text on a dark ground.
+ *
+ * So the theme still decides the hue and only the alpha changes. A light theme
+ * stays pale and see-through; a dark one stays dark and see-through.
+ *
+ * Only the body. Every surface above it — cards, dialogs, the sidebar — keeps
+ * its own opaque background, so text always sits on something solid and only
+ * the empty space shows what is behind.
+ */
+:root {
+  /*
+   * Set from Go at startup to match the window's own alpha, so the two agree.
+   * The fallback is what a build without that would show, which is the theme
+   * as it always was.
+   */
+  --app-alpha: 100%;
+  --app-ground: color-mix(in oklch, var(--background) var(--app-alpha), transparent);
+}
+
+/*
+ * Focus rings, drawn without a gap.
+ *
+ * The shared stylesheet offsets the outline by two pixels, which is right on a
+ * solid page: the gap shows the surface behind the control and the ring reads
+ * as attached to it. On a translucent window that gap shows the *desktop*, so
+ * the ring floats away from what it is marking and reads as a stray box.
+ *
+ * No offset, and a shadow standing in for the separation the gap gave. The
+ * shadow is drawn in the surface colour rather than the ground, so it works
+ * whatever is behind the window.
+ */
+:focus-visible {
+  outline-offset: 0;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/*
+ * Except where a control sits on its own coloured fill — a primary button
+ * carries its own ground, and a surface-coloured shadow around it would be a
+ * pale halo.
+ */
+.btn-primary:focus-visible,
+.btn-danger:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--foreground) 20%, transparent);
+}
+
+/*
+ * A slider marks its focus on the handle, not around the track.
+ *
+ * A range input is a long thin control, and a ring drawn around the whole of
+ * it reads as a text field rather than as something being dragged — which is
+ * how it looked on the appearance screen. The handle is the part that moves
+ * and the part somebody is acting on, so that is what says it has focus.
+ */
+input[type="range"]:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+input[type="range"]:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

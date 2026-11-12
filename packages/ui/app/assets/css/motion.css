@@ -1,0 +1,481 @@
+/*
+ * Motion: one vocabulary, and one switch for all of it.
+ *
+ * Every animation in the interface is keyed off `data-motion` on the root
+ * element, which the head script sets before the first paint and the interface
+ * preferences keep current afterwards:
+ *
+ *   full     — things fade, rise, scale and slide
+ *   reduced  — things fade; nothing travels, nothing loops for decoration
+ *   off      — nothing moves at all
+ *
+ * The default follows the operating system: somebody who asked their system
+ * for less motion gets "reduced" without visiting a settings page.
+ *
+ * Only transform and opacity are animated, because those are the two
+ * properties a browser can change without laying the page out again — a
+ * transition on height or margin is a transition that stutters on exactly the
+ * phones this community uses. And nothing here is longer than 250ms, nor makes
+ * anybody wait for it: a dialog is interactive the moment it starts to appear.
+ */
+
+/* The vocabulary. Durations and curves are tokens so every surface agrees. */
+:root {
+  /* A hover, a press, a badge. */
+  --motion-duration-fast: 120ms;
+  /* A dialog, a popover, a message arriving. */
+  --motion-duration: 160ms;
+  /* A panel crossing part of the screen, a card finding its new place. */
+  --motion-duration-slow: 200ms;
+
+  /* Arriving: quick to start, gentle to settle. */
+  --motion-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  /* Leaving: gets out of the way. */
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* Moving between two places on screen. */
+  --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* A small overshoot, for the one thing that should feel like it popped. */
+  --motion-ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* How far things travel. Zeroed under reduced motion, so they only fade. */
+  --motion-rise: 6px;
+  --motion-nudge: 16px;
+  --motion-scale: 0.96;
+  --motion-sheet: 100%;
+}
+
+/*
+ * Reduced: the same transitions, with nowhere to go.
+ *
+ * Distances become zero and scales become one, so every preset below turns
+ * into a fade without needing a second version of itself. The variables the
+ * vendored animation utilities use are neutralised the same way.
+ */
+:root[data-motion="reduced"] {
+  --motion-rise: 0px;
+  --motion-nudge: 0px;
+  --motion-scale: 1;
+  --motion-sheet: 0px;
+}
+
+:root[data-motion="reduced"] :is(.animate-in, .animate-out) {
+  --tw-enter-scale: 1 !important;
+  --tw-exit-scale: 1 !important;
+  --tw-enter-translate-x: 0 !important;
+  --tw-enter-translate-y: 0 !important;
+  --tw-exit-translate-x: 0 !important;
+  --tw-exit-translate-y: 0 !important;
+  --tw-enter-rotate: 0 !important;
+  --tw-exit-rotate: 0 !important;
+}
+
+/*
+ * Reduced also stops transitions on transform anywhere — the drawer, the
+ * switch thumb, a chevron turning — while keeping colour and opacity, so a
+ * hover still answers and a panel still fades. Loops that exist only for
+ * decoration (a shimmer, a pulse, bouncing dots) stop entirely; a spinner keeps
+ * turning, because it is telling somebody that something is still happening.
+ */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  transition-property:
+    color, background-color, border-color, outline-color, text-decoration-color, fill, stroke,
+    opacity, box-shadow !important;
+}
+
+:root[data-motion="reduced"] :is(.animate-pulse, .animate-bounce, .animate-ping) {
+  animation: none !important;
+}
+
+/*
+ * Off: nothing moves.
+ *
+ * A near-zero duration rather than none, so code waiting for a transition or
+ * an animation to end still hears that it ended — Vue's own transitions do
+ * exactly that.
+ */
+:root[data-motion="off"] *,
+:root[data-motion="off"] *::before,
+:root[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+}
+
+/*
+ * Before the head script has run — or where storage refused it — the
+ * operating system's own setting still applies.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion]) *,
+  :root:not([data-motion]) *::before,
+  :root:not([data-motion]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Smooth scrolling is motion too, and only for somebody who wants all of it. */
+:root[data-motion="full"] {
+  scroll-behavior: smooth;
+}
+
+/*
+ * Tailwind's own motion variants, answering the preference rather than only
+ * the operating system — otherwise `motion-reduce:` in a component would
+ * ignore somebody who turned motion down here but not in their system.
+ */
+@custom-variant motion-reduce (&:where([data-motion="reduced"] *, [data-motion="off"] *));
+@custom-variant motion-safe (&:where([data-motion="full"] *));
+
+/*
+ * Density. Compact scales the whole interface by its root size, because every
+ * size in it is in rem — one value rather than a second set of spacings that
+ * would drift from the first.
+ */
+:root[data-density="compact"] {
+  font-size: 93.75%;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Presets for Vue's <Transition> and <TransitionGroup>, by name.            */
+/* ------------------------------------------------------------------------- */
+
+/* motion-fade: something appearing in place. */
+.motion-fade-enter-active {
+  transition: opacity var(--motion-duration) var(--motion-ease-out);
+}
+.motion-fade-leave-active {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-in);
+}
+.motion-fade-enter-from,
+.motion-fade-leave-to {
+  opacity: 0;
+}
+
+/*
+ * motion-pop: dialogs, popovers, menus.
+ *
+ * Grows from just under its size rather than from nothing: from nothing reads
+ * as a zoom, and a zoom draws the eye to the motion instead of the content.
+ */
+.motion-pop-enter-active {
+  transition:
+    opacity var(--motion-duration) var(--motion-ease-out),
+    transform var(--motion-duration) var(--motion-ease-out);
+}
+.motion-pop-leave-active {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-in),
+    transform var(--motion-duration-fast) var(--motion-ease-in);
+}
+.motion-pop-enter-from,
+.motion-pop-leave-to {
+  opacity: 0;
+  transform: translateY(calc(var(--motion-rise) / 2)) scale(var(--motion-scale));
+}
+
+/*
+ * motion-panel: a panel opening beside the content, like a thread.
+ *
+ * A short nudge rather than the full width: the panel takes its space in the
+ * layout at once, so the conversation beside it never animates its width —
+ * only the panel's contents slide the last few pixels into place.
+ */
+.motion-panel-enter-active {
+  transition:
+    opacity var(--motion-duration-slow) var(--motion-ease-out),
+    transform var(--motion-duration-slow) var(--motion-ease-out);
+}
+.motion-panel-leave-active {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-in),
+    transform var(--motion-duration-fast) var(--motion-ease-in);
+}
+.motion-panel-enter-from,
+.motion-panel-leave-to {
+  opacity: 0;
+  transform: translateX(var(--motion-nudge));
+}
+
+/* motion-sheet: a panel sliding over the content from the right edge. */
+.motion-sheet-enter-active {
+  transition: transform var(--motion-duration-slow) var(--motion-ease-out);
+}
+.motion-sheet-leave-active {
+  transition: transform var(--motion-duration) var(--motion-ease-in);
+}
+.motion-sheet-enter-from,
+.motion-sheet-leave-to {
+  transform: translateX(var(--motion-sheet));
+}
+/* Reduced: a sheet that cannot slide fades instead of snapping. */
+:root[data-motion="reduced"] :is(.motion-sheet-enter-active, .motion-sheet-leave-active) {
+  transition: opacity var(--motion-duration) var(--motion-ease-out);
+}
+:root[data-motion="reduced"] :is(.motion-sheet-enter-from, .motion-sheet-leave-to) {
+  opacity: 0;
+}
+
+/* motion-toast: a confirmation rising from the bottom, and fading away. */
+.motion-toast-enter-active {
+  transition:
+    opacity var(--motion-duration) var(--motion-ease-out),
+    transform var(--motion-duration) var(--motion-ease-pop);
+}
+.motion-toast-leave-active {
+  transition: opacity var(--motion-duration) var(--motion-ease-in);
+}
+.motion-toast-enter-from {
+  opacity: 0;
+  transform: translateY(var(--motion-rise)) scale(var(--motion-scale));
+}
+.motion-toast-leave-to {
+  opacity: 0;
+}
+
+/*
+ * motion-collapse: a section opening or closing.
+ *
+ * Its contents fade and settle rather than the section animating its height,
+ * which would lay the whole sidebar out again on every frame.
+ */
+.motion-collapse-enter-active {
+  transition:
+    opacity var(--motion-duration) var(--motion-ease-out),
+    transform var(--motion-duration) var(--motion-ease-out);
+}
+.motion-collapse-leave-active {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-in);
+}
+.motion-collapse-enter-from {
+  opacity: 0;
+  transform: translateY(calc(var(--motion-rise) * -1));
+}
+.motion-collapse-leave-to {
+  opacity: 0;
+}
+
+/*
+ * motion-list: items arriving in, leaving, and moving within a list — new
+ * messages, uploads, cards on a board.
+ *
+ * The move class is what makes a reordered list glide (Vue measures where each
+ * item was and where it is, then animates the difference as a transform). A
+ * leaving item is taken out of the flow at once, so the items after it move
+ * up smoothly instead of jumping when it finally goes.
+ */
+.motion-list-enter-active {
+  transition:
+    opacity var(--motion-duration-slow) var(--motion-ease-out),
+    transform var(--motion-duration-slow) var(--motion-ease-out);
+}
+.motion-list-leave-active {
+  position: absolute;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-in);
+}
+.motion-list-enter-from {
+  opacity: 0;
+  transform: translateY(var(--motion-rise));
+}
+.motion-list-leave-to {
+  opacity: 0;
+}
+.motion-list-move {
+  transition: transform var(--motion-duration-slow) var(--motion-ease-in-out);
+}
+
+/*
+ * motion-cards: cards on a board.
+ *
+ * Like a list, except that a card leaving one column goes at once: it is
+ * arriving in another, and two copies of it on screen — one fading, one
+ * rising — would read as a duplicate. The cards it leaves behind close the gap
+ * smoothly, and the ones in its new column make room for it the same way.
+ */
+.motion-cards-enter-active {
+  transition:
+    opacity var(--motion-duration-slow) var(--motion-ease-out),
+    transform var(--motion-duration-slow) var(--motion-ease-out);
+}
+.motion-cards-enter-from {
+  opacity: 0;
+  transform: translateY(var(--motion-rise)) scale(var(--motion-scale));
+}
+.motion-cards-move {
+  transition: transform var(--motion-duration-slow) var(--motion-ease-in-out);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Utilities.                                                                */
+/* ------------------------------------------------------------------------- */
+
+/*
+ * motion-pop-in: the motion-pop entrance as a class, for a popover that is
+ * simply shown with v-if. A class on the element rather than a <Transition>
+ * around it, so adding it does not re-indent a template other people are
+ * editing; it costs only the exit, which is the half nobody watches.
+ */
+@keyframes motion-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-rise) / 2)) scale(var(--motion-scale));
+  }
+}
+:root:is([data-motion="full"], [data-motion="reduced"]) .motion-pop-in {
+  animation: motion-pop-in var(--motion-duration) var(--motion-ease-out);
+}
+
+/* ------------------------------------------------------------------------- */
+
+/*
+ * motion-press: a control that gives under a finger.
+ *
+ * Only under full motion — a press that moves is still a movement.
+ */
+:root[data-motion="full"] .motion-press {
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+:root[data-motion="full"] .motion-press:active:not(:disabled, [aria-disabled="true"]) {
+  transform: scale(0.97);
+}
+
+/* motion-row: a list row answering the pointer, the same everywhere. */
+.motion-row {
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+/*
+ * motion-badge: an unread count appearing.
+ *
+ * The one thing allowed to overshoot, because its whole job is to be noticed.
+ */
+@keyframes motion-badge {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+:root[data-motion="full"] .motion-badge {
+  animation: motion-badge var(--motion-duration-slow) var(--motion-ease-pop);
+}
+:root[data-motion="reduced"] .motion-badge {
+  animation: motion-fade-in var(--motion-duration) var(--motion-ease-out);
+}
+
+@keyframes motion-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/*
+ * motion-shimmer: a placeholder that is visibly waiting.
+ *
+ * A highlight crossing the shape, drawn on a pseudo-element and moved with a
+ * transform, so it costs a composite rather than a repaint every frame.
+ */
+@keyframes motion-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.motion-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+:root[data-motion="full"] .motion-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--foreground) 7%, transparent),
+    transparent
+  );
+  animation: motion-shimmer 1.4s var(--motion-ease-in-out) infinite;
+}
+
+/*
+ * motion-typing: three dots that say somebody is writing.
+ *
+ * Staggered so they read as a wave. Under reduced motion they stay still and
+ * the sentence beside them says the same thing.
+ */
+@keyframes motion-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.motion-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.motion-typing > span {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.5;
+}
+:root[data-motion="full"] .motion-typing > span {
+  animation: motion-typing 1s var(--motion-ease-in-out) infinite;
+}
+:root[data-motion="full"] .motion-typing > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+:root[data-motion="full"] .motion-typing > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/*
+ * Arriving on a page: the content settles the last few pixels into place.
+ *
+ * A transform rather than a fade, deliberately. A page at partial opacity has
+ * text at partial contrast, and the accessibility audit measured a label at
+ * 4.39:1 mid-fade — anybody (or any screenshot) catching a screen in its first
+ * frames would read the same. Movement alone acknowledges the change without
+ * ever dimming what is on it, and nothing waits on it: the page is interactive
+ * from the first frame.
+ *
+ * Full motion only, since it is movement. Keyed on a page's root being
+ * inserted, so it plays when somebody goes to a different screen and not when
+ * they move between two conversations, which reuse the same one: flicking
+ * through channels with the keyboard should not jiggle.
+ */
+@keyframes motion-page {
+  from {
+    transform: translateY(calc(var(--motion-rise) / 2));
+  }
+}
+:root[data-motion="full"] main > :not([class*="animate-"]) {
+  animation: motion-page var(--motion-duration) var(--motion-ease-out);
+}
+
+/*
+ * The mark on a message a search or a thread jumped to. Somebody who turned
+ * motion down still needs to see which message it is, so the mark is shown
+ * and simply does not fade.
+ */
+:root:is([data-motion="reduced"], [data-motion="off"]) .just-found {
+  animation: none !important;
+  background-color: color-mix(in oklab, var(--color-primary) 22%, transparent);
+}

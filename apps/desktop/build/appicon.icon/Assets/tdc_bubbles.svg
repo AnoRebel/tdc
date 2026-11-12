@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    The mark's foreground, alone, for macOS Icon Composer.
+
+    Icon Composer supplies the ground itself — the fill in icon.json, and the
+    glass, shadow and tinting that macOS 26 renders around it — so this layer
+    is only the two bubbles from tdc.svg, in the same positions, with the
+    further one at half opacity as it is there. Drawing a ground here would put
+    a square of purple under the system's own rounded one.
+  -->
+  <path fill="#ffffff" fill-opacity="0.5"
+        d="M262 96h134a54 54 0 0 1 54 54v92a54 54 0 0 1-54 54h-6v54l-56-54h-72
+           a54 54 0 0 1-54-54v-92a54 54 0 0 1 54-54z"/>
+  <path fill="#ffffff"
+        d="M116 226h150a54 54 0 0 1 54 54v96a54 54 0 0 1-54 54h-72l-62 52 8-52h-24
+           a54 54 0 0 1-54-54v-96a54 54 0 0 1 54-54z"/>
+</svg>

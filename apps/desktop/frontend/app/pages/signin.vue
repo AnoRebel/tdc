@@ -1,0 +1,433 @@
+<script setup lang="ts">
+import { useForm } from "@tanstack/vue-form";
+import type { AnyFieldApi } from "@tanstack/vue-form";
+import * as v from "valibot";
+
+import type { OAuthResult, SecondFactorRequired } from "@tdc/types";
+import { isApiError, needsSecondFactor } from "@tdc/types";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Checkbox } from "#layers/ui/app/components/ui/checkbox";
+import { Field } from "#layers/ui/app/components/ui/field";
+import { Input } from "#layers/ui/app/components/ui/input";
+import { Spinner } from "#layers/ui/app/components/ui/spinner";
+import * as Api from "#bindings/api";
+
+/**
+ * Signing in to the chosen server.
+ *
+ * The form and what it does are the web client's, over the same shared useAuth
+ * — the request goes through the desktop transport, and the session lands in
+ * the Go client's jar rather than a browser's cookie store. What the desktop
+ * adds is the offer to be remembered: the web leaves a session cookie the
+ * browser keeps, and the desktop has no browser to keep one, so staying signed
+ * in between launches means putting the credentials in the operating system's
+ * keychain — which is a choice, made here, not a default.
+ */
+
+definePageMeta({ layout: "auth" });
+
+const { signIn, refresh, setupStatus } = useAuth();
+const router = useRouter();
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+useHead({ title: $ts("auth.signIn") });
+
+const server = ref("");
+const remember = ref(false);
+const error = ref<string | null>(null);
+const submitting = ref(false);
+
+const { begin, finish } = useOAuth();
+const { available: recoveryAvailable } = useRecovery();
+
+/*
+ * Signing in through a provider, which works differently here.
+ *
+ * The web navigates to the provider and the callback brings the same browser
+ * back. This client has no browser to send: it hands the URL to the system one,
+ * where the address bar shows whose page is asking for the password, and stays
+ * where it is. The callback then resolves somewhere this window cannot see.
+ *
+ * What it holds is the state the server issued, which is enough to collect the
+ * outcome of its own sign-in afterwards — so it asks, at intervals, until the
+ * answer arrives or the sign-in expires.
+ */
+// A sign-in that stopped short of a session, as on the web.
+const awaitingSecondFactor = ref<SecondFactorRequired | null>(null);
+
+// Asking for a way back in. The link itself lands in a browser, not here.
+const askingForRecovery = ref(false);
+
+const openingProvider = ref<string | null>(null);
+const waitingForProvider = ref(false);
+const returned = ref<OAuthResult | null>(null);
+const returnedState = ref("");
+
+/*
+ * How often to ask, and for how long.
+ *
+ * Every two seconds is prompt enough that somebody returning to this window
+ * finds it already signed in, and rare enough to be nothing. The sign-in itself
+ * expires after ten minutes at the server, so asking past that would be asking
+ * about something that no longer exists.
+ */
+const askInterval = 2000;
+const giveUpAfter = 10 * 60 * 1000;
+
+/*
+ * Where they were trying to reach before any of this started: the sign-in
+ * gate sends them here with it, and the web client returns them to it. The
+ * desktop's did not, so a link opened while signed out ended on the
+ * conversations list instead.
+ */
+function intendedNext(): string | undefined {
+  const next = router.currentRoute.value.query.next;
+  return typeof next === "string" ? next : undefined;
+}
+
+async function chooseProvider(provider: string) {
+  error.value = null;
+  openingProvider.value = provider;
+
+  try {
+    const start = await begin(provider, intendedNext());
+    await Api.Service.OpenSignIn(start.url);
+    openingProvider.value = null;
+    await waitForProvider(start.state);
+  } catch (cause) {
+    openingProvider.value = null;
+    waitingForProvider.value = false;
+    error.value = isApiError(cause) ? cause.message : $ts("desktop.signin.couldNotOpenBrowser");
+  }
+}
+
+/** Ask for the outcome of this sign-in until there is one. */
+async function waitForProvider(state: string) {
+  waitingForProvider.value = true;
+  const until = Date.now() + giveUpAfter;
+
+  while (waitingForProvider.value && Date.now() < until) {
+    const result = await finish({ state });
+
+    if (result.status === "waiting") {
+      await new Promise((resolve) => setTimeout(resolve, askInterval));
+      continue;
+    }
+
+    waitingForProvider.value = false;
+
+    if (result.status === "signed-in" || result.status === "linked") {
+      await signedInThroughProvider(result);
+      return;
+    }
+
+    // A question, or a way it did not happen. Either way it is shown here.
+    returnedState.value = state;
+    returned.value = result;
+    return;
+  }
+
+  waitingForProvider.value = false;
+}
+
+/** Somebody finished a sign-in that owed a second factor. */
+async function signedInWithSecondFactor() {
+  awaitingSecondFactor.value = null;
+  await router.push(intendedNext() || localeRoute({ name: "index" }));
+}
+
+/** Somebody signed in with a passkey, which is already a session. */
+async function signedInWithPasskey() {
+  await refresh();
+  await router.push(intendedNext() || localeRoute({ name: "index" }));
+}
+
+/** Somebody signed in through a provider, one way or another. */
+async function signedInThroughProvider(result: OAuthResult) {
+  returned.value = null;
+  await refresh();
+  await router.push(result.redirectTo || intendedNext() || localeRoute({ name: "index" }));
+}
+
+// Nothing is waited for once this screen is gone.
+onBeforeUnmount(() => {
+  waitingForProvider.value = false;
+});
+
+/*
+ * What a sign-in needs before it is worth sending.
+ *
+ * Valibot rather than a hand-written check, so the rule is stated once and the
+ * message beside the field is the same string the rule carries. The server
+ * decides whether the credentials are right; this only decides whether there is
+ * anything to ask about.
+ */
+const credentials = v.object({
+  username: v.pipe(v.string(), v.trim(), v.minLength(1, $ts("auth.usernameGoesHere"))),
+  password: v.pipe(v.string(), v.minLength(1, $ts("auth.passwordGoesHere"))),
+});
+
+/** The first thing wrong with a field, once somebody has touched it. */
+function firstError(field: AnyFieldApi): string | undefined {
+  if (!field.state.meta.isTouched) return undefined;
+  const [issue] = field.state.meta.errors;
+  if (!issue) return undefined;
+  return typeof issue === "string" ? issue : (issue as { message?: string }).message;
+}
+
+// Whether this machine has anywhere safe to keep credentials. Without a
+// keychain the offer would be a checkbox that silently does nothing, so it is
+// not shown; the servers screen already explains why signing in each time is
+// what happens here.
+const keychain = ref(false);
+
+// The username last remembered for this server, offered so somebody is not
+// retyping what the machine already knows.
+onMounted(async () => {
+  try {
+    const current = await Api.Service.CurrentServer();
+    if (!current) {
+      // No server chosen yet — that screen comes first.
+      await router.replace(localeRoute({ name: "servers" }));
+      return;
+    }
+    server.value = current;
+
+    /*
+     * A server with no accounts yet cannot be signed in to, so its first
+     * visitor sets it up instead — as on the web. Unknown is not an error
+     * here: the form is shown, and signing in reports the problem against
+     * something the person actually did.
+     */
+    try {
+      if ((await setupStatus()).setupRequired) {
+        await router.replace(localeRoute({ name: "setup" }));
+        return;
+      }
+    } catch {
+      // Unreachable or unanswerable; the form stays.
+    }
+
+    try {
+      keychain.value = (await Api.Service.CredentialStorage()) !== "none";
+    } catch {
+      keychain.value = false;
+    }
+
+    try {
+      const remembered = await Api.Service.Recall(current);
+      if (remembered) {
+        form.setFieldValue("username", remembered);
+        // A remembered username means they asked to be remembered before, so
+        // the box starts ticked — unticking it is how somebody stops being.
+        remember.value = true;
+      }
+    } catch {
+      // Nothing remembered, or no keychain. The empty form is correct.
+    }
+  } catch (cause) {
+    error.value = $ts("desktop.signin.startupError", {
+      message: String((cause as Error)?.message ?? cause),
+    });
+  }
+});
+
+/*
+ * The form itself, which owns what was typed and when it is valid.
+ *
+ * The submit below is unchanged in what it does — it is the same sign-in, the
+ * same offer to be remembered, the same messages. What it no longer does is
+ * hold the two fields in refs of its own and decide by hand whether they are
+ * filled in.
+ */
+const form = useForm({
+  defaultValues: { username: "", password: "" },
+  validators: { onSubmit: credentials },
+  async onSubmit({ value }) {
+    error.value = null;
+    submitting.value = true;
+
+    try {
+      const outcome = await signIn({ username: value.username, password: value.password });
+
+      if (needsSecondFactor(outcome)) {
+        awaitingSecondFactor.value = outcome;
+        return;
+      }
+
+      // Kept only if asked, and only where there is a keychain to keep it in.
+      // The session token stays on the Go side; what is handed over is what the
+      // person typed, so Go can sign in again with it after a relaunch.
+      // Declining simply stores nothing — the server stays chosen and the
+      // session stays live for this run; it is just not remembered past it.
+      // Forgetting the server here would undo the sign-in that just succeeded.
+      if (remember.value && keychain.value) {
+        try {
+          await Api.Service.Remember(server.value, value.username, value.password, "");
+        } catch {
+          // Being remembered failed, but signing in did not. Better to be
+          // signed in and not remembered than to lose the sign-in over the
+          // keychain.
+        }
+      }
+
+      await router.push(intendedNext() || localeRoute({ name: "index" }));
+    } catch (cause) {
+      if (isApiError(cause) && cause.code === "rate-limited") {
+        const wait = cause.retryAfterSeconds;
+        error.value = wait
+          ? $ts("auth.tooManyAttemptsMinutes", { count: Math.ceil(wait / 60) })
+          : $ts("auth.tooManyAttempts");
+      } else if (isApiError(cause)) {
+        error.value = cause.message;
+      } else {
+        error.value = $ts("error.couldNotReach");
+      }
+    } finally {
+      submitting.value = false;
+    }
+  },
+});
+</script>
+
+<template>
+  <div>
+    <!-- Returning from a provider with a question to answer. The sign-in form
+         is not shown underneath it: there is one thing to do here. -->
+    <SignInProviderReturn
+      v-if="returned"
+      :state="returnedState"
+      :result="returned"
+      @done="signedInThroughProvider"
+      @cancel="returned = null"
+    />
+
+    <RecoveryRequest v-else-if="askingForRecovery" @cancel="askingForRecovery = false" />
+
+    <SecondFactorPrompt
+      v-else-if="awaitingSecondFactor"
+      :pending="awaitingSecondFactor"
+      @done="signedInWithSecondFactor"
+      @cancel="awaitingSecondFactor = null"
+    />
+
+    <div v-else>
+      <!-- Draws nothing where either side cannot do it. On the desktop the
+           authenticator prompt is the operating system's, which is the one
+           place this client does not have to be a browser to be trusted. -->
+      <SignInWithPasskey @done="signedInWithPasskey" />
+
+      <div class="mb-6 text-center">
+        <h2 class="text-base font-semibold">{{ $t("auth.signIn") }}</h2>
+        <p v-if="server" class="mt-1 truncate text-xs text-muted-foreground">{{ server }}</p>
+      </div>
+
+      <form class="space-y-4" @submit.prevent="form.handleSubmit()">
+        <p
+          v-if="error"
+          class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          role="alert"
+        >
+          {{ error }}
+        </p>
+
+        <form.Field name="username">
+          <template #default="{ field }">
+            <Field :label="$ts('auth.usernameOrEmail')" :error="firstError(field)" required>
+              <template #default="{ id, invalid, describedBy }">
+                <Input
+                  :id="id"
+                  :model-value="field.state.value"
+                  autofocus
+                  autocomplete="username"
+                  :invalid="invalid"
+                  :described-by="describedBy"
+                  @update:model-value="field.handleChange($event)"
+                  @blur="field.handleBlur"
+                />
+              </template>
+            </Field>
+          </template>
+        </form.Field>
+
+        <form.Field name="password">
+          <template #default="{ field }">
+            <Field :label="$ts('auth.password')" :error="firstError(field)" required>
+              <template #default="{ id, invalid, describedBy }">
+                <Input
+                  :id="id"
+                  type="password"
+                  :model-value="field.state.value"
+                  autocomplete="current-password"
+                  :invalid="invalid"
+                  :described-by="describedBy"
+                  @update:model-value="field.handleChange($event)"
+                  @blur="field.handleBlur"
+                />
+              </template>
+            </Field>
+          </template>
+        </form.Field>
+
+        <!-- The label wraps its control, which is how HTML associates the
+             two. The rule cannot see the input inside <Checkbox>. -->
+        <!-- eslint-disable-next-line vuejs-accessibility/label-has-for -->
+        <label v-if="keychain" class="flex cursor-pointer items-center gap-2">
+          <Checkbox v-model="remember" />
+          <span class="text-sm">{{ $t("desktop.signin.keepSignedIn") }}</span>
+        </label>
+
+        <Button type="submit" class="h-9 w-full" :disabled="submitting">
+          {{ submitting ? $t("auth.signingIn") : $t("auth.signIn") }}
+        </Button>
+      </form>
+
+      <!-- Draws nothing when the server offers no providers. -->
+      <SignInProviders :busy="openingProvider" @choose="chooseProvider" />
+
+      <!-- The browser is open somewhere else, and this window is waiting for
+           it. Said plainly, because a window that looks idle while something is
+           happening reads as a window that did nothing. -->
+      <p
+        v-if="waitingForProvider"
+        class="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground"
+        role="status"
+      >
+        <Spinner size="sm" />
+        {{ $t("desktop.signin.waitingForBrowser") }}
+      </p>
+
+      <!-- The mail carries a link to the server's own page, which opens in a
+           browser. This client then signs in with the new password like any
+           other, so nothing here has to receive it. -->
+      <p v-if="recoveryAvailable" class="mt-4 text-center text-xs">
+        <button
+          type="button"
+          class="font-medium text-muted-foreground hover:text-foreground hover:underline"
+          @click="askingForRecovery = true"
+        >
+          {{ $t("auth.forgottenPassword") }}
+        </button>
+      </p>
+
+      <p class="mt-6 text-center text-xs text-muted-foreground">
+        {{ $t("auth.noAccountYet") }}
+        <NuxtLink
+          :to="localeRoute({ name: 'register' })"
+          class="font-medium text-primary hover:underline"
+        >
+          {{ $t("auth.createOne") }}
+        </NuxtLink>
+      </p>
+
+      <p class="mt-2 text-center text-xs text-muted-foreground">
+        {{ $t("desktop.signin.differentServer") }}
+        <NuxtLink
+          :to="localeRoute({ name: 'servers' })"
+          class="font-medium text-primary hover:underline"
+        >
+          {{ $t("desktop.signin.chooseOne") }}
+        </NuxtLink>
+      </p>
+    </div>
+  </div>
+</template>

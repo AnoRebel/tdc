@@ -1,0 +1,21 @@
+# Development tool versions.
+#
+# Pinned so that every contributor and every continuous integration run uses
+# the same toolchain. Run "mise install" after cloning.
+#
+# These are exact versions rather than ranges: a toolchain that drifts between
+# contributors produces failures that are hard to reproduce.
+#
+# This file governs local development. Continuous integration is deliberately
+# different: it takes the latest release of the runtimes that publish one
+# regularly — Bun in particular — so that an incompatibility is found by a
+# build rather than by a contributor months later. Go and Wails stay pinned
+# there, for the reason above.
+
+[tools]
+go = "1.27.4"
+sqlc = "1.31.1"
+air = "1.67.4"
+golangci-lint = "2.15.0"
+task = "3.54.0"
+bun = "1.4.4"

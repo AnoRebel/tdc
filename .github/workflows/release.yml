@@ -1,0 +1,569 @@
+# What a release is, and what makes one trustworthy.
+#
+# The desktop client refuses an update it cannot prove came from here. That
+# proof is a sigstore bundle, signed with no key at all: GitHub vouches for the
+# workflow through OIDC, sigstore records the certificate in a public
+# transparency log, and the client checks the certificate names this repository
+# and this issuer. There is no signing key to leak, rotate or lose, and no
+# maintainer holds one.
+#
+# The client's side of that contract is in apps/desktop/internal/updater —
+# certIdentityIssuer and certIdentitySANRegex — and the two have to agree. A
+# rename of this repository breaks verification until both are changed, which is
+# the correct outcome: an artifact from somewhere else should not install.
+name: Release
+
+on:
+  push:
+    # Only a tag. A release is a deliberate act, not something a branch does.
+    tags: ["v*"]
+  # So the workflow can be exercised without cutting a release.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, without a leading v"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  # What is being released, decided once so every job agrees.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: pick
+        name: Work out the version
+        # A tag is the source of truth when there is one; a manual run says so
+        # itself. Either way it is checked against VERSION, because a tag that
+        # disagrees with the file produces a binary that reports one version and
+        # is published as another.
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            version="${{ inputs.version }}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+
+          declared=$(cat VERSION)
+          if [ "$version" != "$declared" ]; then
+            echo "The tag says $version and VERSION says $declared."
+            echo "One of them is wrong; a binary that reports a version it was not published as is worse than a failed release."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # The desktop client, one binary per platform.
+  desktop:
+    needs: version
+    strategy:
+      # One platform failing should not cancel the others: knowing that Linux
+      # and macOS built and Windows did not is more useful than knowing the
+      # matrix stopped.
+      #
+      # It does still fail the release. fail-fast governs whether the siblings
+      # are cancelled, not whether the job succeeds — a failed leg fails the
+      # matrix, and publish needs this job, so nothing is published. That is the
+      # intended outcome: a release missing a platform is one where those people
+      # silently get no update.
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          # A native arm64 runner rather than cross-compilation: the webview is
+          # cgo against the platform's own GTK and WebKit, which cannot be
+          # cross-compiled without a sysroot nobody wants to maintain.
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          # The legacy toolkit, for distributions that predate GTK4.
+          #
+          # Ubuntu 22.04, Debian 12 and RHEL 9 are all still supported and none
+          # of them has WebKitGTK 6.0, so the default build will not start on
+          # any of them. Somebody running a long-term-support distribution is
+          # exactly the person a self-hosted client should not exclude.
+          #
+          # Deliberately time-limited: Wails schedules the gtk3 path for removal
+          # in v3.1, and those distributions leave support before that becomes
+          # urgent. The variant is named so nobody downloads it by accident.
+          - os: ubuntu-22.04
+            goos: linux
+            goarch: amd64
+            variant: gtk3
+          # The Intel label by name: GitHub retired macos-13, and a job asking
+          # for a runner that no longer exists does not fail — it waits, and the
+          # Intel build simply never appears in the release.
+          - os: macos-15-intel
+            goos: darwin
+            goarch: amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+          - os: windows-11-arm
+            goos: windows
+            goarch: arm64
+
+    runs-on: ${{ matrix.os }}
+    permissions:
+      # Sigstore's keyless signing: the token is what the certificate attests to.
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/desktop/go.mod
+          cache-dependency-path: apps/desktop/go.sum
+
+      - name: Install the webview's dependencies
+        if: matrix.goos == 'linux' && matrix.variant != 'gtk3'
+        # GTK4 and WebKitGTK 6.0, the default build path.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Install the legacy webview's dependencies
+        if: matrix.variant == 'gtk3'
+        # GTK3 and WebKitGTK 4.1, which is what the distributions this variant
+        # exists for actually ship.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the frontend
+        # Before the Go build, which embeds its output.
+        run: bun run --cwd apps/desktop/frontend build
+
+      - name: Build
+        working-directory: apps/desktop
+        env:
+          # Reproducibility: the commit's own timestamp rather than the moment
+          # the runner happened to start, so two builds of one commit agree.
+          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+          # The legacy toolkit where this is that variant. Empty otherwise, so
+          # the default path is unchanged.
+          EXTRA_TAGS: ${{ matrix.variant == 'gtk3' && 'gtk3' || '' }}
+        run: go run github.com/wailsapp/wails/v3/cmd/wails3 task build
+
+      - name: Package it
+        id: packages
+        if: matrix.goos != 'windows' && !matrix.variant
+        working-directory: apps/desktop
+        shell: bash
+        env:
+          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+          # The AppImage tool is itself an AppImage, and runners have no FUSE.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        # What can update itself — an AppImage, a .app bundle — and what a
+        # distribution installs. The plain binary stays beside them for
+        # anybody who wants only that.
+        run: |
+          version="${{ needs.version.outputs.version }}"
+          stem="tdc-${version}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          wails() { go run github.com/wailsapp/wails/v3/cmd/wails3 "$@"; }
+          made=()
+          if [ "${{ matrix.goos }}" = "darwin" ]; then
+            wails task darwin:package
+            # ditto keeps the bundle's symlinks and attributes, which zip does not.
+            ditto -c -k --keepParent bin/tdc.app "../../${stem}.app.zip"
+            made+=("${stem}.app.zip")
+          else
+            # The AppImage only on amd64: the tool that makes one has no arm64
+            # build, so arm64 is told of updates and given the release page.
+            if [ "${{ matrix.goarch }}" = "amd64" ]; then
+              wails task linux:create:appimage
+              mv bin/*.AppImage "../../${stem}.AppImage"
+              made+=("${stem}.AppImage")
+            fi
+            wails task linux:create:deb
+            wails task linux:create:rpm
+            mv bin/*.deb "../../${stem}.deb"
+            mv bin/*.rpm "../../${stem}.rpm"
+            made+=("${stem}.deb" "${stem}.rpm")
+          fi
+          echo "paths=${made[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Name the artifact
+        id: artifact
+        shell: bash
+        # One name carrying the version and the platform, so a directory of
+        # downloads is readable and nothing collides.
+        run: |
+          name="tdc-${{ needs.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          # Named so nobody downloads the legacy build by accident, and so it
+          # does not collide with the default one for the same platform.
+          if [ -n "${{ matrix.variant }}" ]; then
+            name="$name-${{ matrix.variant }}"
+          fi
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            mv apps/desktop/bin/tdc.exe "$name.exe"
+            echo "path=$name.exe" >> "$GITHUB_OUTPUT"
+          else
+            mv apps/desktop/bin/tdc "$name"
+            echo "path=$name" >> "$GITHUB_OUTPUT"
+          fi
+          echo "key=${{ matrix.goos }}/${{ matrix.goarch }}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign it
+        uses: sigstore/gh-action-sigstore-python@v3.5.0
+        with:
+          inputs: ${{ steps.artifact.outputs.path }} ${{ steps.packages.outputs.paths }}
+          # A bundle beside each artifact, for anybody checking a download by
+          # hand. Nothing is uploaded to a release without one.
+          upload-signing-artifacts: false
+
+      - name: Keep the artifact and its proof together
+        uses: actions/upload-artifact@v7
+        with:
+          name: tdc-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}
+          # Each bundle's name is its artifact's with .sigstore.json appended.
+          path: |
+            tdc-*
+          if-no-files-found: error
+
+  # The server, which unlike the desktop client cross-compiles.
+  #
+  # CGO is off, so one runner produces every platform: no webview, no system
+  # libraries, nothing that needs the target's own toolchain. That is also what
+  # makes the binary static and the container image able to be distroless.
+  server:
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the web application
+        # The server serves it from its own origin, so it is part of the
+        # release rather than a separate download. Empty base means "wherever
+        # this was served from", which is the only answer that is right at
+        # every address an operator might run this on.
+        env:
+          NUXT_PUBLIC_API_BASE: ""
+        run: bun run --cwd apps/web generate
+
+      - name: Build
+        working-directory: server
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          # The commit's own timestamp, so two builds of one commit agree.
+          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+        run: |
+          go build \
+            -trimpath \
+            -ldflags="-s -w -buildid= \
+              -X github.com/AnoRebel/tdc/server/internal/buildinfo.Commit=${GITHUB_SHA} \
+              -X github.com/AnoRebel/tdc/server/internal/buildinfo.BuildTime=${SOURCE_DATE_EPOCH}" \
+            -o ../tdc-server ./cmd/tdc-server
+
+      - name: Package it
+        id: artifact
+        # The binary and the web application together, since the server needs
+        # both and an operator downloading one file should get a working
+        # server rather than half of one.
+        run: |
+          name="tdc-server-${{ needs.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          mkdir -p "$name/web"
+          cp -r apps/web/.output/public/. "$name/web/"
+          cp VERSION "$name/"
+
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            mv tdc-server "$name/tdc-server.exe"
+          else
+            mv tdc-server "$name/tdc-server"
+          fi
+
+          tar --sort=name --mtime="@${SOURCE_DATE_EPOCH:-0}" \
+              --owner=0 --group=0 --numeric-owner \
+              -czf "$name.tar.gz" "$name"
+
+          echo "path=$name.tar.gz" >> "$GITHUB_OUTPUT"
+        env:
+          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
+
+      - name: Sign it
+        uses: sigstore/gh-action-sigstore-python@v3.5.0
+        with:
+          inputs: ${{ steps.artifact.outputs.path }}
+          upload-signing-artifacts: false
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tdc-server-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            ${{ steps.artifact.outputs.path }}
+            ${{ steps.artifact.outputs.path }}.sigstore.json
+          if-no-files-found: error
+
+  # The container image, for the operators who deploy that way.
+  #
+  # Two architectures under one tag, so `docker run` on a Raspberry Pi and on a
+  # rented amd64 box both pull something that runs — rather than the operator
+  # having to know which suffix their machine wants.
+  image:
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      # Pushing to this repository's own registry namespace.
+      packages: write
+      contents: read
+      # Sigstore again: an image is as much a thing to be forged as a binary.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # QEMU for the architecture this runner is not, since the image is built
+      # rather than cross-compiled: the Go build inside it sets CGO_ENABLED=0,
+      # but bun and the base image still run as the target architecture.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Work out the tags
+        id: tags
+        # The version, and `latest` — but only for a real release. A manual run
+        # exercising the workflow must not move the tag everybody pulls.
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/tdc-server"
+          tags="$image:${{ needs.version.outputs.version }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tags="$tags,$image:latest"
+          fi
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          # Built either way, pushed only for a release: a manual run is a
+          # rehearsal, and must not publish an image under the version.
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.event.repository.pushed_at }}
+          # The commit's timestamp rather than the build's, so two builds of one
+          # commit produce the same layers.
+          provenance: mode=max
+          sbom: true
+
+      - name: Sign the image
+        if: github.event_name == 'push'
+        # By digest rather than tag: a tag can be moved afterwards, and a
+        # signature that followed it would attest to whatever it was moved to.
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE: ${{ steps.tags.outputs.image }}
+        run: |
+          go install github.com/sigstore/cosign/v2/cmd/cosign@latest
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+
+  publish:
+    needs: [version, desktop, server, image]
+    runs-on: ubuntu-latest
+    permissions:
+      # Creating the release.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history and every tag, because the release notes are the
+          # commits since the previous release and a shallow clone has neither
+          # the commits nor the tag to measure from.
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/desktop/go.mod
+          cache-dependency-path: apps/desktop/go.sum
+
+      - name: Write the update manifest
+        # What each copy that can update itself downloads, one per platform:
+        # the AppImage, the .app, the Windows executable — and arm64 Linux's
+        # plain binary, which has no AppImage, so it is told of the update and
+        # given this release's page. Each entry is signed with the key whose
+        # public half the client carries; the private half is only here.
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          TDC_UPDATER_KEY: ${{ secrets.TDC_UPDATER_KEY }}
+        run: |
+          if [ -z "$TDC_UPDATER_KEY" ]; then
+            echo "TDC_UPDATER_KEY is not set, so no update can be signed" >&2
+            exit 1
+          fi
+          key="$(mktemp)"
+          trap 'rm -f "$key"' EXIT
+          chmod 600 "$key"
+          printf '%s\n' "$TDC_UPDATER_KEY" > "$key"
+
+          mkdir offered
+          for file in \
+            "artifacts/tdc-${VERSION}-linux-amd64.AppImage" \
+            "artifacts/tdc-${VERSION}-linux-arm64" \
+            artifacts/tdc-"${VERSION}"-darwin-*.app.zip \
+            artifacts/tdc-"${VERSION}"-windows-*.exe; do
+            ln "$file" offered/
+          done
+
+          wails() { (cd apps/desktop && go run github.com/wailsapp/wails/v3/cmd/wails3 "$@"); }
+          wails updater manifest -version "$VERSION" -key "$key" \
+            -url-prefix "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/" \
+            -output "$PWD/artifacts/update-manifest.json" "$PWD/offered"
+          wails updater verify -manifest "$PWD/artifacts/update-manifest.json" \
+            -publickey "$PWD/apps/desktop/build/tdc.key.pub" -dir "$PWD/offered"
+
+      - name: Write the checksums
+        # One file covering every artifact, so somebody who downloaded over a
+        # bad connection can tell. It is not a substitute for the signatures —
+        # a checksum file alongside the downloads proves nothing an attacker
+        # who replaced both could not also have written — which is why the
+        # signatures exist and why this is a convenience rather than the
+        # security story.
+        working-directory: artifacts
+        run: |
+          shopt -s extglob
+          # Every artifact except the signatures, in the glob's sorted order.
+          sha256sum !(*.sigstore.json) > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Write the release notes
+        id: notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        # The commit subjects since the previous release, as they were written.
+        #
+        # No parsing, no categories, no "feat:" prefixes to strip: the subjects
+        # in this repository are already sentences saying what changed for
+        # somebody using it, which is what release notes are. Reformatting them
+        # into a taxonomy would lose the one thing that makes them readable.
+        #
+        # Merge commits are left out — they say which branch met which, not what
+        # changed — and so is the release commit itself where there is one.
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'v*' --exclude '*-dev' "v${VERSION}^" 2>/dev/null || true)
+
+          {
+            if [ -n "$previous" ]; then
+              echo "## What changed since ${previous}"
+              echo
+              git log --no-merges --format='- %s' "${previous}..v${VERSION}"
+              echo
+              echo "**Full log:** https://github.com/${GITHUB_REPOSITORY}/compare/${previous}...v${VERSION}"
+            else
+              # The first release. There is no "since" to describe, and a list
+              # of every commit ever made is not release notes.
+              echo "## The first release"
+              echo
+              echo "See the [documentation](https://github.com/${GITHUB_REPOSITORY}/tree/v${VERSION}/docs) for what this is and how to run it."
+            fi
+
+            echo
+            echo "### Verifying what you downloaded"
+            echo
+            echo "Every artifact is signed with sigstore, keylessly — there is no signing key, and no maintainer holds one."
+            echo "\`SHA256SUMS\` covers the same files, for checking a download that may have been truncated."
+            echo
+            echo "\`\`\`"
+            echo "cosign verify-blob \\"
+            echo "  --bundle <artifact>.sigstore.json \\"
+            echo "  --certificate-identity 'https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@refs/tags/v${VERSION}' \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\"
+            echo "  <artifact>"
+            echo "\`\`\`"
+          } > release-notes.md
+
+          cat release-notes.md
+
+      - name: Publish
+        # Only for a tag. A manual run is a rehearsal: everything is built,
+        # signed and checked, and kept below instead of published.
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          body_path: release-notes.md
+          # Every artifact, its signature, and update-manifest.json, which the
+          # desktop client reads from the latest release.
+          files: |
+            artifacts/*
+          fail_on_unmatched_files: true
+
+      - name: Keep what a release would have published
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-rehearsal-${{ needs.version.outputs.version }}
+          path: |
+            artifacts/*
+            release-notes.md
+          if-no-files-found: error

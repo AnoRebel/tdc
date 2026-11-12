@@ -7,5 +7,19 @@
  * party writing an integration.
  */
 
+export * from "./charts";
+export * from "./client";
+export * from "./apiclient";
 export * from "./server";
+export * from "./auth";
+export * from "./rooms";
+export * from "./presence";
 export * from "./errors";
+export * from "./search";
+export * from "./integrations";
+export * from "./directory";
+export * from "./projects";
+export * from "./calls";
+export * from "./transfers";
+export * from "./translation";
+export * from "./events";

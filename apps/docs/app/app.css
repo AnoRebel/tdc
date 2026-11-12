@@ -1,0 +1,92 @@
+/*
+ * Imported by the layer after Tailwind and Nuxt UI (see its css module), so
+ * utilities and theme variables are available here.
+ */
+@source "./";
+
+/*
+ * Moving between pages: a quick cross-fade with the content rising a few
+ * pixels, through the browser's view transitions. Fast on purpose — a docs
+ * site is read by people jumping between pages, and motion that makes them
+ * wait is motion in the way.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 160ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+::view-transition-new(root) {
+  animation-name: tdc-enter;
+}
+::view-transition-old(root) {
+  animation-name: tdc-leave;
+}
+
+@keyframes tdc-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes tdc-leave {
+  to {
+    opacity: 0;
+  }
+}
+
+/* The front page's sections arrive one after another, once. */
+@keyframes tdc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.tdc-rise {
+  animation: tdc-rise 360ms cubic-bezier(0.2, 0, 0, 1) both;
+  animation-delay: calc(var(--tdc-order, 0) * 50ms);
+}
+
+/* Cards answer the pointer and the keyboard alike. */
+.tdc-card {
+  transition:
+    transform 150ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 150ms,
+    box-shadow 150ms;
+}
+.tdc-card:hover,
+.tdc-card:focus-within {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px -12px color-mix(in oklab, var(--ui-primary) 45%, transparent);
+}
+
+/* A section jumped to from a link or the contents flashes once, so the eye finds it. */
+:target {
+  scroll-margin-top: calc(var(--ui-header-height) + 1.5rem);
+}
+h2:target,
+h3:target,
+h4:target {
+  animation: tdc-target 1.2s ease-out;
+}
+@keyframes tdc-target {
+  from {
+    background-color: color-mix(in oklab, var(--ui-primary) 18%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  .tdc-rise,
+  h2:target,
+  h3:target,
+  h4:target {
+    animation: none;
+  }
+  .tdc-card,
+  .tdc-card:hover,
+  .tdc-card:focus-within {
+    transition: none;
+    transform: none;
+  }
+}

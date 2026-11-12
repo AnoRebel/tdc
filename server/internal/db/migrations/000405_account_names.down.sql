@@ -1,0 +1,2 @@
+DROP FUNCTION IF EXISTS user_named(TEXT);
+DROP TABLE IF EXISTS username_history;
