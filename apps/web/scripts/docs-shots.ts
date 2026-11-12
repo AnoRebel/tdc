@@ -1092,7 +1092,9 @@ export const shots: Shot[] = [
     async take(studio) {
       await joined(studio);
       const key = copy(studio);
-      const card = new RegExp(`^Move ${key.replace(/[.@]/g, "\\$&")}-\\d+, now in To do$`);
+      const card = new RegExp(
+        `^Move ${key.replace(/[.*+?^${}()|[\]\\@]/g, "\\$&")}-\\d+, now in To do$`,
+      );
       const page = await open(studio, "imani", `/projects/${key}/board`, { elsewhere: true });
       // Her membership arrives from the home a moment after she is let in.
       await eventually("Imani being able to work in the website", async () => {

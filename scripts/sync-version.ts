@@ -130,9 +130,14 @@ const targets: Target[] = [
      */
     path: "apps/desktop/build/config.yml",
     read: (text) =>
-      text.match(/^info:\n(?:[ \t]+.*\n)*?[ \t]+version:\s*"?([^"\n]+)"?/m)?.[1]?.trim() ?? null,
+      text
+        .match(/^info:\n(?:[ \t]+\S.*\n|[ \t]*\n)*?[ \t]+version:\s*"?([^"\n]+)"?/m)?.[1]
+        ?.trim() ?? null,
     write: (text, next) =>
-      text.replace(/^(info:\n(?:[ \t]+.*\n)*?[ \t]+version:\s*)"?[^"\n]+"?/m, `$1"${next}"`),
+      text.replace(
+        /^(info:\n(?:[ \t]+\S.*\n|[ \t]*\n)*?[ \t]+version:\s*)"?[^"\n]+"?/m,
+        `$1"${next}"`,
+      ),
   },
   {
     // Compiled into the server so it can report its own version at runtime.
