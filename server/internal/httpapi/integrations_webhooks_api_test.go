@@ -429,6 +429,34 @@ func TestASubscriptionHasOneDeliveryInFlight(t *testing.T) {
 	}
 }
 
+/*
+The server starts no more deliveries a second than it is set to, however many
+are waiting and however promptly receivers answer.
+
+Unpaced, these twenty-four go to a receiver that answers at once in a few tens
+of milliseconds. At twenty a second, with the four workers' worth allowed
+straight away, the other twenty take a second.
+*/
+func TestDeliveriesAreStartedNoFasterThanThePace(t *testing.T) {
+	handler, owner, roomID := webhookFixture(t, map[string]string{
+		"integrations.delivery_workers":      "4",
+		"integrations.deliveries_per_second": "20",
+	})
+	endpoint := newReceiver(t, answering(http.StatusOK))
+	for range 4 {
+		subscribe(t, handler, owner, roomID, endpoint.URL)
+	}
+
+	started := time.Now()
+	for i := range 6 {
+		postMessage(t, handler, owner, roomID, "paced "+string(rune('a'+i)))
+	}
+	eventually(t, 10*time.Second, "all twenty-four deliveries", func() bool { return len(endpoint.deliveries()) == 24 })
+	if elapsed := time.Since(started); elapsed < 900*time.Millisecond {
+		t.Errorf("twenty-four deliveries took %s at twenty a second; the pace allows no less than a second", elapsed)
+	}
+}
+
 // A subscription over its rate is held back, not dropped, and says so.
 func TestARateLimitIsVisibleAndDropsNothing(t *testing.T) {
 	handler, owner, roomID := webhookFixture(t, map[string]string{

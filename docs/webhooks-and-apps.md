@@ -443,7 +443,12 @@ back, not dropped**: it waits for the limit, the history records a
 `lastRateLimited` time say that it happened.
 
 Each subscription has **one delivery in flight at a time**, and the whole server
-no more than `integrations.delivery_workers` (four by default). A slow or silent
+no more than `integrations.delivery_workers` (four by default), started no faster
+than `integrations.deliveries_per_second` (a hundred by default). The pace is
+what protects chat from prompt receivers: each delivery is two database commits,
+and an unpaced pool sending to receivers that answer at once was measured
+starting over 800 a second on a CI runner, enough to make posting a message wait
+its turn. A slow or silent
 receiver therefore occupies one worker for at most the timeout and cannot hold
 up anybody else's deliveries — or the channel itself: queuing happens after a
 message is stored and off the request that stored it, so posting never waits on
@@ -458,12 +463,12 @@ in the job that reports the server's memory, on every pull request to a release
 branch: the first fails if a target is missed, the second is reported with its
 change from the base commit.
 
-| What                                                          | Target              | Measured when this was written                 |
-| ------------------------------------------------------------- | ------------------- | ---------------------------------------------- |
-| Deliveries a second, four workers, receivers on the same host | at least 50         | 157–262                                        |
-| Posting's median beside a receiver that never answers         | within 1.5× or 5 ms | 10.1 → 10.2 ms, 12.6 → 14.0 ms, 15.3 → 15.8 ms |
-| Posting's 95th percentile while the pool is busy              | within 3× + 10 ms   | 18–35 ms, against 11–16 ms quiet               |
-| Memory after 1,000 deliveries beside a stalled receiver       | reported            | +1.8 MiB, with goroutines back to idle         |
+| What                                                          | Target              | Measured when this was written                   |
+| ------------------------------------------------------------- | ------------------- | ------------------------------------------------ |
+| Deliveries a second, four workers, receivers on the same host | at least 50         | 71–89 at the default pace of 100; 80–815 unpaced |
+| Posting's median beside a receiver that never answers         | within 1.5× or 5 ms | 10.1 → 10.2 ms, 12.6 → 14.0 ms, 15.3 → 15.8 ms   |
+| Posting's 95th percentile while the pool is busy              | within 3× + 10 ms   | 18–35 ms, against 11–16 ms quiet                 |
+| Memory after 1,000 deliveries beside a stalled receiver       | reported            | +1.8 MiB, with goroutines back to idle           |
 
 Those were measured on a twelve-core machine with Postgres in a container
 shared with other work; a production host differs, and the shape is the point.

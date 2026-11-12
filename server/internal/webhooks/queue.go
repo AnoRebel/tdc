@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/time/rate"
 
 	"github.com/AnoRebel/tdc/server/internal/cache"
 	"github.com/AnoRebel/tdc/server/internal/db/dbgen"
@@ -109,9 +110,17 @@ func (s *Service) Run(ctx context.Context) {
 	group.Wait()
 }
 
-// dispatch claims work for idle workers until ctx ends.
+/*
+dispatch claims work for idle workers until ctx ends.
+
+Paced by DeliveriesPerSecond as well as bounded by the workers: the pace is
+what keeps the pool from taking the database's commits away from people
+posting, since prompt receivers free a worker almost as soon as it starts.
+Read on every claim, so a change takes effect without a restart.
+*/
 func (s *Service) dispatch(ctx context.Context, jobs chan<- dbgen.WebhookDelivery, finished <-chan struct{}, workers int) {
 	idle := workers
+	pace := rate.NewLimiter(rate.Inf, workers)
 	for {
 		// Workers that finished since the last look are idle again.
 		for drained := false; !drained; {
@@ -124,9 +133,31 @@ func (s *Service) dispatch(ctx context.Context, jobs chan<- dbgen.WebhookDeliver
 		}
 
 		if idle > 0 && ctx.Err() == nil {
-			claimed, err := s.store.ClaimWebhookDeliveries(ctx, int32(idle))
+			want := idle
+			perSecond := s.deliveriesPerSecond(ctx)
+			if perSecond > 0 {
+				pace.SetLimit(rate.Limit(perSecond))
+				// Only as many as the pace has already earned, and none until
+				// it has earned one.
+				earned := pace.Tokens()
+				if earned < 1 {
+					wait := time.Duration((1 - earned) / perSecond * float64(time.Second))
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(wait):
+					}
+					continue
+				}
+				want = min(idle, int(earned))
+			}
+
+			claimed, err := s.store.ClaimWebhookDeliveries(ctx, int32(want))
 			if err != nil && ctx.Err() == nil {
 				s.log.Error("cannot claim webhook deliveries", "error", err)
+			}
+			if perSecond > 0 {
+				pace.AllowN(time.Now(), len(claimed))
 			}
 			for _, job := range claimed {
 				jobs <- job
@@ -436,6 +467,14 @@ func (s *Service) setting(ctx context.Context, key settings.Key, fallback int64)
 		return value
 	}
 	return fallback
+}
+
+// deliveriesPerSecond is the pace deliveries are started at, or 0 for none.
+func (s *Service) deliveriesPerSecond(ctx context.Context) float64 {
+	if s.config.Settings == nil {
+		return 100
+	}
+	return float64(s.config.Settings.Int(ctx, settings.DeliveriesPerSecond))
 }
 
 func optional(value string) *string {
