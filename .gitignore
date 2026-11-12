@@ -49,3 +49,24 @@ data/
 # Agent instruction files (empty placeholders)
 CLAUDE.md
 AGENTS.md
+
+# What the accessibility checks leave behind: traces and screenshots from a
+# failure, and the signed-in session they share. None of it belongs in the
+# repository — the session file in particular holds a cookie.
+test-results/
+playwright-report/
+
+# Per-page locale scaffolding, created by nuxt-i18n-micro on build. The
+# translations that matter live in packages/ui/locales; these are empty files
+# the module writes for routes it finds, and regenerate on every build.
+apps/web/locales/
+apps/desktop/frontend/locales/
+
+# The update signing key. Its public half is apps/desktop/build/tdc.key.pub;
+# this half lives in the TDC_UPDATER_KEY secret and an offline backup.
+tdc.key
+
+# What the AppImage task copies in and builds, each run.
+apps/desktop/build/linux/appimage/tdc
+apps/desktop/build/linux/appimage/tdc.png
+apps/desktop/build/linux/appimage/build/

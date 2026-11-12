@@ -1,0 +1,618 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * Motion: the vocabulary every animation uses, and the switch that turns it
+ * down or off. Its own file, so what moves and why is in one place.
+ */
+@import "./motion.css";
+
+/*
+ * Geist: a grotesque with enough character to not read as a browser default,
+ * and a variable weight axis so hierarchy can be built from 400/500/600
+ * rather than only regular and bold.
+ */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/*
+ * The date picker's own styles, imported before the variables below so that
+ * ours win. It is themed entirely through CSS variables, which is why it fits
+ * here rather than needing its markup overridden.
+ */
+@import "@vuepic/vue-datepicker/dist/main.css";
+
+/*
+ * Where the classes actually are, named rather than discovered.
+ *
+ * Tailwind v4 finds its sources by scanning outward from this stylesheet, and
+ * what that reaches depends on where the build is run from. The web client's
+ * build happened to reach this layer's components; the desktop client's, run
+ * from its own frontend directory, did not — so every class used only in a
+ * shared component was absent from its stylesheet, and the application shell
+ * rendered with no layout at all: no sidebar column, no full-height flex, the
+ * whole interface stacked in the first two hundred pixels.
+ *
+ * Naming the directories removes the guesswork. Both clients compile the same
+ * classes because both are told the same places to look.
+ */
+@source "../../components";
+@source "../../composables";
+@source "../../layouts";
+@source "../../lib";
+@source "../../pages";
+@source "../../plugins";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * The palette, as tokens rather than literal colours, so an operator can
+ * rebrand without editing components and so light and dark stay in step.
+ *
+ * Greys are tinted cool throughout rather than neutral: a consistent hue reads
+ * as a considered surface, where mixed warm and cool greys read as an
+ * accident. The accent is a single desaturated indigo — one accent, kept below
+ * 80% saturation so it sits with the neutrals instead of shouting over them.
+ */
+:root {
+  --radius: 0.5rem;
+
+  /* Off-white rather than pure white: pure white glares beside a dark UI. */
+  --background: oklch(0.985 0.002 265);
+  --foreground: oklch(0.21 0.012 265);
+
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(0.995 0.002 265);
+  --surface-sunken: oklch(0.965 0.004 265);
+
+  --muted: oklch(0.955 0.005 265);
+  --muted-foreground: oklch(0.51 0.014 265);
+
+  --border: oklch(0.905 0.006 265);
+  --border-strong: oklch(0.855 0.008 265);
+
+  /*
+   * The accent, which somebody may override.
+   *
+   * --accent-light and --accent-dark are set on the root element when
+   * somebody chooses their own, one shade per appearance: light mode draws
+   * near-white text on this and dark mode near-black, so a single value
+   * cannot be readable in both. Unset, each palette's own colour applies.
+   */
+  --primary: var(--accent-light, oklch(0.53 0.16 269));
+  --primary-hover: oklch(0.48 0.17 269);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --accent: oklch(0.955 0.008 265);
+  --accent-foreground: oklch(0.25 0.014 265);
+
+  --success: oklch(0.62 0.14 155);
+  /*
+   * The same green, dark enough to read on a tint of itself.
+   *
+   * The fill and the text want different lightnesses: a dot has only to be
+   * seen, and a word has to be read. Using one value for both put small text
+   * at 2.89:1 against its own 15% tint in light mode, which axe caught and an
+   * eye would call "a bit faint" — the failure people work around rather than
+   * report.
+   */
+  --success-text: oklch(0.46 0.14 155);
+  --warning: oklch(0.72 0.14 75);
+  --destructive: oklch(0.56 0.19 27);
+  --destructive-foreground: oklch(0.99 0 0);
+
+  --ring: oklch(0.53 0.16 269);
+
+  /*
+   * Shadows carry the background's hue rather than pure black, which is what
+   * keeps them from looking like a grey smudge over a tinted surface.
+   */
+  --shadow-xs: 0 1px 2px oklch(0.21 0.012 265 / 0.05);
+  --shadow-sm: 0 1px 3px oklch(0.21 0.012 265 / 0.07), 0 1px 2px oklch(0.21 0.012 265 / 0.04);
+  --shadow-md: 0 4px 12px oklch(0.21 0.012 265 / 0.08), 0 2px 4px oklch(0.21 0.012 265 / 0.04);
+  --shadow-lg: 0 12px 32px oklch(0.21 0.012 265 / 0.12);
+}
+
+/*
+ * Dark is the mode most chat happens in, so it is designed rather than
+ * derived: a tinted charcoal ground, not pure black, with surfaces that rise
+ * by lightness rather than by border alone.
+ */
+.dark,
+:root:not(.light) {
+  --background: oklch(0.175 0.008 265);
+  --foreground: oklch(0.955 0.004 265);
+
+  --surface: oklch(0.205 0.009 265);
+  --surface-raised: oklch(0.235 0.01 265);
+  --surface-sunken: oklch(0.155 0.008 265);
+
+  --muted: oklch(0.255 0.01 265);
+  --muted-foreground: oklch(0.68 0.012 265);
+
+  --border: oklch(1 0 0 / 9%);
+  --border-strong: oklch(1 0 0 / 16%);
+
+  --primary: var(--accent-dark, oklch(0.66 0.16 268));
+  --primary-hover: oklch(0.71 0.16 268);
+  --primary-foreground: oklch(0.16 0.01 265);
+
+  --accent: oklch(0.265 0.012 265);
+  --accent-foreground: oklch(0.955 0.004 265);
+
+  --success: oklch(0.7 0.15 155);
+  /* Already clears 4.5:1 against its own tint on a dark ground, so the text
+     colour is the fill. */
+  --success-text: oklch(0.7 0.15 155);
+  --warning: oklch(0.78 0.14 78);
+  --destructive: oklch(0.66 0.18 25);
+  --destructive-foreground: oklch(0.16 0.01 265);
+
+  --ring: oklch(0.66 0.16 268);
+
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.4), 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.45), 0 2px 4px oklch(0 0 0 / 0.3);
+  --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.55);
+}
+
+/*
+ * Warm, as a second palette.
+ *
+ * Selected with `data-theme="congrator"` on the root element. Drawn from the
+ * Congrator application so somebody running both sees one family rather than
+ * two unrelated products — a terracotta and amber ground against the default's
+ * cool indigo.
+ *
+ * Every token the default defines is redefined here. A palette that sets only
+ * the colours somebody thought to check leaves the rest inherited from the
+ * default, which shows up as one cool grey border in an otherwise warm
+ * interface — the kind of thing nobody reports and everybody notices.
+ */
+[data-theme="congrator"] {
+  --background: oklch(0.991 0.005 95);
+  --foreground: oklch(0.151 0.02 20);
+
+  --surface: oklch(0.994 0.003 85);
+  --surface-raised: oklch(0.999 0.002 85);
+  --surface-sunken: oklch(0.966 0.01 42);
+
+  --muted: oklch(0.961 0.01 42);
+  /* Darkened from the source palette's 0.549 to clear 4.5:1 on muted. */
+  --muted-foreground: oklch(0.53 0.021 26);
+
+  --border: oklch(0.9 0.029 51);
+  --border-strong: oklch(0.855 0.035 51);
+
+  --primary: var(--accent-light, oklch(0.449 0.15 35));
+  --primary-hover: oklch(0.4 0.155 35);
+  --primary-foreground: oklch(0.98 0.01 87);
+
+  --accent: oklch(0.951 0.02 45);
+  --accent-foreground: oklch(0.25 0.05 25);
+
+  --success: oklch(0.6 0.13 150);
+  --success-text: oklch(0.45 0.13 150);
+  --warning: oklch(0.7 0.14 70);
+  --destructive: oklch(0.581 0.238 28);
+  --destructive-foreground: oklch(0.989 0.01 82);
+
+  --ring: oklch(0.65 0.12 40);
+
+  /* The ground's own hue, so a shadow reads as depth rather than as dirt. */
+  --shadow-xs: 0 1px 2px oklch(0.151 0.02 20 / 0.06);
+  --shadow-sm: 0 1px 3px oklch(0.151 0.02 20 / 0.09), 0 1px 2px oklch(0.151 0.02 20 / 0.05);
+  --shadow-md: 0 4px 12px oklch(0.151 0.02 20 / 0.1), 0 2px 4px oklch(0.151 0.02 20 / 0.05);
+  --shadow-lg: 0 12px 32px oklch(0.151 0.02 20 / 0.14);
+}
+
+/*
+ * The same palette after dark.
+ *
+ * The selector mirrors the default's: an explicit .dark class, or the absence
+ * of .light, so a palette behaves the same way the default does rather than
+ * needing its own rule about when dark applies.
+ */
+[data-theme="congrator"].dark,
+[data-theme="congrator"]:not(.light) {
+  --background: oklch(0.181 0.018 32);
+  --foreground: oklch(0.971 0.01 87);
+
+  --surface: oklch(0.212 0.02 30);
+  --surface-raised: oklch(0.25 0.031 29);
+  --surface-sunken: oklch(0.16 0.016 31);
+
+  --muted: oklch(0.22 0.02 24);
+  --muted-foreground: oklch(0.681 0.029 41);
+
+  --border: oklch(0.279 0.02 28);
+  --border-strong: oklch(0.319 0.026 34);
+
+  --primary: var(--accent-dark, oklch(0.738 0.172 46));
+  --primary-hover: oklch(0.78 0.16 46);
+  --primary-foreground: oklch(0.151 0.02 26);
+
+  --accent: oklch(0.551 0.144 51);
+  --accent-foreground: oklch(0.959 0.01 82);
+
+  --success: oklch(0.7 0.15 150);
+  --success-text: oklch(0.7 0.15 150);
+  --warning: oklch(0.78 0.14 75);
+  /*
+   * Lightened from the source palette, which was 0.56.
+   *
+   * This colour is used as text as well as a fill — a destructive button on
+   * this surface is transparent with the word in this colour — and at 0.56 it
+   * managed 3.4:1 against the dark surface behind it. The accessibility pass
+   * caught it, which is the reason for having one: a value copied from a
+   * palette designed against different surfaces is not thereby right here.
+   */
+  --destructive: oklch(0.64 0.215 25);
+  --destructive-foreground: oklch(0.971 0.01 87);
+
+  --ring: oklch(0.649 0.15 50);
+
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.4), 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-md: 0 4px 12px oklch(0 0 0 / 0.45), 0 2px 4px oklch(0 0 0 / 0.3);
+  --shadow-lg: 0 12px 32px oklch(0 0 0 / 0.55);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  /*
+   * Cards and popovers, by the names shadcn-vue components and their copies
+   * use. Without these, bg-card and bg-popover compile to nothing and a
+   * dialog or picker drawn with them is see-through over the page.
+   */
+  --color-card: var(--surface-raised);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--surface-raised);
+  --color-popover-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+
+  --font-sans: "Geist Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    /*
+     * The ground everything is drawn on.
+     *
+     * A variable rather than the token directly, so a client that draws its
+     * own ground can step aside. The desktop application does: its window can
+     * be translucent, and an opaque body would paint over whatever the window
+     * was letting through — which is the whole of the setting doing nothing.
+     */
+    background: var(--app-ground, var(--background));
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    /* Optical rather than metric spacing at body size reads cleaner. */
+    letter-spacing: -0.006em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Headings carry presence through weight and tighter tracking, not size
+     alone. */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.021em;
+    text-wrap: balance;
+  }
+
+  /* Counts and timestamps line up in columns when the figures are tabular. */
+  time,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * Anything you can act on says so under the pointer.
+   *
+   * Tailwind v4 no longer sets this on buttons, so without a rule here every
+   * control in the application would keep the text caret and read as inert.
+   * Stated once, as a property of being interactive, rather than repeated as
+   * a utility class on each of the places it is needed.
+   */
+  button:not(:disabled),
+  summary,
+  label[for],
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="option"],
+  [role="menuitem"],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="range"]:not(:disabled),
+  input[type="color"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* A link with no destination is not yet a link, so it keeps the default. */
+  a[href] {
+    cursor: pointer;
+  }
+
+  /* A control that cannot be used says that too, whichever element it is. */
+  :disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  /* A visible focus ring is an accessibility requirement, not decoration. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 25%, transparent);
+  }
+
+  /* Scrollbars that match the surface rather than the operating system's
+     default, which looks pasted on over a dark UI. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--foreground) 14%, transparent);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--foreground) 24%, transparent);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  /*
+   * Controls are defined once here rather than repeated as class strings, so
+   * that size, radius and motion stay consistent across every screen.
+   */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    height: 2rem;
+    padding-inline: 0.7rem;
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition:
+      background-color var(--motion-duration) var(--motion-ease-in-out),
+      border-color var(--motion-duration) var(--motion-ease-in-out),
+      transform var(--motion-duration-fast) var(--motion-ease-in-out),
+      opacity var(--motion-duration);
+  }
+
+  /* A press that moves is what makes a control feel physical. */
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  /* The cursor comes from the base rule for anything disabled; only the
+     dimming is particular to a button. */
+  .btn:disabled {
+    opacity: 0.5;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-foreground);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--primary-hover);
+  }
+
+  .btn-ghost {
+    color: var(--muted-foreground);
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .btn-outline {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--foreground);
+  }
+
+  .btn-outline:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--border-strong);
+  }
+
+  .btn-danger {
+    color: var(--destructive);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: color-mix(in oklch, var(--destructive) 12%, transparent);
+  }
+
+  .input {
+    width: 100%;
+    height: 2.25rem;
+    padding-inline: 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--foreground);
+    font-size: 0.875rem;
+    transition:
+      border-color 160ms,
+      box-shadow 160ms;
+  }
+
+  .input::placeholder {
+    color: var(--muted-foreground);
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
+  }
+
+  /* Sidebar rows: the pattern repeated most, so it earns a component. */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+    transition:
+      background-color var(--motion-duration-fast) var(--motion-ease-out),
+      color var(--motion-duration-fast) var(--motion-ease-out);
+  }
+
+  .nav-item:hover {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .nav-item[data-active="true"] {
+    background: color-mix(in oklch, var(--primary) 14%, transparent);
+    color: var(--foreground);
+    font-weight: 500;
+  }
+}
+
+/*
+ * The date picker, in this application's colours.
+ *
+ * A component rather than the browser's own datetime input, because that
+ * renders as a different control on every platform — a wheel on iOS, a
+ * dropdown on Chrome, nothing at all on Firefox for some types — and none of
+ * them can be made to look like the rest of this.
+ *
+ * Mapped onto the existing tokens rather than given its own palette, so a
+ * change to the theme reaches the picker without anybody remembering to update
+ * a second list of colours.
+ */
+/*
+ * The class names below are v14's. The documentation still shows the v13
+ * spelling (dp__theme_dark), which does not match anything the component
+ * emits — so variables written against it silently never applied and the
+ * picker kept its own grey.
+ */
+.dp--theme-dark,
+.dp--theme-light,
+.dp--menu-wrapper,
+.dp__main {
+  --dp-background-color: var(--color-surface);
+  --dp-text-color: var(--color-foreground);
+  --dp-hover-color: var(--color-accent);
+  --dp-hover-text-color: var(--color-accent-foreground);
+  --dp-hover-icon-color: var(--color-foreground);
+  --dp-primary-color: var(--color-primary);
+  --dp-primary-text-color: var(--color-primary-foreground);
+  --dp-primary-disabled-color: var(--color-muted);
+  --dp-secondary-color: var(--color-muted-foreground);
+  --dp-border-color: var(--color-border);
+  --dp-menu-border-color: var(--color-border);
+  --dp-border-color-hover: var(--color-border-strong);
+  --dp-border-color-focus: var(--color-ring);
+  --dp-disabled-color: var(--color-muted);
+  --dp-disabled-color-text: var(--color-muted-foreground);
+  --dp-scroll-bar-background: var(--color-surface);
+  --dp-scroll-bar-color: var(--color-border-strong);
+  --dp-success-color: var(--color-success);
+  --dp-icon-color: var(--color-muted-foreground);
+  --dp-danger-color: var(--color-destructive);
+  --dp-marker-color: var(--color-primary);
+  --dp-tooltip-color: var(--color-surface-raised);
+  --dp-highlight-color: color-mix(in oklab, var(--color-primary) 15%, transparent);
+
+  /* Matching the rest of the interface rather than the library's defaults. */
+  --dp-font-family: inherit;
+  --dp-border-radius: var(--radius-md);
+  --dp-cell-border-radius: var(--radius-sm);
+  --dp-font-size: 0.8125rem;
+  --dp-preview-font-size: 0.75rem;
+  --dp-time-font-size: 0.8125rem;
+  --dp-cell-size: 32px;
+  --dp-button-height: 32px;
+  --dp-menu-min-width: 17rem;
+}
+
+/*
+ * The menu is teleported to the body, so it sits outside the dialog that
+ * opened it — as a sibling of that dialog rather than a child.
+ *
+ * It therefore has to out-rank the dialog's own backdrop, not merely the page
+ * beneath it. A value equal to the dialog's loses on document order alone,
+ * which is why the calendar was appearing behind the panel that opened it.
+ */
+.dp--menu-wrapper {
+  /*
+   * Fixed rather than absolute, which is what the library uses by default.
+   * The dialog that opens this is fixed, and a fixed element paints above an
+   * absolute sibling regardless of z-index — so the calendar kept appearing
+   * behind the panel it belongs to.
+   */
+  position: fixed;
+  z-index: 70;
+}
+
+/* The library draws its own shadow; this matches the application's. */
+.dp--menu {
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
+}

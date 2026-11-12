@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS event_idempotency;
+DROP TABLE IF EXISTS room_sequences;
+DROP TABLE IF EXISTS events;
+DROP TABLE IF EXISTS room_members;
+DROP TABLE IF EXISTS rooms;

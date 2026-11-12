@@ -1,0 +1,880 @@
+# Continuous integration.
+#
+# Tiered by branch, deliberately. `dev` is where work lands first and where
+# people iterate, so it runs the fast checks and gets out of the way. `beta` and
+# `main` are what other people run, so they get everything — a slow gate is
+# worth it on the branches where a mistake reaches someone else.
+name: CI
+
+on:
+  push:
+    branches: [dev, beta, main]
+  pull_request:
+    branches: [dev, beta, main]
+
+# A new push supersedes whatever was running for the same branch. Reviewing the
+# results of a commit that has already been replaced wastes both minutes and
+# attention.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Go's version is read from each module's go.mod rather than written here.
+#
+# Still fixed, deliberately — a Go release can change vet's rules and turn a
+# green branch red for reasons that have nothing to do with the change under
+# review — but fixed in one place. A version written here as well is a second
+# copy that falls behind the first: go.mod moves, CI keeps the old toolchain,
+# and every job fails at the first command with "go.mod requires go >= …".
+
+jobs:
+  # Decides which tier this run is. Expressed once here rather than repeated as
+  # a condition on every job, so the rule stays legible.
+  tier:
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.decide.outputs.full }}
+    steps:
+      - id: decide
+        run: |
+          case "${{ github.base_ref || github.ref_name }}" in
+            beta|main) echo "full=true"  >> "$GITHUB_OUTPUT" ;;
+            *)         echo "full=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+  web:
+    name: Web and shared packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Deliberately unpinned: Bun releases often and stays compatible, and
+          # taking the latest means an incompatibility surfaces in a build here
+          # rather than months later on a contributor's machine.
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/desktop/go.mod
+          cache-dependency-path: apps/desktop/go.sum
+
+      - name: Generate the desktop's bindings
+        # The desktop frontend imports TypeScript generated from the Go
+        # services, which is not committed. Without cgo, so the runner needs
+        # no GTK or WebKit headers: Wails' pure-Go Linux path describes the
+        # same services.
+        working-directory: apps/desktop
+        env:
+          CGO_ENABLED: "0"
+        run: go run github.com/wailsapp/wails/v3/cmd/wails3 generate bindings -clean=true -ts -i
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+      - name: Build the static application
+        # The budget measures what a browser downloads, which is the static
+        # output rather than the server build above.
+        env:
+          NUXT_PUBLIC_API_BASE: ""
+        run: bun run --cwd apps/web generate
+
+      - name: Initial load stays within budget
+        run: bun run budget
+        working-directory: apps/web
+
+  # The public documentation site. Built on every branch because each branch is
+  # its own published version of the docs, and a guide edited through Studio
+  # lands on whichever branch that version is — dev included.
+  docs:
+    name: Documentation site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The content layer indexes the guides with node:sqlite, which the
+      # runner's default Node may predate.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build:docs
+
+  accessibility:
+    name: Browsers
+    runs-on: ubuntu-latest
+    # Needs the database the server runs against, since almost nothing in this
+    # application is reachable without signing in.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tdc
+          POSTGRES_PASSWORD: tdc
+          POSTGRES_DB: tdc
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build the application
+        # Empty, so the built application calls the host it is served from
+        # rather than the address a developer's machine uses.
+        env:
+          NUXT_PUBLIC_API_BASE: ""
+        run: bun run --cwd apps/web generate
+
+      - name: Cache the browsers
+        uses: actions/cache@v6
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          # The engine list is part of the key, not only the lockfile. Adding
+          # Firefox and WebKit does not change bun.lock, so a key derived from
+          # it alone would restore the Chromium-only cache, skip the install,
+          # and fail on the two engines that were never downloaded.
+          key: playwright-chromium-firefox-webkit-${{ hashFiles('bun.lock') }}
+
+      - name: Install the browsers
+        # Only when the cache missed: they are several hundred megabytes, and
+        # these checks are worth having on every run rather than only when
+        # cheap.
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: bunx --bun playwright install chromium firefox webkit
+        working-directory: apps/web
+
+      - name: Install what the browsers need from the system
+        # Every run, cache or not: the cache restores the browsers but not the
+        # libraries they load, and a runner image without one of those (WebKit's
+        # libevent, once) fails every WebKit check at launch.
+        run: bunx --bun playwright install-deps chromium firefox webkit
+        working-directory: apps/web
+
+      - name: Serve the application
+        env:
+          TDC_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          TDC_SERVER_WEB_ROOT: ${{ github.workspace }}/apps/web/.output/public
+          TDC_SERVER_ADDRESS: 127.0.0.1:8099
+          # Plain HTTP: a Secure session cookie is never sent back over it.
+          # Chromium makes an exception for a loopback address; WebKit does
+          # not, and signs nobody in.
+          TDC_SERVER_SECURE_COOKIES: "false"
+        run: |
+          go build -o /tmp/tdc-server ./cmd/tdc-server
+          /tmp/tdc-server &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8099/api/server >/dev/null && break
+            sleep 1
+          done
+        working-directory: server
+
+      - name: Prepare an account to sign in with
+        run: |
+          curl -sf -X POST http://127.0.0.1:8099/api/setup             -H 'Content-Type: application/json'             -d '{"username":"founder","password":"correct horse battery staple"}'
+          TOKEN=$(curl -sf -X POST http://127.0.0.1:8099/api/auth/signin             -H 'Content-Type: application/json'             -d '{"username":"founder","password":"correct horse battery staple"}'             | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+          curl -sf -X POST http://127.0.0.1:8099/api/rooms             -H "Authorization: Bearer $TOKEN"             -H 'Content-Type: application/json'             -d '{"slug":"general","name":"General","topic":"A channel to look at"}'
+
+      # All three engines a release is gated on, plus the first-arrival checks
+      # on their own fresh account. WebKit is what every iPhone runs whatever
+      # browser is installed, and Firefox implements the specification rather
+      # than Chromium's reading of it — this matrix has already caught a
+      # difference between them. The calls-* projects hold a two-person call in
+      # each engine with fake camera and microphone; WebKit takes them as
+      # granted permissions, and skips saying so where its build has no WebRTC.
+      # The first-arrival checks register fresh accounts and sign the founder
+      # in, and by the time the three engines are done the server's in-memory
+      # allowance for both is spent. They run against the server started
+      # afresh, as the directory's journeys below do.
+      - name: Check
+        env:
+          TDC_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          TDC_SERVER_WEB_ROOT: ${{ github.workspace }}/apps/web/.output/public
+          TDC_SERVER_ADDRESS: 127.0.0.1:8099
+          TDC_SERVER_SECURE_COOKIES: "false"
+        run: |
+          status=0
+          bunx playwright test --project=setup --project=chromium --project=firefox --project=webkit --project=calls-chromium --project=calls-firefox --project=calls-webkit || status=1
+          pkill -f /tmp/tdc-server || true
+          sleep 1
+          /tmp/tdc-server >/tmp/tdc-server.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8099/api/server >/dev/null && break
+            sleep 1
+          done
+          bunx playwright test --project=setup --project=arrival --output=test-results/arrival || status=1
+          exit $status
+        working-directory: apps/web
+
+      # The directory's journeys, in the same three engines, each against the
+      # server started afresh on the same database. Each engine signs its two
+      # people in about as often as the server allows one account in a quarter
+      # hour, and registration is limited per address; both allowances live in
+      # the server's memory, so a restart is what lets the next engine run —
+      # as an operator's deployment would. The specs switch the directory on
+      # themselves, so nothing above depends on it.
+      - name: Check the directory
+        env:
+          TDC_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          TDC_SERVER_WEB_ROOT: ${{ github.workspace }}/apps/web/.output/public
+          TDC_SERVER_ADDRESS: 127.0.0.1:8099
+          # Plain HTTP: a Secure session cookie is never sent back over it.
+          # Chromium makes an exception for a loopback address; WebKit does
+          # not, and signs nobody in.
+          TDC_SERVER_SECURE_COOKIES: "false"
+          TDC_DIRECTORY_RUN: ci${{ github.run_id }}${{ github.run_attempt }}
+        run: |
+          for project in directory directory-webkit directory-firefox; do
+            pkill -f /tmp/tdc-server || true
+            sleep 1
+            /tmp/tdc-server >/tmp/tdc-server.log 2>&1 &
+            for i in $(seq 1 30); do
+              curl -sf http://127.0.0.1:8099/api/server >/dev/null && break
+              sleep 1
+            done
+            bunx playwright test --project="$project"
+          done
+        working-directory: apps/web
+
+      # A project shared between two servers, in the same three engines: an
+      # administrator on one opens it and adds somebody from the other, who
+      # works in it there. The script starts both servers afresh for each
+      # engine, on databases of their own beside the suite's.
+      - name: Check a project shared between servers
+        env:
+          ENGINES: chromium firefox webkit
+          SKIP_WEB_BUILD: "1"
+          TDC_DEMO_DATABASE_SERVER: postgres://tdc:tdc@127.0.0.1:5432
+        run: |
+          pkill -f /tmp/tdc-server || true
+          scripts/demo-milestone-project-federation-5.sh
+
+      - name: Keep what a failure produced
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-failures
+          path: apps/web/test-results/
+          retention-days: 7
+
+  server:
+    name: Server
+    runs-on: ubuntu-latest
+
+    services:
+      # The Debian image rather than Alpine, matching production: musl's
+      # collation differs from glibc's, and a test that passes here and fails
+      # there is worse than no test.
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tdc
+          POSTGRES_PASSWORD: tdc
+          POSTGRES_DB: tdc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tdc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Formatting
+        working-directory: server
+        run: |
+          # gofmt reports rather than exits non-zero, so the check has to be
+          # explicit or a badly formatted file passes silently.
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        working-directory: server
+        run: go vet ./...
+
+      # What vet does not: an error compared with == that will stop matching
+      # the day it arrives wrapped, a sentinel nobody can find because it is
+      # not named Err, a function nothing calls any more. The set is in
+      # server/.golangci.yml, chosen by running each candidate against this
+      # codebase rather than by reputation.
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: server
+
+      - name: Test
+        working-directory: server
+        run: go test -race ./...
+
+      - name: Build
+        working-directory: server
+        run: go build ./...
+
+  desktop:
+    name: Desktop
+    # Full tier only. It compiles a webview application against GTK and
+    # WebKit, which is several minutes of apt on every run — too slow to sit
+    # in front of every push to dev, and the thing it guards (an embed
+    # directive) changes rarely.
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/desktop/go.mod
+          cache-dependency-path: apps/desktop/go.sum
+
+      - name: Install the webview's dependencies
+        # What Wails links against on Linux. Named rather than pulled in by a
+        # setup action so an upgrade is somebody's decision.
+        # GTK 4 and WebKitGTK 6, as Wails 3.1 builds by default and the release
+        # does; the GTK 3 build has its own job below.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - run: bun install --frozen-lockfile
+
+      - name: Generate the bindings, and check the menu events are current
+        # The bindings are not committed (they are generated, like this, before
+        # every typecheck and build), so there is nothing to compare them with.
+        # The menu events file is committed, so it can go stale; regenerating it
+        # and finding a diff is the only way to notice.
+        run: |
+          go run github.com/wailsapp/wails/v3/cmd/wails3 generate bindings -ts -i
+          go generate ./internal/shell
+          if ! git diff --quiet -- frontend/app/lib/menu-events.ts; then
+            echo "The menu events are out of date. Regenerate and commit:"
+            echo "  go generate ./internal/shell"
+            git diff --stat -- frontend/app/lib/menu-events.ts
+            exit 1
+          fi
+        working-directory: apps/desktop
+
+      - name: Build the frontend
+        # Before the Go build, which embeds its output. Without this the embed
+        # directive has no directory to read and the compile fails outright —
+        # which is the right failure, just an unhelpfully worded one.
+        run: bun run --cwd apps/desktop/frontend build
+
+      - name: Formatting
+        working-directory: apps/desktop
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        working-directory: apps/desktop
+        run: go vet ./...
+
+      - name: Test
+        # Checks that the built frontend actually reached the binary, which a
+        # successful build does not.
+        working-directory: apps/desktop
+        run: go test ./...
+
+      - name: Build
+        working-directory: apps/desktop
+        run: go build ./...
+
+  # The heavier checks, on the branches other people actually run.
+  licences:
+    name: Licence audit
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Check Go dependency licences
+        run: |
+          # AGPL in the default path would make this impossible to self-host
+          # freely, which is the whole premise. An operator may still choose an
+          # AGPL service to run alongside; that is different from linking one.
+          #
+          # Both modules, not only the server: the desktop client links a
+          # keychain library and its transitive dependencies, which is exactly
+          # where something restricted would arrive unnoticed.
+          go install github.com/google/go-licenses@latest
+          (cd server && go-licenses check ./... --disallowed_types=forbidden,restricted)
+          (cd apps/desktop && go-licenses check ./... --disallowed_types=forbidden,restricted)
+
+  vulnerabilities:
+    name: Vulnerability scan
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: govulncheck
+        working-directory: server
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  migrations:
+    name: Migrations apply cleanly
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tdc
+          POSTGRES_PASSWORD: tdc
+          POSTGRES_DB: tdc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tdc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Apply every migration from empty
+        working-directory: server
+        env:
+          TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+        run: |
+          # A migration that only works against the schema its author happened
+          # to have is the classic way an upgrade breaks for everyone else. The
+          # test applies the whole sequence to an empty database, then applies
+          # it again to check the runner is idempotent.
+          go test ./internal/db/ -run TestMigrationsApplyFromEmpty -v
+
+  # Two builds of one commit are the same bytes.
+  #
+  # Reproducibility is what lets somebody check that a published binary was built
+  # from the source it claims — they build it themselves and compare. That only
+  # works while it stays true, and it stops being true quietly: a timestamp
+  # embedded by a new dependency, a path that leaks through, a build ID nobody
+  # asked for. This notices the day it happens rather than the day somebody
+  # tries to verify a release.
+  reproducible:
+    name: A build is the same twice
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Build it twice and compare
+        working-directory: server
+        env:
+          CGO_ENABLED: "0"
+          # Fixed, because the point is that everything else is deterministic:
+          # a release sets this from the commit, and a build that disagreed
+          # between two runs would disagree here for the same reason.
+          SOURCE_DATE_EPOCH: "1700000000"
+        run: |
+          build() {
+            go build -trimpath \
+              -ldflags="-s -w -buildid=" \
+              -o "$1" ./cmd/tdc-server
+          }
+
+          build /tmp/first
+          # A clean cache for the second, so a cached artifact cannot make two
+          # different builds look alike.
+          go clean -cache
+          build /tmp/second
+
+          if ! cmp -s /tmp/first /tmp/second; then
+            echo "Two builds of this commit produced different binaries."
+            echo "Something non-deterministic has got into the build — a timestamp,"
+            echo "an absolute path, or a build ID. A published binary can no longer"
+            echo "be checked against its source."
+            sha256sum /tmp/first /tmp/second
+            exit 1
+          fi
+
+          echo "Identical: $(sha256sum /tmp/first | cut -d" " -f1)"
+
+  # The legacy desktop build still runs where the ordinary one cannot.
+  #
+  # This variant exists for one reason: distributions without GTK4. That claim is
+  # about the binary's own requirements, so it can be checked without a machine
+  # running those distributions — the highest glibc symbol version it imports is
+  # the oldest glibc it can start on.
+  #
+  # The number to beat is 2.35, Ubuntu 22.04's glibc, which is the oldest release
+  # the legacy variant is published for. Debian 12 ships 2.36 and clears it too.
+  legacy-desktop:
+    name: The legacy build runs on older distributions
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/desktop/go.mod
+          cache-dependency-path: apps/desktop/go.sum
+
+      - name: Install the legacy webview's dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Build it and check what it needs
+        working-directory: apps/desktop
+        # A stand-in for the built frontend, which the binary embeds: what this
+        # checks is which libraries and glibc it needs, and the files it carries
+        # change neither. The Desktop job builds the real thing.
+        run: |
+          mkdir -p frontend/dist
+          [ -e frontend/dist/index.html ] || echo '<!doctype html>' > frontend/dist/index.html
+          go build -tags "production,gtk3" -o /tmp/tdc-gtk3 .
+
+          # Every versioned glibc symbol the binary imports. The highest is the
+          # floor: a system with an older glibc cannot supply it, and the binary
+          # fails to start rather than degrading.
+          floor=$(objdump -T /tmp/tdc-gtk3 \
+            | grep -o "GLIBC_[0-9.]*" \
+            | sed "s/GLIBC_//" \
+            | sort -V -u \
+            | tail -1)
+
+          echo "Highest glibc version required: $floor"
+
+          # sort -V puts the older version first, so if the floor sorts first
+          # against 2.35 it is at or below it.
+          if [ "$(printf "%s\n2.35\n" "$floor" | sort -V | head -1)" != "$floor" ]; then
+            echo
+            echo "The legacy desktop build now needs glibc $floor, but it is"
+            echo "published for Ubuntu 22.04, which has 2.35. It would not start"
+            echo "there — which is the only reason this build exists."
+            echo
+            echo "Something pulled in a newer symbol. The usual cause is a"
+            echo "dependency compiled against the host's headers rather than the"
+            echo "legacy webview's."
+            exit 1
+          fi
+
+          # And it is genuinely the legacy toolkit, not a default build wearing
+          # the name. A GTK4 binary here would pass the check above on a runner
+          # whose glibc happened to be old enough.
+          if ! ldd /tmp/tdc-gtk3 | grep -q "libgtk-3.so.0"; then
+            echo "This build does not link GTK3, so the tag did not reach the compiler."
+            ldd /tmp/tdc-gtk3 | grep -E "gtk|webkit" || true
+            exit 1
+          fi
+
+          echo "Links GTK3 and starts on glibc $floor or newer."
+
+  # What fanout costs when a channel is busy.
+  #
+  # One message into a channel everybody is watching becomes one delivery per
+  # connected member, and that multiplication is the shape of the problem this
+  # server has to survive. The figure is reported rather than gated for the
+  # same reason as memory: latency moves on a shared runner, and a job that
+  # failed on a threshold would be routed around within a month.
+  #
+  # What it does fail on is a fanout that drops deliveries — which would report
+  # a better latency while being worse, and is a bug rather than a measurement.
+  fanout:
+    name: What fanout costs
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Measure delivery under load
+        working-directory: server
+        # -v so the figures reach the log: the whole point is that somebody
+        # reviewing can see the number and its change.
+        run: go test -v -run "TestFanoutUnderLoad|TestConnectionsScale" ./internal/realtime/
+
+  # What the server costs to run, measured rather than assumed.
+  #
+  # The design puts a 1 GB target on a server for a community of this size, which
+  # is the difference between something a Tanzanian developer can host on a cheap
+  # VPS and something that needs a machine nobody wants to pay for. A target
+  # nobody measures is a hope.
+  #
+  # Deliberately reporting rather than failing. Memory moves for legitimate
+  # reasons — a cache that earns its keep, a library that grew — and a job that
+  # blocked on it would be routed around within a month. What it does instead is
+  # put the number and its change in front of whoever is reviewing, so an
+  # increase is something a person chose rather than something that happened.
+  memory:
+    name: What the server costs to run
+    needs: tier
+    if: needs.tier.outputs.full == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: tdc
+          POSTGRES_PASSWORD: tdc
+          POSTGRES_DB: tdc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tdc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The base commit as well, so the delta is against what this change is
+          # actually changing rather than against nothing.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Measure this commit
+        id: measure
+        working-directory: server
+        env:
+          TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+        run: |
+          go test ./internal/loadprofile/ -run TestServerFitsItsMemoryTarget -v 2>&1 | tee measurement.txt
+          grep '^MEMORY_BYTES=' measurement.txt >> "$GITHUB_OUTPUT"
+          # The webhook delivery pool under sustained load, beside a receiver
+          # that never answers: the one part of the server that holds work for
+          # somebody else's endpoint.
+          go test ./internal/loadprofile/ -run TestDeliveryPoolFitsItsMemoryTarget -v 2>&1 | tee deliveries.txt
+          grep '^DELIVERY_MEMORY_BYTES=' deliveries.txt >> "$GITHUB_OUTPUT"
+
+      # What webhook delivery can carry, and that a receiver which never answers
+      # costs the people posting nothing. Run here, alone, because beside the
+      # rest of the suite it would measure the runner's load instead; it fails
+      # when a documented target is missed, and prints its figures either way.
+      - name: Measure webhook delivery under load
+        working-directory: server
+        env:
+          TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          TDC_LOAD_TESTS: "1"
+        run: go test ./internal/httpapi/ -run TestDeliveryLoadLeavesChatUnaffected -v -count=1
+
+      - name: Compare against the base
+        if: github.event_name == 'pull_request'
+        id: baseline
+        working-directory: server
+        env:
+          TDC_TEST_DATABASE_URL: postgres://tdc:tdc@127.0.0.1:5432/tdc?sslmode=disable
+          BASE: ${{ github.event.pull_request.base.sha }}
+        # The same measurement on the commit this branches from. A failure here
+        # is not a failure of the change: an older commit may not have the test
+        # at all, in which case there is simply no delta to report.
+        continue-on-error: true
+        run: |
+          git stash --include-untracked --quiet || true
+          git checkout --quiet "$BASE"
+
+          if go test ./internal/loadprofile/ -run TestServerFitsItsMemoryTarget 2>&1 | tee base.txt | grep -q '^MEMORY_BYTES='; then
+            grep '^MEMORY_BYTES=' base.txt | sed 's/MEMORY_BYTES=/base_bytes=/' >> "$GITHUB_OUTPUT"
+          else
+            echo "The base commit does not measure this; reporting the figure alone."
+          fi
+
+          if go test ./internal/loadprofile/ -run TestDeliveryPoolFitsItsMemoryTarget 2>&1 | tee base-deliveries.txt | grep -q '^DELIVERY_MEMORY_BYTES='; then
+            grep '^DELIVERY_MEMORY_BYTES=' base-deliveries.txt | sed 's/DELIVERY_MEMORY_BYTES=/base_delivery_bytes=/' >> "$GITHUB_OUTPUT"
+          fi
+
+          git checkout --quiet -
+          git stash pop --quiet || true
+
+      - name: Report
+        env:
+          BYTES: ${{ steps.measure.outputs.MEMORY_BYTES }}
+          BASE_BYTES: ${{ steps.baseline.outputs.base_bytes }}
+          DELIVERY_BYTES: ${{ steps.measure.outputs.DELIVERY_MEMORY_BYTES }}
+          BASE_DELIVERY_BYTES: ${{ steps.baseline.outputs.base_delivery_bytes }}
+        run: |
+          python3 - >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import os
+
+          target = 1024 ** 3
+          bytes_now = int(os.environ["BYTES"])
+          base = os.environ.get("BASE_BYTES") or ""
+
+          def mib(value):
+              return f"{value / 1024 / 1024:.1f} MiB"
+
+          print("## What the server costs to run")
+          print()
+          print(f"**{mib(bytes_now)}** against a target of {mib(target)} "
+                f"— {bytes_now / target * 100:.1f}% of it.")
+          print()
+
+          if base:
+              delta = bytes_now - int(base)
+              if abs(delta) < 1024 * 1024:
+                  print(f"Unchanged from the base commit ({mib(int(base))}).")
+              else:
+                  direction = "more" if delta > 0 else "less"
+                  print(f"That is **{mib(abs(delta))} {direction}** than the base "
+                        f"commit's {mib(int(base))}.")
+                  if delta > 0:
+                      print()
+                      print("An increase is not a failure. It is worth a sentence in the "
+                            "pull request saying what it buys.")
+          else:
+              print("No comparable measurement on the base commit, so no delta.")
+
+          if bytes_now > target:
+              print()
+              print("> This is over the target. Not blocking, and worth deciding "
+                    "about deliberately rather than discovering on somebody's VPS.")
+
+          # The webhook delivery pool, measured the same way: a thousand
+          # deliveries beside a receiver that never answers.
+          delivery = os.environ.get("DELIVERY_BYTES") or ""
+          base_delivery = os.environ.get("BASE_DELIVERY_BYTES") or ""
+          if delivery:
+              print()
+              print("### With webhook deliveries running")
+              print()
+              print(f"**{mib(int(delivery))}** after a thousand deliveries beside a "
+                    f"stalled receiver.")
+              if base_delivery:
+                  delta = int(delivery) - int(base_delivery)
+                  if abs(delta) < 1024 * 1024:
+                      print(f"Unchanged from the base commit ({mib(int(base_delivery))}).")
+                  else:
+                      direction = "more" if delta > 0 else "less"
+                      print(f"That is **{mib(abs(delta))} {direction}** than the base "
+                            f"commit's {mib(int(base_delivery))}.")
+                      if delta > 0:
+                          print()
+                          print("An increase here is worth a sentence in the pull request "
+                                "saying what it buys.")
+          PY
+
+  # One required check for branch protection, rather than a list that has to be
+  # updated whenever a job is added or renamed.
+  ci-success:
+    name: CI
+    if: always()
+    needs:
+      [
+        web,
+        docs,
+        accessibility,
+        server,
+        desktop,
+        licences,
+        vulnerabilities,
+        migrations,
+        memory,
+        reproducible,
+        legacy-desktop,
+        fanout,
+      ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify every job succeeded or was skipped
+        run: |
+          # "skipped" is fine — that is the fast tier deliberately not running
+          # the heavy jobs. "failure" and "cancelled" are not.
+          results='${{ join(needs.*.result, ' ') }}'
+          echo "Job results: $results"
+
+          for result in $results; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "A required job reported: $result"; exit 1 ;;
+            esac
+          done

@@ -1,0 +1,185 @@
+## Purpose
+
+Defines how TDC decides what an authenticated actor is allowed to do, through roles and granular permissions scoped to a server, a channel, or an individual resource, so operators can delegate moderation and administration without granting unrelated power.
+
+## Requirements
+
+### Requirement: Permissions are granular and named
+
+Authority SHALL be expressed as named, individually grantable permissions rather than coarse account types. Every action that changes state or reveals non-public information MUST be governed by a named permission.
+
+#### Scenario: Every guarded action names its permission
+
+- **WHEN** a request is denied for insufficient authority
+- **THEN** the response names the permission that would have allowed it
+
+#### Scenario: Permissions are enumerable
+
+- **WHEN** an administrator inspects the permission catalogue
+- **THEN** every permission is listed with a description of what it allows
+
+### Requirement: Roles group permissions
+
+The server SHALL support roles that bundle permissions and can be assigned to users. Operators MUST be able to create, modify, and delete roles, and a user MUST be able to hold more than one role.
+
+Deleting a role MUST NOT delete the users holding it.
+
+#### Scenario: Role change takes effect promptly
+
+- **WHEN** a permission is removed from a role
+- **THEN** users holding only that role lose the ability to perform the corresponding action without needing to sign in again
+
+#### Scenario: Multiple roles combine
+
+- **WHEN** a user holds two roles
+- **THEN** the user's effective permissions are the union of both roles' grants, subject to explicit denials
+
+#### Scenario: Deleting a role preserves users
+
+- **WHEN** a role held by users is deleted
+- **THEN** those users remain, having lost only the permissions that role granted
+
+### Requirement: Scoped authority
+
+Permissions SHALL be grantable at server scope and at channel scope. A grant at channel scope MUST NOT confer authority in any other channel.
+
+Where scopes conflict, the more specific scope governs, and an explicit denial MUST override a grant at a broader scope.
+
+#### Scenario: Channel moderator has no server authority
+
+- **WHEN** a user is granted moderation permissions in one channel
+- **THEN** they can moderate that channel
+- **AND** they cannot moderate any other channel or change server settings
+
+#### Scenario: Specific denial overrides broad grant
+
+- **WHEN** a user holds a server-scope grant and an explicit channel-scope denial for the same permission
+- **THEN** the action is denied in that channel and allowed elsewhere
+
+### Requirement: The role every account holds is a baseline
+
+The role every account is given on registration SHALL be a baseline beneath every other role: an entry another role makes at the same scope, granting or denying, MUST replace the baseline's entry there. Between any two other roles an explicit denial still overrides a grant. A person another role makes an administrator MUST NOT be bound by the baseline.
+
+Without this, withdrawing a permission from the baseline in one channel could never be undone for anybody, because everybody holds the baseline.
+
+#### Scenario: An announcement channel
+
+- **WHEN** the baseline role is denied `channel.post` in one channel, and another role is granted `channel.post` in that channel
+- **THEN** people holding only the baseline cannot post there
+- **AND** people also holding the other role can
+
+#### Scenario: A broader grant does not reopen the channel
+
+- **WHEN** the baseline role is denied a permission in one channel, and another role grants it at server scope
+- **THEN** the permission is still denied in that channel
+
+#### Scenario: Administrators are not ordinary members
+
+- **WHEN** a person holding the baseline role is made an administrator
+- **THEN** the baseline's denials no longer apply to them
+
+### Requirement: Enforcement is server-side
+
+Authorization SHALL be enforced by the server on every request. Client behaviour, including hiding interface elements, MUST NOT be relied upon for enforcement.
+
+#### Scenario: Direct request without authority is denied
+
+- **WHEN** a client issues a request for an action the user lacks permission to perform, bypassing the user interface
+- **THEN** the server denies the request
+
+#### Scenario: Hidden does not mean unenforced
+
+- **WHEN** an interface element is hidden because the user lacks a permission
+- **THEN** the corresponding server-side action is independently denied for that user
+
+### Requirement: Administrator floor
+
+There SHALL always be at least one account able to administer the server. Any change that would leave the server with no such account MUST be refused.
+
+Administrative permissions MUST be individually revocable rather than tied irrevocably to an account.
+
+#### Scenario: Last administrator cannot be demoted
+
+- **WHEN** an action would remove administrative authority from the last account holding it
+- **THEN** the action is refused with an explanation
+
+#### Scenario: A role every administrator shares cannot be emptied
+
+- **WHEN** every account able to administer the server holds one role, and that role would stop conferring administration, by withdrawal, by an explicit denial on it, or by deletion
+- **THEN** the change is refused, however many administrators there are
+
+#### Scenario: Administrator actions are recorded
+
+- **WHEN** an account exercises an administrative permission
+- **THEN** the action is written to the audit log with the actor, target, and permission used
+
+### Requirement: Roles are administered from the interface
+
+Holders of `role.manage` SHALL be able to create, rename, describe and delete roles, and set each permission on a role to allowed, denied or unset, server-wide and for one channel, from the clients without using the API directly. Holders of `role.assign` SHALL be able to see every role and what it allows, and give roles to people and take them away. A built-in role MUST keep its name, because the server finds it by name. Every change MUST go through the same server checks and audit as the API. A client MUST show an entry's consequence under the baseline, denial and administration rules before it is changed. It MUST show a refusal in the server's words and put back any change it showed before the server refused it.
+
+Unset MUST be distinct from denied. A role with no entry for a permission leaves the decision to the person's other roles. A denial beats them.
+
+#### Scenario: A moderator is set up without the API
+
+- **WHEN** an administrator creates a role from the roles screen, allows moderation permissions on it, and adds a person to it
+- **THEN** that person can review reports, with no request made outside the clients
+
+#### Scenario: Clearing a denial gives the decision back
+
+- **WHEN** a role's denial of a permission is cleared rather than replaced with a grant
+- **THEN** its holders have the permission exactly when another of their roles, including the baseline, allows it
+
+#### Scenario: A built-in role keeps its name
+
+- **WHEN** somebody tries to rename `Member` or `Administrator`
+- **THEN** the change is refused and the description can still be changed
+
+#### Scenario: Assigning is not editing
+
+- **WHEN** somebody holding `role.assign` but not `role.manage` opens a role
+- **THEN** they can see what it allows and change who holds it, and cannot change what it allows
+
+### Requirement: Effective permissions are explainable
+
+An administrator SHALL be able to ask what a person may do, server-wide or in one channel. The answer MUST be computed by the same resolution the server uses to decide that person's requests. For each permission it MUST give the outcome, whether that came from administration, a server-wide entry, an entry for the channel, or nothing, and the role entries behind it, with baseline entries marked.
+
+#### Scenario: The explanation matches enforcement
+
+- **WHEN** posting is denied to `Member` in one channel and an administrator asks what a member may do there
+- **THEN** the answer says posting is not allowed in that channel because of `Member`'s entry for it
+- **AND** a post by that member in that channel is refused
+
+### Requirement: Authority over one's own content
+
+Users SHALL be able to edit and delete their own messages, and to manage their own profile and sessions, without holding moderation permissions.
+
+An operator MUST be able to restrict self-editing and self-deletion windows by policy.
+
+#### Scenario: User edits own message
+
+- **WHEN** a user edits a message they authored, within any configured window
+- **THEN** the edit succeeds and is recorded as an edit
+
+#### Scenario: User cannot edit another's message
+
+- **WHEN** a user attempts to edit a message authored by someone else without moderation permission
+- **THEN** the request is denied
+
+#### Scenario: Policy window is enforced
+
+- **WHEN** an operator configures a time limit for self-deletion and a user attempts deletion after it
+- **THEN** the request is denied with the policy explained
+
+### Requirement: Guest and unauthenticated access
+
+The server SHALL default to requiring authentication for all non-public endpoints. Any capability an operator chooses to expose without authentication MUST be explicitly enabled and clearly documented as public.
+
+#### Scenario: Unauthenticated request is denied by default
+
+- **WHEN** an unauthenticated request is made to a resource the operator has not explicitly made public
+- **THEN** the request is denied
+
+#### Scenario: Public exposure is deliberate
+
+- **WHEN** an operator makes a channel publicly readable
+- **THEN** the setting is recorded in the audit log and shown clearly in the channel's settings

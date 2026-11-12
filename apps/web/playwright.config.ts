@@ -1,0 +1,249 @@
+import { defineConfig, devices } from "@playwright/test";
+
+/*
+ * The accessibility checks, which need a real browser.
+ *
+ * jsdom can parse markup but has no layout, so it cannot say whether a control
+ * is visible, what colour it resolves to, or where Tab actually goes. Those
+ * are exactly the questions worth asking, so these run against a browser
+ * driving the built application.
+ *
+ * Separate from the unit tests deliberately: those run in milliseconds on
+ * every save, and these need a build and a server behind them.
+ */
+/*
+ * Where the signed-in session is kept between the setup and the checks.
+ *
+ * Under test-results, which is already ignored — a file holding a session
+ * cookie is not something to leave lying in the working tree.
+ */
+export const SESSION = "test-results/.session.json";
+
+/*
+ * A note on sign-ins, which is the thing that breaks this suite.
+ *
+ * The server allows eight sign-in attempts per account per quarter hour, and
+ * five registrations per address per hour. Both limits are right — an endpoint
+ * that accepts unlimited attempts is a password guesser's front door, and one
+ * that accepts unlimited registrations is a spam account factory — so the
+ * suite is what has to fit inside them.
+ *
+ * That is why the session is established once and everything else reads it
+ * from SESSION, including the fixtures that need to act as somebody
+ * privileged. A check that signs in for itself spends one of eight, and a
+ * suite that does it per test reports the application as broken when what
+ * broke was the suite.
+ */
+
+/*
+ * One name for this run's directory people, whichever browser is checking.
+ * Set here, before any worker starts, so every directory project inherits the
+ * same one and the second and third engines sign in as the people the first
+ * registered: three engines registering their own would need nine of the five
+ * registrations an hour the server allows one address.
+ */
+process.env.TDC_DIRECTORY_RUN ??= Date.now().toString(36);
+export default defineConfig({
+  testDir: "./tests",
+  // One at a time. These share a server and a signed-in account, and the
+  // point is a clear answer rather than a fast one.
+  workers: 1,
+  fullyParallel: false,
+  /*
+   * No retries. A flaky accessibility failure is still a failure worth
+   * looking at, and retrying until it passes is how a real violation gets
+   * dismissed as noise.
+   */
+  retries: 0,
+  reporter: process.env.CI ? "github" : "list",
+
+  use: {
+    baseURL: process.env.TDC_TEST_URL ?? "http://127.0.0.1:8099",
+    // Kept only for a failure, since that is the only time anybody looks.
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+  },
+
+  projects: [
+    /*
+     * Signing in once, for everything.
+     *
+     * A fresh browser profile per test means a fresh sign-in per test, and
+     * the server rate-limits those — correctly, since a sign-in endpoint that
+     * accepts unlimited attempts is a password guesser's front door. The
+     * suite tripped it and then reported that the application was broken.
+     *
+     * So the session is established once and reused. Faster, and closer to
+     * how anybody actually uses this.
+     */
+    { name: "setup", testMatch: /session\.setup\.ts/ },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], storageState: SESSION },
+      dependencies: ["setup"],
+      // The milestone demonstration signs itself in, because two of its four
+      // parts are about what happens on arrival.
+      testIgnore:
+        /milestone-8\.spec\.ts|milestone-10a\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
+    },
+    /*
+     * The other two engines a release is gated on.
+     *
+     * Chromium alone would not have caught the things these exist for: WebKit
+     * is what every iPhone runs whatever browser is installed, and Firefox is
+     * the one that implements a specification rather than matching Chromium's
+     * reading of it. A behaviour that works in one engine is not a behaviour
+     * that works.
+     *
+     * The accessibility pass stays on Chromium: axe reports the same
+     * violations on all three, so running it three times costs minutes and
+     * finds nothing.
+     */
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"], storageState: SESSION },
+      dependencies: ["setup"],
+      testIgnore:
+        /milestone-8\.spec\.ts|milestone-10a\.spec\.ts|accessibility\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
+    },
+    /*
+     * WebKit needs libraries a Debian-family machine has and others may not —
+     * libicu 74 and flite's voice libraries, by their Debian sonames. On a
+     * distribution shipping a different ICU it refuses to launch, and every
+     * test "fails" in milliseconds with a message about the host rather than
+     * the application. `bunx playwright install --with-deps webkit` fixes it
+     * where the package names exist; CI runs on ubuntu-latest, where they do.
+     */
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"], storageState: SESSION },
+      dependencies: ["setup"],
+      testIgnore:
+        /milestone-8\.spec\.ts|milestone-10a\.spec\.ts|accessibility\.spec\.ts|tour\.spec\.ts|permissions\.spec\.ts/,
+    },
+    /*
+     * A two-person call, in each engine, with fake camera and microphone.
+     *
+     * Their own projects because the fakes are launch options: Chromium's
+     * flags and Firefox's preferences answer every permission prompt, which
+     * no other check should have done for it. WebKit has no such switch and
+     * takes granted permissions on the context instead (the spec does that).
+     * The spec builds its own channel and second person, so it signs the
+     * founder in once over the API, beside the stored session.
+     */
+    {
+      name: "calls-chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+        },
+      },
+      dependencies: ["setup"],
+      testMatch: /calls\.spec\.ts/,
+    },
+    {
+      name: "calls-firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        launchOptions: {
+          firefoxUserPrefs: {
+            "media.navigator.streams.fake": true,
+            "media.navigator.permission.disabled": true,
+            // Played without a gesture of its own: the remote video is what
+            // carries the other person's sound.
+            "media.autoplay.default": 0,
+          },
+        },
+      },
+      dependencies: ["setup"],
+      testMatch: /calls\.spec\.ts/,
+    },
+    {
+      name: "calls-webkit",
+      use: { ...devices["Desktop Safari"] },
+      dependencies: ["setup"],
+      testMatch: /calls\.spec\.ts/,
+    },
+    /*
+     * The milestone demonstration, run on its own.
+     *
+     * A fresh profile each time: it shows what somebody meets on a first
+     * visit, and a shared session would have already been through that.
+     */
+    /*
+     * The first-arrival checks, on a fresh profile and a fresh account.
+     *
+     * Separate from the engine projects because it registers its own account:
+     * whether the introduction appears is a property of the account, so it
+     * cannot share the signed-in one every other check reuses.
+     */
+    {
+      name: "arrival",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /tour\.spec\.ts|permissions\.spec\.ts/,
+      // For the stored session, which the permission checks read to build
+      // their fixture as somebody who may create a channel. The pages
+      // themselves run with no session at all.
+      dependencies: ["setup"],
+    },
+    /*
+     * The Milestone 10a demonstration's web half.
+     *
+     * Its own project because it is run deliberately, by
+     * scripts/demo-milestone-10a.sh, rather than as part of the suite: it
+     * creates a channel and prints what the desktop half needs.
+     */
+    {
+      name: "milestone-10a",
+      use: { ...devices["Desktop Chrome"], storageState: SESSION },
+      dependencies: ["setup"],
+      testMatch: /milestone-10a\.spec\.ts/,
+    },
+    {
+      name: "milestone",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /milestone-8\.spec\.ts/,
+    },
+    /*
+     * The directory, on a phone.
+     *
+     * A phone rather than a desktop, because that is where a developer
+     * answering a client is most likely to be — and a form that works at 1280
+     * pixels and scrolls sideways at 412 is a form that does not work. No
+     * stored session: these sign in the people they need, since a directory
+     * is about two strangers and the founder alone cannot play both.
+     */
+    {
+      name: "directory",
+      use: { ...devices["Pixel 7"] },
+      // Each one is a whole journey between two people, several sign-ins
+      // and page loads long, rather than one check on one screen.
+      timeout: 120_000,
+      testMatch: /directory-.*\.spec\.ts/,
+    },
+    /*
+     * The same journeys in the other two engines a release is gated on.
+     * WebKit as the iPhone it is on every iPhone; Firefox has no mobile mode,
+     * so a desktop Firefox at a phone's width, which is what catches a layout
+     * that only fits because Chromium measured it.
+     *
+     * Each engine is run on its own, against a server started afresh: one
+     * engine's journeys sign each person in about as often as the server
+     * allows an account in a quarter hour, and that allowance is held in the
+     * server's memory. Continuous integration runs them that way.
+     */
+    {
+      name: "directory-webkit",
+      use: { ...devices["iPhone 13"] },
+      timeout: 120_000,
+      testMatch: /directory-.*\.spec\.ts/,
+    },
+    {
+      name: "directory-firefox",
+      use: { ...devices["Desktop Firefox"], viewport: { width: 412, height: 915 } },
+      timeout: 120_000,
+      testMatch: /directory-.*\.spec\.ts/,
+    },
+  ],
+});

@@ -1,0 +1,10 @@
+# Read by BuildKit for apps/docs/Dockerfile only; the context is the repository root.
+**/node_modules
+**/.nuxt
+**/.output
+**/.data
+**/dist
+.git
+server
+openspec
+apps/desktop/build

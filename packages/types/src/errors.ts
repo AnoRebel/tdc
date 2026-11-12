@@ -8,16 +8,32 @@
  */
 
 /** Machine-readable error categories. Clients branch on these, not on prose. */
-export type ErrorCode =
-  | "unauthenticated"
-  | "forbidden"
-  | "not-found"
-  | "conflict"
-  | "invalid"
-  | "rate-limited"
-  | "not-enabled"
-  | "unavailable"
-  | "internal";
+/**
+ * Every code a refusal can carry, as values.
+ *
+ * A list rather than only a type, because something has to check at runtime
+ * whether a code that arrived over the wire is one this application knows —
+ * and a second list written by hand drifts from the first the moment somebody
+ * adds a code to one of them.
+ */
+export const errorCodes = [
+  "unauthenticated",
+  "forbidden",
+  "not-found",
+  "conflict",
+  "invalid",
+  "rate-limited",
+  "not-enabled",
+  "unavailable",
+  "internal",
+] as const;
+
+export type ErrorCode = (typeof errorCodes)[number];
+
+/** Whether something that arrived is a code this application understands. */
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === "string" && (errorCodes as readonly string[]).includes(value);
+}
 
 export interface ApiErrorBody {
   code: ErrorCode;

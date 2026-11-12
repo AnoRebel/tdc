@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS issue_milestone;
+DROP TABLE IF EXISTS milestones;
+DROP TABLE IF EXISTS issue_cycle;
+DROP TABLE IF EXISTS cycles;
+ALTER TABLE projects DROP COLUMN IF EXISTS cycle_policy;
+ALTER TABLE projects DROP COLUMN IF EXISTS time_zone;

@@ -1,0 +1,266 @@
+import type { Component } from "vue";
+import {
+  Braces,
+  CalendarClock,
+  CircleDot,
+  Flag,
+  MessageSquarePlus,
+  Keyboard,
+  LifeBuoy,
+  KeyboardOff,
+  LogOut,
+  Moon,
+  Palette,
+  Plus,
+  ScrollText,
+  Settings,
+  SlidersHorizontal,
+  Sun,
+  Users,
+  Wind,
+} from "lucide-vue-next";
+
+/** Something the palette can do, rather than somewhere it can go. */
+export interface Command {
+  id: string;
+  /** What it does, as the row reads. */
+  label: string;
+  icon: Component;
+  /** Extra words matched against, so "dark" finds "Appearance". */
+  keywords?: string;
+  run: () => void | Promise<void>;
+}
+
+/**
+ * The commands this person may actually run.
+ *
+ * Filtered by permission and by what the server offers, not merely hidden in a
+ * stylesheet — a palette listing an action that will be refused teaches people
+ * the list cannot be trusted, and they stop reading it. What is absent here is
+ * absent because this person genuinely cannot do it.
+ *
+ * The server enforces all of this regardless. This decides what is worth
+ * showing, never what is allowed.
+ */
+export function useCommands(options: { openShortcuts: () => void; createChannel: () => void }) {
+  const { $localeRoute: localeRoute, $ts } = useI18n();
+  // The motion and keyboard preferences, which a dialog in the layout shows.
+  const showingInterface = useState("interface.open", () => false);
+  const showingAppearance = useState("appearance.open", () => false);
+  const { shortcuts: shortcutsOn } = useInterfacePreferences();
+  const { can, signOut } = useAuth();
+  const router = useRouter();
+  const theme = useTheme();
+  const { offers } = useServerInfo();
+  const newMessage = useNewMessage();
+  const scheduled = useScheduled();
+  const showingStatus = useState("status.open", () => false);
+
+  const commands = computed<Command[]>(() => {
+    const available: Command[] = [];
+
+    // Only where this person may actually make one. A palette offering an
+    // action that will be refused is one that has misled them.
+    if (can("channel.create")) {
+      available.push({
+        id: "new-channel",
+        label: $ts("nav.newChannel"),
+        icon: Plus,
+        keywords: "create make room",
+        run: options.createChannel,
+      });
+    }
+
+    available.push(
+      {
+        id: "new-message",
+        label: $ts("newMessage.command"),
+        icon: MessageSquarePlus,
+        keywords: "direct group dm people conversation write ujumbe",
+        run: () => newMessage.open(),
+      },
+      {
+        id: "status",
+        label: $ts("status.command"),
+        icon: CircleDot,
+        keywords: "away busy offline invisible appear presence note hali",
+        run: () => {
+          showingStatus.value = true;
+        },
+      },
+    );
+
+    if (scheduled.scheduled.value.length) {
+      available.push({
+        id: "scheduled",
+        label: $ts("scheduled.title"),
+        icon: CalendarClock,
+        keywords: "later send queued pending",
+        run: () => scheduled.open(),
+      });
+    }
+
+    available.push(
+      {
+        id: "settings",
+        label: $ts("nav.settings"),
+        icon: Settings,
+        keywords: "account status devices privacy blocked",
+        run: () => void router.push(localeRoute({ name: "settings" })),
+      },
+      {
+        id: "shortcuts",
+        label: $ts("nav.keyboardShortcuts"),
+        icon: Keyboard,
+        keywords: "keys help",
+        run: options.openShortcuts,
+      },
+      {
+        id: "help",
+        label: $ts("help.title"),
+        icon: LifeBuoy,
+        keywords: "guides documentation docs how manual msaada miongozo",
+        run: () => void router.push(localeRoute({ name: "help" })),
+      },
+      {
+        id: "api-reference",
+        label: $ts("help.apiReference.title"),
+        icon: Braces,
+        keywords: "endpoints routes developers integrating http",
+        run: () => void router.push(localeRoute({ name: "help-api" })),
+      },
+      {
+        id: "interface",
+        label: $ts("interface.command"),
+        icon: Wind,
+        keywords: "motion animation reduce density compact keyboard shortcuts",
+        run: () => {
+          showingInterface.value = true;
+        },
+      },
+      {
+        id: "appearance",
+        label: $ts("appearance.command"),
+        icon: Palette,
+        keywords: "theme colours colors material glass contrast rangi",
+        run: () => {
+          showingAppearance.value = true;
+        },
+      },
+      {
+        id: "shortcuts-toggle",
+        label: shortcutsOn.value
+          ? $ts("interface.turnShortcutsOff")
+          : $ts("interface.turnShortcutsOn"),
+        icon: shortcutsOn.value ? KeyboardOff : Keyboard,
+        keywords: "keys keyboard disable enable",
+        run: () => {
+          shortcutsOn.value = !shortcutsOn.value;
+        },
+      },
+      {
+        id: "theme-dark",
+        label: $ts("nav.darkAppearance"),
+        icon: Moon,
+        keywords: "theme night colour color",
+        run: () => theme.set("dark"),
+      },
+      {
+        id: "theme-light",
+        label: $ts("nav.lightAppearance"),
+        icon: Sun,
+        keywords: "theme day colour color",
+        run: () => theme.set("light"),
+      },
+    );
+
+    if (can("moderation.review")) {
+      available.push({
+        id: "reports",
+        label: $ts("moderation.reports"),
+        icon: Flag,
+        keywords: "moderation queue abuse",
+        run: () => void router.push(localeRoute({ name: "reports" })),
+      });
+    }
+
+    if (can("user.suspend") || can("user.invite")) {
+      available.push({
+        id: "people",
+        label: $ts("nav.people"),
+        icon: Users,
+        keywords: "members invite suspend accounts",
+        run: () => void router.push(localeRoute({ name: "people" })),
+      });
+    }
+
+    if (can("server.configure")) {
+      available.push({
+        id: "admin",
+        label: $ts("admin.serverSettings"),
+        icon: SlidersHorizontal,
+        keywords: "administration limits policy filter branding",
+        run: () => void router.push(localeRoute({ name: "admin" })),
+      });
+    }
+
+    if (can("server.audit.read")) {
+      available.push({
+        id: "audit",
+        label: $ts("moderation.auditLog"),
+        icon: ScrollText,
+        keywords: "history record who did",
+        run: () => void router.push(localeRoute({ name: "audit" })),
+      });
+    }
+
+    /*
+     * A capability the operator turned off is not offered.
+     *
+     * Distinct from a permission: this person may be entitled to invite
+     * people, on a server that is not issuing invitations at all. Both are
+     * reasons the command should not appear, and neither is the other.
+     */
+    if (can("user.invite") && offers("invitations")) {
+      available.push({
+        id: "invite",
+        label: $ts("directory.company.invite"),
+        icon: Users,
+        keywords: "invitation link code join",
+        run: () => void router.push(localeRoute({ name: "people" })),
+      });
+    }
+
+    available.push({
+      id: "sign-out",
+      label: $ts("auth.signOut"),
+      icon: LogOut,
+      keywords: "leave log out",
+      run: async () => {
+        await signOut();
+        await router.push(localeRoute({ name: "signin" }));
+      },
+    });
+
+    return available;
+  });
+
+  /**
+   * The commands matching what somebody has typed.
+   *
+   * Matched against the label and its keywords, so "dark" finds the appearance
+   * command whose label says nothing about darkness. Empty text offers
+   * everything, which is what makes the palette browsable rather than only
+   * searchable.
+   */
+  function matching(query: string): Command[] {
+    const text = query.trim().toLowerCase();
+    if (!text) return commands.value;
+
+    return commands.value.filter((command) =>
+      `${command.label} ${command.keywords ?? ""}`.toLowerCase().includes(text),
+    );
+  }
+
+  return { commands, matching };
+}

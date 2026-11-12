@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    The tray icon, in one colour.
+
+    A tray sits on a panel whose colour this application does not choose and
+    cannot read — light on some desktops, dark on others, and either at
+    different times of day. A symbolic icon is drawn in a single fill that the
+    desktop environment recolours to suit, which is why this has no gradient,
+    no ground and no second tone.
+
+    The same two bubbles, opened out: at panel size a solid pair merges into a
+    blob, so the further one is an outline and the nearer one solid. That reads
+    as two shapes at 16 pixels where two solid ones do not.
+
+    Drawn in white rather than currentColor. currentColor has no value when an
+    SVG is rendered on its own — it falls back to black, which on a dark panel
+    is an invisible icon, and that is exactly what shipped the first time. A
+    desktop that recolours template icons recolours this; one that does not
+    shows white, which is right on the dark panels that are the common case.
+  -->
+  <path fill="#ffffff"
+        d="M286 64h124a58 58 0 0 1 58 58v92a58 58 0 0 1-58 58h-4v58l-60-58h-60
+           a58 58 0 0 1-58-58v-92a58 58 0 0 1 58-58zm0 44a14 14 0 0 0-14 14v92
+           a14 14 0 0 0 14 14h78l20 19v-19h26a14 14 0 0 0 14-14v-92
+           a14 14 0 0 0-14-14z"/>
+
+  <path fill="#ffffff"
+        d="M102 214h160a58 58 0 0 1 58 58v104a58 58 0 0 1-58 58h-74l-72 60 10-60h-24
+           a58 58 0 0 1-58-58V272a58 58 0 0 1 58-58z"/>
+</svg>

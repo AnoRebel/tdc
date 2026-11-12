@@ -1,0 +1,63 @@
+# What the Go linter checks, and what it deliberately does not.
+#
+# The set is chosen by running each candidate against this codebase rather than
+# by reputation: a linter earns its place by finding something real here, and
+# one that only produces noise costs more attention than it returns. Two genuine
+# bugs came out of this exercise — a `!= pgx.ErrNoRows` and a `!= io.EOF`, both
+# of which fail silently the day the error arrives wrapped.
+#
+# Version 2 of the configuration schema, matching the pinned golangci-lint in
+# mise.toml.
+version: "2"
+
+linters:
+  # The defaults, which are the four that pay for themselves everywhere:
+  # errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+
+  enable:
+    # Finds `err == SomeSentinel` and `fmt.Errorf("%v", err)`. Both compile,
+    # both behave correctly today, and both fail quietly the first time the
+    # error reaches them through a wrapper — which is a change somebody makes
+    # in a different package, so nothing points back here.
+    - errorlint
+
+    # Catches a struct field or parameter shadowing a package, and similar
+    # near-misses that read correctly.
+    - predeclared
+
+    # A sentinel that is not named Err, or an error type not suffixed Error,
+    # is one nobody finds when they go looking for it.
+    - errname
+
+  exclusions:
+    # The generated presets, plus the two below.
+    presets:
+      - comments
+      - std-error-handling
+
+    rules:
+      # A deferred Close on a read, or on a temporary file that has already
+      # been renamed away, has no error worth acting on: there is nothing to
+      # retry and nothing to tell anybody. Where a Close genuinely matters —
+      # the write path in internal/storage — it is called explicitly and its
+      # error is checked, which is what makes the deferred one redundant rather
+      # than missing.
+      - linters: [errcheck]
+        source: "^\\s*defer .*\\.Close\\(\\)$"
+
+      # Tests write to buffers and recorders that cannot fail, and threading an
+      # error check through a fixture obscures what the test is about.
+      - linters: [errcheck]
+        path: "_test\\.go"
+
+      # authz.Decision is the outcome of a permission check, which implements
+      # error so that a refusal can explain itself. Renaming it DecisionError
+      # would misdescribe it: the allowed case is not an error at all, and the
+      # type is returned and inspected far more often than it is raised.
+      - linters: [errname]
+        path: "internal/authz/decision\\.go"
+
+formatters:
+  enable:
+    - gofmt

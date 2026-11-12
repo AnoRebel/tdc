@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=TDC
+Comment=Chat, project tracking, and a directory connecting developers with the people who need them.
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/tdc %u
+Terminal=false
+Type=Application
+Icon=tdc
+Categories=Utility;
+StartupWMClass=tdc
+
+ 

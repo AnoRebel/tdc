@@ -1,0 +1,270 @@
+<script setup lang="ts">
+import { nameAt } from "#layers/ui/app/lib/names";
+import type { Report } from "@tdc/types";
+import { ArrowLeft, Check, Flag, ShieldAlert, X } from "lucide-vue-next";
+import { Avatar } from "#layers/ui/app/components/ui/avatar";
+import { reportReasonLabel } from "#layers/ui/app/lib/reports";
+import { Button } from "#layers/ui/app/components/ui/button";
+import { Textarea } from "#layers/ui/app/components/ui/textarea";
+import { onDayAtTime } from "#layers/ui/app/lib/dates";
+
+const { $t, $ts, $localeRoute: localeRoute } = useI18n();
+
+/**
+ * The moderation queue.
+ *
+ * Reaching this needs the review permission, which the server checks on the
+ * request; the check below only decides what to show. Somebody who navigates
+ * here without it sees the refusal rather than an empty queue, because an
+ * empty queue and a refused one look the same and mean opposite things.
+ *
+ * Everything a moderator needs to decide is on the card: what was said, who
+ * said it, why it was reported and by whom. The reported party has no way to
+ * see any of it — this page is the only place the reporter's name appears.
+ */
+
+definePageMeta({ middleware: "auth", layout: "app" });
+
+useHead({ title: $ts("moderation.reports") });
+
+const queue = useReportQueue();
+
+/*
+ * Resolving asks for a note first.
+ *
+ * A queue where anything can be cleared with one click is a queue that gets
+ * cleared without being read. The note is what the next moderator sees when
+ * the same person is reported again.
+ */
+const deciding = ref<{ report: Report; dismissing: boolean } | null>(null);
+const note = ref("");
+const busy = ref(false);
+
+onMounted(() => void queue.refresh());
+
+function decide(report: Report, dismissing: boolean) {
+  deciding.value = { report, dismissing };
+  note.value = "";
+}
+
+async function record() {
+  if (!deciding.value) return;
+
+  const { report, dismissing } = deciding.value;
+  busy.value = true;
+
+  try {
+    if (dismissing) {
+      await queue.dismiss(report.id, note.value.trim());
+    } else {
+      await queue.resolve(report.id, note.value.trim());
+    }
+    deciding.value = null;
+  } catch {
+    // The list is refreshed either way; a failure leaves the report where it
+    // was rather than removing it from a screen it is still open on.
+    await queue.refresh();
+  } finally {
+    busy.value = false;
+  }
+}
+
+function when(value: number): string {
+  return onDayAtTime(value);
+}
+
+/** What to call the person at an address. */
+function name(address: string): string {
+  return nameAt(address);
+}
+</script>
+
+<template>
+  <div class="flex-1 overflow-y-auto">
+    <header class="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+      <NuxtLink
+        :to="localeRoute({ name: 'settings' })"
+        class="btn btn-ghost size-7 px-0"
+        :aria-label="$ts('admin.backToSettings')"
+      >
+        <ArrowLeft class="size-4" />
+      </NuxtLink>
+      <h1 class="text-sm font-semibold">{{ $t("moderation.reports") }}</h1>
+      <span
+        v-if="!queue.failed.value && queue.reports.value.length"
+        class="tabular ml-auto text-xs text-muted-foreground"
+      >
+        {{ $t("moderation.openCount", { count: queue.reports.value.length }) }}
+      </span>
+    </header>
+
+    <div class="max-w-3xl px-4 py-6">
+      <div
+        v-if="queue.failed.value"
+        class="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/8 p-4"
+        role="alert"
+      >
+        <ShieldAlert class="mt-0.5 size-4 shrink-0 text-destructive" />
+        <div class="text-sm">
+          <p class="font-medium text-destructive">{{ $t("moderation.cannotReadQueue") }}</p>
+          <p class="mt-1 text-muted-foreground">
+            {{ $t("admin.needsPermissionBefore") }}
+            <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">moderation.review</code>
+            {{ $t("admin.needsPermissionAfter") }}
+          </p>
+        </div>
+      </div>
+
+      <template v-else>
+        <p class="text-sm text-muted-foreground">
+          {{ $t("moderation.reportedOldestFirstHint") }}
+        </p>
+
+        <!-- An empty queue is the good outcome, so it says so rather than
+             looking like something failed to load. -->
+        <div
+          v-if="!queue.loading.value && !queue.reports.value.length"
+          class="mt-6 rounded-lg border border-dashed py-12 text-center"
+        >
+          <Flag class="mx-auto size-6 text-muted-foreground/60" />
+          <p class="mt-2 text-sm font-medium">{{ $t("notification.nothingWaiting") }}</p>
+          <p class="mt-0.5 text-xs text-muted-foreground">{{ $t("moderation.allDealtWith") }}</p>
+        </div>
+
+        <ul class="mt-4 space-y-3">
+          <li
+            v-for="report in queue.reports.value"
+            :key="report.id"
+            class="rounded-lg border bg-surface p-4"
+          >
+            <div class="flex flex-wrap items-start gap-3">
+              <Avatar :name="name(report.subject)" size="sm" />
+
+              <div class="min-w-0 flex-1">
+                <p class="text-sm">
+                  <span class="font-medium">{{ name(report.subject) }}</span>
+                  <span class="text-muted-foreground"> {{ $t("moderation.wasReportedFor") }} </span>
+                  <span class="font-medium">{{ reportReasonLabel(report.reason, $ts) }}</span>
+                </p>
+                <p class="mt-0.5 text-xs text-muted-foreground">
+                  <template v-if="report.reporter">
+                    {{ $t("moderation.byWhom", { who: name(report.reporter) }) }} ·
+                  </template>
+                  <time>{{ when(report.createdAt) }}</time>
+                </p>
+              </div>
+            </div>
+
+            <!-- A copy taken when the report was filed, so it survives the
+                 author deleting what they said.
+
+                 Inline-block so it hugs a short message: stretched to the full
+                 width of the card, three words read as an empty input rather
+                 than as something somebody said. -->
+            <blockquote
+              v-if="report.reportedBody"
+              class="mt-3 inline-block max-h-40 max-w-full overflow-y-auto rounded-lg border-l-2 border-muted-foreground/40 bg-muted/40 px-3 py-2 text-sm break-words whitespace-pre-wrap"
+            >
+              {{ report.reportedBody }}
+            </blockquote>
+
+            <p v-if="report.detail" class="mt-2 text-sm text-muted-foreground">
+              <span class="font-medium">{{ $t("moderation.theySaid") }}</span> {{ report.detail }}
+            </p>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+              <Button variant="outline" @click="decide(report, false)">
+                <Check class="size-3.5" />
+                {{ $t("moderation.actedOnIt") }}
+              </Button>
+              <Button variant="ghost" @click="decide(report, true)">
+                <X class="size-3.5" />
+                {{ $t("moderation.dismiss") }}
+              </Button>
+              <NuxtLink
+                v-if="report.roomId"
+                :to="`/rooms/${report.roomId}`"
+                class="btn btn-ghost ml-auto"
+              >
+                {{ $t("moderation.openTheChannel") }}
+              </NuxtLink>
+            </div>
+          </li>
+        </ul>
+      </template>
+    </div>
+
+    <!-- A modal backdrop: role="dialog" with aria-modal, dismissed by
+         clicking outside it or pressing Escape. The rule wants an
+         interactive element, but a dialog is not a button — the role is
+         what tells assistive technology what this is, and the Escape
+         handler beside the click is the keyboard path it exists to
+         require. -->
+    <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -->
+    <div
+      v-if="deciding"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="
+        deciding.dismissing
+          ? $ts('moderation.dismissThisReport')
+          : $ts('moderation.recordWhatWasDone')
+      "
+      @click.self="deciding = null"
+      @keydown.esc="deciding = null"
+    >
+      <div class="w-[min(26rem,100%)] rounded-xl border border-border bg-card p-4 shadow-2xl">
+        <h2 class="text-sm font-semibold">
+          {{
+            deciding.dismissing
+              ? $t("moderation.dismissThisReport")
+              : $t("moderation.recordWhatWasDone")
+          }}
+        </h2>
+        <p class="mt-1 text-xs text-muted-foreground">
+          {{
+            deciding.dismissing
+              ? $t("moderation.keptOnRecordHint")
+              : $t("moderation.nextModeratorWillReadHint")
+          }}
+        </p>
+
+        <form class="mt-3 space-y-3" @submit.prevent="record">
+          <!-- A placeholder is not a label: it disappears the moment somebody
+               starts typing, so anybody who looks away loses what the field
+               was for, and a screen reader may never announce it at all. -->
+          <label class="sr-only" for="moderation-note">
+            {{
+              deciding.dismissing ? $t("moderation.whyNothingNeeded") : $t("moderation.whatYouDid")
+            }}
+          </label>
+          <Textarea
+            id="moderation-note"
+            class="h-auto py-2"
+            v-model="note"
+            rows="3"
+            :placeholder="
+              deciding.dismissing
+                ? $ts('moderation.whyNothingNeeded')
+                : $ts('moderation.whatYouDid')
+            "
+          />
+
+          <div class="flex justify-end gap-2">
+            <Button variant="ghost" @click="deciding = null">{{ $t("action.cancel") }}</Button>
+            <Button type="submit" :disabled="busy">
+              {{
+                busy
+                  ? $t("moderation.recording")
+                  : deciding.dismissing
+                    ? $t("moderation.dismiss")
+                    : $t("moderation.record")
+              }}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>

@@ -1,0 +1,9 @@
+go 1.27.4
+
+// Two modules now: the server, and the desktop client that talks to it. A
+// workspace means a change to shared Go code is visible to both without a
+// replace directive in either, and without publishing anything.
+use (
+	./apps/desktop
+	./server
+)

@@ -1,0 +1,275 @@
+[
+  {
+    "name": "plain text is one segment",
+    "source": "habari za asubuhi",
+    "segments": [
+      {
+        "translate": "habari za asubuhi"
+      }
+    ]
+  },
+  {
+    "name": "surrounding whitespace is kept",
+    "source": "  hello there  ",
+    "segments": [
+      {
+        "keep": "  "
+      },
+      {
+        "translate": "hello there"
+      },
+      {
+        "keep": "  "
+      }
+    ]
+  },
+  {
+    "name": "mentions and channels are kept",
+    "source": "thanks @amina, see #general",
+    "segments": [
+      {
+        "translate": "thanks"
+      },
+      {
+        "keep": " @amina"
+      },
+      {
+        "translate": ", see"
+      },
+      {
+        "keep": " #general"
+      }
+    ]
+  },
+  {
+    "name": "a mention on another server is kept whole",
+    "source": "ask @juma@chapter.example about it",
+    "segments": [
+      {
+        "translate": "ask"
+      },
+      {
+        "keep": " @juma@chapter.example "
+      },
+      {
+        "translate": "about it"
+      }
+    ]
+  },
+  {
+    "name": "an email address is kept",
+    "source": "write to info@tdc.example today",
+    "segments": [
+      {
+        "translate": "write to"
+      },
+      {
+        "keep": " info@tdc.example "
+      },
+      {
+        "translate": "today"
+      }
+    ]
+  },
+  {
+    "name": "a hash or at inside a word is text",
+    "source": "I like C# and F#",
+    "segments": [
+      {
+        "translate": "I like C# and F#"
+      }
+    ]
+  },
+  {
+    "name": "inline code is kept",
+    "source": "run `make test` before pushing",
+    "segments": [
+      {
+        "translate": "run"
+      },
+      {
+        "keep": " `make test` "
+      },
+      {
+        "translate": "before pushing"
+      }
+    ]
+  },
+  {
+    "name": "double backtick code is kept",
+    "source": "type ``a `b` c`` exactly",
+    "segments": [
+      {
+        "translate": "type"
+      },
+      {
+        "keep": " ``a `b` c`` "
+      },
+      {
+        "translate": "exactly"
+      }
+    ]
+  },
+  {
+    "name": "a bare link is kept",
+    "source": "the docs are at https://tdc.example/docs and good",
+    "segments": [
+      {
+        "translate": "the docs are at"
+      },
+      {
+        "keep": " https://tdc.example/docs "
+      },
+      {
+        "translate": "and good"
+      }
+    ]
+  },
+  {
+    "name": "a markdown link keeps its target and translates its label",
+    "source": "read [the guide](https://tdc.example/guide) first",
+    "segments": [
+      {
+        "translate": "read [the guide"
+      },
+      {
+        "keep": "](https://tdc.example/guide) "
+      },
+      {
+        "translate": "first"
+      }
+    ]
+  },
+  {
+    "name": "emoji shortcodes are kept",
+    "source": "well done :tada: everyone",
+    "segments": [
+      {
+        "translate": "well done"
+      },
+      {
+        "keep": " :tada: "
+      },
+      {
+        "translate": "everyone"
+      }
+    ]
+  },
+  {
+    "name": "list and quote markers are kept",
+    "source": "- first item\n\u003e quoted words\n1. numbered",
+    "segments": [
+      {
+        "keep": "- "
+      },
+      {
+        "translate": "first item"
+      },
+      {
+        "keep": "\n\u003e "
+      },
+      {
+        "translate": "quoted words"
+      },
+      {
+        "keep": "\n1. "
+      },
+      {
+        "translate": "numbered"
+      }
+    ]
+  },
+  {
+    "name": "a heading marker is kept",
+    "source": "## Release notes",
+    "segments": [
+      {
+        "keep": "## "
+      },
+      {
+        "translate": "Release notes"
+      }
+    ]
+  },
+  {
+    "name": "a fenced code block is kept whole",
+    "source": "look:\n```go\nfmt.Println(\"hi\")\n```\nnice",
+    "segments": [
+      {
+        "translate": "look:"
+      },
+      {
+        "keep": "\n```go\nfmt.Println(\"hi\")\n```\n"
+      },
+      {
+        "translate": "nice"
+      }
+    ]
+  },
+  {
+    "name": "an unclosed fence keeps the rest",
+    "source": "~~~\nnot words\nstill code",
+    "segments": [
+      {
+        "keep": "~~~\nnot words\nstill code"
+      }
+    ]
+  },
+  {
+    "name": "emphasis markers travel with the words",
+    "source": "this is **very** important",
+    "segments": [
+      {
+        "translate": "this is **very** important"
+      }
+    ]
+  },
+  {
+    "name": "punctuation and numbers alone are kept",
+    "source": "ok... 42!",
+    "segments": [
+      {
+        "translate": "ok... 42!"
+      }
+    ]
+  },
+  {
+    "name": "lines are segmented separately",
+    "source": "first line\nsecond line",
+    "segments": [
+      {
+        "translate": "first line"
+      },
+      {
+        "keep": "\n"
+      },
+      {
+        "translate": "second line"
+      }
+    ]
+  },
+  {
+    "name": "only punctuation is not sent",
+    "source": "?!",
+    "segments": [
+      {
+        "keep": "?!"
+      }
+    ]
+  },
+  {
+    "name": "swahili with a link",
+    "source": "Karibu https://tdc.example — tutaonana",
+    "segments": [
+      {
+        "translate": "Karibu"
+      },
+      {
+        "keep": " https://tdc.example "
+      },
+      {
+        "translate": "— tutaonana"
+      }
+    ]
+  }
+]

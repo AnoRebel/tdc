@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS audit_entries;
+DROP TABLE IF EXISTS user_roles;
+DROP TABLE IF EXISTS role_permissions;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS credentials;
+DROP TABLE IF EXISTS users;

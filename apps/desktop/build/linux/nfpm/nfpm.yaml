@@ -1,0 +1,91 @@
+# Feel free to remove those if you don't want/need to use them.
+# Make sure to check the documentation at https://nfpm.goreleaser.com
+#
+# The lines below are called `modelines`. See `:help modeline`
+
+name: "tdc"
+arch: ${GOARCH}
+platform: "linux"
+version: "0.1.0"
+section: "default"
+priority: "extra"
+maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
+description: "Chat, project tracking, and a directory connecting developers with the people who need them."
+vendor: "Tanzania Developers Community"
+homepage: "https://wails.io"
+license: "MIT"
+release: "1"
+
+contents:
+  - src: "./bin/tdc"
+    dst: "/usr/local/bin/tdc"
+  # Every size a desktop environment looks for, under the application id the
+  # .desktop entry names. Installing one large image as though it were 128px —
+  # which this did — leaves the launcher scaling a 1024px picture down badly
+  # and every other size missing.
+  - src: "./build/linux/icons/hicolor"
+    dst: "/usr/share/icons/hicolor"
+    type: tree
+  - src: "./build/linux/tdc.desktop"
+    dst: "/usr/share/applications/net.anorebel.tdc.desktop"
+
+# Default dependencies for the GTK4 + WebKitGTK 6.0 stack (Ubuntu 24.04+ / Debian 13+),
+# with the GStreamer plugins WebKitGTK plays sound and video with.
+depends:
+  - libgtk-4-1
+  - libwebkitgtk-6.0-4
+  - gstreamer1.0-plugins-base
+  - gstreamer1.0-plugins-good
+
+# Distribution-specific overrides for different package formats
+overrides:
+  # RPM packages for Fedora / RHEL / AlmaLinux / Rocky Linux
+  rpm:
+    depends:
+      - gtk4
+      - webkitgtk6.0
+      - gstreamer1-plugins-base
+      - gstreamer1-plugins-good
+
+  # Arch Linux packages
+  archlinux:
+    depends:
+      - gtk4
+      - webkitgtk-6.0
+      - gst-plugins-base
+      - gst-plugins-good
+
+# Refresh the desktop, MIME and icon databases after install, and the icon
+# cache again after removal so it stops naming files that are gone.
+scripts:
+  postinstall: "./build/linux/nfpm/scripts/postinstall.sh"
+  postremove: "./build/linux/nfpm/scripts/postremove.sh"
+
+# If you build your app with -tags gtk3 (legacy WebKit2GTK 4.1 stack — supported through v3.0.x, removed in v3.1),
+# replace the depends/overrides above with these:
+#
+# depends:
+#   - libgtk-3-0
+#   - libwebkit2gtk-4.1-0
+# overrides:
+#   rpm:
+#     depends:
+#       - gtk3
+#       - webkit2gtk4.1
+#   archlinux:
+#     depends:
+#       - gtk3
+#       - webkit2gtk-4.1
+#
+# replaces:
+#   - foobar
+# provides:
+#   - bar
+# recommends:
+#   - whatever
+# suggests:
+#   - something-else
+# conflicts:
+#   - not-foo
+#   - not-bar
+# changelog: "changelog.yaml"
