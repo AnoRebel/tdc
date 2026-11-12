@@ -42,27 +42,19 @@ func TestTheLastPlaceGoesToOnePersonAndTheWaitingListMovesUp(t *testing.T) {
 		t.Fatalf("the first answer is %v", got)
 	}
 
-	/*
-		Sent past the settling wrapper, then settled once. Each request it
-		wraps waits for the server's background work, and a wait running while
-		the other request starts some is the misuse of a WaitGroup that the race
-		detector reports. The race this test is about is in the database.
-	*/
-	settled := handler.(settledHandler)
 	var wait sync.WaitGroup
 	results := make([]string, 2)
 	for i, token := range []string{baraka, chausiku} {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			recorder := call(t, settled.handler, http.MethodPut, "/api/events/"+id+"/rsvp", map[string]any{"status": "going"}, token)
+			recorder := call(t, handler, http.MethodPut, "/api/events/"+id+"/rsvp", map[string]any{"status": "going"}, token)
 			if recorder.Code == http.StatusOK {
 				results[i], _ = decode(t, recorder)["status"].(string)
 			}
 		}()
 	}
 	wait.Wait()
-	settled.server.WaitForBackground()
 	slices.Sort(results)
 	if !slices.Equal(results, []string{"going", "waitlisted"}) {
 		t.Fatalf("two people answering for one place came out %v", results)

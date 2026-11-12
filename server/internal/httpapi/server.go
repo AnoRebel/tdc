@@ -209,7 +209,7 @@ type Server struct {
 
 	// background counts work detached from requests — notifications and search
 	// indexing — so shutdown can wait for it rather than cutting it off.
-	background sync.WaitGroup
+	background inFlight
 }
 
 // Services are the collaborators the HTTP layer needs.

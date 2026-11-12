@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -48,10 +49,10 @@ func (s *Server) inBackground(ctx context.Context, name string, work func(contex
 	// Tracked so that shutdown can wait for it, and so a test can wait for the
 	// effects of a request it has just made. Without this, a server could exit
 	// with notifications half-written, and every test touching one would race.
-	s.background.Add(1)
+	s.background.add()
 
 	go func() {
-		defer s.background.Done()
+		defer s.background.done()
 		defer cancel()
 		defer func() {
 			if recovered := recover(); recovered != nil {
@@ -71,5 +72,44 @@ Called on shutdown, so a server does not exit with notifications half-written,
 and by tests, which would otherwise race the very work they are asserting on.
 */
 func (s *Server) WaitForBackground() {
-	s.background.Wait()
+	s.background.wait()
+}
+
+/*
+inFlight counts the work detached from requests, and lets something wait for
+it to reach none.
+
+Not a WaitGroup, whose Add from zero must not overlap a Wait: requests arrive
+while a test waits for an earlier one's work, and a server under load starts
+work while shutdown has begun waiting. Here starting work during a wait is
+allowed; the wait simply ends at the next moment nothing is running.
+*/
+type inFlight struct {
+	mu    sync.Mutex
+	count int
+	idle  sync.Cond
+}
+
+func (f *inFlight) add() {
+	f.mu.Lock()
+	f.count++
+	f.mu.Unlock()
+}
+
+func (f *inFlight) done() {
+	f.mu.Lock()
+	f.count--
+	if f.count == 0 {
+		f.idle.Broadcast()
+	}
+	f.mu.Unlock()
+}
+
+func (f *inFlight) wait() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.idle.L = &f.mu
+	for f.count > 0 {
+		f.idle.Wait()
+	}
 }
