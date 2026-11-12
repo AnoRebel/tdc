@@ -114,6 +114,12 @@ jobs:
             goarch: arm64
 
     runs-on: ${{ matrix.os }}
+    env:
+      # Every `go run` of the Wails CLI, including the ones inside its tasks,
+      # links the webview through cgo; the legacy runner has only GTK 3, so the
+      # CLI must be built for that too. The application's own build passes
+      # -tags explicitly, which overrides this, hence EXTRA_TAGS below.
+      GOFLAGS: ${{ matrix.variant == 'gtk3' && '-tags=gtk3' || '' }}
     permissions:
       # Sigstore's keyless signing: the token is what the certificate attests to.
       id-token: write
@@ -121,6 +127,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Date the build from its commit
+        # Reproducibility: two builds of one commit agree. A dispatched run has
+        # no push timestamp, and a pushed one gives the repository's latest push
+        # rather than this commit; clang also rejects anything but seconds.
+        shell: bash
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          echo "BUILD_TIME=$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -133,11 +148,12 @@ jobs:
 
       - name: Install the webview's dependencies
         if: matrix.goos == 'linux' && matrix.variant != 'gtk3'
-        # GTK4 and WebKitGTK 6.0, the default build path.
+        # GTK4 and WebKitGTK 6.0, the default build path. With recommends: the
+        # AppImage's GTK plugin copies GTK's module directory, which only the
+        # recommended media and print modules create.
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libgtk-4-dev libwebkitgtk-6.0-dev
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
 
       - name: Install the legacy webview's dependencies
         if: matrix.variant == 'gtk3'
@@ -150,6 +166,12 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Generate the bindings
+        # The frontend imports TypeScript generated from the Go services, which
+        # is not committed.
+        working-directory: apps/desktop
+        run: go run github.com/wailsapp/wails/v3/cmd/wails3 generate bindings -clean=true -ts -i
+
       - name: Build the frontend
         # Before the Go build, which embeds its output.
         run: bun run --cwd apps/desktop/frontend build
@@ -157,9 +179,6 @@ jobs:
       - name: Build
         working-directory: apps/desktop
         env:
-          # Reproducibility: the commit's own timestamp rather than the moment
-          # the runner happened to start, so two builds of one commit agree.
-          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
           # The legacy toolkit where this is that variant. Empty otherwise, so
           # the default path is unchanged.
           EXTRA_TAGS: ${{ matrix.variant == 'gtk3' && 'gtk3' || '' }}
@@ -171,7 +190,6 @@ jobs:
         working-directory: apps/desktop
         shell: bash
         env:
-          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
           # The AppImage tool is itself an AppImage, and runners have no FUSE.
           APPIMAGE_EXTRACT_AND_RUN: "1"
         # What can update itself — an AppImage, a .app bundle — and what a
@@ -225,6 +243,10 @@ jobs:
           echo "key=${{ matrix.goos }}/${{ matrix.goarch }}" >> "$GITHUB_OUTPUT"
 
       - name: Sign it
+        # Not on Windows arm64: the signer needs cryptography, which has no
+        # wheel there and will not compile without OpenSSL. That one is signed
+        # by the job below instead.
+        if: matrix.os != 'windows-11-arm'
         uses: sigstore/gh-action-sigstore-python@v3.5.0
         with:
           inputs: ${{ steps.artifact.outputs.path }} ${{ steps.packages.outputs.paths }}
@@ -273,6 +295,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Date the build from its commit
+        # Reproducibility: two builds of one commit agree. A dispatched run has
+        # no push timestamp, and a pushed one gives the repository's latest push
+        # rather than this commit; clang also rejects anything but seconds.
+        shell: bash
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          echo "BUILD_TIME=$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -299,14 +330,12 @@ jobs:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          # The commit's own timestamp, so two builds of one commit agree.
-          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
         run: |
           go build \
             -trimpath \
             -ldflags="-s -w -buildid= \
               -X github.com/AnoRebel/tdc/server/internal/buildinfo.Commit=${GITHUB_SHA} \
-              -X github.com/AnoRebel/tdc/server/internal/buildinfo.BuildTime=${SOURCE_DATE_EPOCH}" \
+              -X github.com/AnoRebel/tdc/server/internal/buildinfo.BuildTime=${BUILD_TIME}" \
             -o ../tdc-server ./cmd/tdc-server
 
       - name: Package it
@@ -331,8 +360,6 @@ jobs:
               -czf "$name.tar.gz" "$name"
 
           echo "path=$name.tar.gz" >> "$GITHUB_OUTPUT"
-        env:
-          SOURCE_DATE_EPOCH: ${{ github.event.repository.pushed_at }}
 
       - name: Sign it
         uses: sigstore/gh-action-sigstore-python@v3.5.0
@@ -365,6 +392,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Date the build from its commit
+        # Reproducibility: two builds of one commit agree. A dispatched run has
+        # no push timestamp, and a pushed one gives the repository's latest push
+        # rather than this commit; clang also rejects anything but seconds.
+        shell: bash
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          echo "BUILD_TIME=$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
       # QEMU for the architecture this runner is not, since the image is built
       # rather than cross-compiled: the Go build inside it sets CGO_ENABLED=0,
@@ -405,7 +441,7 @@ jobs:
           build-args: |
             VERSION=${{ needs.version.outputs.version }}
             COMMIT=${{ github.sha }}
-            BUILD_TIME=${{ github.event.repository.pushed_at }}
+            BUILD_TIME=${{ env.BUILD_TIME }}
           # The commit's timestamp rather than the build's, so two builds of one
           # commit produce the same layers.
           provenance: mode=max
@@ -422,8 +458,37 @@ jobs:
           go install github.com/sigstore/cosign/v2/cmd/cosign@latest
           cosign sign --yes "${IMAGE}@${DIGEST}"
 
+  sign-windows-arm64:
+    # The signature a Windows arm64 runner cannot make. Same workflow, same
+    # keyless identity, so it verifies exactly like every other one.
+    needs: desktop
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: tdc-windows-arm64
+          path: signed
+
+      - name: Sign it
+        uses: sigstore/gh-action-sigstore-python@v3.5.0
+        with:
+          inputs: signed/tdc-*.exe
+          upload-signing-artifacts: false
+
+      - name: Put it back with its proof
+        uses: actions/upload-artifact@v7
+        with:
+          name: tdc-windows-arm64
+          path: signed/tdc-*
+          overwrite: true
+          if-no-files-found: error
+
   publish:
-    needs: [version, desktop, server, image]
+    needs: [version, desktop, sign-windows-arm64, server, image]
     runs-on: ubuntu-latest
     permissions:
       # Creating the release.
@@ -439,6 +504,9 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
+          # Ours only. The image build also uploads a Docker build record,
+          # which is not a release file and does not download as one.
+          pattern: tdc-*
           path: artifacts
           merge-multiple: true
 
@@ -456,6 +524,9 @@ jobs:
         env:
           VERSION: ${{ needs.version.outputs.version }}
           TDC_UPDATER_KEY: ${{ secrets.TDC_UPDATER_KEY }}
+          # The Wails CLI links GTK and WebKit through cgo on Linux, and this
+          # runner has neither; its pure-Go path signs manifests just the same.
+          CGO_ENABLED: "0"
         run: |
           if [ -z "$TDC_UPDATER_KEY" ]; then
             echo "TDC_UPDATER_KEY is not set, so no update can be signed" >&2
