@@ -577,6 +577,7 @@ The settings that have no section of their own below:
 | `integrations.webhook_disable_after_failures`     | `24`      | Failed attempts in a row that turn a subscription off                               |
 | `integrations.webhook_deliveries_per_minute`      | `120`     | Deliveries one subscription is sent a minute; `0` is no limit                       |
 | `integrations.delivery_workers`                   | `4`       | Deliveries attempted at once across the server. Read at startup, unlike the rest    |
+| `integrations.deliveries_per_second`              | `100`     | Deliveries started a second across the server; `0` is no limit                      |
 | `integrations.delivery_history_days`              | `30`      | Days of finished deliveries kept for their owners to inspect                        |
 | `integrations.incoming_webhook_posts_per_minute`  | `60`      | Messages one incoming webhook may post a minute; `0` is no limit                    |
 | `integrations.application_requests_per_minute`    | `600`     | Requests one application may make a minute; `0` is no limit                         |
