@@ -150,6 +150,12 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Generate the bindings
+        # The frontend imports TypeScript generated from the Go services, which
+        # is not committed.
+        working-directory: apps/desktop
+        run: go run github.com/wailsapp/wails/v3/cmd/wails3 generate bindings -clean=true -ts -i
+
       - name: Build the frontend
         # Before the Go build, which embeds its output.
         run: bun run --cwd apps/desktop/frontend build
